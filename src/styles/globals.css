@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   DESIGN TOKENS & THEMING — YATES CHILE (yateschile.com)
+   Style: Light Mode Ultra-Luxury Maritime
+   Typography: Inter (Sole Official Typography)
+   ========================================================================== */
+
+@theme {
+  /* ------------------------------------------------------------------------
+     1. COLOR PALETTE (Ultra-Luxury Light Maritime Theme)
+     ------------------------------------------------------------------------ */
+  /* Primary Backgrounds */
+  --color-fjord-light: #F8FAFC;
+  --color-fjord-pure: #FFFFFF;
+  --color-fjord-soft: #F1F5F9;
+
+  /* Card Surfaces & Overlays (Light Glass) */
+  --color-surface-white: #FFFFFF;
+  --color-surface-hover: #F8FAFC;
+
+  /* Accents & CTAs */
+  --color-ivory-gold: #D4AF37;
+  --color-ivory-gold-hover: #B89228;
+  --color-gold-light: #FDFBF7;
+
+  /* Text & Contrast */
+  --color-navy-dark: #0F172A;     /* Primary headings & text */
+  --color-navy-body: #1E293B;     /* Body text */
+  --color-fog-dark: #64748B;      /* Secondary text */
+  --color-fog-light: #94A3B8;     /* Muted subtitles */
+
+  /* Glassmorphism Borders & Glows */
+  --color-glass-border: rgba(212, 175, 55, 0.20);
+  --color-glass-surface: rgba(255, 255, 255, 0.85);
+
+  /* ------------------------------------------------------------------------
+     2. TYPOGRAPHY (Inter — Official Project Typography)
+     ------------------------------------------------------------------------ */
+  --font-serif: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Base Body Size Minimum 18px for 55+ Audience */
+  --text-base: 1.125rem; /* 18px */
+  --text-base--line-height: 1.75rem;
+
+  --text-lg: 1.25rem;    /* 20px */
+  --text-lg--line-height: 1.875rem;
+
+  --text-xl: 1.5rem;     /* 24px */
+  --text-xl--line-height: 2rem;
+
+  --text-2xl: 2rem;      /* 32px */
+  --text-2xl--line-height: 2.375rem;
+
+  --text-3xl: 2.75rem;   /* 44px */
+  --text-3xl--line-height: 3rem;
+
+  --text-4xl: 3.5rem;    /* 56px */
+  --text-4xl--line-height: 3.75rem;
+
+  /* ------------------------------------------------------------------------
+     3. RADII, SHADOWS & SPACING
+     ------------------------------------------------------------------------ */
+  --radius-luxury: 1rem;       /* 16px rounded corners */
+  --radius-luxury-lg: 1.5rem;  /* 24px for large modals */
+
+  --shadow-gold-glow: 0 4px 20px -2px rgba(212, 175, 55, 0.25);
+  --shadow-luxury-soft: 0 15px 35px -10px rgba(15, 23, 42, 0.08);
+}
+
+/* ==========================================================================
+   BASE UTILITIES & OVERRIDES
+   ========================================================================== */
+
+@layer base {
+  html {
+    background-color: var(--color-fjord-light);
+    color: var(--color-navy-dark);
+    font-family: var(--font-sans);
+    font-size: 112.5%; /* Sets default rem to 18px */
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--color-fjord-light);
+    color: var(--color-navy-body);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+  }
+
+  /* Headings Setup using Inter Heavy Weights */
+  h1, h2, h3, h4, .font-serif-heading {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--color-navy-dark);
+  }
+
+  /* Accessibility & Touch Target Minimum (48px) */
+  button, a, input, select {
+    min-height: 3rem; /* 48px */
+    min-width: 3rem;
+  }
+}
+
+/* ==========================================================================
+   CUSTOM UTILITY CLASSES
+   ========================================================================== */
+
+/* Glassmorphism Card for Light Luxury Panels */
+.glass-panel {
+  background-color: var(--color-glass-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-glass-border);
+  border-radius: var(--radius-luxury);
+  box-shadow: var(--shadow-luxury-soft);
+}
+
+/* White/Monochrome Text Utility */
+.text-gold-gradient {
+  color: #FFFFFF;
+}

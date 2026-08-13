@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" fill="none">
+  <!-- Outer decorative dashed & dotted circles -->
+  <circle cx="100" cy="100" r="94" stroke="currentColor" stroke-width="2" stroke-dasharray="8 4" opacity="0.85"/>
+  <circle cx="100" cy="100" r="88" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="100" cy="100" r="82" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" opacity="0.4"/>
+
+  <!-- Center hub -->
+  <circle cx="100" cy="100" r="10" stroke="currentColor" stroke-width="2.5" fill="none"/>
+  <circle cx="100" cy="100" r="3" fill="currentColor"/>
+
+  <!-- 8 Main Axes -->
+  <!-- Top (N) -->
+  <path d="M100 90 V20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M90 32 H110 M88 42 H112 M94 22 L100 15 L106 22" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+  <!-- Top-Right (NE) -->
+  <path d="M107 93 L156 44" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M140 48 L152 60 M148 40 L160 52" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Right (E) -->
+  <path d="M110 100 H180" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M168 90 V110 M158 88 V112 M178 94 L185 100 L178 106" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+  <!-- Bottom-Right (SE) -->
+  <path d="M107 107 L156 156" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M148 148 L160 136 M140 140 L152 128" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Bottom (S) -->
+  <path d="M100 110 V180" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M90 168 H110 M88 158 H112 M94 178 L100 185 L106 178" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+  <!-- Bottom-Left (SW) -->
+  <path d="M93 107 L44 156" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M52 148 L40 136 M60 140 L48 128" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Left (W) -->
+  <path d="M90 100 H20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M32 90 V110 M42 88 V112 M22 94 L15 100 L22 106" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+  <!-- Top-Left (NW) -->
+  <path d="M93 93 L44 44" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M48 40 L36 52 M60 48 L48 60" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Decorative Accent Dots -->
+  <circle cx="35" cy="35" r="4" fill="currentColor"/>
+  <circle cx="25" cy="48" r="2.5" fill="currentColor"/>
+  <circle cx="48" cy="25" r="2.5" fill="currentColor"/>
+  <circle cx="165" cy="165" r="4" fill="currentColor"/>
+  <circle cx="175" cy="152" r="2.5" fill="currentColor"/>
+  <circle cx="152" cy="175" r="2.5" fill="currentColor"/>
+</svg>
