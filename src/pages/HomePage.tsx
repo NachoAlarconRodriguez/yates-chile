@@ -26,7 +26,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               Tres Formas de Vivir la Aventura Austral
             </h2>
             <p className="text-slate-600 text-base sm:text-lg">
-              Explore el Archipiélago Juan Fernández, Isla Alejandro Selkirk y los fiordos de la Patagonia a través de nuestras tres experiencias exclusivas.
+              Explora el Archipiélago Juan Fernández, Isla Alejandro Selkirk y los fiordos del Cabo de Hornos a través de nuestras tres experiencias exclusivas.
             </p>
           </div>
 
@@ -52,7 +52,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs leading-relaxed opacity-95">
-                    Velero expedicionario diseñado para surcar aguas prístinas e inexploradas con total seguridad y confort.
+                    Velero Dufour 52.5 ft francés de expedición (12 PAX • 5 cabinas • 5 baños) con Starlink 24/7 y autonomía total.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
@@ -82,7 +82,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs leading-relaxed opacity-95">
-                    Yate de alta gama con visores panorámicos 360°, camarotes suites y tripulación privada dedicada.
+                    Yate Hatteras 65ft LRC americano de 3 cubiertas (20 PAX • 5 cabinas • 5 baños) con 3.000 MN de autonomía y Starlink 24/7.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
@@ -112,7 +112,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs leading-relaxed opacity-95">
-                    Arquitectura sustentable, gastronomía de autor y maridajes exclusivos frente a la bahía de Robinson Crusoe.
+                    Lodge frente al mar en Uberlindo Andaur 222 (11 PAX • 4 cabinas con baño privado), amplio quincho, terraza y exploraciones en Robinson Crusoe.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">

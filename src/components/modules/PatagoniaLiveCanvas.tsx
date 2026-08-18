@@ -42,7 +42,7 @@ export const PatagoniaLiveCanvas: React.FC = () => {
           </span>
           <div className="flex items-center gap-1 font-medium tracking-wider uppercase text-[11px] md:text-xs text-blue-350">
             <MapPin className="w-3.5 h-3.5 text-blue-350" />
-            <span>Patagonia Live Canvas</span>
+            <span>Cabo de Hornos Live Canvas</span>
           </div>
           <span className="hidden sm:inline-block text-slate-500">|</span>
           <span className="hidden sm:inline-block text-slate-300 font-sans text-xs">

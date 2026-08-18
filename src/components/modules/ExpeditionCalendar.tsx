@@ -153,7 +153,7 @@ export const EXPEDITIONS: Expedition[] = [
     year: 2026,
     spotsLeft: 2,
     vessel: 'Yate Terranova',
-    description: 'Travesía rápida y confortable a motor a bordo de nuestro yate de alta velocidad. Explore caletas solitarias con la comodidad y el lujo que ofrece el Terranova.',
+    description: 'Travesía rápida y confortable a motor a bordo de nuestro yate de alta velocidad. Explora caletas solitarias con la comodidad y el lujo que ofrece el Terranova.',
     location: 'Juan Fernández',
     image: 'https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=800&q=80',
     bestViewTime: 'Atardecer en flybridge',
@@ -413,7 +413,7 @@ export const ExpeditionCalendar: React.FC = () => {
             Calendario de Expediciones
           </h2>
           <p className="mt-4 text-slate-655 text-base sm:text-lg leading-relaxed">
-            Consulte los zarpes confirmados y la disponibilidad de cupos en tiempo real para nuestros programas al archipiélago de Juan Fernández y fiordos patagónicos.
+            Consulta los zarpes confirmados y la disponibilidad de cupos en tiempo real para nuestros programas al archipiélago de Juan Fernández y Cabo de Hornos.
           </p>
         </div>
 
@@ -764,7 +764,7 @@ export const ExpeditionCalendar: React.FC = () => {
 
                   <div className="relative z-10 pt-4 border-t border-white/10 hidden md:block">
                     <p className="text-[11px] text-slate-350 italic font-light leading-relaxed">
-                      "Su expedición austral comienza aquí. Inicie su solicitud de reserva; un asesor náutico se contactará con usted para personalizar su travesía y validar disponibilidad."
+                      "Tu expedición austral comienza aquí. Inicia tu solicitud de reserva; un asesor náutico se contactará contigo para personalizar tu travesía y confirmar disponibilidad."
                     </p>
                   </div>
                 </div>
@@ -918,9 +918,9 @@ export const ExpeditionCalendar: React.FC = () => {
                 <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center border border-white/10 shrink-0 relative animate-[fadeIn_0.5s_ease-out]">
                   <span className="absolute -inset-3 rounded-full border border-emerald-500/20 animate-ping opacity-60 pointer-events-none" />
                   <img
-                    src="/vegvisir-emblem.svg"
+                    src="/vegvisir-emblem-white.png"
                     alt="Success Emblem"
-                    className="w-12 h-12 filter drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] invert animate-[spin_50s_linear_infinite]"
+                    className="w-12 h-12 object-contain filter drop-shadow-[0_0_8px_rgba(52,211,153,0.4)] animate-[spin_50s_linear_infinite]"
                   />
                 </div>
                 

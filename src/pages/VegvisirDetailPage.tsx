@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Compass, Users, Shield, Wind, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X, Radio, Droplets, FileText } from 'lucide-react';
 
 interface VegvisirDetailPageProps {
   onNavigate: (path: string) => void;
@@ -14,6 +14,14 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
   const [currentStation, setCurrentStation] = React.useState<'exterior' | 'salon' | 'camarote'>('exterior');
   const [isTransitioning, setIsTransitioning] = React.useState(false);
   const [activeInfo, setActiveInfo] = React.useState<{ title: string; desc: string } | null>(null);
+
+  const currentDateFormatted = React.useMemo(() => {
+    return new Intl.DateTimeFormat('es-CL', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date()).toUpperCase();
+  }, []);
 
   const navigateToStation = (station: 'exterior' | 'salon' | 'camarote') => {
     setIsTransitioning(true);
@@ -60,7 +68,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           y: '30%',
           type: 'info',
           title: 'Aparejo Vélico Carbono',
-          desc: 'Mástil y botavara reforzados para vientos patagónicos con velas enrollables de alta tenacidad operadas desde timonera.',
+          desc: 'Mástil y botavara reforzados para vientos australes con velas enrollables de alta tenacidad operadas desde timonera.',
         },
         {
           x: '62%',
@@ -73,15 +81,15 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           x: '78%',
           y: '72%',
           type: 'info',
-          title: 'Bitácora del Timón',
-          desc: 'Doble estación de gobierno con pantallas Raymarine e instrumental náutico completo para navegación austral.',
+          title: 'Bitácora & Navegación Raymarine',
+          desc: 'Doble estación de gobierno con Plotter y Piloto Automático Raymarine, conexión Starlink 24/7 e instrumental náutico completo para navegación oceánica.',
         },
         {
           x: '22%',
           y: '73%',
           type: 'info',
-          title: 'Sistema de Fondeo',
-          desc: 'Molinete eléctrico de alta tracción y ancla de roca pesada para fondeos seguros en canales profundos.',
+          title: 'Sistema de Fondeo & Zodiac 4.3m',
+          desc: 'Molinete eléctrico de alta tracción y bote Zodiac de desembarco 4.3 mts con motor Mercury 4T 15hp para aproximaciones glaciares seguras.',
         },
       ],
     },
@@ -93,8 +101,8 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           x: '52%',
           y: '62%',
           type: 'info',
-          title: 'Comedor Principal',
-          desc: 'Mesa noble de roble para 6 comensales, donde se sirven maridajes seleccionados de vinos nacionales y pesca fresca.',
+          title: 'Amplio Salón Central',
+          desc: 'Espacio social panorámico con mesa noble para comensales, donde se comparten maridajes seleccionados y conectividad satelital Starlink 24/7.',
         },
         {
           x: '25%',
@@ -107,35 +115,35 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           x: '75%',
           y: '58%',
           type: 'nav',
-          label: 'Ir al Camarote Principal',
+          label: 'Ir a Cabinas & Baños',
           target: 'camarote' as const,
         },
         {
           x: '15%',
           y: '65%',
           type: 'info',
-          title: 'Cocina Náutica',
-          desc: 'Encimera cardánica, refrigerador de bajo consumo y despensas herméticas para viajes prolongados.',
+          title: 'Cocina Completa & Desalinizador',
+          desc: 'Cocina integral equipada para alta gastronomía y planta desalinizadora de 140 ltrs/hr que garantiza autonomía ilimitada de agua dulce.',
         },
       ],
     },
     camarote: {
-      title: 'Camarote Suite Principal',
+      title: 'Cabinas & Baños (5 Cabinas / 5 Baños)',
       image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
       hotspots: [
         {
           x: '50%',
           y: '62%',
           type: 'info',
-          title: 'Cama Suite Principal',
-          desc: 'Colchón viscoelástico Queen-size con calefacción hidrónica independiente y vistas directas a los fiordos.',
+          title: '5 Cabinas Privadas (12 PAX)',
+          desc: 'Capacidad de habitabilidad para 12 pasajeros distribuidos en 5 cabinas independientes con climatización hidrónica y confort absoluto.',
         },
         {
           x: '48%',
           y: '22%',
           type: 'info',
-          title: 'Escotilla Cenital',
-          desc: 'Hatch de cristal templado que ofrece vistas despejadas a las estrellas y constelaciones del cielo austral.',
+          title: '5 Baños Completos',
+          desc: 'Cinco baños equipados con agua caliente continua y privacidad total para todos los tripulantes y huéspedes.',
         },
         {
           x: '12%',
@@ -168,7 +176,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       coordinates: '54°30\' S, 69°12\' W',
       wind: 'Calma',
       temp: '4°C Ext',
-      text: 'Hemos fondeado al resguardo directo del glaciar. A bordo, nuestro chef ha preparado un plato de centolla patagónica recién extraída, acompañada de un Chardonnay frío. Cenar frente a la imponente pared de hielo azul es una experiencia mística.',
+      text: 'Hemos fondeado al resguardo directo del glaciar. A bordo, nuestro chef ha preparado un plato de centolla austral recién extraída, acompañada de un Chardonnay frío. Cenar frente a la imponente pared de hielo azul es una experiencia mística.',
       image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1000&q=80',
     },
     casco: {
@@ -196,13 +204,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
   const images = [
     {
       url: 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1',
-      title: 'Velero Vegvisir en aguas patagónicas',
+      title: 'Velero Vegvisir en aguas australes',
       desc: 'El Vegvisir navegando majestuosamente frente a las costas vírgenes del extremo sur de Chile. Su casco reforzado corta con solidez las frías aguas australes.',
     },
     {
       url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
       title: 'Navegación a vela de alta mar',
-      desc: 'Una perspectiva de cubierta durante la travesía a vela con viento favorable. Experimente la auténtica pasión del velerismo tradicional con la máxima seguridad.',
+      desc: 'Una perspectiva de cubierta durante la travesía a vela con viento favorable. Experimenta la auténtica pasión del velerismo tradicional con la máxima seguridad.',
     },
     {
       url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
@@ -250,11 +258,27 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-blue-900/80 backdrop-blur-md border border-blue-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Velero de Expedición
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-blue-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Dufour 52.5 ft • Francés
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Matrícula QUI 2718
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Starlink 24/7
+            </span>
+          </div>
+
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
             Velero Vegvisir
           </h1>
-          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-xl">
-            La verdadera autenticidad del viento y la navegación austral. Diseñado específicamente para desafiar los fiordos patagónicos con calidez, robustez y máxima seguridad.
+          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
+            Velero de expedición Dufour 52.5 ft (Astillero Francés, Matrícula QUI 2718) con capacidad para 12 PAX en 5 cabinas con 5 baños privados. Equipado con Starlink 24/7, instrumental Raymarine, desalinizador de 140 ltrs/hr y Zodiac de desembarco con motor Mercury 4T 15hp.
           </p>
         </div>
       </section>
@@ -265,7 +289,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           {/* Tech Specs Cards in a Single Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
             
-            {/* Card 1: NORTH - ESLORA */}
+            {/* Card 1: NORTH - ESLORA & ASTILLERO */}
             <div
               onClick={() => toggleFlip('eslora')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -289,9 +313,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / ESLORA</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">52 Pies</span>
-                    <span className="text-slate-500 text-[10px] block">15.8 Metros total</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / ASTILLERO</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Dufour 52.5 ft</span>
+                    <span className="text-slate-500 text-[10px] block">Francés • QUI 2718</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -304,16 +328,16 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Detalle Eslora</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Identificación</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Casco de planeo optimizado con quilla de plomo para máxima estabilidad contra vientos cruzados.
+                    Astillero Francés Dufour 52.5 ft (16 m). Matrícula oficial QUI 2718. Casco oceánico reforzado para aguas australes.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: WEST - CAPACIDAD */}
+            {/* Card 2: WEST - CAPACIDAD & CABINAS */}
             <div
               onClick={() => toggleFlip('capacidad')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -338,8 +362,8 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   </div>
                   <div>
                     <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CAPACIDAD</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">6 Huéspedes</span>
-                    <span className="text-slate-500 text-[10px] block">Suites de lujo</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">12 PAX</span>
+                    <span className="text-slate-500 text-[10px] block">5 Cabinas / 5 Baños</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -354,14 +378,14 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 >
                   <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Habitabilidad</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    2 camarotes independientes con calefacción central hidrónica y baño privado en suite.
+                    Capacidad para 12 pasajeros con 5 cabinas privadas y 5 baños completos. Amplio salón central y cocina completa.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 3: SOUTH - TRIPULACIÓN */}
+            {/* Card 3: SOUTH - NAVEGACIÓN & SATELITAL */}
             <div
               onClick={() => toggleFlip('tripulacion')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -381,13 +405,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <div className="w-11 h-11 rounded-full bg-slate-50 flex items-center justify-center relative border border-slate-200 shadow-inner">
-                    <Shield className="w-4.5 h-4.5 text-blue-900 relative z-10" />
+                    <Radio className="w-4.5 h-4.5 text-blue-900 relative z-10" />
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / TRIPULACIÓN</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">3 Tripulantes</span>
-                    <span className="text-slate-500 text-[10px] block">Patrón, Co-patrón, Chef</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / NAVEGACIÓN</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Raymarine</span>
+                    <span className="text-slate-500 text-[10px] block">Starlink 24/7</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -400,16 +424,16 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Tripulación</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Electrónica</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Navegue seguro junto a un Patrón de Ultramar, Co-patrón experto y Chef gastronómico a bordo.
+                    Plotter Raymarine, Piloto Automático Raymarine y conexión satelital Starlink 24/7 de alta velocidad.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 4: EAST - NAVEGACIÓN */}
+            {/* Card 4: EAST - AUTONOMÍA & DESEMBARCO */}
             <div
               onClick={() => toggleFlip('navegacion')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -429,13 +453,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <div className="w-11 h-11 rounded-full bg-slate-50 flex items-center justify-center relative border border-slate-200 shadow-inner">
-                    <Wind className="w-4.5 h-4.5 text-blue-900 relative z-10" />
+                    <Droplets className="w-4.5 h-4.5 text-blue-900 relative z-10" />
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / NAVEGACIÓN</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Vela & Motor</span>
-                    <span className="text-slate-500 text-[10px] block">Aparejo de alta mar</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / AUTONOMÍA</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">140 Ltrs/hr</span>
+                    <span className="text-slate-500 text-[10px] block">Zodiac 4.3m / 15hp</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -448,14 +472,154 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Aparejo Náutico</span>
-                  <p className="text-slate-300 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Velas de Dacron de alta tenacidad con enrollador de proa y winches autocazantes Harken.
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Desembarco</span>
+                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
+                    Planta Desalinizadora de 140 ltrs/hr. Bote Zodiac de 4.3 mts con Motor Mercury 4T 15hp para desembarcos remotos.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FICHA TÉCNICA OFICIAL / TECHNICAL SPECIFICATIONS MATRIX */}
+      <section className="py-16 bg-slate-50 border-t border-b border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10">
+          <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
+            <span className="text-blue-900 font-bold text-xs uppercase tracking-widest bg-blue-50 px-3.5 py-1.5 rounded-full border border-blue-900/15 inline-flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5 text-blue-900" />
+              <span>Ficha Técnica Oficial • Matrícula QUI 2718</span>
+            </span>
+            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
+              Especificaciones Técnicas del Velero Vegvisir
+            </h2>
+            <p className="text-slate-600 text-sm max-w-xl mx-auto">
+              Velero de expedición de astillero francés Dufour 52.5 ft con equipamiento oceánico de última generación y autonomía total.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Box 1: Embarcación & Registro */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Anchor className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Embarcación & Registro</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Identificación y dimensiones</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Astillero / Modelo:</span>
+                  <span className="font-bold text-slate-900">Dufour 52.5 ft</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Origen:</span>
+                  <span className="font-bold text-slate-900">Francés</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Matrícula:</span>
+                  <span className="font-mono font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">QUI 2718</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Tipo:</span>
+                  <span className="font-bold text-slate-900">Velero de Expedición</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 2: Capacidad & Habitabilidad */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Habitabilidad & Confort</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Alojamiento y distribución</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Capacidad Total:</span>
+                  <span className="font-bold text-slate-900">12 PAX (Pasajeros)</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Cabinas:</span>
+                  <span className="font-bold text-slate-900">5 Cabinas privadas</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Baños:</span>
+                  <span className="font-bold text-slate-900">5 Baños completos</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Espacios Comunes:</span>
+                  <span className="font-bold text-slate-900">Amplio salón & Cocina</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 3: Navegación & Telecomunicaciones */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Radio className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Electrónica & Satelital</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Instrumental de alta precisión</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Internet Satelital:</span>
+                  <span className="font-bold text-emerald-700 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Starlink 24/7
+                  </span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Plotter Náutico:</span>
+                  <span className="font-bold text-slate-900">Raymarine</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Piloto Automático:</span>
+                  <span className="font-bold text-slate-900">Raymarine</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Cocina a Bordo:</span>
+                  <span className="font-bold text-slate-900">Cocina Completa</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 4: Autonomía & Desembarcos */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Droplets className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Autonomía & Desembarco</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Equipamiento expedicionario</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Desalinizador:</span>
+                  <span className="font-bold text-blue-900">140 ltrs/hr</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Zodiac Auxiliar:</span>
+                  <span className="font-bold text-slate-900">4.3 metros</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Motor Fuera de Borda:</span>
+                  <span className="font-bold text-slate-900">Mercury 4T / 15 HP</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Salón Central:</span>
+                  <span className="font-bold text-slate-900">Amplio & Climatizado</span>
+                </li>
+              </ul>
+            </div>
+
           </div>
         </div>
       </section>
@@ -491,7 +655,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                       Yacht Logbook
                     </span>
                     <span className="font-mono text-[10px] uppercase font-black tracking-widest text-blue-900 animate-pulse">
-                      • {logbookEntries[selectedFeature].day}
+                      • {currentDateFormatted}
                     </span>
                   </div>
 
@@ -607,7 +771,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <div className="space-y-1">
                   <h4 className="font-bold text-base text-slate-900">Casco Reforzado</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Ingeniería de casco adaptada a la geografía extrema de fiordos e islas del extremo sur, asegurando una rigidez y estabilidad superiores frente a vientos patagónicos.
+                    Ingeniería de casco adaptada a la geografía extrema de fiordos e islas del extremo sur, asegurando una rigidez y estabilidad superiores frente a vientos australes.
                   </p>
                 </div>
               </div>
@@ -1002,7 +1166,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
             ¿Listo para Vivir la Experiencia Vegvisir?
           </h3>
           <p className="text-slate-300 text-sm sm:text-lg max-w-2xl mx-auto">
-            Revise las próximas fechas disponibles de nuestros programas de navegación por los canales y fiordos de la Patagonia.
+            Revisa las próximas fechas disponibles de nuestros programas de navegación por los canales y fiordos del Cabo de Hornos.
           </p>
           <div className="pt-4">
             <button

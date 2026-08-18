@@ -229,9 +229,9 @@ export const AdminPage: React.FC = () => {
             {/* Logo & Header */}
             <div className="text-center mb-8 space-y-3">
               <img
-                src="/vegvisir-emblem.svg"
+                src="/vegvisir-emblem-white.png"
                 alt="Logo Vegvisir Emblem"
-                className="w-12 h-12 mx-auto brightness-0 invert"
+                className="w-14 h-14 mx-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.3)]"
               />
               <h1 className="font-serif text-2xl font-bold text-white tracking-wide uppercase">
                 Yates Chile
@@ -330,9 +330,9 @@ export const AdminPage: React.FC = () => {
             {/* Brand Header */}
             <div className="flex items-center gap-3 border-b border-white/10 pb-6">
               <img
-                src="/vegvisir-emblem.svg"
+                src="/vegvisir-emblem-white.png"
                 alt="Logo Vegvisir Emblem"
-                className="w-9 h-9 brightness-0 invert"
+                className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.25)]"
               />
               <div className="flex flex-col text-left">
                 <span className="font-extrabold text-sm tracking-wider">

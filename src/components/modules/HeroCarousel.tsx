@@ -43,7 +43,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
       titleHtml: (
         <>
           <span className="block font-bold">Donde la cartografía termina,</span>
-          <span className="block italic font-serif font-normal text-slate-200">comienza su expedición.</span>
+          <span className="block italic font-serif font-normal text-slate-200">comienza tu expedición.</span>
         </>
       ),
       description:

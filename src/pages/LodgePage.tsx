@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Maximize2, ChevronLeft, ChevronRight, X, Home, Wifi, MapPin } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Sparkles, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed } from 'lucide-react';
 
 interface LodgePageProps {
   onNavigate: (path: string) => void;
@@ -14,6 +14,14 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   const [currentStation, setCurrentStation] = React.useState<'exterior' | 'comedor' | 'habitacion'>('exterior');
   const [isTransitioning, setIsTransitioning] = React.useState(false);
   const [activeInfo, setActiveInfo] = React.useState<{ title: string; desc: string } | null>(null);
+
+  const currentDateFormatted = React.useMemo(() => {
+    return new Intl.DateTimeFormat('es-CL', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date()).toUpperCase();
+  }, []);
 
   const navigateToStation = (station: 'exterior' | 'comedor' | 'habitacion') => {
     setIsTransitioning(true);
@@ -52,136 +60,136 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
 
   const tourStations = {
     exterior: {
-      title: 'Terraza Mirador',
+      title: 'Terraza & Quincho Exterior',
       image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
       hotspots: [
         {
           x: '45%',
           y: '60%',
           type: 'info' as const,
-          title: 'Hot Tubs de Madera',
-          desc: 'Tinas de ciprés calentadas a leña, ubicadas estratégicamente para contemplar las puestas de sol sobre la bahía Cumberland.',
+          title: 'Amplio Quincho Isleño',
+          desc: 'Espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre frente al paisaje de Robinson Crusoe tras recorrer la isla.',
         },
         {
           x: '25%',
           y: '42%',
           type: 'info' as const,
-          title: 'Terraza Exterior 180°',
-          desc: 'Plataforma de avistamiento equipada con telescopios para observar aves endémicas y la bóveda celeste de Juan Fernández.',
+          title: 'Terraza & Atardeceres Frente al Mar',
+          desc: 'Ubicación privilegiada en Uberlindo Andaur 222 justo frente al mar para contemplar atardeceres inolvidables sobre el océano Pacífico.',
         },
         {
           x: '75%',
           y: '65%',
           type: 'nav' as const,
-          label: 'Ingresar al Comedor Principal',
+          label: 'Ingresar al Espacio Común',
           target: 'comedor' as const,
         },
       ],
     },
     comedor: {
-      title: 'Comedor & Cava',
+      title: 'Espacio Común & Comedor',
       image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
       hotspots: [
         {
           x: '55%',
           y: '50%',
           type: 'info' as const,
-          title: 'Cava de Vinos Seleccionados',
-          desc: 'Colección exclusiva de cepas chilenas y espumantes, ideales para maridar con la tradicional langosta de Juan Fernández.',
+          title: 'Inspiración Náutica & Luz Natural',
+          desc: 'Estética funcional donde la luz natural, la brisa marina y las vistas acompañan cada espacio para una experiencia auténtica.',
         },
         {
           x: '35%',
           y: '68%',
           type: 'info' as const,
-          title: 'Mesa del Chef',
-          desc: 'Mesa central de madera nativa recuperada, con vistas directas a la bahía de Robinson Crusoe a través de ventanales termopanel.',
+          title: 'Comedor & Encuentro',
+          desc: 'Lugar de reunión para compartir vivencias y sabores locales frente al mar de Bahía Cumberland.',
         },
         {
           x: '20%',
           y: '45%',
           type: 'nav' as const,
-          label: 'Salir a la Terraza Mirador',
+          label: 'Salir a la Terraza y Quincho',
           target: 'exterior' as const,
         },
         {
           x: '80%',
           y: '60%',
           type: 'nav' as const,
-          label: 'Ir a la Suite Forestal',
+          label: 'Ir a Cabinas Independientes',
           target: 'habitacion' as const,
         },
       ],
     },
     habitacion: {
-      title: 'Suite Forestal',
+      title: 'Cabinas Independientes Frente al Mar',
       image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
       hotspots: [
         {
           x: '50%',
           y: '60%',
           type: 'info' as const,
-          title: 'Habitación Panorámica',
-          desc: 'Cama King-size premium con sábanas de lino, ventanales de piso a techo y climatización geotérmica.',
+          title: '4 Cabinas (Hasta 11 Pasajeros)',
+          desc: 'Cuatro cabinas independientes (3 para hasta 3 personas y 1 para hasta 2 personas), todas con baño privado y vista directa al océano.',
         },
         {
           x: '30%',
           y: '55%',
           type: 'info' as const,
-          title: 'Calidez Ecológica',
-          desc: 'Chimenea de combustión lenta de alta eficiencia, perfecta para templar la cabina en las tardes húmedas de la isla.',
+          title: 'Baño Privado & Vista al Océano',
+          desc: 'Todas las cabinas cuentan con su propio baño privado independiente y vistas panorámicas hacia la inmensidad del mar.',
         },
         {
           x: '12%',
           y: '58%',
           type: 'nav' as const,
-          label: 'Regresar al Comedor Principal',
+          label: 'Regresar al Espacio Común',
           target: 'comedor' as const,
         },
       ],
     },
   };
 
-  const [selectedFeature, setSelectedFeature] = React.useState<'diseno' | 'gastronomia' | 'aventuras' | 'bienestar'>('diseno');
+  const [selectedFeature, setSelectedFeature] = React.useState<'arquitectura' | 'quincho' | 'exploraciones' | 'atardeceres'>('arquitectura');
 
   const logbookEntries = {
-    diseno: {
-      title: 'Arquitectura Sustentable',
-      day: 'Construcción & Entorno',
-      location: 'Bahía Cumberland',
+    arquitectura: {
+      title: 'Arquitectura & Inspiración Náutica',
+      day: 'Diseño & Entorno Natural',
+      location: 'Uberlindo Andaur 222',
+      coordinates: '33°38\' S, 78°50\' W',
+      wind: 'Brisa Marina',
+      temp: '16°C Ext',
+      text: 'Su diseño se organiza en torno a cuatro cabinas independientes, todas con baño privado y vista al océano, además de espacios comunes que incluyen terraza, quincho y áreas verdes. La construcción mantiene una estética funcional y de inspiración náutica, donde el entorno es el verdadero protagonista: la luz natural, la brisa marina y las vistas acompañan cada espacio, creando una experiencia auténtica y conectada con la vida isleña.',
+      image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
+    },
+    quincho: {
+      title: 'Amplio Quincho & Encuentros',
+      day: 'Momentos al Aire Libre',
+      location: 'Quincho del Lodge',
+      coordinates: '33°38\' S, 78°50\' W',
+      wind: 'Calma',
+      temp: '18°C Ext',
+      text: 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.',
+      image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
+    },
+    exploraciones: {
+      title: 'Exploraciones Exclusivas',
+      day: 'Aventura con Expertos Locales',
+      location: 'Isla Robinson Crusoe',
+      coordinates: '33°39\' S, 78°51\' W',
+      wind: 'SW 14 Nudos',
+      temp: '15°C Ext',
+      text: 'Guiados por expertos locales, exploramos la isla Robinson Crusoe a través de experiencias únicas: cabalgatas por paisajes de gran belleza, senderismo entre bosques de helechos gigantes y especies endémicas, buceo y snorkel en aguas de extraordinaria biodiversidad, y navegaciones que revelan acantilados, bahías y rincones inaccesibles por tierra. Cada aventura permite descubrir la historia, la naturaleza y el espíritu de una de las islas más fascinantes del mundo.',
+      image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
+    },
+    atardeceres: {
+      title: 'Atardeceres Frente al Mar',
+      day: 'Horizonte Infinito',
+      location: 'Frente al Mar (Bahía Cumberland)',
       coordinates: '33°38\' S, 78°50\' W',
       wind: 'Calma',
       temp: '14°C Ext',
-      text: 'El lodge fue levantado utilizando técnicas constructivas de bajo impacto y ciprés local. Su diseño arquitectónico se funde con la vegetación nativa de la ladera, ofreciendo un excelente aislamiento térmico e iluminación natural que respeta el frágil ecosistema de Robinson Crusoe.',
-      image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
-    },
-    gastronomia: {
-      title: 'Gastronomía Robinsoniana',
-      day: 'Sabores del Océano',
-      location: 'Comedor del Lodge',
-      coordinates: '33°38\' S, 78°49\' W',
-      wind: 'SW 12 Nudos',
-      temp: '15°C Ext',
-      text: 'Nuestra cocina se basa en la sustentabilidad del mar. La langosta de Juan Fernández es la protagonista absoluta, extraída mediante pesca artesanal regulada, acompañada de maridajes exclusivos de vinos chilenos seleccionados de nuestra cava privada en un comedor frente al mar.',
-      image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
-    },
-    aventuras: {
-      title: 'Exploraciones Exclusivas',
-      day: 'Rutas & Senderismo',
-      location: 'Mirador Selkirk',
-      coordinates: '33°39\' S, 78°51\' W',
-      wind: 'W 18 Nudos',
-      temp: '12°C Ext',
-      text: 'Guiados por expertos locales, nos adentramos en senderos rodeados de helechos gigantes y especies endémicas únicas en el mundo. Subimos hasta el mirador de Alejandro Selkirk, donde el náufrago vigilaba el horizonte en busca de barcos, contemplando la inmensidad del océano.',
-      image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
-    },
-    bienestar: {
-      title: 'Hot Tubs & Relax',
-      day: 'Bienestar Austral',
-      location: 'Terraza Exterior',
-      coordinates: '33°38\' S, 78°50\' W',
-      wind: 'Calma',
-      temp: '11°C Ext',
-      text: 'Al atardecer, las tinas calientes de madera (hot tubs) en la terraza exterior se templan con fuego a leña. Relajarse en el agua caliente bajo un cielo estrellado libre de contaminación lumínica, escuchando el suave oleaje de la bahía Cumberland, es el cierre perfecto para un día de aventura.',
+      text: 'Desde Rincón de Navegantes, el océano se convierte en parte del paisaje cotidiano. Su ubicación privilegiada frente al mar permite contemplar atardeceres inolvidables, mientras el cielo cambia de color y el sol se pierde en el horizonte. Un escenario único para descansar, compartir y dejarse envolver por la inmensidad de Robinson Crusoe.',
       image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
     },
   };
@@ -190,32 +198,32 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
     {
       url: '/rincon-de-navegantes.jpg',
       title: 'Lodge Rincón de Navegantes',
-      desc: 'El refugio boutique emplazado en la verde ladera de la bahía Cumberland, en armonía absoluta con el ecosistema insular.',
+      desc: 'Refugio boutique ubicado en Uberlindo Andaur 222, justo en frente del mar en la Isla Robinson Crusoe.',
     },
     {
       url: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
-      title: 'Arquitectura en Madera Nativa',
-      desc: 'Cabinas construidas en maderas nobles con terrazas panorámicas que miran hacia el océano Pacífico.',
+      title: 'Arquitectura e Inspiración Náutica',
+      desc: 'Diseño funcional en torno a 4 cabinas independientes, terraza, amplio quincho y áreas verdes.',
     },
     {
       url: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
-      title: 'Suites de Descanso Premium',
-      desc: 'Dormitorio de diseño acogedor con ventanales hacia los bosques nativos de helechos y palmeras endémicas.',
+      title: 'Cabinas con Vista al Océano',
+      desc: 'Todas las cabinas cuentan con baño privado y vistas panorámicas hacia el mar de Robinson Crusoe.',
     },
     {
       url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
-      title: 'Comedor y Cava de Isla',
-      desc: 'Espacio gastronómico del Lodge donde se sirven pescados locales, langostas y vinos de guarda.',
+      title: 'Amplio Quincho & Encuentros',
+      desc: 'Espacio acogedor para compartir, cocinar y disfrutar de momentos inolvidables al aire libre tras recorrer la isla.',
     },
     {
       url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
-      title: 'Tinas calientes frente al mar',
-      desc: 'Nuestras tinas de madera calentadas a leña ofrecen la relajación definitiva bajo las estrellas australes.',
+      title: 'Atardeceres Frente al Mar',
+      desc: 'Puestas de sol inolvidables mientras el cielo cambia de color y el sol se pierde en el horizonte del Pacífico.',
     },
     {
       url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
-      title: 'Entorno del Archipiélago',
-      desc: 'Acantilados escarpados, bahías de agua cristalina y una flora y fauna marina única en el Pacífico Sur chileno.',
+      title: 'Exploraciones Exclusivas',
+      desc: 'Cabalgatas, senderismo entre helechos gigantes, buceo, snorkel y navegaciones guiadas por expertos locales.',
     },
   ];
 
@@ -243,11 +251,30 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-emerald-900/80 backdrop-blur-md border border-emerald-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Lodge Frente al Mar
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
+              <MapPin className="w-3 h-3 text-emerald-400" />
+              Uberlindo Andaur 222
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              4 Cabinas • Hasta 11 Pasajeros
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-sky-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Baño Privado & Vista al Océano
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-indigo-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Isla Robinson Crusoe
+            </span>
+          </div>
+
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
             Lodge Rincón de Navegantes
           </h1>
-          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-xl">
-            Refugio boutique de arquitectura sustentable frente a la bahía de Robinson Crusoe, Archipiélago Juan Fernández. Un santuario de calidez e intimidad en el Pacífico austral.
+          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
+            Ubicado en Uberlindo Andaur 222, justo en frente del mar en la Isla Robinson Crusoe. Diseñado en torno a 4 cabinas independientes (todas con baño privado y vista al océano para hasta 11 pasajeros), amplio quincho, terraza, áreas verdes y expediciones exclusivas guiadas por expertos locales.
           </p>
         </div>
       </section>
@@ -258,7 +285,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           {/* Tech Specs Cards in a Single Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
             
-            {/* Card 1: SUITES */}
+            {/* Card 1: NORTE / CABINAS */}
             <div
               onClick={() => toggleFlip('suites')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -282,9 +309,9 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">HABITACIONES</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">6 Suites</span>
-                    <span className="text-slate-500 text-[10px] block">Vistas a la Bahía</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / CABINAS</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">4 Cabinas</span>
+                    <span className="text-slate-500 text-[10px] block">Baño Privado & Vista al Mar</span>
                   </div>
                   <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -297,16 +324,16 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Diseño y Materialidad</span>
+                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Distribución</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Cabinas construidas en maderas nativas con terrazas privadas orientadas hacia el relieve oceánico de Cumberland.
+                    4 cabinas independientes: 3 cabinas triples (hasta 3 pers.) y 1 cabina doble (hasta 2 pers.), todas con baño privado y vista al océano.
                   </p>
                   <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: CAPACIDAD */}
+            {/* Card 2: OESTE / CAPACIDAD */}
             <div
               onClick={() => toggleFlip('capacidad')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -330,8 +357,8 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">CAPACIDAD</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">12 Huéspedes</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CAPACIDAD</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Hasta 11 Pasajeros</span>
                     <span className="text-slate-500 text-[10px] block">Exclusividad total</span>
                   </div>
                   <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
@@ -347,14 +374,14 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 >
                   <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Aforo Exclusivo</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Aforo sumamente limitado que asegura una experiencia íntima, libre de ruidos y en completa privacidad.
+                    Capacidad máxima de 11 pasajeros para una estadía íntima, conectada con el entorno y en absoluta tranquilidad isleña.
                   </p>
                   <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 3: UBICACIÓN */}
+            {/* Card 3: SUR / UBICACIÓN */}
             <div
               onClick={() => toggleFlip('ubicacion')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -378,9 +405,9 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">UBICACIÓN</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Robinson Crusoe</span>
-                    <span className="text-slate-500 text-[10px] block">Archipiélago Juan Fernández</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / DIRECCIÓN</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Uberlindo Andaur 222</span>
+                    <span className="text-slate-500 text-[10px] block">Justo en frente del mar</span>
                   </div>
                   <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -393,16 +420,16 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Reserva Biosfera</span>
+                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Frente al Mar</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Entorno prístino y de aislamiento protegido por la UNESCO, hogar de aves e invertebrados endémicos únicos.
+                    Ubicación privilegiada en primera línea de mar en Isla Robinson Crusoe, permitiendo contemplar atardeceres inolvidables sobre el horizonte.
                   </p>
                   <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 4: CONECTIVIDAD */}
+            {/* Card 4: ESTE / ESPACIOS & QUINCHO */}
             <div
               onClick={() => toggleFlip('conectividad')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -422,13 +449,13 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <div className="w-11 h-11 rounded-full bg-slate-50 flex items-center justify-center relative border border-slate-200 shadow-inner">
-                    <Wifi className="w-4.5 h-4.5 text-emerald-800 relative z-10" />
+                    <UtensilsCrossed className="w-4.5 h-4.5 text-emerald-800 relative z-10" />
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">CONECTIVIDAD</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Satelital Starlink</span>
-                    <span className="text-slate-500 text-[10px] block">Servicio Concierge Exclusivo</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / QUINCHO & ESPACIOS</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Amplio Quincho</span>
+                    <span className="text-slate-500 text-[10px] block">Terraza & Áreas Verdes</span>
                   </div>
                   <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -441,14 +468,155 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Conexión Global</span>
+                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Espacios Comunes</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Conexión a internet satelital de alta velocidad y un equipo local dedicado a coordinar sus aventuras y recorridos.
+                    Amplio quincho para cocinar y compartir, terraza con vista panorámica y áreas verdes rodeadas de vegetación nativa.
                   </p>
                   <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FICHA TÉCNICA OFICIAL DEL LODGE / TECHNICAL SPECIFICATIONS MATRIX */}
+      <section className="py-16 bg-slate-50 border-t border-b border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10">
+          <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
+            <span className="text-emerald-850 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-800/15 inline-flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5 text-emerald-800" />
+              <span>Ficha Técnica Oficial • Isla Robinson Crusoe</span>
+            </span>
+            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
+              Detalle y Especificaciones del Lodge Rincón de Navegantes
+            </h2>
+            <p className="text-slate-600 text-sm max-w-xl mx-auto">
+              Refugio boutique frente al mar de 4 cabinas independientes con baño privado, amplio quincho, terraza y exploraciones exclusivas.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Box 1: Ubicación & Emplazamiento */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800">
+                <MapPin className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Ubicación & Entorno</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Emplazamiento privilegiado</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Dirección:</span>
+                  <span className="font-bold text-slate-900">Uberlindo Andaur 222</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Posición:</span>
+                  <span className="font-bold text-emerald-700">Justo en frente del mar</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Destino:</span>
+                  <span className="font-bold text-slate-900">Isla Robinson Crusoe</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Archipiélago:</span>
+                  <span className="font-bold text-slate-900">Juan Fernández, Chile</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 2: Cabinas & Capacidad */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800">
+                <Home className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Cabinas & Capacidad</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Hasta 11 Pasajeros</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Total Cabinas:</span>
+                  <span className="font-bold text-slate-900">4 Independientes</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">3 Cabinas:</span>
+                  <span className="font-bold text-slate-900">Hasta 3 personas c/u</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">1 Cabina:</span>
+                  <span className="font-bold text-slate-900">Hasta 2 personas</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Baños:</span>
+                  <span className="font-bold text-emerald-800">Privado en cada cabina</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Vista:</span>
+                  <span className="font-bold text-slate-900">Directa al Océano</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 3: Espacios Comunes & Quincho */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800">
+                <UtensilsCrossed className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Quincho & Espacios</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Encuentros al aire libre</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-start">
+                  <span className="text-slate-500">Amplio Quincho:</span>
+                  <span className="font-bold text-slate-900 text-right">Para compartir & cocinar</span>
+                </li>
+                <li className="flex justify-between items-start">
+                  <span className="text-slate-500">Terraza:</span>
+                  <span className="font-bold text-slate-900 text-right">Frente al océano</span>
+                </li>
+                <li className="flex justify-between items-start">
+                  <span className="text-slate-500">Áreas Verdes:</span>
+                  <span className="font-bold text-slate-900 text-right">Jardines nativos</span>
+                </li>
+                <li className="flex justify-between items-start">
+                  <span className="text-slate-500">Atardeceres:</span>
+                  <span className="font-bold text-amber-700 text-right">Vistas al horizonte</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 4: Exploraciones Exclusivas */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-800">
+                <Compass className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Exploraciones Exclusivas</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Guiadas por expertos locales</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Cabalgatas:</span>
+                  <span className="font-bold text-slate-900">Paisajes de gran belleza</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Senderismo:</span>
+                  <span className="font-bold text-slate-900">Helechos gigantes & endémicos</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Buceo & Snorkel:</span>
+                  <span className="font-bold text-blue-900">Alta biodiversidad marina</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Navegaciones:</span>
+                  <span className="font-bold text-slate-900">Acantilados & bahías</span>
+                </li>
+              </ul>
+            </div>
+
           </div>
         </div>
       </section>
@@ -484,7 +652,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       Lodge Chronicle
                     </span>
                     <span className="font-mono text-[10px] uppercase font-black tracking-widest text-emerald-800 animate-pulse">
-                      • {logbookEntries[selectedFeature].day}
+                      • {currentDateFormatted}
                     </span>
                   </div>
 
@@ -536,94 +704,94 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
             {/* Right Column: Dynamic Feature selector cards (7 cols) */}
             <div className="lg:col-span-7 flex flex-col justify-center space-y-4">
               
-              {/* Feature 1: Diseno */}
+              {/* Feature 1: Arquitectura */}
               <div
-                onClick={() => setSelectedFeature('diseno')}
-                onMouseEnter={() => setSelectedFeature('diseno')}
+                onClick={() => setSelectedFeature('arquitectura')}
+                onMouseEnter={() => setSelectedFeature('arquitectura')}
                 className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex items-start gap-4 ${
-                  selectedFeature === 'diseno'
+                  selectedFeature === 'arquitectura'
                     ? 'border-emerald-800 bg-emerald-50/10 shadow-md translate-x-1'
-                    : 'border-slate-200 bg-white hover:border-slate-350 hover:shadow-sm'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
-                  selectedFeature === 'diseno' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
+                  selectedFeature === 'arquitectura' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
                 }`}>
                   <Home className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Arquitectura Sustentable</h4>
+                  <h4 className="font-bold text-base text-slate-900">Arquitectura & Vista al Océano</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Cabinas privadas aisladas térmicamente de ciprés nativo, integradas orgánicamente con la flora local de la bahía Cumberland.
+                    4 cabinas independientes con baño privado y vista al mar, terraza, quincho y áreas verdes con estética funcional e inspiración náutica.
                   </p>
                 </div>
               </div>
 
-              {/* Feature 2: Gastronomia */}
+              {/* Feature 2: Quincho */}
               <div
-                onClick={() => setSelectedFeature('gastronomia')}
-                onMouseEnter={() => setSelectedFeature('gastronomia')}
+                onClick={() => setSelectedFeature('quincho')}
+                onMouseEnter={() => setSelectedFeature('quincho')}
                 className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex items-start gap-4 ${
-                  selectedFeature === 'gastronomia'
+                  selectedFeature === 'quincho'
                     ? 'border-emerald-800 bg-emerald-50/10 shadow-md translate-x-1'
-                    : 'border-slate-200 bg-white hover:border-slate-350 hover:shadow-sm'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
-                  selectedFeature === 'gastronomia' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
+                  selectedFeature === 'quincho' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
                 }`}>
-                  <Sparkles className="w-5 h-5" />
+                  <UtensilsCrossed className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Gastronomía Robinsoniana</h4>
+                  <h4 className="font-bold text-base text-slate-900">Amplio Quincho</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Pesca artesanal regulada y el icónico menú de Langosta de Juan Fernández, maridada con vinos premium en comedor con vista al mar.
+                    Espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre frente al paisaje de Robinson Crusoe.
                   </p>
                 </div>
               </div>
 
-              {/* Feature 3: Aventuras */}
+              {/* Feature 3: Exploraciones */}
               <div
-                onClick={() => setSelectedFeature('aventuras')}
-                onMouseEnter={() => setSelectedFeature('aventuras')}
+                onClick={() => setSelectedFeature('exploraciones')}
+                onMouseEnter={() => setSelectedFeature('exploraciones')}
                 className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex items-start gap-4 ${
-                  selectedFeature === 'aventuras'
+                  selectedFeature === 'exploraciones'
                     ? 'border-emerald-800 bg-emerald-50/10 shadow-md translate-x-1'
-                    : 'border-slate-200 bg-white hover:border-slate-350 hover:shadow-sm'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
-                  selectedFeature === 'aventuras' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
+                  selectedFeature === 'exploraciones' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
                 }`}>
                   <Compass className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
                   <h4 className="font-bold text-base text-slate-900">Exploraciones Exclusivas</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Caminatas guiadas por expertos nativos hacia el mirador histórico Selkirk y senderismo a través de bosques de helechos gigantes.
+                    Cabalgatas, senderismo entre helechos gigantes, buceo, snorkel y navegaciones por acantilados guiadas por expertos locales.
                   </p>
                 </div>
               </div>
 
-              {/* Feature 4: Bienestar */}
+              {/* Feature 4: Atardeceres */}
               <div
-                onClick={() => setSelectedFeature('bienestar')}
-                onMouseEnter={() => setSelectedFeature('bienestar')}
+                onClick={() => setSelectedFeature('atardeceres')}
+                onMouseEnter={() => setSelectedFeature('atardeceres')}
                 className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex items-start gap-4 ${
-                  selectedFeature === 'bienestar'
+                  selectedFeature === 'atardeceres'
                     ? 'border-emerald-800 bg-emerald-50/10 shadow-md translate-x-1'
-                    : 'border-slate-200 bg-white hover:border-slate-350 hover:shadow-sm'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
-                  selectedFeature === 'bienestar' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
+                  selectedFeature === 'atardeceres' ? 'bg-emerald-800 border-emerald-700 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
                 }`}>
-                  <Thermometer className="w-5 h-5" />
+                  <Sun className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Tinas Calientes & Relax</h4>
+                  <h4 className="font-bold text-base text-slate-900">Atardeceres Frente al Mar</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Hot tubs de madera a leña en la terraza exterior, diseñadas para la desconexión total bajo la bóveda estrellada del Pacífico.
+                    Ubicación en primera línea para contemplar puestas de sol inolvidables mientras el cielo cambia de color sobre el Pacífico.
                   </p>
                 </div>
               </div>
@@ -986,7 +1154,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
             ¿Listo para Vivir la Experiencia Robinson Crusoe?
           </h3>
           <p className="text-slate-300 text-sm sm:text-lg max-w-2xl mx-auto">
-            Revise las próximas fechas disponibles y consulte con nuestro concierge para planificar su estadía y expedición al Archipiélago.
+            Revisa las próximas fechas disponibles y consulta con nuestro concierge para planificar tu estadía y expedición al Archipiélago.
           </p>
           <div className="pt-4">
             <button

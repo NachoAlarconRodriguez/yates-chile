@@ -133,13 +133,33 @@ export const FleetHotspotViewer: React.FC = () => {
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-slate-50 p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
               <div>
-                <span className="text-blue-600 font-serif font-bold text-xs uppercase tracking-widest">
-                  Ficha Técnica
-                </span>
-                <h3 className="font-serif text-2xl font-bold text-slate-900 mt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-blue-900 font-serif font-bold text-xs uppercase tracking-widest bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
+                    {selectedVessel.type}
+                  </span>
+                  {selectedVessel.registration && (
+                    <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded">
+                      Mat. {selectedVessel.registration}
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-serif text-2xl font-bold text-slate-900 mt-2">
                   {selectedVessel.name}
                 </h3>
-                <p className="text-slate-655 text-sm italic mt-1 font-light">
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {selectedVessel.length}
+                  </span>
+                  <span className="text-[11px] font-bold text-blue-900 bg-blue-50/80 px-2 py-0.5 rounded border border-blue-200">
+                    {selectedVessel.capacity}
+                  </span>
+                  {selectedVessel.cabins && (
+                    <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {selectedVessel.cabins} / {selectedVessel.bathrooms}
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-655 text-xs italic mt-2 font-light leading-relaxed">
                   "{selectedVessel.tagline}"
                 </p>
               </div>

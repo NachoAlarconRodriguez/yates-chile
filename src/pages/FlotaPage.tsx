@@ -22,7 +22,7 @@ export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
             La Flota: Vegvisir & Terranova
           </h1>
           <p className="max-w-2xl mx-auto text-slate-300 text-base sm:text-lg">
-            Conozca en detalle las especificaciones técnicas y visores 3D de nuestras embarcaciones diseñadas para la Patagonia.
+            Conoce en detalle las especificaciones técnicas y visores 3D de nuestras embarcaciones diseñadas para el Cabo de Hornos.
           </p>
         </div>
       </section>
@@ -38,7 +38,7 @@ export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
               Comparativa de Embarcaciones
             </h2>
             <p className="text-slate-600 text-base">
-              Seleccione la embarcación ideal para el estilo de expedición que desea experimentar.
+              Elige la embarcación ideal para el estilo de expedición que buscas vivir.
             </p>
           </div>
 

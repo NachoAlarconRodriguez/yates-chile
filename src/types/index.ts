@@ -21,16 +21,21 @@ export interface VesselHotspot {
 export interface Vessel {
   id: 'vegvisir' | 'terranova';
   name: string;
-  type: 'Velero de Travesía' | 'Yate Motor Panorámico';
+  type: string;
   tagline: string;
   description: string;
-  length: string; // E.g. "54 Pies"
-  capacity: string; // E.g. "Hasta 8 Huéspedes"
-  crew: string; // E.g. "Capitán + Marinero + Chef"
+  length: string;
+  capacity: string;
+  cabins?: string;
+  bathrooms?: string;
+  registration?: string;
+  builder?: string;
+  crew: string;
   features: string[];
   mainImage: string;
   hotspots: VesselHotspot[];
   badge?: string;
+  specs?: Record<string, string>;
 }
 
 export interface FaunaSpot {

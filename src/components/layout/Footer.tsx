@@ -28,16 +28,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Logo & Name (Left) */}
           <div className="flex items-center gap-3">
             <img
-              src="/vegvisir-emblem.svg"
+              src="/vegvisir-emblem-white.png"
               alt="Logo Vegvisir Emblem"
-              className="w-9 h-9 brightness-0 invert"
+              className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.25)]"
             />
             <div className="flex flex-col text-left">
               <span className="font-serif text-lg font-bold tracking-wider text-white">
                 YATES CHILE
               </span>
               <span className="text-[10px] text-slate-400 font-mono tracking-widest uppercase">
-                Vegvisir Sailing & Lodge
+                Sailing & Lodge
               </span>
             </div>
           </div>
@@ -101,15 +101,15 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <Mail className="w-4.5 h-4.5" />
             </a>
 
-            {/* Location (Puerto Montt) */}
+            {/* Location (Uberlindo Andaur 222) */}
             <span
               className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#EA4335] border border-white/10 hover:border-[#EA4335]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 cursor-help shadow-md relative group/tooltip"
-              title="Urbelindo Andaur 222, Puerto Montt"
+              title="Uberlindo Andaur 222, Isla Robinson Crusoe"
             >
               <MapPin className="w-4.5 h-4.5" />
               {/* Tooltip */}
               <span className="absolute bottom-12 bg-slate-900 border border-white/10 px-3 py-1.5 rounded-md text-[10px] text-slate-300 tracking-wide whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-300 select-none pointer-events-none shadow-xl z-30">
-                Urbelindo Andaur 222, Puerto Montt
+                Uberlindo Andaur 222, Isla Robinson Crusoe
               </span>
             </span>
 
@@ -117,8 +117,34 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         </div>
 
-        {/* Row 2: Copyright & Attribution */}
-        <div className="pt-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] sm:text-xs text-slate-400">
+        {/* Row 2: SERNATUR Institutional Accreditation Seal */}
+        <div className="py-4 my-2 border-b border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="bg-white/95 p-1 rounded-lg shadow-sm shrink-0 border border-white/20">
+              <img
+                src="/sernatur-logo.png"
+                alt="Sernatur — Servicio Nacional de Turismo | Gobierno de Chile"
+                className="h-10 w-auto object-contain rounded"
+              />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[11px] font-semibold text-white tracking-wide">
+                Prestador de Servicios Turísticos Registrado en SERNATUR
+              </span>
+              <span className="text-[9.5px] text-slate-400">
+                Ministerio de Economía, Fomento y Turismo • Gobierno de Chile
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px] text-slate-300 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Registro Oficial de Turismo Aventura & Navegación</span>
+          </div>
+        </div>
+
+        {/* Row 3: Copyright & Attribution */}
+        <div className="pt-4 flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] sm:text-xs text-slate-400">
           <div>
             © 2026 YATES CHILE. Todos los derechos reservados.
           </div>

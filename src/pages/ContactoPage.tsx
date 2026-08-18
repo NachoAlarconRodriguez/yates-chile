@@ -17,7 +17,7 @@ export const ContactoPage: React.FC = () => {
             Contacto & Concierge Exclusivo
           </h1>
           <p className="max-w-2xl mx-auto text-slate-300 text-base sm:text-lg">
-            Permítanos diseñar su itinerario a medida por la Patagonia o resolver cualquier inquietud de navegación.
+            Diseña tu itinerario a medida por Cabo de Hornos o cuéntanos tus consultas de navegación.
           </p>
         </div>
       </section>

@@ -38,16 +38,16 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
         {/* Small Transparent Emblem Logo */}
         <div className="flex items-center gap-2.5 opacity-90 hover:opacity-100 transition-opacity">
           <img
-            src="/vegvisir-emblem.svg"
+            src="/vegvisir-emblem-white.png"
             alt="Logo Vegvisir Emblem"
-            className="w-7 h-7 text-white filter drop-shadow-md invert"
+            className="w-8 h-8 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
           />
           <div className="flex flex-col">
             <span className="font-bold text-xs sm:text-sm text-white tracking-widest uppercase">
               Yates Chile
             </span>
             <span className="text-[9px] text-slate-300 tracking-wider uppercase font-light">
-              Vegvisir Sailing & Lodge
+              Sailing & Lodge
             </span>
           </div>
         </div>
@@ -83,11 +83,11 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
         <div className="max-w-xl text-left space-y-2.5 text-white">
           <h1 className="text-base sm:text-lg lg:text-xl font-bold tracking-tight text-white leading-snug drop-shadow-xl">
             <span className="block font-bold">Donde la cartografía termina,</span>
-            <span className="block italic font-serif font-normal text-slate-200">comienza su expedición.</span>
+            <span className="block italic font-serif font-normal text-slate-200">comienza tu expedición.</span>
           </h1>
 
           <p className="text-slate-200 text-[11px] sm:text-xs font-normal leading-relaxed text-shadow max-w-lg opacity-95">
-            Expediciones marítimas privadas a bordo del velero <strong className="text-white font-semibold">Vegvisir</strong> y el yate <strong className="text-white font-semibold">Terranova</strong> hacia el Archipiélago Juan Fernández, Isla Alejandro Selkirk y la Patagonia.
+            Expediciones marítimas privadas a bordo del velero <strong className="text-white font-semibold">Vegvisir</strong> y el yate <strong className="text-white font-semibold">Terranova</strong> hacia el Archipiélago Juan Fernández, Isla Alejandro Selkirk y Cabo de Hornos.
           </p>
 
           <div className="pt-1">

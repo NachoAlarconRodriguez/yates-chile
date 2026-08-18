@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Compass, Users, Shield, Thermometer, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship } from 'lucide-react';
+import { ArrowLeft, Compass, Thermometer, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge } from 'lucide-react';
 
 interface TerranovaDetailPageProps {
   onNavigate: (path: string) => void;
@@ -14,6 +14,14 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
   const [currentStation, setCurrentStation] = React.useState<'exterior' | 'salon' | 'camarote'>('exterior');
   const [isTransitioning, setIsTransitioning] = React.useState(false);
   const [activeInfo, setActiveInfo] = React.useState<{ title: string; desc: string } | null>(null);
+
+  const currentDateFormatted = React.useMemo(() => {
+    return new Intl.DateTimeFormat('es-CL', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date()).toUpperCase();
+  }, []);
 
   const navigateToStation = (station: 'exterior' | 'salon' | 'camarote') => {
     setIsTransitioning(true);
@@ -52,89 +60,103 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
 
   const tourStations = {
     exterior: {
-      title: 'Cubierta Flybridge',
+      title: 'Cubierta 3: Flybridge & Deck Superior',
       image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
       hotspots: [
         {
           x: '50%',
           y: '55%',
           type: 'info',
-          title: 'Jacuzzi Termo-Regulado',
-          desc: 'Jacuzzi exterior templado a 38°C en el flybridge elevado, perfecto para relajarse observando ventisqueros de la Patagonia.',
+          title: 'Deck Superior & Parrilla',
+          desc: 'Área social abierta en el tercer nivel equipada con parrilla para asados al aire libre frente a los glaciares australes.',
         },
         {
           x: '72%',
           y: '68%',
           type: 'nav',
-          label: 'Ingresar al Salón Principal',
+          label: 'Bajar a Cubierta 2 (Salón & Comedor)',
           target: 'salon' as const,
         },
         {
           x: '25%',
           y: '40%',
           type: 'info',
-          title: 'Puesto de Mando Superior',
-          desc: 'Estación de gobierno elevada con pantallas multifunción táctiles e instrumentación de navegación satelital.',
+          title: '2do Puente de Gobierno & Navegación',
+          desc: 'Puesto de pilotaje elevado equipado con doble electrónica Raymarine y Garmin, Starlink 24/7 y visión panorámica 360°.',
+        },
+        {
+          x: '80%',
+          y: '45%',
+          type: 'info',
+          title: 'Zodiac Yamaha 70hp & Grúa 1 Ton',
+          desc: 'Bote auxiliar semirrígido con potente motor fuera de borda Yamaha 4T de 70 HP operado con pluma/grúa de 1 tonelada para desembarcos ágiles.',
         },
       ],
     },
     salon: {
-      title: 'Salón Principal & Cava',
+      title: 'Cubierta 2: Puente, Deck Central, Salón & Cocina',
       image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
       hotspots: [
         {
           x: '58%',
           y: '52%',
           type: 'info',
-          title: 'Cava Gourmet Privada',
-          desc: 'Cava de maderas nobles integrada con control de temperatura, diseñada para albergar vinos seleccionados de nuestra reserva.',
+          title: 'Puente de Gobierno Principal',
+          desc: 'Comando central con instrumental dual Raymarine y Garmin, Piloto Automático y consola de monitoreo de los 2 generadores Northern Lights.',
         },
         {
           x: '35%',
           y: '65%',
           type: 'info',
-          title: 'Salón Principal 360°',
-          desc: 'Espacio de descanso con terminaciones en nogal, sistema de audio de alta fidelidad y ventanales panorámicos de piso a techo.',
+          title: 'Deck Central, Comedor & Popa',
+          desc: 'Espacio de estar de gran amplitud con comedor noble, ventanales panorámicos y salida directa a la cubierta exterior de popa.',
         },
         {
           x: '22%',
           y: '45%',
           type: 'nav',
-          label: 'Subir al Flybridge',
+          label: 'Subir a Cubierta 3 (Flybridge)',
           target: 'exterior' as const,
         },
         {
           x: '75%',
           y: '60%',
           type: 'nav',
-          label: 'Ir al Camarote Stateroom',
+          label: 'Bajar a Cubierta 1 (Dormitorios)',
           target: 'camarote' as const,
+        },
+        {
+          x: '15%',
+          y: '55%',
+          type: 'info',
+          title: 'Cocina Full Equipo',
+          desc: 'Cocina profesional completa integrada con provisión de agua continua mediante 2 plantas desalinizadoras (140 ltrs/hr c/u).',
         },
       ],
     },
     camarote: {
-      title: 'Master Stateroom',
+      title: 'Cubierta 1: Dormitorios (5 Cabinas / 5 Baños)',
       image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
       hotspots: [
         {
           x: '50%',
           y: '62%',
           type: 'info',
-          title: 'Master Suite a Toda Manga',
-          desc: 'Cama King-size premium con sábanas de algodón egipcio, climatización hidrónica y ventanales al ras de la línea de agua.',
+          title: '5 Cabinas Privadas (20 PAX)',
+          desc: 'Nivel completo de descanso con 5 cabinas suites independientes diseñadas para albergar con total holgura hasta 20 pasajeros.',
         },
         {
           x: '30%',
           y: '48%',
           type: 'info',
-          title: 'Baño en Suite de Mármol',
-          desc: 'Exclusivo baño privado con revestimientos de mármol, grifería italiana y ducha de hidromasaje independiente.',
+          title: '5 Baños Completos en Suite',
+          desc: 'Cinco baños privados independientes con duchas y confort térmico para todos los huéspedes a bordo.',
         },
         {
           x: '12%',
           y: '58%',
           type: 'nav',
-          label: 'Regresar al Salón Principal',
+          label: 'Subir a Cubierta 2 (Salón)',
           target: 'salon' as const,
         },
       ],
@@ -189,13 +211,13 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
   const images = [
     {
       url: 'https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=1000&q=80',
-      title: 'Yate Terranova en aguas patagónicas',
+      title: 'Yate Terranova en aguas australes',
       desc: 'El Terranova navegando entre los canales australes. Su potencia y diseño contemporáneo ofrecen una navegación incomparable.',
     },
     {
       url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
       title: 'Flybridge Elevado con Jacuzzi',
-      desc: 'Nuestra terraza superior es el espacio ideal para relajarse en el jacuzzi templado mientras observa los ventisqueros de la Patagonia.',
+      desc: 'Nuestra terraza superior es el espacio ideal para relajarse en el jacuzzi templado mientras contemplas los ventisqueros del Cabo de Hornos.',
     },
     {
       url: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
@@ -243,11 +265,30 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-blue-900/80 backdrop-blur-md border border-blue-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Yate de Expedición
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-blue-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Hatteras 65ft LRC • Americano
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              Matrícula PMO 6128
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-sky-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+              3 Cubiertas • 20 PAX
+            </span>
+            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Starlink 24/7
+            </span>
+          </div>
+
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
             Yate Terranova
           </h1>
-          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-xl">
-            El equilibrio perfecto entre potencia de navegación y lujo contemporáneo en la Patagonia profunda. Diseñado específicamente para recorrer múltiples ventisqueros con rapidez y confort absoluto.
+          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
+            Yate de expedición oceánica Hatteras 65ft LRC (Astillero Americano, Matrícula PMO 6128) distribuido en 3 cubiertas con capacidad para 20 PAX (5 cabinas / 5 baños). Equipado con 2 motores Detroit de 450 HP (3.000 MN de autonomía con estanque de 10.000 L), doble navegación Raymarine + Garmin, Starlink 24/7, 2 desalinizadores y Zodiac semirrígido con motor Yamaha 70hp y grúa de 1 tonelada.
           </p>
         </div>
       </section>
@@ -258,7 +299,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
           {/* Tech Specs Cards in a Single Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
             
-            {/* Card 1: NORTH - ESLORA */}
+            {/* Card 1: NORTH - ASTILLERO & MODELO */}
             <div
               onClick={() => toggleFlip('eslora')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -282,9 +323,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / ESLORA</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">68 Pies</span>
-                    <span className="text-slate-500 text-[10px] block">20.7 Metros total</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / ASTILLERO</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Hatteras 65ft LRC</span>
+                    <span className="text-slate-500 text-[10px] block">Americano • PMO 6128</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -297,16 +338,16 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Diseño y Eslora</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Identificación</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Diseño aerodinámico de planeo con estabilizadores activos de última generación para navegación de alto confort.
+                    Astillero Americano Hatteras 65ft LRC (Long Range Cruiser). Matrícula oficial PMO 6128. Eslora 20 metros.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: WEST - CAPACIDAD */}
+            {/* Card 2: WEST - 3 CUBIERTAS & 20 PAX */}
             <div
               onClick={() => toggleFlip('capacidad')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -326,13 +367,13 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <div className="w-11 h-11 rounded-full bg-slate-50 flex items-center justify-center relative border border-slate-200 shadow-inner">
-                    <Users className="w-4.5 h-4.5 text-blue-900 relative z-10" />
+                    <Layers className="w-4.5 h-4.5 text-blue-900 relative z-10" />
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CAPACIDAD</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">8 Huéspedes</span>
-                    <span className="text-slate-500 text-[10px] block">Suites de lujo</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CUBIERTAS</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">3 Cubiertas</span>
+                    <span className="text-slate-500 text-[10px] block">20 PAX • 5 Cab / 5 Baños</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -345,16 +386,16 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Habitabilidad</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Distribución</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    4 camarotes suites dobles con terminaciones finas, climatización inteligente y baños en suite privados.
+                    3 cubiertas: Cubierta 1 (5 cabinas / 5 baños), Cubierta 2 (Puente, salón, comedor, cocina), Cubierta 3 (Flybridge, parrilla).
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 3: SOUTH - TRIPULACIÓN */}
+            {/* Card 3: SOUTH - MOTORES & AUTONOMÍA */}
             <div
               onClick={() => toggleFlip('tripulacion')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -374,13 +415,13 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <div className="w-11 h-11 rounded-full bg-slate-50 flex items-center justify-center relative border border-slate-200 shadow-inner">
-                    <Shield className="w-4.5 h-4.5 text-blue-900 relative z-10" />
+                    <Gauge className="w-4.5 h-4.5 text-blue-900 relative z-10" />
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / TRIPULACIÓN</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">4 Tripulantes</span>
-                    <span className="text-slate-500 text-[10px] block">Capitán, Tripulación, Chef</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / AUTONOMÍA</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">3.000 MN</span>
+                    <span className="text-slate-500 text-[10px] block">2x Detroit 450HP • 10.000L</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -393,16 +434,16 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Servicio Exclusivo</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Propulsión</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Navegación profesional y servicio de concierge con Chef de cocina dedicado para gastronomía gourmet a bordo.
+                    2 motores Detroit 450 HP c/u, estanque de 10.000 ltrs, autonomía de 3.000 MN a 10 kts y 2 generadores Northern Lights 10kVA.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
 
-            {/* Card 4: EAST - NAVEGACIÓN */}
+            {/* Card 4: EAST - NAVEGACIÓN & DESEMBARCO */}
             <div
               onClick={() => toggleFlip('navegacion')}
               className="relative h-48 w-full cursor-pointer select-none"
@@ -422,13 +463,13 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   style={{ backfaceVisibility: 'hidden' }}
                 >
                   <div className="w-11 h-11 rounded-full bg-slate-50 flex items-center justify-center relative border border-slate-200 shadow-inner">
-                    <Ship className="w-4.5 h-4.5 text-blue-900 relative z-10" />
+                    <Radio className="w-4.5 h-4.5 text-blue-900 relative z-10" />
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / NAVEGACIÓN</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Motor Twin 1200HP</span>
-                    <span className="text-slate-500 text-[10px] block">1,200 Millas Autonomía</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / EQUIPAMIENTO</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Raymarine + Garmin</span>
+                    <span className="text-slate-500 text-[10px] block">Starlink • Yamaha 70HP</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
@@ -441,14 +482,150 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Potencia y Autonomía</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Equipamiento</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Motores gemelos diésel de alta potencia y tanques de combustible de gran capacidad para cruces de fiordos rápidos y seguros.
+                    Plotter & Piloto Raymarine + Garmin, Starlink 24/7, 2 desalinizadores 140 ltrs/hr, Zodiac semirrígido Yamaha 70hp y grúa 1T.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FICHA TÉCNICA OFICIAL / TECHNICAL SPECIFICATIONS MATRIX */}
+      <section className="py-16 bg-slate-50 border-t border-b border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10">
+          <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
+            <span className="text-blue-900 font-bold text-xs uppercase tracking-widest bg-blue-50 px-3.5 py-1.5 rounded-full border border-blue-900/15 inline-flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5 text-blue-900" />
+              <span>Ficha Técnica Oficial • Matrícula PMO 6128</span>
+            </span>
+            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
+              Especificaciones Técnicas del Yate Terranova
+            </h2>
+            <p className="text-slate-600 text-sm max-w-xl mx-auto">
+              Yate de expedición oceánica de astillero americano Hatteras 65ft LRC de 3 cubiertas con autonomía de 3.000 millas náuticas y equipamiento de alta gama.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Box 1: Embarcación & Registro */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Ship className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Embarcación & Registro</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Identificación y dimensiones</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Astillero / Modelo:</span>
+                  <span className="font-bold text-slate-900">Hatteras 65ft LRC</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Origen:</span>
+                  <span className="font-bold text-slate-900">Americano</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Matrícula:</span>
+                  <span className="font-mono font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">PMO 6128</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Tipo:</span>
+                  <span className="font-bold text-slate-900">Yate de Expedición</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 2: Distribución en 3 Cubiertas */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Layers className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Distribución 3 Cubiertas</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Capacidad para 20 PAX</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-start">
+                  <span className="text-slate-500">Cubierta 1:</span>
+                  <span className="font-bold text-slate-900 text-right">5 Cabinas / 5 Baños</span>
+                </li>
+                <li className="flex justify-between items-start">
+                  <span className="text-slate-500">Cubierta 2:</span>
+                  <span className="font-bold text-slate-900 text-right">Puente, Salón, Comedor, Cocina & Popa</span>
+                </li>
+                <li className="flex justify-between items-start">
+                  <span className="text-slate-500">Cubierta 3:</span>
+                  <span className="font-bold text-slate-900 text-right">2do Puente, Deck, Parrilla & Grúa</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 3: Propulsión & Autonomía */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Gauge className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Propulsión & Autonomía</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Potencia oceánica</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Motores:</span>
+                  <span className="font-bold text-slate-900">2x Detroit 450 HP c/u</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Estanque Diésel:</span>
+                  <span className="font-bold text-slate-900">10.000 Litros</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Autonomía:</span>
+                  <span className="font-bold text-blue-900">3.000 MN (a 10 kts)</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Generadores:</span>
+                  <span className="font-bold text-slate-900">2x Northern Lights 10kVA</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Box 4: Electrónica & Desembarcos */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
+                <Radio className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Navegación & Desembarco</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Equipamiento expedicionario</p>
+              </div>
+              <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Internet Satelital:</span>
+                  <span className="font-bold text-emerald-700 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Starlink 24/7
+                  </span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Electrónica Dual:</span>
+                  <span className="font-bold text-slate-900">Raymarine + Garmin</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Desalinizadores:</span>
+                  <span className="font-bold text-blue-900">2x 140 ltrs/hr</span>
+                </li>
+                <li className="flex justify-between items-center">
+                  <span className="text-slate-500">Zodiac Auxiliar:</span>
+                  <span className="font-bold text-slate-900">Yamaha 70hp + Grúa 1T</span>
+                </li>
+              </ul>
+            </div>
+
           </div>
         </div>
       </section>
@@ -484,7 +661,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                       Yacht Logbook
                     </span>
                     <span className="font-mono text-[10px] uppercase font-black tracking-widest text-blue-900 animate-pulse">
-                      • {logbookEntries[selectedFeature].day}
+                      • {currentDateFormatted}
                     </span>
                   </div>
 
@@ -577,7 +754,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                 <div className="space-y-1">
                   <h4 className="font-bold text-base text-slate-900">Gastronomía Gourmet</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Chef gourmet dedicado preparando platos con centollas y pescados frescos patagónicos, maridados con vinos selectos de nuestra cava integrada.
+                    Chef gourmet dedicado preparando platos con centollas y pescados frescos australes, maridados con vinos selectos de nuestra cava integrada.
                   </p>
                 </div>
               </div>
@@ -995,7 +1172,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
             ¿Listo para Vivir la Experiencia Terranova?
           </h3>
           <p className="text-slate-300 text-sm sm:text-lg max-w-2xl mx-auto">
-            Revise las próximas fechas disponibles de nuestros programas de navegación por los canales y fiordos de la Patagonia.
+            Revisa las próximas fechas disponibles de nuestros programas de navegación por los canales y fiordos del Cabo de Hornos.
           </p>
           <div className="pt-4">
             <button

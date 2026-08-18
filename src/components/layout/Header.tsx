@@ -69,16 +69,16 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
             title="Ver experiencia cinemática en video"
           >
             <img
-              src="/vegvisir-emblem.svg"
+              src="/vegvisir-emblem-dark.png"
               alt="Logo Vegvisir Emblem"
-              className="w-9 h-9 text-slate-900 group-hover:scale-105 transition-transform"
+              className="w-10 h-10 object-contain group-hover:scale-105 transition-transform"
             />
             <div className="flex flex-col">
               <span className="font-extrabold text-lg text-slate-900 tracking-wider">
                 YATES CHILE
               </span>
               <span className="text-[11px] text-slate-600 font-sans tracking-widest uppercase font-semibold">
-                Vegvisir Sailing & Lodge
+                Sailing & Lodge
               </span>
             </div>
           </a>

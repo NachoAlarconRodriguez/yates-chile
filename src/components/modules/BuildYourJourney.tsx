@@ -97,7 +97,7 @@ export const BuildYourJourney: React.FC = () => {
             Build Your Journey
           </h2>
           <p className="mt-3 text-slate-450 text-base sm:text-lg">
-            Diseñe su travesía a medida por los canales de la Patagonia en 3 simples pasos.
+            Diseña tu travesía a medida por los canales del Cabo de Hornos en 3 simples pasos.
           </p>
         </div>
 
@@ -138,7 +138,7 @@ export const BuildYourJourney: React.FC = () => {
               {step === 1 && (
                 <div className="space-y-6">
                   <h3 className="font-serif text-xl sm:text-2xl font-bold text-blue-300 text-center">
-                    Paso 1: Seleccione la Base de su Experiencia
+                    Paso 1: Elige la Base de tu Experiencia
                   </h3>
                   <div className="grid sm:grid-cols-3 gap-4">
                     
@@ -222,7 +222,7 @@ export const BuildYourJourney: React.FC = () => {
               {step === 2 && (
                 <div className="space-y-6">
                   <h3 className="font-serif text-xl sm:text-2xl font-bold text-blue-300 text-center">
-                    Paso 2: Elija el Enfoque Principal de su Viaje
+                    Paso 2: Elige el Enfoque Principal de tu Viaje
                   </h3>
                   <div className="grid sm:grid-cols-3 gap-4">
                     
@@ -298,7 +298,7 @@ export const BuildYourJourney: React.FC = () => {
                         onChange={(e) => setFormData({ ...formData, guestsCount: Number(e.target.value) })}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:border-blue-400 focus:outline-none min-h-[48px]"
                       >
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                        {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
                           <option key={n} value={n}>
                             {n} {n === 1 ? 'Huésped' : 'Huéspedes'}
                           </option>
@@ -421,7 +421,7 @@ export const BuildYourJourney: React.FC = () => {
                 ¡Postulación Registrada Exitosamente!
               </h3>
               <p className="text-slate-300 text-sm max-w-lg mx-auto leading-relaxed">
-                Su solicitud ha sido almacenada en Supabase y el correo automático de Brevo con el **Brochure PDF de Yates Chile** ha sido despachado a <span className="text-blue-300 font-semibold">{formData.email}</span>.
+                Tu solicitud ha sido recibida y el correo automático de Brevo con el **Brochure PDF de Yates Chile** ha sido despachado a <span className="text-blue-300 font-semibold">{formData.email}</span>.
               </p>
               <p className="text-xs text-slate-400 italic">
                 Redirigiendo automáticamente a WhatsApp Concierge...

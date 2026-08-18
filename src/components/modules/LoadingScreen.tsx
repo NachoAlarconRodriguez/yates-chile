@@ -80,119 +80,39 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete, isVide
           {/* Compass Container */}
           <div className="relative flex flex-col items-center justify-center max-w-md w-full px-6">
             
-            {/* Elegant Nautical Compass (Vegvisir) SVG */}
+            {/* Elegant Nautical Compass (Vegvisir) Emblem */}
             <div className="relative w-44 h-44 sm:w-52 sm:h-52 mb-10 flex items-center justify-center">
               
-              {/* Outer compass rim (aesthetic ring) */}
-              <div className="absolute inset-0 border border-white/5 rounded-full scale-110 pointer-events-none" />
+              {/* Outer decorative dashed circle (Clockwise Rotation) */}
+              <motion.div 
+                className="absolute inset-0 rounded-full border border-dashed border-white/20"
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 45, ease: 'linear' }}
+              />
+              
+              {/* Middle subtle dotted ring (Counter-Clockwise Rotation) */}
+              <motion.div 
+                className="absolute inset-3 rounded-full border border-dotted border-white/15"
+                animate={{ rotate: -360 }}
+                transition={{ repeat: Infinity, duration: 35, ease: 'linear' }}
+              />
 
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 200 200" 
-                className="w-full h-full text-slate-100 filter drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]"
-                fill="none"
-              >
-                {/* 1. Outer decorative dashed & dotted circles (Clockwise Rotation) */}
-                <motion.circle 
-                  cx="100" 
-                  cy="100" 
-                  r="94" 
-                  stroke="currentColor" 
-                  strokeWidth="1.5" 
-                  strokeDasharray="8 4" 
-                  className="opacity-70"
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 40, ease: 'linear' }}
-                  style={{ transformOrigin: 'center' }}
-                />
-                
-                {/* 2. Middle solid circle (Steady helper) */}
-                <circle cx="100" cy="100" r="88" stroke="currentColor" strokeWidth="1" className="opacity-30" />
-                
-                {/* 3. Inner decorative dashed circle (Counter-Clockwise Rotation) */}
-                <motion.circle 
-                  cx="100" 
-                  cy="100" 
-                  r="82" 
-                  stroke="currentColor" 
-                  strokeWidth="1" 
-                  strokeDasharray="4 4" 
-                  className="opacity-55"
-                  animate={{ rotate: -360 }}
-                  transition={{ repeat: Infinity, duration: 30, ease: 'linear' }}
-                  style={{ transformOrigin: 'center' }}
-                />
-
-                {/* 4. Center hub (Steady and pulsing) */}
-                <motion.circle 
-                  cx="100" 
-                  cy="100" 
-                  r="10" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  fill="rgba(15, 23, 42, 0.8)" 
-                  animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-                  style={{ transformOrigin: 'center' }}
-                />
-                <circle cx="100" cy="100" r="3" fill="currentColor" />
-
-                {/* 5. The 8 Main Axes of Vegvisir (Slow Clockwise Drift + Fade In) */}
-                <motion.g
-                  initial={{ opacity: 0.3, scale: 0.95 }}
-                  animate={{ 
-                    opacity: [0.85, 1, 0.85],
-                    scale: 1,
-                    rotate: 5
-                  }}
-                  transition={{ 
-                    opacity: { repeat: Infinity, duration: 4, ease: 'easeInOut' },
-                    scale: { duration: 1.5, ease: 'easeOut' },
-                    rotate: { repeat: Infinity, repeatType: 'reverse', duration: 8, ease: 'easeInOut' }
-                  }}
-                  style={{ transformOrigin: 'center' }}
-                >
-                  {/* Top (N) */}
-                  <path d="M100 90 V20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M90 32 H110 M88 42 H112 M94 22 L100 15 L106 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
-
-                  {/* Top-Right (NE) */}
-                  <path d="M107 93 L156 44" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M140 48 L152 60 M148 40 L160 52" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-
-                  {/* Right (E) */}
-                  <path d="M110 100 H180" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M168 90 V110 M158 88 V112 M178 94 L185 100 L178 106" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
-
-                  {/* Bottom-Right (SE) */}
-                  <path d="M107 107 L156 156" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M148 148 L160 136 M140 140 L152 128" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-
-                  {/* Bottom (S) */}
-                  <path d="M100 110 V180" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M90 168 H110 M88 158 H112 M94 178 L100 185 L106 178" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
-
-                  {/* Bottom-Left (SW) */}
-                  <path d="M93 107 L44 156" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M52 148 L40 136 M60 140 L48 128" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-
-                  {/* Left (W) */}
-                  <path d="M90 100 H20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M32 90 V110 M42 88 V112 M22 94 L15 100 L22 106" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
-
-                  {/* Top-Left (NW) */}
-                  <path d="M93 93 L44 44" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                  <path d="M48 40 L36 52 M60 48 L48 60" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-
-                  {/* Decorative Accent Dots */}
-                  <circle cx="35" cy="35" r="3.5" fill="currentColor"/>
-                  <circle cx="25" cy="48" r="2" fill="currentColor"/>
-                  <circle cx="48" cy="25" r="2" fill="currentColor"/>
-                  <circle cx="165" cy="165" r="3.5" fill="currentColor"/>
-                  <circle cx="175" cy="152" r="2" fill="currentColor"/>
-                  <circle cx="152" cy="175" r="2" fill="currentColor"/>
-                </motion.g>
-              </svg>
+              {/* Center Authentic Vegvisir Emblem Logo */}
+              <motion.img
+                src="/vegvisir-emblem-white.png"
+                alt="Logo Vegvisir Emblem"
+                className="w-36 h-36 sm:w-44 sm:h-44 object-contain filter drop-shadow-[0_0_20px_rgba(255,255,255,0.25)] relative z-10 select-none"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ 
+                  opacity: [0.85, 1, 0.85],
+                  scale: [0.98, 1.02, 0.98]
+                }}
+                transition={{ 
+                  duration: 4, 
+                  repeat: Infinity, 
+                  ease: 'easeInOut' 
+                }}
+              />
             </div>
 
             {/* Typography Section */}
@@ -207,7 +127,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete, isVide
                   Yates Chile
                 </h2>
                 <p className="text-[10px] text-slate-400 tracking-[0.18em] uppercase font-light mt-1">
-                  Vegvisir Sailing & Lodge
+                  Sailing & Lodge
                 </p>
               </motion.div>
 
