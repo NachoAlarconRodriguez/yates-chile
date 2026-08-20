@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Anchor, Compass, Sparkles } from 'lucide-react';
+import { useSiteContent } from '../../hooks/useSiteContent';
 
 interface Slide {
   id: string;
@@ -16,25 +17,36 @@ interface HeroCarouselProps {
   onNavigate: (path: string) => void;
 }
 
+const isMediaVideo = (url?: string | null) => {
+  if (!url) return false;
+  return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') || url.includes('video/');
+};
+
 export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const { getSection } = useSiteContent();
+  const heroData = getSection('home_hero');
+  const flotaData = getSection('flota_hero');
 
   const slides: Slide[] = [
     {
       id: 'slide-juan-fernandez',
-      badge: 'Archipiélago Juan Fernández & Selkirk',
+      badge: heroData.subtitle || 'Archipiélago Juan Fernández & Selkirk',
       badgeIcon: <Compass className="w-3 h-3 text-white" />,
-      titleHtml: (
+      titleHtml: heroData.title ? (
+        <span className="block font-bold">{heroData.title}</span>
+      ) : (
         <>
           <span className="block font-bold">Aventuras en el insólito</span>
           <span className="block italic font-serif font-normal text-slate-200">Archipiélago Juan Fernández.</span>
         </>
       ),
       description:
+        heroData.body_text ||
         'Expediciones marítimas privadas hacia la mítica Isla Robinson Crusoe y la salvaje Isla Alejandro Selkirk a bordo de nuestras embarcaciones.',
       primaryCtaText: 'Explorar Expediciones',
       primaryCtaPath: '/expediciones',
-      bgImage: 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/AF12CiSUWjDQxAunvIp-k_k/Fotos/IMG_0852.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=qgulyvgx&raw=1',
+      bgImage: heroData.media_url || 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/AF12CiSUWjDQxAunvIp-k_k/Fotos/IMG_0852.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=qgulyvgx&raw=1',
     },
     {
       id: 'slide-cabo-hornos',
@@ -66,7 +78,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
         'Navegación exclusiva a bordo de embarcaciones de alta gama con visores 360°, suites matrimoniales y tripulación dedicada en alta mar.',
       primaryCtaText: 'Ver Fichas Técnicas 3D',
       primaryCtaPath: '/flota',
-      bgImage: 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/AIGICdoepICWrV3KT2HQbnQ/Fotos/341f4272-dce6-4326-997f-a997c01e310b.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=fmfomzjd&raw=1',
+      bgImage: flotaData.media_url || 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/AIGICdoepICWrV3KT2HQbnQ/Fotos/341f4272-dce6-4326-997f-a997c01e310b.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=fmfomzjd&raw=1',
     },
   ];
 
@@ -91,7 +103,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   return (
     <section className="relative h-[460px] sm:h-[490px] flex items-end justify-start bg-slate-950 text-white overflow-hidden border-b border-slate-800">
       
-      {/* Background Images with Fade Transition */}
+      {/* Background Images / Videos with Fade Transition */}
       {slides.map((s, idx) => (
         <div
           key={s.id}
@@ -99,11 +111,22 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
             idx === currentSlide ? 'opacity-85 z-0' : 'opacity-0 -z-10'
           }`}
         >
-          <img
-            src={s.bgImage}
-            alt={s.badge}
-            className="w-full h-full object-cover"
-          />
+          {isMediaVideo(s.bgImage) ? (
+            <video
+              src={s.bgImage}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <img
+              src={s.bgImage}
+              alt={s.badge}
+              className="w-full h-full object-cover"
+            />
+          )}
         </div>
       ))}
 

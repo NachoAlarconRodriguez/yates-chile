@@ -1,11 +1,15 @@
 import React from 'react';
 import { ArrowLeft, Compass, Thermometer, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge } from 'lucide-react';
+import { useSiteContent } from '../hooks/useSiteContent';
 
 interface TerranovaDetailPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavigate }) => {
+  const { getSection } = useSiteContent();
+  const terranovaCms = getSection('flota_terranova');
+
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
   const toggleFlip = (id: string) => {
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -246,11 +250,22 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
       
       {/* HERO SECTION */}
       <section className="relative h-[70vh] sm:h-[80vh] flex items-end justify-start overflow-hidden">
-        <img
-          src="/yate-terranova.jpg"
-          alt="Yate Terranova"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        {(terranovaCms.media_url?.endsWith('.mp4') || terranovaCms.media_url?.endsWith('.webm') || terranovaCms.media_url?.includes('video/')) ? (
+          <video
+            src={terranovaCms.media_url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <img
+            src={terranovaCms.media_url || "/yate-terranova.jpg"}
+            alt={terranovaCms.title || "Yate Terranova"}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
         
         {/* Navigation Overlays */}
@@ -267,16 +282,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
           <div className="flex flex-wrap gap-2">
             <span className="bg-blue-900/80 backdrop-blur-md border border-blue-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Yate de Expedición
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-blue-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Hatteras 65ft LRC • Americano
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Matrícula PMO 6128
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-sky-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              3 Cubiertas • 20 PAX
+              {terranovaCms.subtitle || 'Yate de Expedición • Americano'}
             </span>
             <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -285,10 +291,10 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
           </div>
 
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
-            Yate Terranova
+            {terranovaCms.title || 'Yate Terranova'}
           </h1>
           <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
-            Yate de expedición oceánica Hatteras 65ft LRC (Astillero Americano, Matrícula PMO 6128) distribuido en 3 cubiertas con capacidad para 20 PAX (5 cabinas / 5 baños). Equipado con 2 motores Detroit de 450 HP (3.000 MN de autonomía con estanque de 10.000 L), doble navegación Raymarine + Garmin, Starlink 24/7, 2 desalinizadores y Zodiac semirrígido con motor Yamaha 70hp y grúa de 1 tonelada.
+            {terranovaCms.body_text || 'Yate de expedición oceánica Hatteras 65ft LRC (Astillero Americano, Matrícula PMO 6128) distribuido en 3 cubiertas con capacidad para 20 PAX (5 cabinas / 5 baños). Equipado con 2 motores Detroit de 450 HP (3.000 MN de autonomía con estanque de 10.000 L), doble navegación Raymarine + Garmin, Starlink 24/7, 2 desalinizadores y Zodiac semirrígido con motor Yamaha 70hp y grúa de 1 tonelada.'}
           </p>
         </div>
       </section>

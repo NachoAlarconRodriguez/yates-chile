@@ -1,11 +1,30 @@
 import React from 'react';
-import { ArrowLeft, Compass, Users, Sparkles, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Sparkles, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useLodge } from '../hooks/useLodge';
+import { useSiteContent } from '../hooks/useSiteContent';
 
 interface LodgePageProps {
   onNavigate: (path: string) => void;
 }
 
 export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
+  const { rooms, createBooking } = useLodge();
+  const { getSection } = useSiteContent();
+  const lodgeInfo = getSection('lodge_info');
+  const lodgeDining = getSection('lodge_dining');
+  const [showBookingModal, setShowBookingModal] = React.useState(false);
+  const [selectedRoomId, setSelectedRoomId] = React.useState('');
+  const [guestName, setGuestName] = React.useState('');
+  const [guestEmail, setGuestEmail] = React.useState('');
+  const [guestPhone, setGuestPhone] = React.useState('');
+  const [guestRut, setGuestRut] = React.useState('');
+  const [checkIn, setCheckIn] = React.useState('');
+  const [checkOut, setCheckOut] = React.useState('');
+  const [paxCount, setPaxCount] = React.useState(2);
+  const [bookingLoading, setBookingLoading] = React.useState(false);
+  const [bookingSuccess, setBookingSuccess] = React.useState<{ code: string; deposit: number; total: number } | null>(null);
+  const [bookingError, setBookingError] = React.useState<string | null>(null);
+
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
   const toggleFlip = (id: string) => {
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -163,14 +182,14 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
       image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
     },
     quincho: {
-      title: 'Amplio Quincho & Encuentros',
+      title: lodgeDining.title || 'Amplio Quincho & Encuentros',
       day: 'Momentos al Aire Libre',
       location: 'Quincho del Lodge',
       coordinates: '33°38\' S, 78°50\' W',
       wind: 'Calma',
       temp: '18°C Ext',
-      text: 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.',
-      image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
+      text: lodgeDining.body_text || 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.',
+      image: lodgeDining.media_url || 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
     },
     exploraciones: {
       title: 'Exploraciones Exclusivas',
@@ -232,11 +251,22 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
       
       {/* HERO SECTION */}
       <section className="relative h-[70vh] sm:h-[80vh] flex items-end justify-start overflow-hidden">
-        <img
-          src="/rincon-de-navegantes.jpg"
-          alt="Lodge Rincón de Navegantes"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        {(lodgeInfo.media_url?.endsWith('.mp4') || lodgeInfo.media_url?.endsWith('.webm') || lodgeInfo.media_url?.includes('video/')) ? (
+          <video
+            src={lodgeInfo.media_url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <img
+            src={lodgeInfo.media_url || "/rincon-de-navegantes.jpg"}
+            alt={lodgeInfo.title || "Lodge Rincón de Navegantes"}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
         
         {/* Navigation Overlays */}
@@ -253,7 +283,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
           <div className="flex flex-wrap gap-2">
             <span className="bg-emerald-900/80 backdrop-blur-md border border-emerald-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Lodge Frente al Mar
+              {lodgeInfo.subtitle || 'Lodge Frente al Mar • Uberlindo Andaur 222'}
             </span>
             <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
               <MapPin className="w-3 h-3 text-emerald-400" />
@@ -271,10 +301,10 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           </div>
 
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
-            Lodge Rincón de Navegantes
+            {lodgeInfo.title || 'Lodge Rincón de Navegantes'}
           </h1>
           <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
-            Ubicado en Uberlindo Andaur 222, justo en frente del mar en la Isla Robinson Crusoe. Diseñado en torno a 4 cabinas independientes (todas con baño privado y vista al océano para hasta 11 pasajeros), amplio quincho, terraza, áreas verdes y expediciones exclusivas guiadas por expertos locales.
+            {lodgeInfo.body_text || 'Ubicado en Uberlindo Andaur 222, justo en frente del mar en la Isla Robinson Crusoe. Diseñado en torno a 4 cabinas independientes (todas con baño privado y vista al océano para hasta 11 pasajeros), amplio quincho, terraza, áreas verdes y expediciones exclusivas guiadas por expertos locales.'}
           </p>
         </div>
       </section>
@@ -1154,20 +1184,258 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
             ¿Listo para Vivir la Experiencia Robinson Crusoe?
           </h3>
           <p className="text-slate-300 text-sm sm:text-lg max-w-2xl mx-auto">
-            Revisa las próximas fechas disponibles y consulta con nuestro concierge para planificar tu estadía y expedición al Archipiélago.
+            Selecciona una de nuestras 4 exclusivas habitaciones con vista al mar y asegura tu estadía directamente mediante transferencia bancaria.
           </p>
-          <div className="pt-4">
+          <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
+            <button
+              onClick={() => {
+                if (rooms.length > 0) setSelectedRoomId(rooms[0].id);
+                setShowBookingModal(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-8 py-4 rounded-xl transition shadow-xl text-sm min-h-[48px] cursor-pointer"
+            >
+              <BedDouble className="w-4 h-4 text-slate-950" />
+              <span>Reservar Habitación en el Lodge</span>
+            </button>
             <button
               onClick={() => onNavigate('/contacto')}
-              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-8 py-4 rounded-xl transition shadow-xl text-sm min-h-[48px] cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold px-6 py-4 rounded-xl transition text-sm min-h-[48px] cursor-pointer border border-slate-700"
             >
-              <Home className="w-4 h-4 text-slate-950" />
-              <span>Consultar Disponibilidad con Concierge</span>
+              <Home className="w-4 h-4 text-slate-300" />
+              <span>Consultar con Concierge</span>
             </button>
           </div>
         </div>
       </section>
 
+      {/* BOOKING MODAL */}
+      {showBookingModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-serif text-xl font-bold text-white">Reserva de Habitación • Lodge</h4>
+                <p className="text-xs text-slate-400">Rincón de Navegantes • Isla Robinson Crusoe</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBookingModal(false);
+                  setBookingSuccess(null);
+                  setBookingError(null);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {bookingSuccess ? (
+              <div className="bg-emerald-950/70 border border-emerald-500/40 rounded-2xl p-6 text-center space-y-4">
+                <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                <h5 className="font-serif text-lg font-bold text-white">¡Solicitud de Reserva Registrada!</h5>
+                <div className="bg-slate-950 p-3 rounded-xl font-mono text-emerald-300 text-xs">
+                  Código de Reserva: <strong className="text-white text-sm">{bookingSuccess.code}</strong>
+                </div>
+                <div className="text-left bg-slate-950 p-4 rounded-xl space-y-2 text-xs text-slate-300 border border-slate-800">
+                  <span className="font-bold text-white uppercase text-[10px] tracking-wider block text-emerald-400">
+                    Datos para Transferencia Bancaria
+                  </span>
+                  <div><strong>Monto Pie de Reserva (50%):</strong> ${bookingSuccess.deposit.toLocaleString('es-CL')} CLP</div>
+                  <div><strong>Banco:</strong> Banco de Chile</div>
+                  <div><strong>Titular:</strong> Yates Chile SpA</div>
+                  <div><strong>RUT:</strong> 77.892.341-K</div>
+                  <div><strong>Tipo de Cuenta:</strong> Cuenta Corriente Nº 00-123456-78</div>
+                  <div><strong>Email Comprobantes:</strong> pagos@yateschile.cl</div>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Nuestro concierge revisará tu transferencia en el panel de control y te enviará el voucher oficial de check-in.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowBookingModal(false);
+                    setBookingSuccess(null);
+                  }}
+                  className="w-full bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl text-xs"
+                >
+                  Entendido, Cerrar
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!selectedRoomId || !checkIn || !checkOut || !guestName || !guestEmail || !guestPhone) {
+                    setBookingError('Por favor completa todos los campos requeridos.');
+                    return;
+                  }
+                  setBookingLoading(true);
+                  setBookingError(null);
+
+                  const room = rooms.find((r) => r.id === selectedRoomId);
+                  const d1 = new Date(checkIn);
+                  const d2 = new Date(checkOut);
+                  const nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
+                  const total = (room?.base_price_clp || 220000) * nights;
+
+                  const res = await createBooking({
+                    roomId: selectedRoomId,
+                    guestName,
+                    guestEmail,
+                    guestPhone,
+                    guestRutPassport: guestRut,
+                    checkIn,
+                    checkOut,
+                    paxCount,
+                    totalAmount: total,
+                  });
+
+                  setBookingLoading(false);
+                  if (res.success && res.bookingCode) {
+                    setBookingSuccess({
+                      code: res.bookingCode,
+                      deposit: Math.round(total * 0.5),
+                      total,
+                    });
+                  } else {
+                    setBookingError(res.error || 'Error al procesar la reserva.');
+                  }
+                }}
+                className="space-y-4 text-xs"
+              >
+                {bookingError && (
+                  <div className="bg-rose-950/80 border border-rose-500/40 text-rose-200 p-3 rounded-xl flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{bookingError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                    Selecciona una de las 4 Habitaciones
+                  </label>
+                  <select
+                    value={selectedRoomId}
+                    onChange={(e) => setSelectedRoomId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white"
+                    required
+                  >
+                    {rooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Habitación #{r.room_number} - {r.room_name} (${r.base_price_clp.toLocaleString('es-CL')}/noche)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Fecha Check-in</label>
+                    <input
+                      type="date"
+                      value={checkIn}
+                      onChange={(e) => setCheckIn(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Fecha Check-out</label>
+                    <input
+                      type="date"
+                      value={checkOut}
+                      onChange={(e) => setCheckOut(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Nombre Completo</label>
+                  <input
+                    type="text"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="Ej: Sebastián Errázuriz"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Correo Electrónico</label>
+                    <input
+                      type="email"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      placeholder="nombre@email.com"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Teléfono / WhatsApp</label>
+                    <input
+                      type="tel"
+                      value={guestPhone}
+                      onChange={(e) => setGuestPhone(e.target.value)}
+                      placeholder="+56 9 1234 5678"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">RUT o Pasaporte</label>
+                    <input
+                      type="text"
+                      value={guestRut}
+                      onChange={(e) => setGuestRut(e.target.value)}
+                      placeholder="12.345.678-9"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Nº de Pasajeros</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3}
+                      value={paxCount}
+                      onChange={(e) => setPaxCount(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1 text-slate-300">
+                  <div className="flex justify-between font-semibold">
+                    <span>Modalidad de Pago:</span>
+                    <span className="text-emerald-400">Transferencia Bancaria (2 Cuotas)</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    Se solicita un <strong>50% de Pie</strong> para confirmar y el 50% restante antes del ingreso.
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={bookingLoading}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-extrabold py-3.5 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{bookingLoading ? 'Registrando...' : 'Solicitar Reserva & Ver Datos de Transferencia'}</span>
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+

@@ -12,6 +12,7 @@ import { ExpedicionesPage } from './pages/ExpedicionesPage';
 import { AdminPage } from './pages/AdminPage';
 import { VegvisirDetailPage } from './pages/VegvisirDetailPage';
 import { TerranovaDetailPage } from './pages/TerranovaDetailPage';
+import { analyticsService } from './services/analyticsService';
 
 export function App() {
   const [appLoading, setAppLoading] = useState<boolean>(true);
@@ -19,7 +20,7 @@ export function App() {
   const [currentPath, setCurrentPath] = useState<string>('/welcome');
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
-  // Synchronize path with URL hash for MPA experience
+  // Synchronize path with URL hash for MPA experience and track analytics
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') || '/welcome';
@@ -30,6 +31,11 @@ export function App() {
       }
       setCurrentPath(hash);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Track public page visits
+      if (hash !== '/welcome' && hash !== '/intro' && hash !== '/admin') {
+        analyticsService.trackPageView(hash);
+      }
     };
 
     handleHashChange();
@@ -76,8 +82,8 @@ export function App() {
       {/* Main Website Experience (shown when splash is closed) */}
       {!showSplash && (
         <>
-          {/* Main Header Navigation */}
-          <Header currentPath={currentPath} onNavigate={navigate} />
+          {/* Main Header Navigation (hidden in Admin) */}
+          {currentPath !== '/admin' && <Header currentPath={currentPath} onNavigate={navigate} />}
 
           {/* Multi-Page View Container */}
           <main className="flex-1">
@@ -85,16 +91,16 @@ export function App() {
             {currentPath === '/flota' && <FlotaPage onNavigate={navigate} />}
             {currentPath === '/lodge' && <LodgePage onNavigate={navigate} />}
             {currentPath === '/expediciones' && <ExpedicionesPage onNavigate={navigate} />}
-            {currentPath === '/admin' && <AdminPage />}
+            {currentPath === '/admin' && <AdminPage onNavigate={navigate} />}
             {currentPath === '/velero-vegvisir' && <VegvisirDetailPage onNavigate={navigate} />}
             {currentPath === '/yate-terranova' && <TerranovaDetailPage onNavigate={navigate} />}
           </main>
 
-          {/* Footer */}
-          <Footer onNavigate={navigate} />
+          {/* Footer (hidden in Admin) */}
+          {currentPath !== '/admin' && <Footer onNavigate={navigate} />}
 
-          {/* Persistent Concierge WhatsApp Button */}
-          <FloatingConcierge />
+          {/* Persistent Concierge WhatsApp Button (hidden in Admin) */}
+          {currentPath !== '/admin' && <FloatingConcierge />}
         </>
       )}
 

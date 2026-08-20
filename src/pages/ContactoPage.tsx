@@ -1,23 +1,37 @@
 import React from 'react';
 import { BuildYourJourney } from '../components/modules/BuildYourJourney';
 import { Phone, Mail, MapPin, Anchor, Clock } from 'lucide-react';
+import { useSiteContent } from '../hooks/useSiteContent';
 
 export const ContactoPage: React.FC = () => {
+  const { getSection } = useSiteContent();
+  const contactInfo = getSection('contact_info');
+
   return (
     <div className="space-y-0 bg-white">
       
       {/* Header Banner */}
       <section className="bg-slate-900 text-white py-20 relative overflow-hidden border-b border-slate-800">
+        {contactInfo.media_url && (
+          <>
+            <img
+              src={contactInfo.media_url}
+              alt={contactInfo.title || "Contacto"}
+              className="absolute inset-0 w-full h-full object-cover opacity-25"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent" />
+          </>
+        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider">
             <Anchor className="w-4 h-4 text-blue-400" />
-            <span>Atención Personalizada 24/7</span>
+            <span>{contactInfo.subtitle || 'Atención Personalizada 24/7'}</span>
           </div>
           <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white">
-            Contacto & Concierge Exclusivo
+            {contactInfo.title || 'Contacto & Concierge Exclusivo'}
           </h1>
           <p className="max-w-2xl mx-auto text-slate-300 text-base sm:text-lg">
-            Diseña tu itinerario a medida por Cabo de Hornos o cuéntanos tus consultas de navegación.
+            {contactInfo.body_text || 'Diseña tu itinerario a medida por Cabo de Hornos o cuéntanos tus consultas de navegación.'}
           </p>
         </div>
       </section>

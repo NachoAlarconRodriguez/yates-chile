@@ -2,12 +2,19 @@ import React from 'react';
 import { HeroCarousel } from '../components/modules/HeroCarousel';
 import { ExpeditionCalendar } from '../components/modules/ExpeditionCalendar';
 import { ArrowRight } from 'lucide-react';
+import { useSiteContent } from '../hooks/useSiteContent';
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
+  const { getSection } = useSiteContent();
+  const introSection = getSection('home_intro');
+  const vegvisirSec = getSection('flota_vegvisir');
+  const terranovaSec = getSection('flota_terranova');
+  const lodgeSec = getSection('lodge_info');
+
   return (
     <div className="space-y-0">
       
@@ -20,13 +27,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
             <span className="text-slate-600 font-bold text-xs uppercase tracking-widest bg-slate-200/80 px-3 py-1 rounded-full border border-slate-300">
-              AVENTURA EN TERRITORIOS INEXPLORADOS & PRÍSTINOS
+              {introSection.subtitle || 'AVENTURA EN TERRITORIOS INEXPLORADOS & PRÍSTINOS'}
             </span>
             <h2 className="font-serif text-3xl sm:text-5xl font-bold text-slate-900">
-              Tres Formas de Vivir la Aventura Austral
+              {introSection.title || 'Tres Formas de Vivir la Aventura Austral'}
             </h2>
             <p className="text-slate-600 text-base sm:text-lg">
-              Explora el Archipiélago Juan Fernández, Isla Alejandro Selkirk y los fiordos del Cabo de Hornos a través de nuestras tres experiencias exclusivas.
+              {introSection.body_text || 'Explora el Archipiélago Juan Fernández, Isla Alejandro Selkirk y los fiordos del Cabo de Hornos a través de nuestras tres experiencias exclusivas.'}
             </p>
           </div>
 
@@ -38,7 +45,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
-                src="https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1"
+                src={vegvisirSec.media_url || "https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1"}
                 alt="Velero Vegvisir"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -48,11 +55,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <h3 className="font-serif text-xl font-bold text-white group-hover:text-stone-200 transition-colors w-fit">
                     <span className="relative pb-1 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-stone-200 after:transition-all after:duration-500 group-hover:after:w-full">
-                      Velero Vegvisir
+                      {vegvisirSec.title ? vegvisirSec.title.split('(')[0].trim() : 'Velero Vegvisir'}
                     </span>
                   </h3>
-                  <p className="text-slate-300 text-xs leading-relaxed opacity-95">
-                    Velero Dufour 52.5 ft francés de expedición (12 PAX • 5 cabinas • 5 baños) con Starlink 24/7 y autonomía total.
+                  <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
+                    {vegvisirSec.body_text || 'Velero Dufour 52.5 ft francés de expedición (12 PAX • 5 cabinas • 5 baños) con Starlink 24/7 y autonomía total.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
@@ -68,7 +75,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
-                src="/yate-terranova.jpg"
+                src={terranovaSec.media_url || "/yate-terranova.jpg"}
                 alt="Yate Terranova"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -78,11 +85,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <h3 className="font-serif text-xl font-bold text-white group-hover:text-stone-200 transition-colors w-fit">
                     <span className="relative pb-1 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-stone-200 after:transition-all after:duration-500 group-hover:after:w-full">
-                      Yate Terranova
+                      {terranovaSec.title ? terranovaSec.title.split('(')[0].trim() : 'Yate Terranova'}
                     </span>
                   </h3>
-                  <p className="text-slate-300 text-xs leading-relaxed opacity-95">
-                    Yate Hatteras 65ft LRC americano de 3 cubiertas (20 PAX • 5 cabinas • 5 baños) con 3.000 MN de autonomía y Starlink 24/7.
+                  <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
+                    {terranovaSec.body_text || 'Yate Hatteras 65ft LRC americano de 3 cubiertas (20 PAX • 5 cabinas • 5 baños) con 3.000 MN de autonomía y Starlink 24/7.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
@@ -98,7 +105,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
-                src="/rincon-de-navegantes.jpg"
+                src={lodgeSec.media_url || "/rincon-de-navegantes.jpg"}
                 alt="Lodge Rincón de Navegantes"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -108,11 +115,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <h3 className="font-serif text-xl font-bold text-white group-hover:text-stone-200 transition-colors w-fit">
                     <span className="relative pb-1 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-stone-200 after:transition-all after:duration-500 group-hover:after:w-full">
-                      Lodge Rincón de Navegantes
+                      {lodgeSec.title || 'Lodge Rincón de Navegantes'}
                     </span>
                   </h3>
-                  <p className="text-slate-300 text-xs leading-relaxed opacity-95">
-                    Lodge frente al mar en Uberlindo Andaur 222 (11 PAX • 4 cabinas con baño privado), amplio quincho, terraza y exploraciones en Robinson Crusoe.
+                  <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
+                    {lodgeSec.body_text || 'Lodge frente al mar en Uberlindo Andaur 222 (11 PAX • 4 cabinas con baño privado), amplio quincho, terraza y exploraciones en Robinson Crusoe.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">

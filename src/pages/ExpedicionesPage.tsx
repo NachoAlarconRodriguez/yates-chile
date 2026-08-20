@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { EXPEDITIONS, type Expedition } from '../components/modules/ExpeditionCalendar';
+import { useSiteContent } from '../hooks/useSiteContent';
 import { 
   Compass, 
   Download, 
@@ -154,6 +155,9 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
   const [downloadSent, setDownloadSent] = useState(false);
   const [selectedExpedition, setSelectedExpedition] = useState<Expedition | null>(null);
 
+  const { getSection } = useSiteContent();
+  const expHero = getSection('expeditions_hero');
+
   const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition) : null;
 
   const handleBrochureDownload = (e: React.FormEvent) => {
@@ -184,16 +188,26 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
       
       {/* Header Banner */}
       <section className="bg-slate-900 text-white py-20 relative overflow-hidden border-b border-slate-800">
+        {expHero.media_url && (
+          <>
+            <img
+              src={expHero.media_url}
+              alt={expHero.title || "Expediciones"}
+              className="absolute inset-0 w-full h-full object-cover opacity-25"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent" />
+          </>
+        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider">
             <Compass className="w-4 h-4 text-blue-400" />
-            <span>Itinerarios de Navegación Austral</span>
+            <span>{expHero.subtitle || 'Itinerarios de Navegación Austral'}</span>
           </div>
           <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white">
-            Expediciones & Rutas Marítimas
+            {expHero.title || 'Expediciones & Rutas Marítimas'}
           </h1>
           <p className="max-w-2xl mx-auto text-slate-350 text-base sm:text-lg">
-            Descubre nuestras travesías disponibles para reserva inmediata. Explora las rutas del calendario y consulta por tu cupo a bordo.
+            {expHero.body_text || 'Descubre nuestras travesías disponibles para reserva inmediata. Explora las rutas del calendario y consulta por tu cupo a bordo.'}
           </p>
         </div>
       </section>

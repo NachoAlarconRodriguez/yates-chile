@@ -120,11 +120,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         {/* Row 2: SERNATUR Institutional Accreditation Seal */}
         <div className="py-4 my-2 border-b border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="bg-white/95 p-1 rounded-lg shadow-sm shrink-0 border border-white/20">
+            <div className="shrink-0 flex items-center justify-center">
               <img
                 src="/sernatur-logo.png"
-                alt="Sernatur — Servicio Nacional de Turismo | Gobierno de Chile"
-                className="h-10 w-auto object-contain rounded"
+                alt="Sernatur — Registro Nacional de Servicios Turísticos | Gobierno de Chile"
+                className="h-12 w-auto object-contain drop-shadow-md"
               />
             </div>
             <div className="flex flex-col text-left">

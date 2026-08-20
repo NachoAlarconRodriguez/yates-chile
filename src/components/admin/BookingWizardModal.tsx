@@ -1,0 +1,1670 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  XCircle,
+  Ship,
+  BedDouble,
+  Plane,
+  Compass,
+  Calendar,
+  Users,
+  CreditCard,
+  CheckCircle2,
+  ChevronRight,
+  ChevronLeft,
+  DollarSign,
+  Percent,
+  Sparkles,
+  ShieldCheck,
+  Sailboat,
+  AlertCircle,
+  Check,
+  Clock
+} from 'lucide-react';
+
+export interface BookingWizardData {
+  bookingCode: string;
+  categories: string[];
+  selectedPrograms: {
+    id: string;
+    title: string;
+    categoryLabel: string;
+    priceClp: number;
+    unitType: 'pax' | 'fixed' | 'night';
+  }[];
+  startDate: string;
+  endDate: string;
+  durationNights: number;
+  passengersCount: number;
+  passengers: {
+    fullName: string;
+    rutOrPassport: string;
+    birthDate?: string;
+    email: string;
+    phone: string;
+    nationality: string;
+    dietaryPreferences?: string;
+    notes?: string;
+  }[];
+  paymentMethod: 'transfer' | 'credit_card' | 'cash' | 'airbnb' | 'invoice';
+  discountType: 'none' | 'percent' | 'amount';
+  discountValue: number;
+  installmentsCount: number;
+  specialNotes?: string;
+  totalAmountClp: number;
+}
+
+interface BookingWizardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirmBooking: (data: BookingWizardData) => void;
+}
+
+// PROGRAM CATALOG WITH INCLUDED ASSETS TAGS
+export const ASSET_META: Record<string, { label: string; icon: any; color: string }> = {
+  vegvisir: { label: 'Velero Vegvisir', icon: Sailboat, color: 'bg-sky-50 text-sky-800 border-sky-200' },
+  terranova: { label: 'Yate Terranova', icon: Ship, color: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+  lodge: { label: 'Lodge Rincón', icon: BedDouble, color: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  servicios: { label: 'Excursiones', icon: Compass, color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  aeronave: { label: 'Aeronave / Vuelo', icon: Plane, color: 'bg-purple-50 text-purple-800 border-purple-200' },
+};
+
+const CATALOG_PROGRAMS = [
+  // ----------------------------------------------------
+  // PAQUETES COMBINADOS (MÚLTIPLES ACTIVOS SIMULTÁNEOS)
+  // ----------------------------------------------------
+  {
+    id: 'prog-combo-veg-lodge',
+    title: 'Paquete Mar & Refugio: Expedición Velero Vegvisir + Estadía en Lodge Rincón',
+    category: 'combo',
+    categoryLabel: 'Paquete Combinado (Velero + Lodge)',
+    includedAssets: ['vegvisir', 'lodge'],
+    duration: '8 Días / 7 Noches',
+    priceClp: 2450000,
+    unitType: 'pax' as const,
+    description: 'Navegación oceánica a vela por el archipiélago y descanso en cabinas privadas frente al mar con pensión completa.',
+    paxLimit: 6,
+  },
+  {
+    id: 'prog-combo-terra-lodge',
+    title: 'Travesía Alejandro Selkirk en Yate Terranova + Estadía en Lodge Rincón',
+    category: 'combo',
+    categoryLabel: 'Paquete Combinado (Terranova + Lodge)',
+    includedAssets: ['terranova', 'lodge'],
+    duration: '9 Días / 8 Noches',
+    priceClp: 2750000,
+    unitType: 'pax' as const,
+    description: 'Expedición en yate motorizado de 60 ft hacia Isla Más Afuera combinado con hospedaje de lujo en Bahía Cumberland.',
+    paxLimit: 8,
+  },
+  {
+    id: 'prog-combo-lodge-serv',
+    title: 'Pack Aventura Terrestre & Submarina: Lodge Rincón + Buceo & Cabalgatas',
+    category: 'combo',
+    categoryLabel: 'Paquete Combinado (Lodge + Excursiones)',
+    includedAssets: ['lodge', 'servicios'],
+    duration: '5 Días / 4 Noches',
+    priceClp: 980000,
+    unitType: 'pax' as const,
+    description: 'Hospedaje en Lodge Rincón de Navegantes con salidas de buceo con lobos marinos y cabalgatas a los miradores.',
+    paxLimit: 8,
+  },
+  {
+    id: 'prog-combo-veg-serv',
+    title: 'Expedición Náutica a Vela Vegvisir + Jornadas de Buceo & Pesca de Altura',
+    category: 'combo',
+    categoryLabel: 'Paquete Combinado (Velero + Excursiones)',
+    includedAssets: ['vegvisir', 'servicios'],
+    duration: '7 Días / 6 Noches',
+    priceClp: 1950000,
+    unitType: 'pax' as const,
+    description: 'Travesía a bordo del catamarán Vegvisir con inmersiones de buceo PADI y expedición marina guiada.',
+    paxLimit: 6,
+  },
+  {
+    id: 'prog-combo-veg-lodge-aero',
+    title: 'Paquete All-Inclusive: Vuelo Regular Santiago ⇄ Isla + Velero Vegvisir + Lodge Rincón',
+    category: 'combo',
+    categoryLabel: 'Paquete Integral (Vuelo + Velero + Lodge)',
+    includedAssets: ['vegvisir', 'lodge', 'aeronave'],
+    duration: '8 Días / 7 Noches',
+    priceClp: 3150000,
+    unitType: 'pax' as const,
+    description: 'Experiencia completa que cubre traslados aéreos ida y vuelta, expedición náutica a vela y noches en el Lodge.',
+    paxLimit: 6,
+  },
+  {
+    id: 'prog-combo-terra-lodge-aero',
+    title: 'Gran Expedición VIP: Vuelo Privado King Air + Yate Terranova + Lodge Rincón',
+    category: 'combo',
+    categoryLabel: 'Paquete Integral (Vuelo + Terranova + Lodge)',
+    includedAssets: ['terranova', 'lodge', 'aeronave'],
+    duration: '9 Días / 8 Noches',
+    priceClp: 3600000,
+    unitType: 'pax' as const,
+    description: 'Chárter aéreo ejecutivo privado, navegación en yate de 60 ft y hospedaje exclusivo con chef privado.',
+    paxLimit: 8,
+  },
+  {
+    id: 'prog-combo-full-360',
+    title: 'Experiencia Máxima Robinson Crusoe 360° (Vuelo + Velero + Lodge + Excursiones)',
+    category: 'combo',
+    categoryLabel: 'Paquete Total 360°',
+    includedAssets: ['vegvisir', 'lodge', 'servicios', 'aeronave'],
+    duration: '8 Días / 7 Noches',
+    priceClp: 3650000,
+    unitType: 'pax' as const,
+    description: 'Paquete todo incluido con vuelos, expedición a vela Vegvisir, descanso en Lodge Rincón y todas las excursiones guiadas.',
+    paxLimit: 6,
+  },
+  {
+    id: 'prog-combo-terra-full-360',
+    title: 'Experiencia Gran Oceánica Terranova 360° (Vuelo + Yate Terranova + Lodge + Excursiones)',
+    category: 'combo',
+    categoryLabel: 'Paquete Total 360°',
+    includedAssets: ['terranova', 'lodge', 'servicios', 'aeronave'],
+    duration: '9 Días / 8 Noches',
+    priceClp: 3950000,
+    unitType: 'pax' as const,
+    description: 'El paquete más exclusivo del archipiélago: vuelo directo, crucero de expedición en Terranova, Lodge y gastronomía de autor.',
+    paxLimit: 8,
+  },
+
+  // ----------------------------------------------------
+  // OPCIONES INDIVIDUALES (UN SOLO ACTIVO)
+  // ----------------------------------------------------
+  // VEGVISIR SOLO
+  {
+    id: 'prog-veg-1',
+    title: 'Expedición Selkirk & Robinson Crusoe (Velero Vegvisir)',
+    category: 'vegvisir',
+    categoryLabel: 'Velero Vegvisir',
+    includedAssets: ['vegvisir'],
+    duration: '7 Días / 6 Noches',
+    priceClp: 1850000,
+    unitType: 'pax' as const,
+    description: 'Navegación a vela por el archipiélago histórico con avistamiento y trekking.',
+    paxLimit: 6,
+  },
+  {
+    id: 'prog-veg-2',
+    title: 'Vuelta al Archipiélago & Buceo con Lobos (Velero Vegvisir)',
+    category: 'vegvisir',
+    categoryLabel: 'Velero Vegvisir',
+    includedAssets: ['vegvisir'],
+    duration: '7 Días / 6 Noches',
+    priceClp: 1750000,
+    unitType: 'pax' as const,
+    description: 'Inmersiones en aguas cristalinas y circunnavegación de Santa Clara.',
+    paxLimit: 6,
+  },
+  {
+    id: 'prog-veg-3',
+    title: 'Chárter Exclusivo Privado Velero Vegvisir',
+    category: 'vegvisir',
+    categoryLabel: 'Velero Vegvisir',
+    includedAssets: ['vegvisir'],
+    duration: '7 Días / 6 Noches',
+    priceClp: 11000000,
+    unitType: 'fixed' as const,
+    description: 'Barco completo con patrón y chef privado para hasta 6 navegantes.',
+    paxLimit: 6,
+  },
+
+  // TERRANOVA SOLO
+  {
+    id: 'prog-terra-1',
+    title: 'Travesía Alejandro Selkirk Extremo (Yate Terranova)',
+    category: 'terranova',
+    categoryLabel: 'Yate Terranova',
+    includedAssets: ['terranova'],
+    duration: '8 Días / 7 Noches',
+    priceClp: 2100000,
+    unitType: 'pax' as const,
+    description: 'Navegación oceánica de alto confort hacia la remota Isla Más Afuera.',
+    paxLimit: 8,
+  },
+  {
+    id: 'prog-terra-2',
+    title: 'Chárter Ejecutivo Oceánico Yate Terranova',
+    category: 'terranova',
+    categoryLabel: 'Yate Terranova',
+    includedAssets: ['terranova'],
+    duration: '8 Días / 7 Noches',
+    priceClp: 14500000,
+    unitType: 'fixed' as const,
+    description: 'Yate oceánico exclusivo de 60 pies para grupos privados de hasta 8 personas.',
+    paxLimit: 8,
+  },
+
+  // LODGE SOLO
+  {
+    id: 'prog-lodge-1',
+    title: 'Habitación Proa #1 (Triple Vista Océano) — Lodge Rincón',
+    category: 'lodge',
+    categoryLabel: 'Lodge Rincón',
+    includedAssets: ['lodge'],
+    duration: 'Por noche',
+    priceClp: 240000,
+    unitType: 'night' as const,
+    description: 'Vista panorámica a Bahía Cumberland con terraza privada y desayuno isleño.',
+    paxLimit: 3,
+  },
+  {
+    id: 'prog-lodge-2',
+    title: 'Habitación Barlovento #2 (Triple Vista Océano) — Lodge Rincón',
+    category: 'lodge',
+    categoryLabel: 'Lodge Rincón',
+    includedAssets: ['lodge'],
+    duration: 'Por noche',
+    priceClp: 240000,
+    unitType: 'night' as const,
+    description: 'Cabina superior con chimenea a leña y ventanales al mar.',
+    paxLimit: 3,
+  },
+  {
+    id: 'prog-lodge-3',
+    title: 'Habitación Sotavento #3 (Triple Vista Océano) — Lodge Rincón',
+    category: 'lodge',
+    categoryLabel: 'Lodge Rincón',
+    includedAssets: ['lodge'],
+    duration: 'Por noche',
+    priceClp: 240000,
+    unitType: 'night' as const,
+    description: 'Silenciosa cabina equipada para familias o expedicionarios.',
+    paxLimit: 3,
+  },
+  {
+    id: 'prog-lodge-4',
+    title: 'Habitación Popa #4 (Doble Matrimonial) — Lodge Rincón',
+    category: 'lodge',
+    categoryLabel: 'Lodge Rincón',
+    includedAssets: ['lodge'],
+    duration: 'Por noche',
+    priceClp: 210000,
+    unitType: 'night' as const,
+    description: 'Suite íntima frente al mar ideal para parejas.',
+    paxLimit: 2,
+  },
+
+  // SERVICIOS SOLO
+  {
+    id: 'prog-serv-1',
+    title: 'Expedición de Buceo con Lobos Marinos de Dos Pelos',
+    category: 'servicios',
+    categoryLabel: 'Servicios & Excursiones',
+    includedAssets: ['servicios'],
+    duration: '4 horas',
+    priceClp: 120000,
+    unitType: 'pax' as const,
+    description: 'Incluye equipo completo, lancha de apoyo y guía biólogo marino.',
+    paxLimit: 6,
+  },
+  {
+    id: 'prog-serv-2',
+    title: 'Cabalgata al Mirador de Selkirk & Cerro Pascua',
+    category: 'servicios',
+    categoryLabel: 'Servicios & Excursiones',
+    includedAssets: ['servicios'],
+    duration: '5 horas',
+    priceClp: 65000,
+    unitType: 'pax' as const,
+    description: 'Ruta ecuestre por los senderos de bosque nativo y miradores oceánicos.',
+    paxLimit: 8,
+  },
+  {
+    id: 'prog-serv-3',
+    title: 'Degustación Gastronómica de Langosta de Juan Fernández',
+    category: 'servicios',
+    categoryLabel: 'Servicios & Excursiones',
+    includedAssets: ['servicios'],
+    duration: 'Cena / Almuerzo',
+    priceClp: 85000,
+    unitType: 'pax' as const,
+    description: 'Menú maridado con vinos chilenos de alta gama en el comedor del Lodge.',
+    paxLimit: 12,
+  },
+
+  // AERONAVE SOLO
+  {
+    id: 'prog-aero-1',
+    title: 'Vuelo Regular Santiago (SCL) ⇄ Juan Fernández (SCIR)',
+    category: 'aeronave',
+    categoryLabel: 'Aeronave & Vuelos',
+    includedAssets: ['aeronave'],
+    duration: '2.5 hrs por tramo',
+    priceClp: 650000,
+    unitType: 'pax' as const,
+    description: 'Pasaje aéreo ida y vuelta con 15kg de equipaje por pasajero.',
+    paxLimit: 9,
+  },
+  {
+    id: 'prog-aero-2',
+    title: 'Vuelo Charter Privado Ejecutivo King Air B200',
+    category: 'aeronave',
+    categoryLabel: 'Aeronave & Vuelos',
+    includedAssets: ['aeronave'],
+    duration: '2 hrs por tramo',
+    priceClp: 4800000,
+    unitType: 'fixed' as const,
+    description: 'Aeronave biturbina presurizada exclusiva para itinerarios a medida.',
+    paxLimit: 7,
+  },
+];
+
+export interface ProgramDeparture {
+  id: string;
+  startDate: string;
+  endDate: string;
+  label: string;
+  durationLabel: string;
+  status: 'confirmada' | 'abierta' | 'ultimos_cupos';
+  availableSlots: number;
+}
+
+const DEFAULT_PROGRAM_DEPARTURES: ProgramDeparture[] = [
+  {
+    id: 'dep-oct-1',
+    startDate: '2026-10-15',
+    endDate: '2026-10-22',
+    label: '15 Octubre — 22 Octubre 2026',
+    durationLabel: '8 Días / 7 Noches',
+    status: 'confirmada',
+    availableSlots: 4,
+  },
+  {
+    id: 'dep-nov-1',
+    startDate: '2026-11-05',
+    endDate: '2026-11-12',
+    label: '05 Noviembre — 12 Noviembre 2026',
+    durationLabel: '8 Días / 7 Noches',
+    status: 'confirmada',
+    availableSlots: 6,
+  },
+  {
+    id: 'dep-nov-2',
+    startDate: '2026-11-20',
+    endDate: '2026-11-27',
+    label: '20 Noviembre — 27 Noviembre 2026',
+    durationLabel: '8 Días / 7 Noches',
+    status: 'ultimos_cupos',
+    availableSlots: 2,
+  },
+  {
+    id: 'dep-dic-1',
+    startDate: '2026-12-10',
+    endDate: '2026-12-17',
+    label: '10 Diciembre — 17 Diciembre 2026',
+    durationLabel: '8 Días / 7 Noches',
+    status: 'abierta',
+    availableSlots: 8,
+  },
+  {
+    id: 'dep-ene-1',
+    startDate: '2027-01-08',
+    endDate: '2027-01-15',
+    label: '08 Enero — 15 Enero 2027',
+    durationLabel: '8 Días / 7 Noches',
+    status: 'abierta',
+    availableSlots: 6,
+  },
+  {
+    id: 'dep-feb-1',
+    startDate: '2027-02-05',
+    endDate: '2027-02-12',
+    label: '05 Febrero — 12 Febrero 2027',
+    durationLabel: '8 Días / 7 Noches',
+    status: 'abierta',
+    availableSlots: 6,
+  },
+];
+
+export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirmBooking,
+}) => {
+  // Step state (1 to 6)
+  const [currentStep, setCurrentStep] = useState<number>(1);
+
+  // Step 1: Selected Categories
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['vegvisir', 'lodge']);
+
+  // Step 2: Selected Program IDs
+  const [selectedProgramIds, setSelectedProgramIds] = useState<string[]>(['prog-combo-veg-lodge']);
+
+  // Step 3: Dates & Selected Departure ID
+  const [selectedDepartureId, setSelectedDepartureId] = useState<string>('dep-oct-1');
+  const [startDate, setStartDate] = useState<string>('2026-10-15');
+  const [endDate, setEndDate] = useState<string>('2026-10-22');
+
+  // Step 4: Passengers
+  const [passengersCount, setPassengersCount] = useState<number>(1);
+  const [passengers, setPassengers] = useState<
+    {
+      fullName: string;
+      rutOrPassport: string;
+      birthDate: string;
+      email: string;
+      phone: string;
+      nationality: string;
+      dietaryPreferences: string;
+      notes: string;
+    }[]
+  >([
+    {
+      fullName: '',
+      rutOrPassport: '',
+      birthDate: '',
+      email: '',
+      phone: '',
+      nationality: 'Chilena',
+      dietaryPreferences: '',
+      notes: '',
+    },
+  ]);
+
+  // Step 5: Payment & Installments
+  const paymentMethod: 'transfer' | 'credit_card' | 'cash' | 'airbnb' | 'invoice' = 'transfer';
+  const [discountType, setDiscountType] = useState<'none' | 'percent' | 'amount'>('none');
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [installmentsCount, setInstallmentsCount] = useState<number>(2);
+  const [specialNotes, setSpecialNotes] = useState<string>('');
+
+  // Custom In-App Notification State
+  const [notification, setNotification] = useState<{
+    title: string;
+    message: string;
+    type?: 'warning' | 'error' | 'info';
+  } | null>(null);
+
+  const showNotification = (message: string, title = 'Atención Requerida', type: 'warning' | 'error' | 'info' = 'warning') => {
+    setNotification({ title, message, type });
+  };
+
+  // Toggle category in Step 1
+  const toggleCategory = (catId: string) => {
+    if (selectedCategories.includes(catId)) {
+      if (selectedCategories.length === 1) {
+        showNotification('Debe mantener al menos una opción seleccionada.', 'Selección Mínima');
+        return;
+      }
+      setSelectedCategories(selectedCategories.filter((c) => c !== catId));
+    } else {
+      setSelectedCategories([...selectedCategories, catId]);
+    }
+  };
+
+  // Single selection of program in Step 2 (Radio behavior: only 1 package at a time)
+  const selectProgram = (progId: string) => {
+    setSelectedProgramIds([progId]);
+  };
+
+  // Filter programs based on Step 1: MUST include ALL selected categories (AND logic)
+  const availablePrograms = useMemo(() => {
+    return CATALOG_PROGRAMS.filter((prog) =>
+      selectedCategories.every((catId) => prog.includedAssets.includes(catId))
+    );
+  }, [selectedCategories]);
+
+  // Selected program data
+  const selectedProgramsData = useMemo(() => {
+    return CATALOG_PROGRAMS.filter((p) => selectedProgramIds.includes(p.id));
+  }, [selectedProgramIds]);
+
+  const activeSelectedProgram = selectedProgramsData[0] || availablePrograms[0] || CATALOG_PROGRAMS[0];
+
+  // Sync selectedProgramIds when availablePrograms change
+  useEffect(() => {
+    if (availablePrograms.length > 0) {
+      const hasValidSelection = selectedProgramIds.some((id) =>
+        availablePrograms.some((p) => p.id === id)
+      );
+      if (!hasValidSelection) {
+        setSelectedProgramIds([availablePrograms[0].id]);
+      }
+    } else {
+      setSelectedProgramIds([]);
+    }
+  }, [availablePrograms]);
+
+  // Select departure handler in Step 3
+  const handleSelectDeparture = (dep: ProgramDeparture) => {
+    setSelectedDepartureId(dep.id);
+    setStartDate(dep.startDate);
+    setEndDate(dep.endDate);
+  };
+
+  // Sync passengers list length with passengersCount
+  const handlePaxCountChange = (newCount: number) => {
+    const clamped = Math.max(1, Math.min(12, newCount));
+    setPassengersCount(clamped);
+    if (clamped > passengers.length) {
+      const added = Array.from({ length: clamped - passengers.length }, () => ({
+        fullName: '',
+        rutOrPassport: '',
+        birthDate: '',
+        email: '',
+        phone: '',
+        nationality: 'Chilena',
+        dietaryPreferences: '',
+        notes: '',
+      }));
+      setPassengers([...passengers, ...added]);
+    } else if (clamped < passengers.length) {
+      setPassengers(passengers.slice(0, clamped));
+    }
+  };
+
+const formatRut = (value: string): string => {
+  const clean = value.replace(/[\s.-]/g, '');
+  if (clean.length === 0) return '';
+  
+  // If it contains non-RUT characters (like international passport with letters), keep upper
+  if (/[^0-9kK]/.test(clean)) {
+    return clean.toUpperCase();
+  }
+  
+  const limited = clean.substring(0, 9);
+  if (limited.length === 1) {
+    return limited.toUpperCase();
+  }
+  
+  const body = limited.slice(0, -1);
+  const dv = limited.slice(-1).toUpperCase();
+  
+  let formattedBody = '';
+  let count = 0;
+  for (let i = body.length - 1; i >= 0; i--) {
+    formattedBody = body.charAt(i) + formattedBody;
+    count++;
+    if (count === 3 && i > 0) {
+      formattedBody = '.' + formattedBody;
+      count = 0;
+    }
+  }
+  
+  return `${formattedBody}-${dv}`;
+};
+
+  const updatePassengerField = (index: number, field: string, value: string) => {
+    const updated = [...passengers];
+    const finalValue = field === 'rutOrPassport' ? formatRut(value) : value;
+    updated[index] = { ...updated[index], [field]: finalValue };
+    setPassengers(updated);
+  };
+
+  // Calculation of Nights
+  const calculatedNights = useMemo(() => {
+    if (!startDate || !endDate) return 1;
+    const diffTime = Math.abs(new Date(endDate).getTime() - new Date(startDate).getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(1, diffDays);
+  }, [startDate, endDate]);
+
+  // Financial Calculations
+  const subtotalClp = useMemo(() => {
+    return selectedProgramsData.reduce((acc, prog) => {
+      if (prog.unitType === 'pax') {
+        return acc + prog.priceClp * passengersCount;
+      } else if (prog.unitType === 'night') {
+        return acc + prog.priceClp * calculatedNights;
+      } else {
+        return acc + prog.priceClp; // fixed
+      }
+    }, 0);
+  }, [selectedProgramsData, passengersCount, calculatedNights]);
+
+  const calculatedDiscountClp = useMemo(() => {
+    if (discountType === 'percent') {
+      return Math.round((subtotalClp * discountPercent) / 100);
+    } else if (discountType === 'amount') {
+      return Math.min(subtotalClp, discountAmount);
+    }
+    return 0;
+  }, [subtotalClp, discountType, discountPercent, discountAmount]);
+
+  const totalFinalClp = Math.max(0, subtotalClp - calculatedDiscountClp);
+  const installmentAmountClp = Math.round(totalFinalClp / installmentsCount);
+
+  // Validation before advancing
+  const canProceed = () => {
+    if (currentStep === 1) return selectedCategories.length > 0;
+    if (currentStep === 2) return selectedProgramIds.length > 0;
+    if (currentStep === 3) return Boolean(startDate && endDate && startDate <= endDate);
+    if (currentStep === 4) {
+      // Must at least have Passenger 1 (Lead passenger) filled
+      const lead = passengers[0];
+      return Boolean(lead && lead.fullName.trim() && lead.email.trim());
+    }
+    if (currentStep === 5) return true;
+    return true;
+  };
+
+  const handleNext = () => {
+    if (!canProceed()) {
+      if (currentStep === 4) {
+        showNotification('Por favor complete al menos el nombre y correo del pasajero principal (Titular de Reserva).', 'Datos Requeridos');
+      } else if (currentStep === 3) {
+        showNotification('Por favor seleccione una fecha de salida programada para continuar.', 'Fecha Requerida');
+      } else if (currentStep === 1) {
+        showNotification('Debe seleccionar al menos una opción para continuar.', 'Opciones Requeridas');
+      } else if (currentStep === 2) {
+        showNotification('Debe seleccionar un programa o paquete para continuar.', 'Programa Requerido');
+      } else {
+        showNotification('Por favor complete los campos requeridos para continuar.', 'Atención');
+      }
+      return;
+    }
+    setCurrentStep((prev) => Math.min(6, prev + 1));
+  };
+
+  const handleBack = () => {
+    setCurrentStep((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleFinalSubmit = () => {
+    const randomCode = `RES-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalData: BookingWizardData = {
+      bookingCode: randomCode,
+      categories: selectedCategories,
+      selectedPrograms: selectedProgramsData.map((p) => ({
+        id: p.id,
+        title: p.title,
+        categoryLabel: p.category,
+        priceClp: p.priceClp,
+        unitType: p.unitType,
+      })),
+      startDate,
+      endDate,
+      durationNights: calculatedNights,
+      passengersCount,
+      passengers: passengers.slice(0, passengersCount),
+      paymentMethod,
+      discountType,
+      discountValue: discountType === 'percent' ? discountPercent : discountAmount,
+      installmentsCount,
+      specialNotes,
+      totalAmountClp: totalFinalClp,
+    };
+
+    onConfirmBooking(finalData);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#0a1e34]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+      <div className="max-w-4xl w-full bg-white border border-slate-200/90 rounded-3xl shadow-[0_25px_60px_rgba(15,43,72,0.2)] overflow-hidden flex flex-col my-auto max-h-[92vh]">
+        
+        {/* HEADER MODAL */}
+        <div className="px-6 py-4 bg-[#fbfcfd] border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#0f2b48] text-white flex items-center justify-center shadow-md">
+              <Sparkles className="w-5 h-5 text-sky-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] uppercase font-mono font-bold tracking-widest text-[#0f2b48]/70 block">
+                  Asistente de Reservas Yates Chile
+                </span>
+                <span className="text-[9px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.2 rounded-full font-mono">
+                  Paso {currentStep} de 6
+                </span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-[#0f2b48] leading-tight">
+                Registrar Nueva Reserva Oficial
+              </h3>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-[#0f2b48] p-1.5 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+          >
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* STEP PROGRESS BAR */}
+        <div className="px-6 py-3 bg-slate-50/70 border-b border-slate-100 shrink-0">
+          <div className="grid grid-cols-6 gap-2">
+            {[
+              { step: 1, label: '1. Opciones' },
+              { step: 2, label: '2. Programas' },
+              { step: 3, label: '3. Fechas' },
+              { step: 4, label: '4. Pasajeros' },
+              { step: 5, label: '5. Pago' },
+              { step: 6, label: '6. Resumen' },
+            ].map((s) => {
+              const isDone = currentStep > s.step;
+              const isCurrent = currentStep === s.step;
+              return (
+                <div key={s.step} className="flex flex-col gap-1 text-center">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      isDone
+                        ? 'bg-emerald-500'
+                        : isCurrent
+                        ? 'bg-[#0f2b48]'
+                        : 'bg-slate-200'
+                    }`}
+                  />
+                  <span
+                    className={`text-[10px] font-mono font-bold truncate ${
+                      isCurrent
+                        ? 'text-[#0f2b48]'
+                        : isDone
+                        ? 'text-emerald-700'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* BODY CONTAINER (SCROLLABLE) */}
+        <div className="p-6 overflow-y-auto flex-1 text-slate-700 text-xs">
+          
+          {/* ========================================================================= */}
+          {/* PASO 1: SELECCIONAR COMPONENTES / ACTIVOS (SOLO ÍCONOS CIRCULARES) */}
+          {/* ========================================================================= */}
+          {currentStep === 1 && (
+            <div className="space-y-6 py-4 animate-fadeIn">
+              <div className="space-y-1 text-center">
+                <h4 className="font-serif text-lg font-bold text-[#0f2b48]">
+                  Paso 1: Selecciona las opciones que compondrán esta reserva
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Haz clic en los íconos circulares para activar o desactivar los servicios de la experiencia.
+                </p>
+              </div>
+
+              {/* CIRCULAR ICON BUTTONS */}
+              <div className="flex flex-wrap items-center justify-center gap-5 sm:gap-7 py-6">
+                {[
+                  {
+                    id: 'vegvisir',
+                    title: 'Velero Vegvisir',
+                    icon: Sailboat,
+                  },
+                  {
+                    id: 'terranova',
+                    title: 'Yate Terranova',
+                    icon: Ship,
+                  },
+                  {
+                    id: 'lodge',
+                    title: 'Lodge Rincón de Navegantes',
+                    icon: BedDouble,
+                  },
+                  {
+                    id: 'servicios',
+                    title: 'Servicios & Excursiones',
+                    icon: Compass,
+                  },
+                  {
+                    id: 'aeronave',
+                    title: 'Aeronave & Vuelos',
+                    icon: Plane,
+                  },
+                ].map((item) => {
+                  const isSelected = selectedCategories.includes(item.id);
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.id} className="relative group/iconbtn flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleCategory(item.id)}
+                        className={`w-18 h-18 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-md hover:scale-110 active:scale-95 relative border-2 ${
+                          isSelected
+                            ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-lg shadow-[#0f2b48]/30 scale-105 ring-4 ring-sky-100'
+                            : 'bg-white text-slate-400 border-slate-200 hover:border-[#0f2b48]/40 hover:text-[#0f2b48] hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon className="w-8 h-8" />
+
+                        {/* CHECKMARK BADGE WHEN SELECTED */}
+                        {isSelected && (
+                          <div className="absolute -top-1 -right-1 w-5.5 h-5.5 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-md border-2 border-white animate-scale-in">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+
+                      {/* HOVER TOOLTIP */}
+                      <div className="absolute bottom-full mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/iconbtn:opacity-100 group-hover/iconbtn:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
+                        {item.title}
+                        <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-sky-50/70 border border-sky-200/80 p-3.5 rounded-2xl flex items-center justify-center gap-2 text-sky-900 text-xs font-medium max-w-lg mx-auto text-center">
+                <Sparkles className="w-4 h-4 text-sky-600 shrink-0" />
+                <span>
+                  <strong>{selectedCategories.length} opciones seleccionadas</strong>. Presiona <em>Siguiente Paso</em> para ver sus programas.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* PASO 2: PROGRAMAS Y SERVICIOS FILTRADOS */}
+          {/* ========================================================================= */}
+          {currentStep === 2 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-1">
+                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                  Paso 2: Selecciona los programas o servicios a incluir
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Se muestran únicamente los ítems disponibles para las opciones elegidas en el paso anterior.
+                </p>
+              </div>
+
+              <div className="space-y-2.5 pt-1">
+                {availablePrograms.length > 0 ? (
+                  availablePrograms.map((prog) => {
+                    const isSelected = selectedProgramIds.includes(prog.id);
+                    return (
+                      <div
+                        key={prog.id}
+                        onClick={() => selectProgram(prog.id)}
+                        className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-wrap items-center justify-between gap-3 select-none ${
+                          isSelected
+                            ? 'bg-sky-50/40 border-sky-400 ring-1 ring-sky-300 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
+                              isSelected
+                                ? 'bg-[#0f2b48] border-[#0f2b48] text-white'
+                                : 'bg-white border-slate-300'
+                            }`}
+                          >
+                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h5 className="font-serif font-bold text-sm text-[#0f2b48] truncate">
+                                {prog.title}
+                              </h5>
+                              <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                • {prog.duration}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 font-light line-clamp-1 mt-0.5">
+                              {prog.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                            Tarifa
+                          </span>
+                          <div className="text-sm font-mono font-bold text-[#0f2b48]">
+                            ${prog.priceClp.toLocaleString('es-CL')}{' '}
+                            <span className="text-[10px] font-normal text-slate-500 font-sans">
+                              {prog.unitType === 'pax' ? 'CLP / pax' : prog.unitType === 'night' ? 'CLP / noche' : 'CLP total'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-6 text-center space-y-2">
+                    <Compass className="w-8 h-8 text-amber-600 mx-auto" />
+                    <h5 className="font-serif font-bold text-sm text-amber-900">
+                      No hay un paquete predeterminado con todas estas opciones combinadas
+                    </h5>
+                    <p className="text-xs text-amber-800/80 max-w-md mx-auto">
+                      Puedes regresar al Paso 1 para ajustar las opciones seleccionadas o crear un paquete a medida para esta combinación.
+                    </p>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleBack}
+                        className="px-4 py-2 rounded-xl bg-[#0f2b48] text-white text-xs font-bold transition hover:bg-[#0a1e34]"
+                      >
+                        ← Volver a Seleccionar Opciones
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* PASO 3: FECHAS Y SALIDAS PROGRAMADAS FIJAS */}
+          {/* ========================================================================= */}
+          {currentStep === 3 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] uppercase font-mono font-bold text-sky-800 bg-sky-100/70 border border-sky-200 px-2 py-0.5 rounded-md">
+                    {activeSelectedProgram?.title || 'Paquete Seleccionado'}
+                  </span>
+                </div>
+                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                  Paso 3: Selecciona la Fecha de Salida Programada
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Este paquete opera en fechas fijas de zarpe y expedición. Selecciona la salida que prefieras:
+                </p>
+              </div>
+
+              {/* LIST OF SCHEDULED FIXED DEPARTURES */}
+              <div className="space-y-2.5 pt-1">
+                {DEFAULT_PROGRAM_DEPARTURES.map((dep) => {
+                  const isSelected = selectedDepartureId === dep.id;
+                  return (
+                    <div
+                      key={dep.id}
+                      onClick={() => handleSelectDeparture(dep)}
+                      className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-wrap items-center justify-between gap-3 select-none ${
+                        isSelected
+                          ? 'bg-sky-50/40 border-[#0f2b48] ring-2 ring-[#0f2b48]/20 shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
+                            isSelected
+                              ? 'bg-[#0f2b48] border-[#0f2b48] text-white'
+                              : 'bg-white border-slate-300'
+                          }`}
+                        >
+                          {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
+                            <strong className="text-sm font-mono font-bold text-[#0f2b48]">
+                              {dep.label}
+                            </strong>
+                          </div>
+                          <span className="text-[11px] text-slate-500 font-mono mt-0.5 block">
+                            Duración: {dep.durationLabel}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="font-mono text-xs font-bold text-[#0f2b48] bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                          {dep.availableSlots} cupos disponibles
+                        </span>
+
+                        <span
+                          className={`text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase ${
+                            dep.status === 'confirmada'
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                              : dep.status === 'ultimos_cupos'
+                              ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                              : 'bg-sky-50 text-sky-800 border border-sky-200'
+                          }`}
+                        >
+                          {dep.status === 'confirmada' ? 'Confirmada para zarpe' : dep.status === 'ultimos_cupos' ? 'Últimos cupos' : 'Salida abierta'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl flex items-center justify-between mt-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#0f2b48] shadow-2xs">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-xs text-[#0f2b48] block">Fecha de Salida Seleccionada</span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {startDate} ➔ {endDate} (8 días / 7 noches)
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+                  Salida Programada Activa
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* PASO 4: PASAJEROS & DATOS PERSONALES */}
+          {/* ========================================================================= */}
+          {currentStep === 4 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                    Paso 4: Cantidad de Pasajeros y Fichas de Clientes
+                  </h4>
+                  <p className="text-slate-500 text-xs font-light">
+                    Cada pasajero será creado automáticamente en la base de datos de Clientes CRM.
+                  </p>
+                </div>
+
+                {/* MODERN LUXURY PAX STEPPER */}
+                <div className="flex items-center bg-[#f4f7fa] border border-slate-200/90 rounded-2xl p-1 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => handlePaxCountChange(passengersCount - 1)}
+                    disabled={passengersCount <= 1}
+                    className="w-8 h-8 rounded-xl bg-white border border-slate-200/80 text-slate-700 hover:text-[#0f2b48] hover:border-slate-300 hover:shadow-xs active:scale-95 flex items-center justify-center font-bold text-base disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                    title="Disminuir pasajero"
+                  >
+                    −
+                  </button>
+                  <div className="flex items-center gap-1.5 px-3.5 min-w-[110px] justify-center select-none">
+                    <Users className="w-3.5 h-3.5 text-sky-600" />
+                    <span className="font-mono font-bold text-sm text-[#0f2b48]">
+                      {passengersCount}
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-sans font-medium">
+                      {passengersCount === 1 ? 'Pasajero' : 'Pasajeros'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePaxCountChange(passengersCount + 1)}
+                    disabled={passengersCount >= 12}
+                    className="w-8 h-8 rounded-xl bg-[#0f2b48] text-white hover:bg-[#0a1e34] hover:shadow-xs active:scale-95 flex items-center justify-center font-bold text-base disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                    title="Agregar pasajero"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* DYNAMIC FORMS FOR EACH PASSENGER */}
+              <div className="space-y-3.5 pt-1">
+                {passengers.slice(0, passengersCount).map((pax, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-[#fbfcfd] border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-[#0f2b48] text-white flex items-center justify-center text-[10px] font-bold font-mono">
+                          #{idx + 1}
+                        </div>
+                        <h6 className="font-bold text-xs text-[#0f2b48]">
+                          {idx === 0 ? 'Pasajero Principal (Titular de Reserva)' : `Pasajero Acompañante #${idx + 1}`}
+                        </h6>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400 uppercase">
+                        {idx === 0 ? 'Contacto Facturación' : 'Pasajero Registrado'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          Nombre Completo *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Juan Pérez Mackenna"
+                          value={pax.fullName}
+                          onChange={(e) => updatePassengerField(idx, 'fullName', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          RUT o Pasaporte *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: 15.342.891-K"
+                          value={pax.rutOrPassport}
+                          onChange={(e) => updatePassengerField(idx, 'rutOrPassport', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          Fecha de Nacimiento
+                        </label>
+                        <input
+                          type="date"
+                          value={pax.birthDate || ''}
+                          onChange={(e) => updatePassengerField(idx, 'birthDate', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          Correo Electrónico *
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="correo@ejemplo.com"
+                          value={pax.email}
+                          onChange={(e) => updatePassengerField(idx, 'email', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          Teléfono / WhatsApp *
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="+56 9 1234 5678"
+                          value={pax.phone}
+                          onChange={(e) => updatePassengerField(idx, 'phone', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          Preferencias Alimentarias / Alergias (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Celíaco, vegetariano, alérgico a nueces"
+                          value={pax.dietaryPreferences}
+                          onChange={(e) => updatePassengerField(idx, 'dietaryPreferences', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          Notas Médicas / Buceo (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Certificación PADI Advanced, talla L"
+                          value={pax.notes}
+                          onChange={(e) => updatePassengerField(idx, 'notes', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* PASO 5: FORMA DE PAGO, DESCUENTOS & CUOTAS */}
+          {/* ========================================================================= */}
+          {currentStep === 5 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-1">
+                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                  Paso 5: Plan de Cuotas y Descuentos
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Configura la cantidad de cuotas flexibles y condiciones financieras de la reserva.
+                </p>
+              </div>
+
+              {/* MÉTODO DE PAGO OFICIAL: TRANSFERENCIA BANCARIA */}
+              <div className="bg-[#fbfcfd] border border-slate-200/90 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#0f2b48] text-white flex items-center justify-center shadow-xs">
+                    <CreditCard className="w-5 h-5 text-sky-300" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-mono font-bold text-sky-800 tracking-wider block">
+                      Método de Pago Oficial
+                    </span>
+                    <h5 className="font-serif font-bold text-xs sm:text-sm text-[#0f2b48]">
+                      Transferencia Bancaria Electrónica (Banco de Chile / Santander)
+                    </h5>
+                    <span className="text-[11px] text-slate-500 font-light">
+                      Conciliación directa institucional con comprobante oficial de transferencia.
+                    </span>
+                  </div>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-mono font-bold rounded-full">
+                    Transferencia Bancaria
+                  </span>
+                </div>
+              </div>
+
+              {/* CONFIGURADOR MODERNO Y FLEXIBLE DE CUOTAS */}
+              <div className="bg-[#fbfcfd] border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-[#0f2b48] flex items-center gap-1.5 font-mono">
+                      <DollarSign className="w-4 h-4 text-sky-600" />
+                      <span>Plan de Cuotificación Flexible</span>
+                    </label>
+                    <p className="text-xs text-slate-500 font-light mt-0.5">
+                      Selecciona o ajusta libremente la cantidad de cuotas para el cliente.
+                    </p>
+                  </div>
+
+                  {/* Modern Stepper Counter */}
+                  <div className="flex items-center gap-3 bg-white border border-slate-200 p-1.5 rounded-2xl shadow-2xs">
+                    <span className="text-[11px] uppercase font-mono font-bold text-slate-500 pl-2">
+                      N° de Cuotas:
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setInstallmentsCount((prev) => Math.max(1, prev - 1))}
+                        disabled={installmentsCount <= 1}
+                        className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-[#0f2b48] font-bold text-sm flex items-center justify-center transition cursor-pointer"
+                      >
+                        −
+                      </button>
+                      <span className="w-10 text-center font-mono font-bold text-sm text-[#0f2b48]">
+                        {installmentsCount}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setInstallmentsCount((prev) => Math.min(12, prev + 1))}
+                        disabled={installmentsCount >= 12}
+                        className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-[#0f2b48] font-bold text-sm flex items-center justify-center transition cursor-pointer"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Selection Pills */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] uppercase font-mono font-bold text-slate-400 block">
+                    Opciones Rápidas:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { count: 1, label: '100% Contado' },
+                      { count: 2, label: '2 Cuotas (50/50)' },
+                      { count: 3, label: '3 Cuotas' },
+                      { count: 4, label: '4 Cuotas' },
+                      { count: 6, label: '6 Cuotas' },
+                      { count: 8, label: '8 Cuotas' },
+                      { count: 10, label: '10 Cuotas' },
+                      { count: 12, label: '12 Cuotas' },
+                    ].map((pill) => {
+                      const isActive = installmentsCount === pill.count;
+                      return (
+                        <button
+                          key={pill.count}
+                          type="button"
+                          onClick={() => setInstallmentsCount(pill.count)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-mono transition cursor-pointer ${
+                            isActive
+                              ? 'bg-[#0f2b48] text-white shadow-xs'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          {pill.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Real-time Dynamic Breakdown */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                    <span className="text-xs font-bold text-[#0f2b48]">
+                      Desglose de Pago Programado:
+                    </span>
+                    <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
+                      {installmentsCount === 1
+                        ? '1 Pago de $' + totalFinalClp.toLocaleString('es-CL') + ' CLP'
+                        : `${installmentsCount} cuotas de $${installmentAmountClp.toLocaleString('es-CL')} CLP cada una`}
+                    </span>
+                  </div>
+
+                  {/* Installment cards grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                    {Array.from({ length: installmentsCount }).map((_, idx) => {
+                      const isFirst = idx === 0;
+                      const isLast = idx === installmentsCount - 1;
+                      const amount =
+                        idx === installmentsCount - 1
+                          ? totalFinalClp - installmentAmountClp * (installmentsCount - 1)
+                          : installmentAmountClp;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-xl border transition ${
+                            isFirst
+                              ? 'bg-sky-50/70 border-sky-200 shadow-2xs'
+                              : 'bg-slate-50 border-slate-200/80'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-slate-500 mb-1">
+                            <span>Cuota #{idx + 1}</span>
+                            <span className={isFirst ? 'text-sky-700' : 'text-slate-400'}>
+                              {isFirst ? 'Pie / Reserva' : isLast ? 'Saldo Final' : 'Cuota Intermedia'}
+                            </span>
+                          </div>
+                          <div className="text-sm font-mono font-bold text-[#0f2b48]">
+                            ${amount.toLocaleString('es-CL')} <span className="text-[10px] font-normal text-slate-500">CLP</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-light block mt-0.5">
+                            {isFirst
+                              ? 'Al momento de confirmar reserva'
+                              : isLast
+                              ? 'Previo al zarpe / check-in'
+                              : `Programado correlativo (#${idx + 1})`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* DESCUENTOS Y BENEFICIOS ESPECIALES */}
+              <div className="bg-[#fbfcfd] border border-slate-200/90 p-4 rounded-2xl space-y-3 shadow-2xs">
+                <label className="text-[10px] uppercase font-bold text-[#0f2b48] flex items-center gap-1.5 font-mono">
+                  <Percent className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Descuentos y Beneficios Especiales</span>
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setDiscountType('none'); setDiscountPercent(0); setDiscountAmount(0); }}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                      discountType === 'none'
+                        ? 'bg-[#0f2b48] text-white border-[#0f2b48]'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    Sin Descuento (Tarifa Estándar)
+                  </button>
+
+                  <div
+                    onClick={() => setDiscountType('percent')}
+                    className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2 ${
+                      discountType === 'percent'
+                        ? 'bg-sky-50 border-sky-400 ring-1 ring-sky-300'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-[#0f2b48]">Porcentaje:</span>
+                    <select
+                      value={discountPercent}
+                      onChange={(e) => {
+                        setDiscountType('percent');
+                        setDiscountPercent(Number(e.target.value));
+                      }}
+                      className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-[#0f2b48] focus:outline-none"
+                    >
+                      <option value="5">5% Descuento</option>
+                      <option value="10">10% Descuento (VIP)</option>
+                      <option value="15">15% Descuento</option>
+                      <option value="20">20% Preventa</option>
+                    </select>
+                  </div>
+
+                  <div
+                    onClick={() => setDiscountType('amount')}
+                    className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2 ${
+                      discountType === 'amount'
+                        ? 'bg-sky-50 border-sky-400 ring-1 ring-sky-300'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-[#0f2b48] whitespace-nowrap">Monto Fijo:</span>
+                    <input
+                      type="number"
+                      placeholder="$ CLP"
+                      value={discountAmount || ''}
+                      onChange={(e) => {
+                        setDiscountType('amount');
+                        setDiscountAmount(Number(e.target.value));
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono font-bold text-[#0f2b48] focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* FINANCIAL SUMMARY BOX */}
+              <div className="bg-[#0f2b48] text-white p-4 sm:p-5 rounded-2xl space-y-2.5 shadow-md">
+                <div className="flex justify-between text-xs text-sky-200 font-mono">
+                  <span>Subtotal bruto ({passengersCount} pax / {calculatedNights} días):</span>
+                  <span>${subtotalClp.toLocaleString('es-CL')} CLP</span>
+                </div>
+                {calculatedDiscountClp > 0 && (
+                  <div className="flex justify-between text-xs text-emerald-300 font-mono">
+                    <span>Descuento aplicado:</span>
+                    <span>-${calculatedDiscountClp.toLocaleString('es-CL')} CLP</span>
+                  </div>
+                )}
+                <div className="border-t border-sky-800/80 pt-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <div>
+                    <span className="text-sm font-serif font-bold block">TOTAL FINAL A COBRAR:</span>
+                    <span className="text-xs text-sky-200 font-mono font-light">
+                      {installmentsCount === 1 ? '1 Pago al 100% Contado' : `${installmentsCount} cuotas de $${installmentAmountClp.toLocaleString('es-CL')} CLP`}
+                    </span>
+                  </div>
+                  <span className="text-xl sm:text-2xl font-mono font-bold text-sky-300">
+                    ${totalFinalClp.toLocaleString('es-CL')} <span className="text-xs text-sky-200 font-normal">CLP</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* PASO 6: RESUMEN EJECUTIVO & CONFIRMACIÓN */}
+          {/* ========================================================================= */}
+          {currentStep === 6 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="space-y-1">
+                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                  Paso 6: Resumen Ejecutivo y Creación de Reserva
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Revisa los datos consolidados antes de registrar la reserva y generar las fichas de cliente.
+                </p>
+              </div>
+
+              <div className="bg-[#fbfcfd] border border-slate-200/90 rounded-2xl p-5 space-y-4">
+                
+                {/* HEAD DETAILS */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 pb-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-mono font-bold tracking-widest text-[#0f2b48]/70 block">
+                      Reserva Oficial Yates Chile
+                    </span>
+                    <h5 className="font-serif text-lg font-bold text-[#0f2b48]">
+                      {passengers[0]?.fullName || 'Titular de Reserva'}
+                    </h5>
+                    <span className="text-xs text-slate-500 font-mono">
+                      {passengers[0]?.email} • {passengers[0]?.phone}
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                      Total a Facturar
+                    </span>
+                    <div className="text-xl font-mono font-bold text-[#0f2b48]">
+                      ${totalFinalClp.toLocaleString('es-CL')} CLP
+                    </div>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                      {installmentsCount === 1 ? '100% Contado' : `${installmentsCount} cuotas de $${installmentAmountClp.toLocaleString('es-CL')}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ASSETS & PROGRAMS */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-white border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
+                      Programas & Servicios Incluidos
+                    </span>
+                    <ul className="space-y-1">
+                      {selectedProgramsData.map((prog) => (
+                        <li key={prog.id} className="text-xs font-semibold text-[#0f2b48] flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>{prog.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 p-3.5 rounded-xl space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
+                      Fechas & Pasajeros
+                    </span>
+                    <div className="text-xs text-[#0f2b48] space-y-1">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                        <span><strong>Fechas:</strong> {startDate} ➔ {endDate} ({calculatedNights} días)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <Users className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                        <span><strong>Pasajeros:</strong> {passengersCount} personas</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <CreditCard className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                        <span><strong>Pago:</strong> {paymentMethod === 'transfer' ? 'Transferencia' : paymentMethod === 'credit_card' ? 'Tarjeta' : paymentMethod}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PASSENGERS MINI LIST */}
+                <div className="bg-white border border-slate-200 p-3.5 rounded-xl space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
+                    Fichas Individuales de Pasajeros a Crear ({passengersCount})
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {passengers.slice(0, passengersCount).map((pax, i) => (
+                      <div key={i} className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px]">
+                        <div className="font-bold text-[#0f2b48] truncate">{pax.fullName || `Pasajero #${i + 1}`}</div>
+                        <div className="text-slate-500 font-mono text-[10px] truncate">{pax.rutOrPassport || 'Sin RUT'}</div>
+                        <div className="text-slate-400 text-[10px] truncate">{pax.email || 'Sin correo'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SPECIAL NOTES */}
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                    Notas Internas / Instrucciones para Concierge
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Instrucciones especiales para el traslado, bienvenida en muelle o requerimientos del cliente..."
+                    value={specialNotes}
+                    onChange={(e) => setSpecialNotes(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* FOOTER ACTIONS */}
+        <div className="px-6 py-4 bg-[#fbfcfd] border-t border-slate-100 flex items-center justify-between shrink-0">
+          <div>
+            {currentStep > 1 ? (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 font-bold transition flex items-center gap-1.5 cursor-pointer text-xs"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>Paso Anterior</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-bold transition cursor-pointer text-xs"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+
+          <div>
+            {currentStep < 6 ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-6 py-2.5 rounded-xl bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold transition shadow-md shadow-[#0f2b48]/20 flex items-center gap-2 cursor-pointer text-xs"
+              >
+                <span>Siguiente Paso</span>
+                <ChevronRight className="w-4 h-4 text-sky-300" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleFinalSubmit}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold transition shadow-md shadow-emerald-600/25 flex items-center gap-2 cursor-pointer text-xs"
+              >
+                <ShieldCheck className="w-4.5 h-4.5" />
+                <span>Confirmar y Registrar Reserva Oficial</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* CUSTOM IN-APP NOTIFICATION MODAL */}
+        {notification && (
+          <div className="fixed inset-0 z-70 bg-[#0a1e34]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 max-w-sm w-full shadow-[0_20px_50px_rgba(15,43,72,0.25)] space-y-4 text-center animate-scale-in">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/90 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
+                <AlertCircle className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div className="space-y-1.5">
+                <h5 className="font-serif font-bold text-base text-[#0f2b48]">
+                  {notification.title}
+                </h5>
+                <p className="text-xs text-slate-600 font-light leading-relaxed">
+                  {notification.message}
+                </p>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setNotification(null)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#0f2b48] hover:bg-[#0a1e34] active:scale-98 text-white text-xs font-bold shadow-md hover:shadow-lg transition cursor-pointer"
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+};

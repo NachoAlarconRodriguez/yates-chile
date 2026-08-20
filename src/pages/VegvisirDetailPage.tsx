@@ -1,11 +1,15 @@
 import React from 'react';
 import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X, Radio, Droplets, FileText } from 'lucide-react';
+import { useSiteContent } from '../hooks/useSiteContent';
 
 interface VegvisirDetailPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNavigate }) => {
+  const { getSection } = useSiteContent();
+  const vegvisirCms = getSection('flota_vegvisir');
+
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
   const toggleFlip = (id: string) => {
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -239,11 +243,22 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       
       {/* HERO SECTION */}
       <section className="relative h-[70vh] sm:h-[80vh] flex items-end justify-start overflow-hidden">
-        <img
-          src="https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1"
-          alt="Velero Vegvisir"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        {(vegvisirCms.media_url?.endsWith('.mp4') || vegvisirCms.media_url?.endsWith('.webm') || vegvisirCms.media_url?.includes('video/')) ? (
+          <video
+            src={vegvisirCms.media_url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <img
+            src={vegvisirCms.media_url || "https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1"}
+            alt={vegvisirCms.title || "Velero Vegvisir"}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
         
         {/* Navigation Overlays */}
@@ -260,13 +275,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
           <div className="flex flex-wrap gap-2">
             <span className="bg-blue-900/80 backdrop-blur-md border border-blue-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Velero de Expedición
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-blue-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Dufour 52.5 ft • Francés
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Matrícula QUI 2718
+              {vegvisirCms.subtitle || 'Velero de Expedición • Francés'}
             </span>
             <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -275,10 +284,10 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           </div>
 
           <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
-            Velero Vegvisir
+            {vegvisirCms.title || 'Velero Vegvisir'}
           </h1>
           <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
-            Velero de expedición Dufour 52.5 ft (Astillero Francés, Matrícula QUI 2718) con capacidad para 12 PAX en 5 cabinas con 5 baños privados. Equipado con Starlink 24/7, instrumental Raymarine, desalinizador de 140 ltrs/hr y Zodiac de desembarco con motor Mercury 4T 15hp.
+            {vegvisirCms.body_text || 'Velero de expedición Dufour 52.5 ft (Astillero Francés, Matrícula QUI 2718) con capacidad para 12 PAX en 5 cabinas con 5 baños privados. Equipado con Starlink 24/7, instrumental Raymarine, desalinizador de 140 ltrs/hr y Zodiac de desembarco con motor Mercury 4T 15hp.'}
           </p>
         </div>
       </section>
