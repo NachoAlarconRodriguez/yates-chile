@@ -80,7 +80,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   const tourStations = {
     exterior: {
       title: 'Terraza & Quincho Exterior',
-      image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
+      image: '/jf-noviembre.jpg',
       hotspots: [
         {
           x: '45%',
@@ -141,7 +141,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
     },
     habitacion: {
       title: 'Cabinas Independientes Frente al Mar',
-      image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
+      image: '/rincon-de-navegantes.jpg',
       hotspots: [
         {
           x: '50%',
@@ -179,7 +179,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
       wind: 'Brisa Marina',
       temp: '16°C Ext',
       text: 'Su diseño se organiza en torno a cuatro cabinas independientes, todas con baño privado y vista al océano, además de espacios comunes que incluyen terraza, quincho y áreas verdes. La construcción mantiene una estética funcional y de inspiración náutica, donde el entorno es el verdadero protagonista: la luz natural, la brisa marina y las vistas acompañan cada espacio, creando una experiencia auténtica y conectada con la vida isleña.',
-      image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
+      image: '/jf-noviembre.jpg',
     },
     quincho: {
       title: lodgeDining.title || 'Amplio Quincho & Encuentros',
@@ -220,12 +220,12 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
       desc: 'Refugio boutique ubicado en Uberlindo Andaur 222, justo en frente del mar en la Isla Robinson Crusoe.',
     },
     {
-      url: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=1000&q=80',
+      url: '/jf-noviembre.jpg',
       title: 'Arquitectura e Inspiración Náutica',
       desc: 'Diseño funcional en torno a 4 cabinas independientes, terraza, amplio quincho y áreas verdes.',
     },
     {
-      url: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
+      url: '/rincon-de-navegantes.jpg',
       title: 'Cabinas con Vista al Océano',
       desc: 'Todas las cabinas cuentan con baño privado y vistas panorámicas hacia el mar de Robinson Crusoe.',
     },
@@ -280,32 +280,25 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           </button>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <span className="bg-emerald-900/80 backdrop-blur-md border border-emerald-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              {lodgeInfo.subtitle || 'Lodge Frente al Mar • Uberlindo Andaur 222'}
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-emerald-400" />
-              Uberlindo Andaur 222
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              4 Cabinas • Hasta 11 Pasajeros
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-sky-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Baño Privado & Vista al Océano
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-indigo-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              Isla Robinson Crusoe
-            </span>
-          </div>
-
-          <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
+          <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
             {lodgeInfo.title || 'Lodge Rincón de Navegantes'}
           </h1>
-          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
+          <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
             {lodgeInfo.body_text || 'Ubicado en Uberlindo Andaur 222, justo en frente del mar en la Isla Robinson Crusoe. Diseñado en torno a 4 cabinas independientes (todas con baño privado y vista al océano para hasta 11 pasajeros), amplio quincho, terraza, áreas verdes y expediciones exclusivas guiadas por expertos locales.'}
           </p>
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                if (rooms.length > 0) setSelectedRoomId(rooms[0].id);
+                setShowBookingModal(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-3 rounded-xl transition-all shadow-xl text-xs sm:text-sm border border-white/90 cursor-pointer hover:scale-[1.02]"
+            >
+              <BedDouble className="w-4 h-4 text-slate-950" />
+              <span>Reservar Habitación en el Lodge</span>
+            </button>
+          </div>
         </div>
       </section>
 

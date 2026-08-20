@@ -1,22 +1,10 @@
 import React, { useState } from 'react';
 import { Calendar, MapPin, ArrowRight, Sparkles, ChevronLeft, ChevronRight, Lock, Shield, X, Download } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useExpeditions } from '../../hooks/useExpeditions';
+import { INITIAL_EXPEDITIONS, type PublicExpedition } from '../../services/expeditionService';
 
-export interface Expedition {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  monthsActive: number[]; // 1 to 12
-  year: number;
-  spotsLeft: number | 'completo' | 'bloqueado';
-  vessel: string;
-  description: string;
-  location: string;
-  image: string;
-  bestViewTime?: string;
-  tempEstimate?: string;
-}
+export type Expedition = PublicExpedition;
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -98,158 +86,7 @@ const MONTHS_INFO: Record<number, { temp: string; wind: string; highlights: stri
   }
 };
 
-export const EXPEDITIONS: Expedition[] = [
-  {
-    id: 'exp-rob-1',
-    name: 'Expedición Robinson',
-    startDate: '09 sept 2026',
-    endDate: '24 sept 2026',
-    monthsActive: [9],
-    year: 2026,
-    spotsLeft: 'completo',
-    vessel: 'Lodge Rincón de Navegantes',
-    description: 'Estadía de exploración botánica e inmersión histórica en el archipiélago de Juan Fernández, hospedándose en nuestro santuario privado de Cumberland.',
-    location: 'Isla Robinson Crusoe',
-    image: '/rincon-de-navegantes.jpg',
-    bestViewTime: 'Primavera austral',
-    tempEstimate: '13°C - 16°C'
-  },
-  {
-    id: 'exp-rob-2',
-    name: 'Travesía Robinson',
-    startDate: '30 sept 2026',
-    endDate: '14 oct 2026',
-    monthsActive: [9, 10],
-    year: 2026,
-    spotsLeft: 1,
-    vessel: 'Velero Vegvisir',
-    description: 'Aventura oceánica de ida y vuelta navegando a vela hacia Juan Fernández. Ideal para navegantes apasionados que buscan el reto del mar abierto.',
-    location: 'Océano Pacífico Sur',
-    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Zarpe de primavera',
-    tempEstimate: '12°C - 15°C'
-  },
-  {
-    id: 'exp-jf-nov',
-    name: 'JF 1 de Noviembre',
-    startDate: '31 oct 2026',
-    endDate: '11 nov 2026',
-    monthsActive: [10, 11],
-    year: 2026,
-    spotsLeft: 4,
-    vessel: 'Lodge Rincón de Navegantes',
-    description: 'Travesía de descanso en primavera tardía. Recorra senderos rodeados de helechos gigantes y disfrute de la primera pesca de langosta de la temporada.',
-    location: 'Bahía Cumberland',
-    image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Mañana templada',
-    tempEstimate: '14°C - 18°C'
-  },
-  {
-    id: 'exp-zar-dic',
-    name: 'Zarpe Archipiélago',
-    startDate: '01 dic 2026',
-    endDate: '15 dic 2026',
-    monthsActive: [12],
-    year: 2026,
-    spotsLeft: 2,
-    vessel: 'Yate Terranova',
-    description: 'Travesía rápida y confortable a motor a bordo de nuestro yate de alta velocidad. Explora caletas solitarias con la comodidad y el lujo que ofrece el Terranova.',
-    location: 'Juan Fernández',
-    image: 'https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Atardecer en flybridge',
-    tempEstimate: '16°C - 20°C'
-  },
-  {
-    id: 'exp-sel-dic',
-    name: 'Juan Fernández-Selkirk',
-    startDate: '05 dic 2026',
-    endDate: '12 dic 2026',
-    monthsActive: [12],
-    year: 2026,
-    spotsLeft: 3,
-    vessel: 'Lodge & Velero',
-    description: 'Expedición combinada marítimo-terrestre en busca de los vestigios del histórico navegante Alejandro Selkirk. Incluye navegación en velero e itinerarios de trekking exigentes.',
-    location: 'Santuario Selkirk',
-    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Jornada de día completo',
-    tempEstimate: '15°C - 19°C'
-  },
-  {
-    id: 'exp-jf-ene',
-    name: 'Archipiélago Juan Fernández',
-    startDate: '01 ene 2027',
-    endDate: '16 ene 2027',
-    monthsActive: [1],
-    year: 2027,
-    spotsLeft: 'completo',
-    vessel: 'Lodge Rincón de Navegantes',
-    description: 'Expedición en temporada alta de verano. Senderismo de montaña, buceo con lobos marinos de dos pelos y degustación gastronómica en nuestro refugio Cumberland.',
-    location: 'Robinson Crusoe',
-    image: '/rincon-de-navegantes.jpg',
-    bestViewTime: 'Verano austral',
-    tempEstimate: '18°C - 22°C'
-  },
-  {
-    id: 'exp-sel-ene',
-    name: 'Selkirk Colombia',
-    startDate: '20 ene 2027',
-    endDate: '28 ene 2027',
-    monthsActive: [1],
-    year: 2027,
-    spotsLeft: 5,
-    vessel: 'Velero Vegvisir',
-    description: 'Navegación deportiva, pesca de altura y avistamiento de cetáceos en el Pacífico Sur profundo. Una ruta desafiante con el sello de Yates Chile.',
-    location: 'Isla Alejandro Selkirk',
-    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Navegación matutina',
-    tempEstimate: '17°C - 21°C'
-  },
-  {
-    id: 'exp-pes-ene',
-    name: 'Grupo Pesca Selkirk (España)',
-    startDate: '28 ene 2027',
-    endDate: '04 feb 2027',
-    monthsActive: [1, 2],
-    year: 2027,
-    spotsLeft: 'completo',
-    vessel: 'Yate Terranova',
-    description: 'Chárter de pesca deportiva exclusivo reservado para delegación internacional. Rutas de trolling de alta gama y servicios de lujo de chef a bordo.',
-    location: 'Archipiélago Juan Fernández',
-    image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Pesca de amanecer',
-    tempEstimate: '18°C - 22°C'
-  },
-  {
-    id: 'exp-col-mar',
-    name: 'Colombia Selkirk',
-    startDate: '08 mar 2027',
-    endDate: '17 mar 2027',
-    monthsActive: [3],
-    year: 2027,
-    spotsLeft: 'bloqueado',
-    vessel: 'Lodge Rincón de Navegantes',
-    description: 'Reserva exclusiva bloqueada para misión de investigación científica, filmación de documentales y monitoreo de aves terrestres en peligro de extinción.',
-    location: 'Bahía Cumberland',
-    image: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Reserva científica',
-    tempEstimate: '16°C - 20°C'
-  },
-  {
-    id: 'exp-zar-mar',
-    name: 'Zarpe Especial del Archipiélago',
-    startDate: '14 mar 2027',
-    endDate: '29 mar 2027',
-    monthsActive: [3],
-    year: 2027,
-    spotsLeft: 6,
-    vessel: 'Velero Vegvisir',
-    description: 'Expedición marítima de fin de verano recorriendo las caletas más inaccesibles y bahías protegidas del archipiélago con excelentes vientos de retorno.',
-    location: 'Juan Fernández',
-    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
-    bestViewTime: 'Navegación al atardecer',
-    tempEstimate: '15°C - 19°C'
-  }
-];
+export const EXPEDITIONS: Expedition[] = INITIAL_EXPEDITIONS;
 
 const formatRut = (value: string): string => {
   const clean = value.replace(/[\s.-]/g, '');
@@ -282,6 +119,7 @@ const formatRut = (value: string): string => {
 };
 
 export const ExpeditionCalendar: React.FC = () => {
+  const { expeditions, createBooking } = useExpeditions();
   const [selectedMonth, setSelectedMonth] = useState<number>(9); // Start in September
   const [activeExpeditionId, setActiveExpeditionId] = useState<string | null>('exp-rob-1');
 
@@ -305,7 +143,7 @@ export const ExpeditionCalendar: React.FC = () => {
                       bookingData.docId.trim() !== '';
 
   // Filter expeditions available in selected month
-  const activeExpeditions = EXPEDITIONS.filter(exp => exp.monthsActive.includes(selectedMonth));
+  const activeExpeditions = expeditions.filter(exp => exp.monthsActive.includes(selectedMonth));
 
   // Sync selected expedition when month changes
   React.useEffect(() => {
@@ -317,9 +155,9 @@ export const ExpeditionCalendar: React.FC = () => {
     } else {
       setActiveExpeditionId(null);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, activeExpeditions, activeExpeditionId]);
 
-  const activeExpedition = EXPEDITIONS.find(e => e.id === activeExpeditionId) || null;
+  const activeExpedition = expeditions.find(e => e.id === activeExpeditionId) || activeExpeditions[0] || null;
 
   const handleOpenBookingModal = () => {
     setBookingSubmitted(false);
@@ -355,7 +193,21 @@ export const ExpeditionCalendar: React.FC = () => {
         // Fallback
       }
 
-      // Save booking request to localStorage for Admin Dashboard
+      // Save booking request to shared service and localStorage
+      if (activeExpedition) {
+        createBooking({
+          departureId: activeExpedition.id,
+          guestName: bookingData.fullName,
+          guestEmail: bookingData.email,
+          guestPhone: bookingData.phone,
+          guestRutPassport: bookingData.docId,
+          bookingType: 'per_pax',
+          paxCount: bookingData.guestsCount,
+          totalAmount: (activeExpedition.pricePerPaxClp || 1850000) * bookingData.guestsCount,
+          dietaryMedicalNotes: bookingData.specialRequests,
+        }).catch(() => {});
+      }
+
       try {
         const stored = localStorage.getItem('yates_bookings');
         const bookings = stored ? JSON.parse(stored) : [];
@@ -372,7 +224,7 @@ export const ExpeditionCalendar: React.FC = () => {
         };
         bookings.unshift(newBooking);
         localStorage.setItem('yates_bookings', JSON.stringify(bookings));
-      } catch (err) {
+      } catch (_) {
         // Fallback
       }
 
@@ -450,7 +302,7 @@ export const ExpeditionCalendar: React.FC = () => {
             {MONTH_NAMES.map((name, index) => {
               const monthNum = index + 1;
               const isSelected = selectedMonth === monthNum;
-              const hasExpeditions = EXPEDITIONS.some(exp => exp.monthsActive.includes(monthNum));
+              const hasExpeditions = expeditions.some(exp => exp.monthsActive.includes(monthNum));
 
               return (
                 <button

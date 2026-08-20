@@ -45,7 +45,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
-                src={vegvisirSec.media_url || "https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1"}
+                src={vegvisirSec.media_url && !vegvisirSec.media_url.includes('images.unsplash.com') ? vegvisirSec.media_url : "/velero-vegvisir.jpg"}
                 alt="Velero Vegvisir"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -75,7 +75,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
-                src={terranovaSec.media_url || "/yate-terranova.jpg"}
+                src={terranovaSec.media_url && !terranovaSec.media_url.includes('images.unsplash.com') ? terranovaSec.media_url : "/yate-terranova.jpg"}
                 alt="Yate Terranova"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
@@ -105,7 +105,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
-                src={lodgeSec.media_url || "/rincon-de-navegantes.jpg"}
+                src={lodgeSec.media_url && !lodgeSec.media_url.includes('images.unsplash.com') ? lodgeSec.media_url : "/rincon-de-navegantes.jpg"}
                 alt="Lodge Rincón de Navegantes"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />

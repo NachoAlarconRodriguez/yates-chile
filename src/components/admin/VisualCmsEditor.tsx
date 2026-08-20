@@ -19,9 +19,14 @@ import {
   ArrowRight,
   ArrowLeft,
   Anchor,
-  Clock
+  Clock,
+  Key,
+  Bot,
+  CheckCircle,
+  Wand2
 } from 'lucide-react';
 import { DEFAULT_CMS_CONTENT, type SiteContent } from '../../services/cmsService';
+import { translationService } from '../../services/translationService';
 import { ExpeditionCalendar } from '../modules/ExpeditionCalendar';
 import { BuildYourJourney } from '../modules/BuildYourJourney';
 import { EXPEDITIONS } from '../modules/ExpeditionCalendar';
@@ -34,6 +39,115 @@ interface VisualCmsEditorProps {
   onNavigate?: (path: string) => void;
 }
 
+const CmsContext = React.createContext<{
+  getField: (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url') => string;
+  setField: (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url', value: string) => void;
+}>({
+  getField: () => '',
+  setField: () => {},
+});
+
+// =========================================================================
+// STABLE INLINE EDITABLE COMPONENT (NO UNMOUNTING OR FLICKERING ON TYPING)
+// =========================================================================
+const InlineText: React.FC<{
+  sectionKey: string;
+  field: 'title' | 'subtitle' | 'body_text';
+  tag?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span' | 'div';
+  className?: string;
+  fallback?: string;
+  multiline?: boolean;
+}> = ({ sectionKey, field, tag: Tag = 'div', className = '', fallback = '', multiline = false }) => {
+  const { getField, setField } = React.useContext(CmsContext);
+  const currentVal = getField(sectionKey, field) || fallback;
+  const [isEditing, setIsEditing] = useState(false);
+  const [localVal, setLocalVal] = useState(currentVal);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setLocalVal(currentVal);
+    }
+  }, [currentVal, isEditing]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      const len = inputRef.current.value.length;
+      inputRef.current.setSelectionRange(len, len);
+    }
+  }, [isEditing]);
+
+  const handleCommit = () => {
+    setIsEditing(false);
+    if (localVal !== currentVal) {
+      setField(sectionKey, field, localVal);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!multiline && e.key === 'Enter') {
+      e.preventDefault();
+      handleCommit();
+    } else if (e.key === 'Escape') {
+      setLocalVal(currentVal);
+      setIsEditing(false);
+    }
+  };
+
+  if (isEditing) {
+    if (multiline) {
+      return (
+        <textarea
+          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+          value={localVal}
+          onChange={(e) => {
+            setLocalVal(e.target.value);
+            setField(sectionKey, field, e.target.value);
+          }}
+          onBlur={handleCommit}
+          onKeyDown={handleKeyDown}
+          rows={Math.max(2, (localVal || '').split('\n').length)}
+          className={`w-full bg-sky-500/15 border-2 border-sky-400 text-inherit font-inherit rounded-xl p-2.5 outline-none shadow-xl resize-none transition-all ${className}`}
+        />
+      );
+    }
+
+    return (
+      <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
+        type="text"
+        value={localVal}
+        onChange={(e) => {
+          setLocalVal(e.target.value);
+          setField(sectionKey, field, e.target.value);
+        }}
+        onBlur={handleCommit}
+        onKeyDown={handleKeyDown}
+        className={`w-full bg-sky-500/15 border-2 border-sky-400 text-inherit font-inherit rounded-lg px-2.5 py-1 outline-none shadow-xl transition-all ${className}`}
+      />
+    );
+  }
+
+  const displayText = localVal || fallback || 'Haz clic para escribir...';
+
+  return (
+    <Tag
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      className={`group/inline cursor-text select-text hover:ring-2 hover:ring-sky-400 hover:ring-offset-2 hover:bg-sky-400/10 rounded-md px-1 -mx-1 transition-all duration-150 relative ${className}`}
+      title="Haz clic para editar este texto directamente"
+    >
+      <span>{displayText}</span>
+      <span className="inline-block ml-1.5 opacity-0 group-hover/inline:opacity-100 transition-opacity text-sky-400 text-xs select-none">
+        ✎
+      </span>
+    </Tag>
+  );
+};
+
 export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   content,
   onSaveAllSections,
@@ -43,6 +157,13 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 }) => {
   // Navigation State
   const [activePage, setActivePage] = useState<'home' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'contact'>('home');
+
+  // Language Mode: 'ES' (Spanish base) or 'EN' (English AI review/edit)
+  const [editorLanguage, setEditorLanguage] = useState<'ES' | 'EN'>('ES');
+  const [isTranslatingWithAi, setIsTranslatingWithAi] = useState<boolean>(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const [apiKeyInput, setApiKeyInput] = useState<string>(() => translationService.getGeminiApiKey());
+  const [apiKeySavedMsg, setApiKeySavedMsg] = useState<boolean>(false);
 
   // Drafts State
   const [drafts, setDrafts] = useState<Record<string, Partial<SiteContent>>>({});
@@ -58,10 +179,40 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
   const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
 
-  // Get field with draft priority and proper fallback
+  // Get field with draft priority and proper fallback respecting active editorLanguage
   const getField = (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url'): string => {
-    if (drafts[sectionKey] && drafts[sectionKey][field] !== undefined && drafts[sectionKey][field] !== null) {
-      return drafts[sectionKey][field] as string;
+    if (field === 'media_url') {
+      if (drafts[sectionKey]?.media_url !== undefined && drafts[sectionKey]?.media_url !== null) {
+        return drafts[sectionKey]!.media_url as string;
+      }
+      const sec = content[sectionKey];
+      if (sec?.media_url) return sec.media_url;
+      const def = DEFAULT_CMS_CONTENT[sectionKey];
+      return def?.media_url || '';
+    }
+
+    // When editing in English mode:
+    if (editorLanguage === 'EN') {
+      const draftMeta = (drafts[sectionKey]?.metadata as Record<string, any>) || {};
+      const enField = `${field}_en`;
+      if (draftMeta[enField] !== undefined && draftMeta[enField] !== null) {
+        return draftMeta[enField] as string;
+      }
+      const secMeta = (content[sectionKey]?.metadata as Record<string, any>) || {};
+      if (secMeta[enField] !== undefined && secMeta[enField] !== null && secMeta[enField] !== '') {
+        return secMeta[enField] as string;
+      }
+      const defMeta = (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) || {};
+      if (defMeta[enField] !== undefined && defMeta[enField] !== null) {
+        return defMeta[enField] as string;
+      }
+      // Fallback to Spanish field if no English exists yet
+      return (content[sectionKey]?.[field] || DEFAULT_CMS_CONTENT[sectionKey]?.[field] || '') as string;
+    }
+
+    // When editing in Spanish mode:
+    if (drafts[sectionKey] && drafts[sectionKey]![field] !== undefined && drafts[sectionKey]![field] !== null) {
+      return drafts[sectionKey]![field] as string;
     }
     const sec = content[sectionKey];
     if (sec && sec[field] !== undefined && sec[field] !== null && sec[field] !== '') {
@@ -74,16 +225,48 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     return '';
   };
 
-  // Set draft field
+  // Set draft field respecting active editorLanguage
   const setField = (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url', value: string) => {
+    if (field === 'media_url') {
+      setDrafts((prev) => ({
+        ...prev,
+        [sectionKey]: {
+          ...prev[sectionKey],
+          media_url: value,
+        },
+      }));
+      return;
+    }
+
+    if (editorLanguage === 'EN') {
+      const enField = `${field}_en`;
+      const currentMeta =
+        (drafts[sectionKey]?.metadata as Record<string, any>) ||
+        (content[sectionKey]?.metadata as Record<string, any>) ||
+        (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
+        {};
+
+      setDrafts((prev) => ({
+        ...prev,
+        [sectionKey]: {
+          ...prev[sectionKey],
+          metadata: {
+            ...currentMeta,
+            [enField]: value,
+          },
+        },
+      }));
+      return;
+    }
+
+    // Spanish mode:
     setDrafts((prev) => ({
       ...prev,
       [sectionKey]: {
         ...prev[sectionKey],
-        title: field === 'title' ? value : getField(sectionKey, 'title'),
-        subtitle: field === 'subtitle' ? value : getField(sectionKey, 'subtitle'),
-        body_text: field === 'body_text' ? value : getField(sectionKey, 'body_text'),
-        media_url: field === 'media_url' ? value : getField(sectionKey, 'media_url'),
+        title: field === 'title' ? value : (prev[sectionKey]?.title ?? getField(sectionKey, 'title')),
+        subtitle: field === 'subtitle' ? value : (prev[sectionKey]?.subtitle ?? getField(sectionKey, 'subtitle')),
+        body_text: field === 'body_text' ? value : (prev[sectionKey]?.body_text ?? getField(sectionKey, 'body_text')),
       },
     }));
   };
@@ -92,18 +275,122 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     return Object.keys(drafts).length > 0;
   }, [drafts]);
 
-  // Handle Save All
+  // Handle Save All with automatic AI translation for updated Spanish fields
   const handleSaveAll = async () => {
     if (!hasUnsavedChanges) return;
     setIsSaving(true);
-    const res = await onSaveAllSections(drafts);
-    setIsSaving(false);
-    if (res.success) {
-      setDrafts({});
-      refreshContent();
-      setSaveSuccessMsg('¡Todos los cambios fueron publicados en la web pública con éxito!');
-      setTimeout(() => setSaveSuccessMsg(null), 4500);
+
+    try {
+      const finalDrafts: Record<string, Partial<SiteContent>> = { ...drafts };
+
+      // If saving from Spanish mode, auto-generate English translations with AI
+      for (const sectionKey of Object.keys(finalDrafts)) {
+        const d = finalDrafts[sectionKey];
+        const existingMeta =
+          (d.metadata as Record<string, any>) ||
+          (content[sectionKey]?.metadata as Record<string, any>) ||
+          (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
+          {};
+
+        // If Spanish texts were edited, translate them to English
+        const titleToTranslate = d.title ?? getField(sectionKey, 'title');
+        const subtitleToTranslate = d.subtitle ?? getField(sectionKey, 'subtitle');
+        const bodyToTranslate = d.body_text ?? getField(sectionKey, 'body_text');
+
+        const translated = await translationService.translateSection({
+          title: titleToTranslate,
+          subtitle: subtitleToTranslate,
+          body_text: bodyToTranslate,
+        });
+
+        finalDrafts[sectionKey] = {
+          ...d,
+          metadata: {
+            ...existingMeta,
+            // Only overwrite English if not manually edited in draft
+            title_en: existingMeta.title_en && editorLanguage === 'EN' ? existingMeta.title_en : translated.title_en,
+            subtitle_en: existingMeta.subtitle_en && editorLanguage === 'EN' ? existingMeta.subtitle_en : translated.subtitle_en,
+            body_text_en: existingMeta.body_text_en && editorLanguage === 'EN' ? existingMeta.body_text_en : translated.body_text_en,
+          },
+        };
+      }
+
+      const res = await onSaveAllSections(finalDrafts);
+      setIsSaving(false);
+      if (res.success) {
+        setDrafts({});
+        refreshContent();
+        setSaveSuccessMsg(
+          editorLanguage === 'EN'
+            ? '¡Cambios en inglés guardados con éxito!'
+            : '¡Contenido en español guardado y traducido automáticamente al inglés con IA!'
+        );
+        setTimeout(() => setSaveSuccessMsg(null), 4500);
+      }
+    } catch {
+      setIsSaving(false);
     }
+  };
+
+  // Auto-translate all sections of the active page on demand
+  const handleTranslateCurrentPageWithAi = async () => {
+    setIsTranslatingWithAi(true);
+
+    const pageSectionsMap: Record<string, string[]> = {
+      home: ['home_hero', 'home_intro'],
+      vegvisir: ['flota_vegvisir'],
+      terranova: ['flota_terranova'],
+      lodge: ['lodge_info', 'lodge_dining'],
+      expeditions: ['expeditions_hero', 'expeditions_selkirk'],
+      contact: ['contact_info', 'bank_details'],
+    };
+
+    const targetSections = pageSectionsMap[activePage] || [];
+
+    for (const secKey of targetSections) {
+      const titleEs = (content[secKey]?.title || DEFAULT_CMS_CONTENT[secKey]?.title || '') as string;
+      const subtitleEs = (content[secKey]?.subtitle || DEFAULT_CMS_CONTENT[secKey]?.subtitle || '') as string;
+      const bodyEs = (content[secKey]?.body_text || DEFAULT_CMS_CONTENT[secKey]?.body_text || '') as string;
+
+      const trans = await translationService.translateSection({
+        title: titleEs,
+        subtitle: subtitleEs,
+        body_text: bodyEs,
+      });
+
+      const currentMeta =
+        (drafts[secKey]?.metadata as Record<string, any>) ||
+        (content[secKey]?.metadata as Record<string, any>) ||
+        (DEFAULT_CMS_CONTENT[secKey]?.metadata as Record<string, any>) ||
+        {};
+
+      setDrafts((prev) => ({
+        ...prev,
+        [secKey]: {
+          ...prev[secKey],
+          metadata: {
+            ...currentMeta,
+            title_en: trans.title_en,
+            subtitle_en: trans.subtitle_en,
+            body_text_en: trans.body_text_en,
+          },
+        },
+      }));
+    }
+
+    setIsTranslatingWithAi(false);
+    setEditorLanguage('EN');
+    setSaveSuccessMsg('✨ ¡Sección traducida con IA! Ahora estás en modo de revisión en inglés.');
+    setTimeout(() => setSaveSuccessMsg(null), 4500);
+  };
+
+  const handleSaveApiKey = () => {
+    translationService.setGeminiApiKey(apiKeyInput);
+    setApiKeySavedMsg(true);
+    setTimeout(() => {
+      setApiKeySavedMsg(false);
+      setShowApiKeyModal(false);
+    }, 1200);
   };
 
   const handleResetDrafts = () => {
@@ -130,63 +417,9 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') || url.includes('video/');
   };
 
-  // =========================================================================
-  // INLINE EDITABLE COMPONENT (DIRECT WYSIWYG ON CANVAS)
-  // =========================================================================
-  const InlineText: React.FC<{
-    sectionKey: string;
-    field: 'title' | 'subtitle' | 'body_text';
-    tag?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span' | 'div';
-    className?: string;
-    fallback?: string;
-    multiline?: boolean;
-  }> = ({ sectionKey, field, tag: Tag = 'div', className = '', fallback = '', multiline = false }) => {
-    const elRef = useRef<HTMLElement>(null);
-    const currentVal = getField(sectionKey, field) || fallback;
-    const [isFocused, setIsFocused] = useState(false);
-
-    useEffect(() => {
-      if (elRef.current && !isFocused) {
-        if (elRef.current.innerText !== currentVal) {
-          elRef.current.innerText = currentVal;
-        }
-      }
-    }, [currentVal, isFocused]);
-
-    return (
-      <Tag
-        ref={elRef as any}
-        contentEditable
-        suppressContentEditableWarning
-        spellCheck={false}
-        onFocus={() => setIsFocused(true)}
-        onBlur={(e) => {
-          setIsFocused(false);
-          const text = e.currentTarget.innerText;
-          setField(sectionKey, field, text);
-        }}
-        onInput={(e) => {
-          const text = (e.currentTarget as HTMLElement).innerText;
-          setField(sectionKey, field, text);
-        }}
-        onKeyDown={(e) => {
-          if (!multiline && e.key === 'Enter') {
-            e.preventDefault();
-            (e.currentTarget as HTMLElement).blur();
-          }
-        }}
-        className={`cursor-text select-text outline-none transition-all duration-150 ${
-          isFocused
-            ? 'ring-2 ring-sky-400 bg-sky-500/20 rounded-md shadow-md'
-            : 'hover:opacity-90'
-        } ${className}`}
-        title="Haz clic para escribir directamente aquí"
-      />
-    );
-  };
-
   return (
-    <div className="space-y-4">
+    <CmsContext.Provider value={{ getField, setField }}>
+      <div className="space-y-4">
       {/* ========================================================================= */}
       {/* TOP CONTROL TOOLBAR */}
       {/* ========================================================================= */}
@@ -276,9 +509,10 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-          <div className="flex flex-wrap items-center gap-1.5">
+        {/* Navigation Tabs & Bilingual / AI Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          {/* Capsule Sub-Tabs */}
+          <div className="p-1.5 bg-slate-100/80 border border-slate-200/80 rounded-full flex flex-wrap items-center gap-1 shadow-inner">
             {[
               { id: 'home', label: 'Inicio (Home)', icon: Home },
               { id: 'vegvisir', label: 'Velero Vegvisir', icon: Sailboat },
@@ -293,19 +527,105 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => setActivePage(tab.id as any)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 cursor-pointer ${
+                  className={`px-4 py-2 rounded-full text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                     isActive
-                      ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20'
-                      : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/70'
+                      ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/25 font-bold scale-[1.02]'
+                      : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/90 font-medium'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Bilingual Language Switcher & AI Actions (Capsule Style) */}
+          <div className="flex items-center gap-2">
+            {/* Language Switcher in Public Site Style: ES · EN */}
+            <div className="inline-flex items-center bg-slate-100/90 border border-slate-300/80 rounded-full p-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setEditorLanguage('ES')}
+                className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${
+                  editorLanguage === 'ES'
+                    ? 'bg-white text-slate-950 shadow-xs font-extrabold'
+                    : 'text-slate-400 hover:text-slate-700 font-semibold'
+                }`}
+                title="Editar versión en Español"
+              >
+                ES
+              </button>
+              <span className="text-slate-300 px-0.5 select-none text-xs">·</span>
+              <button
+                type="button"
+                onClick={() => setEditorLanguage('EN')}
+                className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${
+                  editorLanguage === 'EN'
+                    ? 'bg-[#0f2b48] text-white shadow-xs font-extrabold ring-1 ring-sky-400'
+                    : 'text-slate-400 hover:text-slate-700 font-semibold'
+                }`}
+                title="Editar versión en Inglés (IA)"
+              >
+                EN
+              </button>
+            </div>
+
+            {/* Translate with AI on demand Capsule */}
+            <button
+              type="button"
+              onClick={handleTranslateCurrentPageWithAi}
+              disabled={isTranslatingWithAi}
+              className="px-4 py-2 rounded-full bg-purple-50 hover:bg-purple-100/90 text-purple-700 border border-purple-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs hover:scale-105 duration-200"
+              title="Traducir automáticamente esta sección con Inteligencia Artificial"
+            >
+              {isTranslatingWithAi ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                  <span>Traduciendo...</span>
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="hidden sm:inline">Traducir con IA</span>
+                </>
+              )}
+            </button>
+
+            {/* AI API Key Modal Trigger Capsule */}
+            <button
+              type="button"
+              onClick={() => setShowApiKeyModal(true)}
+              className="px-3.5 py-2 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer hover:scale-105 duration-200"
+              title="Configuración de API de Inteligencia Artificial (Gemini)"
+            >
+              <Bot className="w-4 h-4 text-purple-600" />
+              <span className="hidden md:inline font-bold">API IA</span>
+            </button>
+          </div>
         </div>
+
+        {/* English Mode Information Banner */}
+        {editorLanguage === 'EN' && (
+          <div className="bg-sky-50 border border-sky-200 text-sky-950 p-3 rounded-2xl flex items-center justify-between gap-3 text-xs animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🇬🇧</span>
+              <div>
+                <strong className="font-bold">Modo de Edición y Revisión en Inglés:</strong>
+                <span className="ml-1 text-sky-800">
+                  Estás visualizando los textos en inglés. Puedes hacer clic sobre cualquier texto para editarlo directamente y afinar la traducción de la IA.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditorLanguage('ES')}
+              className="text-xs text-sky-700 underline font-bold hover:text-sky-900 shrink-0 cursor-pointer"
+            >
+              Volver a Español
+            </button>
+          </div>
+        )}
 
         {/* SUCCESS NOTIFICATION TOAST */}
         {saveSuccessMsg && (
@@ -382,7 +702,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   />
                 ) : (
                   <img
-                    src={getField('home_hero', 'media_url') || 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1'}
+                    src={getField('home_hero', 'media_url') || '/velero-vegvisir.jpg'}
                     alt="Hero Background"
                     className="absolute inset-0 w-full h-full object-cover opacity-85"
                   />
@@ -428,7 +748,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                       sectionKey="home_hero"
                       field="title"
                       tag="h1"
-                      fallback="EXPEDICIONES PATAGONIA & JUAN FERNÁNDEZe"
+                      fallback="EXPEDICIONES PATAGONIA & JUAN FERNÁNDEZ"
                       className="text-base sm:text-lg lg:text-xl font-bold tracking-tight text-white leading-snug block"
                     />
 
@@ -498,7 +818,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                     {/* Card 1: Velero Vegvisir */}
                     <div className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1">
                       <img
-                        src={getField('flota_vegvisir', 'media_url') || 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1'}
+                        src={getField('flota_vegvisir', 'media_url') || '/velero-vegvisir.jpg'}
                         alt="Velero Vegvisir"
                         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
@@ -666,7 +986,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   />
                 ) : (
                   <img
-                    src={getField('flota_vegvisir', 'media_url') || "https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1"}
+                    src={getField('flota_vegvisir', 'media_url') || "/velero-vegvisir.jpg"}
                     alt="Velero Vegvisir"
                     className="absolute inset-0 w-full h-full object-cover"
                   />
@@ -1304,6 +1624,88 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           </div>
         </div>
       )}
-    </div>
+
+      {/* AI API KEY SETTINGS MODAL */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Bot className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-serif text-base font-bold text-slate-900">
+                    Conectar API de Inteligencia Artificial
+                  </h4>
+                  <p className="text-[11px] text-slate-500">Google Gemini API (100% Gratuito)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+              <p>
+                El sitio cuenta con un <strong>motor de traducción náutico inteligente integrado</strong>. Si deseas conectar tu propia API Key de Google Gemini para traducciones avanzadas con IA generativa, puedes ingresarla a continuación.
+              </p>
+              <div className="flex items-center gap-1.5 text-emerald-700 font-semibold pt-1">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Estado: Motor de IA Activo y Listo</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 block">
+                Google Gemini API Key:
+              </label>
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AIzaSy..."
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <p className="text-[10px] text-slate-400">
+                La clave se almacena de forma segura en tu navegador y se utiliza para auto-traducir al presionar "Guardar".
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveApiKey}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition flex items-center gap-1.5 shadow-md shadow-purple-600/20 cursor-pointer"
+              >
+                {apiKeySavedMsg ? (
+                  <>
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>¡Guardada con éxito!</span>
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-3.5 h-3.5" />
+                    <span>Guardar Clave</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </CmsContext.Provider>
   );
 };

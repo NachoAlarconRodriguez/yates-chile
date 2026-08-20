@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { EXPEDITIONS, type Expedition } from '../components/modules/ExpeditionCalendar';
+import { useExpeditions } from '../hooks/useExpeditions';
+import type { PublicExpedition as Expedition } from '../services/expeditionService';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { leadService } from '../services/leadService';
 import { 
   Compass, 
   Download, 
@@ -151,6 +153,7 @@ const getExpeditionOverview = (exp: Expedition): ExpeditionOverview => {
 };
 
 export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate }) => {
+  const { expeditions } = useExpeditions();
   const [downloadEmail, setDownloadEmail] = useState('');
   const [downloadSent, setDownloadSent] = useState(false);
   const [selectedExpedition, setSelectedExpedition] = useState<Expedition | null>(null);
@@ -164,6 +167,18 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
     e.preventDefault();
     if (!downloadEmail) return;
     setDownloadSent(true);
+
+    // Register lead in CRM
+    leadService.createLead({
+      fullName: downloadEmail.split('@')[0],
+      email: downloadEmail,
+      phone: '',
+      origin: 'brochure',
+      originDetails: 'Descarga Brochure Travesías 2026/2027',
+      interestType: 'expediciones',
+      notes: 'Solicitó descarga del Brochure PDF oficial desde la página de Expediciones.',
+    }).catch(() => {});
+
     setTimeout(() => {
       const link = document.createElement('a');
       link.href = '#';
@@ -187,33 +202,49 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
     <div className="space-y-0 bg-white">
       
       {/* Header Banner */}
-      <section className="bg-slate-900 text-white py-20 relative overflow-hidden border-b border-slate-800">
-        {expHero.media_url && (
-          <>
-            <img
-              src={expHero.media_url}
-              alt={expHero.title || "Expediciones"}
-              className="absolute inset-0 w-full h-full object-cover opacity-25"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent" />
-          </>
-        )}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider">
-            <Compass className="w-4 h-4 text-blue-400" />
-            <span>{expHero.subtitle || 'Itinerarios de Navegación Austral'}</span>
+      <section className="bg-slate-950 text-white py-16 sm:py-20 relative overflow-hidden border-b border-slate-800 flex items-center justify-center min-h-[360px] sm:min-h-[400px]">
+        <img
+          src={expHero.media_url && !expHero.media_url.includes('images.unsplash.com') ? expHero.media_url : "/expediciones-hero.jpg"}
+          alt={expHero.title || "Expediciones"}
+          className="absolute inset-0 w-full h-full object-cover opacity-80"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-slate-950/20" />
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-3.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/60 border border-white/20 text-white text-[10px] font-semibold uppercase tracking-widest backdrop-blur-md shadow-md">
+            <Compass className="w-3.5 h-3.5 text-blue-300" />
+            <span>{expHero.subtitle || 'Travesías de Altamar & Reservas de la Biosfera'}</span>
           </div>
-          <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white">
-            {expHero.title || 'Expediciones & Rutas Marítimas'}
+          
+          <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight leading-snug drop-shadow-md">
+            {expHero.title || 'Rutas & Expediciones Australes'}
           </h1>
-          <p className="max-w-2xl mx-auto text-slate-350 text-base sm:text-lg">
-            {expHero.body_text || 'Descubre nuestras travesías disponibles para reserva inmediata. Explora las rutas del calendario y consulta por tu cupo a bordo.'}
+          
+          <p className="max-w-xl mx-auto text-slate-200 text-xs sm:text-sm leading-relaxed font-light drop-shadow-sm opacity-90">
+            {expHero.body_text || 'Expediciones científicas y de aventura guiadas por capitanes expertos en Juan Fernández, Alejandro Selkirk y los canales patagónicos.'}
           </p>
+
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                const target = document.getElementById('grid-expediciones');
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  window.open('https://wa.me/56981312920?text=Hola%20Yates%20Chile%2C%20deseo%20reservar%20una%20expedici%C3%B3n', '_blank');
+                }
+              }}
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-xl text-xs border border-white/90 cursor-pointer hover:scale-[1.02]"
+            >
+              <Compass className="w-4 h-4 text-slate-950" />
+              <span>Reservar Expedición</span>
+            </button>
+          </div>
         </div>
       </section>
 
       {/* Grid of Expeditions */}
-      <section className="py-20 bg-slate-50/50">
+      <section id="grid-expediciones" className="py-20 bg-slate-50/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-2">
             <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 font-mono">
@@ -228,7 +259,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {EXPEDITIONS.map((exp) => (
+            {expeditions.map((exp) => (
               <div
                 key={exp.id}
                 onClick={() => setSelectedExpedition(exp)}
@@ -363,7 +394,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 </div>
               </div>
 
-              <div className="relative z-10 pt-6 border-t border-white/10 space-y-3">
+              <div className="relative z-10 pt-6 border-t border-white/10 space-y-2.5">
                 {selectedExpedition.spotsLeft === 'completo' ? (
                   <button
                     disabled
@@ -379,13 +410,35 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                     Bloqueado por Misión
                   </button>
                 ) : (
-                  <button
-                    onClick={() => handleBookWhatsApp(selectedExpedition)}
-                    className="w-full bg-white hover:bg-slate-100 text-slate-950 font-bold py-3.5 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
-                  >
-                    <span>Reservar Cupo con Concierge</span>
-                    <ArrowRight className="w-4 h-4 text-slate-900" />
-                  </button>
+                  <>
+                    {/* Botón 1: Descargar Brochure en PDF */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.setAttribute('download', `Dossier_${selectedExpedition.name.replace(/\s+/g, '_')}_2026.pdf`);
+                        document.body.appendChild(link);
+                        setTimeout(() => {
+                          alert(`Descargando Brochure Oficial en PDF de: ${selectedExpedition.name}`);
+                        }, 200);
+                      }}
+                      className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
+                    >
+                      <Download className="w-4 h-4 text-blue-300" />
+                      <span>Descargar Brochure en PDF</span>
+                    </button>
+
+                    {/* Botón 2: Reservar Cupo con Concierge */}
+                    <button
+                      type="button"
+                      onClick={() => handleBookWhatsApp(selectedExpedition)}
+                      className="w-full bg-white hover:bg-slate-100 text-slate-950 font-bold py-3.5 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
+                    >
+                      <span>Reservar Cupo de Expedición</span>
+                      <ArrowRight className="w-4 h-4 text-slate-900" />
+                    </button>
+                  </>
                 )}
               </div>
             </div>

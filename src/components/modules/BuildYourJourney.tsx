@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Compass, Ship, Home, Sparkles, Check, ArrowRight, ArrowLeft, Send, CheckCircle } from 'lucide-react';
 import type { JourneyConfigState } from '../../types';
+import { leadService } from '../../services/leadService';
 
 export const BuildYourJourney: React.FC = () => {
   const [step, setStep] = useState<number>(1);
@@ -31,6 +32,19 @@ export const BuildYourJourney: React.FC = () => {
     e.preventDefault();
     setLoading(true);
 
+    // Register Lead in CRM
+    leadService.createLead({
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      origin: 'contacto_web',
+      originDetails: `Diseña tu Travesía (${formData.experienceType === 'lodgenavigation' ? 'Lodge + Navegación' : formData.experienceType === 'navigation' ? 'Solo Barco' : 'Solo Lodge'})`,
+      interestType: formData.experienceType === 'navigation' ? 'expediciones' : formData.experienceType === 'lodge' ? 'lodge' : 'charter',
+      estimatedPax: formData.guestsCount,
+      tentativeDate: formData.tentativeMonth,
+      notes: formData.specialRequests || 'Solicitud de itinerario a medida enviada desde el configurador web.',
+    }).catch(() => {});
+
     setTimeout(() => {
       setLoading(false);
       setSubmitted(true);
@@ -43,7 +57,7 @@ export const BuildYourJourney: React.FC = () => {
           origin: { y: 0.6 },
           colors: ['#3b82f6', '#0F172A', '#F8FAFC'],
         });
-      } catch (err) {
+      } catch (_) {
         // Fallback
       }
 

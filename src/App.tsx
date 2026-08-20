@@ -66,8 +66,9 @@ export function App() {
       {appLoading && (
         <LoadingScreen 
           onComplete={() => setAppLoading(false)} 
+          isReady={!showSplash || isVideoReady}
           isVideoReady={isVideoReady} 
-          duration={3200} 
+          minDuration={400} 
         />
       )}
 

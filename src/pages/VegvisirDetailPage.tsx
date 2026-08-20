@@ -1,15 +1,18 @@
 import React from 'react';
-import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X, Radio, Droplets, FileText } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X, Radio, Droplets, FileText, Download, ArrowRight } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useExpeditions } from '../hooks/useExpeditions';
 
 interface VegvisirDetailPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNavigate }) => {
+  const { expeditions } = useExpeditions();
   const { getSection } = useSiteContent();
   const vegvisirCms = getSection('flota_vegvisir');
 
+  const [showExpeditionsModal, setShowExpeditionsModal] = React.useState(false);
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
   const toggleFlip = (id: string) => {
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -65,7 +68,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
   const tourStations = {
     exterior: {
       title: 'Cubierta Exterior',
-      image: 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=vde6gklz&raw=1',
+      image: '/velero-vegvisir.jpg',
       hotspots: [
         {
           x: '48%',
@@ -191,7 +194,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       wind: 'NW 45 Nudos',
       temp: '1°C Ext',
       text: 'Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado y la quilla de plomo del Vegvisir infunden total confianza cuando el hielo roza suavemente la estructura. La embarcación corta el mar embravecido con firmeza impecable.',
-      image: 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1',
+      image: '/velero-vegvisir.jpg',
     },
     desembarcos: {
       title: 'Desembarcos Seguros',
@@ -207,7 +210,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
   const images = [
     {
-      url: 'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1',
+      url: '/velero-vegvisir.jpg',
       title: 'Velero Vegvisir en aguas australes',
       desc: 'El Vegvisir navegando majestuosamente frente a las costas vírgenes del extremo sur de Chile. Su casco reforzado corta con solidez las frías aguas australes.',
     },
@@ -254,7 +257,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           />
         ) : (
           <img
-            src={vegvisirCms.media_url || "https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/APoFuaLsV7SP_dnIe3k8vy0/Fotos/397fa5f6-f7a6-4e5f-ab0c-60f45245ddb4.JPG?rlkey=dydsj8rbegl4ga5x2062vycj6&st=v9ltgbio&raw=1"}
+            src={vegvisirCms.media_url && !vegvisirCms.media_url.includes('images.unsplash.com') ? vegvisirCms.media_url : "/velero-vegvisir.jpg"}
             alt={vegvisirCms.title || "Velero Vegvisir"}
             className="absolute inset-0 w-full h-full object-cover"
           />
@@ -272,25 +275,119 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           </button>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <span className="bg-blue-900/80 backdrop-blur-md border border-blue-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              {vegvisirCms.subtitle || 'Velero de Expedición • Francés'}
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Starlink 24/7
-            </span>
-          </div>
-
-          <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
+          <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
             {vegvisirCms.title || 'Velero Vegvisir'}
           </h1>
-          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
+          <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
             {vegvisirCms.body_text || 'Velero de expedición Dufour 52.5 ft (Astillero Francés, Matrícula QUI 2718) con capacidad para 12 PAX en 5 cabinas con 5 baños privados. Equipado con Starlink 24/7, instrumental Raymarine, desalinizador de 140 ltrs/hr y Zodiac de desembarco con motor Mercury 4T 15hp.'}
           </p>
+          <div className="pt-2">
+            <button
+              onClick={() => setShowExpeditionsModal(true)}
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-3 rounded-xl transition-all shadow-xl text-xs sm:text-sm border border-white/90 cursor-pointer hover:scale-[1.02]"
+            >
+              <Compass className="w-4 h-4 text-slate-950" />
+              <span>Reservar Expediciones en Velero Vegvisir</span>
+            </button>
+          </div>
         </div>
       </section>
+
+      {/* MODAL DE EXPEDICIONES DEL VELERO VEGVISIR */}
+      {showExpeditionsModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative text-slate-800 overflow-hidden border border-slate-200">
+            {/* Header */}
+            <div className="bg-[#0f2b48] text-white p-5 sm:p-6 flex items-center justify-between shrink-0">
+              <h3 className="font-serif text-xl sm:text-2xl font-bold text-white pr-4">
+                Expediciones Programadas en Velero Vegvisir
+              </h3>
+              <button
+                onClick={() => setShowExpeditionsModal(false)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Expeditions List */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 bg-slate-50">
+              {expeditions.filter((e) =>
+                e.vessel.toLowerCase().includes('vegvisir') ||
+                e.vessel.toLowerCase().includes('velero') ||
+                e.name.toLowerCase().includes('travesía')
+              ).map((exp) => (
+                <div
+                  key={exp.id}
+                  className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start gap-4">
+                    <img
+                      src={exp.image}
+                      alt={exp.name}
+                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-200"
+                    />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold uppercase text-sky-900 bg-sky-100 px-2 py-0.5 rounded-md">
+                          {exp.startDate} al {exp.endDate}
+                        </span>
+                        {typeof exp.spotsLeft === 'number' && (
+                          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            {exp.spotsLeft} cupos disponibles
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-serif font-bold text-base text-[#0f2b48]">{exp.name}</h4>
+                      <p className="text-xs text-slate-500 font-light line-clamp-2 max-w-md">
+                        {exp.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.setAttribute('download', `Dossier_${exp.name.replace(/\s+/g, '_')}_2026.pdf`);
+                        document.body.appendChild(link);
+                        setTimeout(() => {
+                          alert(`Descargando Brochure Oficial en PDF de: ${exp.name}`);
+                        }, 200);
+                      }}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Brochure PDF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = encodeURIComponent(
+                          `Hola Yates Chile, deseo reservar cupo para la expedición en Velero Vegvisir:\n\n` +
+                          `• Travesía: ${exp.name}\n` +
+                          `• Fechas: ${exp.startDate} al ${exp.endDate}\n` +
+                          `• Embarcación: Velero Vegvisir\n\n` +
+                          `Solicito disponibilidad y valores para confirmar mi reserva.`
+                        );
+                        window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
+                      }}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
+                    >
+                      <span>Reservar Cupo</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TECH SPECS GRID (3D FLIPS ON CLICK) */}
       <section className="py-16 bg-white overflow-hidden">

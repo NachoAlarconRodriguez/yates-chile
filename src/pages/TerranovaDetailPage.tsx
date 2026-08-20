@@ -1,15 +1,18 @@
 import React from 'react';
-import { ArrowLeft, Compass, Thermometer, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge } from 'lucide-react';
+import { ArrowLeft, Compass, Thermometer, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge, Download, ArrowRight } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useExpeditions } from '../hooks/useExpeditions';
 
 interface TerranovaDetailPageProps {
   onNavigate: (path: string) => void;
 }
 
 export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavigate }) => {
+  const { expeditions } = useExpeditions();
   const { getSection } = useSiteContent();
   const terranovaCms = getSection('flota_terranova');
 
+  const [showExpeditionsModal, setShowExpeditionsModal] = React.useState(false);
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
   const toggleFlip = (id: string) => {
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -198,7 +201,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
       wind: 'SW 38 Nudos',
       temp: '6°C Ext',
       text: 'Enfrentamos el oleaje de mar abierto en el Golfo de Penas para cruzar hacia los canales del sur. Al activar los estabilizadores dinámicos del Terranova, el balanceo se reduce casi por completo. La navegación continúa con suavidad asombrosa, permitiendo almorzar sin movimiento alguno.',
-      image: 'https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=1000&q=80',
+      image: '/zarpe-archipielago.jpg',
     },
     desembarcos: {
       title: 'Exploración de Fiordos',
@@ -214,7 +217,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
 
   const images = [
     {
-      url: 'https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=1000&q=80',
+      url: '/yate-terranova.jpg',
       title: 'Yate Terranova en aguas australes',
       desc: 'El Terranova navegando entre los canales australes. Su potencia y diseño contemporáneo ofrecen una navegación incomparable.',
     },
@@ -279,25 +282,120 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
           </button>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <span className="bg-blue-900/80 backdrop-blur-md border border-blue-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
-              {terranovaCms.subtitle || 'Yate de Expedición • Americano'}
-            </span>
-            <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Starlink 24/7
-            </span>
-          </div>
-
-          <h1 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight">
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
+          <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
             {terranovaCms.title || 'Yate Terranova'}
           </h1>
-          <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl">
+          <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
             {terranovaCms.body_text || 'Yate de expedición oceánica Hatteras 65ft LRC (Astillero Americano, Matrícula PMO 6128) distribuido en 3 cubiertas con capacidad para 20 PAX (5 cabinas / 5 baños). Equipado con 2 motores Detroit de 450 HP (3.000 MN de autonomía con estanque de 10.000 L), doble navegación Raymarine + Garmin, Starlink 24/7, 2 desalinizadores y Zodiac semirrígido con motor Yamaha 70hp y grúa de 1 tonelada.'}
           </p>
+          <div className="pt-2">
+            <button
+              onClick={() => setShowExpeditionsModal(true)}
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-3 rounded-xl transition-all shadow-xl text-xs sm:text-sm border border-white/90 cursor-pointer hover:scale-[1.02]"
+            >
+              <Ship className="w-4 h-4 text-slate-950" />
+              <span>Reservar Expediciones en Yate Terranova</span>
+            </button>
+          </div>
         </div>
       </section>
+
+      {/* MODAL DE EXPEDICIONES DEL YATE TERRANOVA */}
+      {showExpeditionsModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative text-slate-800 overflow-hidden border border-slate-200">
+            {/* Header */}
+            <div className="bg-[#0f2b48] text-white p-5 sm:p-6 flex items-center justify-between shrink-0">
+              <h3 className="font-serif text-xl sm:text-2xl font-bold text-white pr-4">
+                Expediciones Programadas en Yate Terranova
+              </h3>
+              <button
+                onClick={() => setShowExpeditionsModal(false)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Expeditions List */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 bg-slate-50">
+              {expeditions.filter((e) =>
+                e.vessel.toLowerCase().includes('terranova') ||
+                e.vessel.toLowerCase().includes('yate') ||
+                e.name.toLowerCase().includes('cabo de hornos') ||
+                e.name.toLowerCase().includes('fiordos')
+              ).map((exp) => (
+                <div
+                  key={exp.id}
+                  className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start gap-4">
+                    <img
+                      src={exp.image}
+                      alt={exp.name}
+                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-200"
+                    />
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md">
+                          {exp.startDate} al {exp.endDate}
+                        </span>
+                        {typeof exp.spotsLeft === 'number' && (
+                          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            {exp.spotsLeft} cupos disponibles
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-serif font-bold text-base text-[#0f2b48]">{exp.name}</h4>
+                      <p className="text-xs text-slate-500 font-light line-clamp-2 max-w-md">
+                        {exp.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.setAttribute('download', `Dossier_${exp.name.replace(/\s+/g, '_')}_2026.pdf`);
+                        document.body.appendChild(link);
+                        setTimeout(() => {
+                          alert(`Descargando Brochure Oficial en PDF de: ${exp.name}`);
+                        }, 200);
+                      }}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Brochure PDF</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = encodeURIComponent(
+                          `Hola Yates Chile, deseo reservar cupo para la expedición en Yate Terranova:\n\n` +
+                          `• Travesía: ${exp.name}\n` +
+                          `• Fechas: ${exp.startDate} al ${exp.endDate}\n` +
+                          `• Embarcación: Yate Terranova\n\n` +
+                          `Solicito disponibilidad y valores para confirmar mi reserva.`
+                        );
+                        window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
+                      }}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
+                    >
+                      <span>Reservar Cupo</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TECH SPECS GRID (3D FLIPS ON CLICK) */}
       <section className="py-16 bg-white overflow-hidden">

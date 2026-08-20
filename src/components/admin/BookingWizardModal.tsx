@@ -20,6 +20,7 @@ import {
   Check,
   Clock
 } from 'lucide-react';
+import { useLodge } from '../../hooks/useLodge';
 
 export interface BookingWizardData {
   bookingCode: string;
@@ -426,16 +427,16 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   // Step state (1 to 6)
   const [currentStep, setCurrentStep] = useState<number>(1);
 
-  // Step 1: Selected Categories
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['vegvisir', 'lodge']);
+  // Step 1: Selected Categories (starts empty - nothing preselected)
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   // Step 2: Selected Program IDs
-  const [selectedProgramIds, setSelectedProgramIds] = useState<string[]>(['prog-combo-veg-lodge']);
+  const [selectedProgramIds, setSelectedProgramIds] = useState<string[]>([]);
 
   // Step 3: Dates & Selected Departure ID
-  const [selectedDepartureId, setSelectedDepartureId] = useState<string>('dep-oct-1');
-  const [startDate, setStartDate] = useState<string>('2026-10-15');
-  const [endDate, setEndDate] = useState<string>('2026-10-22');
+  const [selectedDepartureId, setSelectedDepartureId] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   // Step 4: Passengers
   const [passengersCount, setPassengersCount] = useState<number>(1);
@@ -482,17 +483,56 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     setNotification({ title, message, type });
   };
 
+  // Reset wizard whenever modal opens so nothing is preselected
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep(1);
+      setSelectedCategories([]);
+      setSelectedProgramIds([]);
+      setSelectedDepartureId('');
+      setStartDate('');
+      setEndDate('');
+      setPassengersCount(1);
+      setPassengers([
+        {
+          fullName: '',
+          rutOrPassport: '',
+          birthDate: '',
+          email: '',
+          phone: '',
+          nationality: 'Chilena',
+          dietaryPreferences: '',
+          notes: '',
+        },
+      ]);
+      setDiscountType('none');
+      setDiscountPercent(0);
+      setDiscountAmount(0);
+      setInstallmentsCount(2);
+      setSpecialNotes('');
+      setNotification(null);
+    }
+  }, [isOpen]);
+
   // Toggle category in Step 1
   const toggleCategory = (catId: string) => {
     if (selectedCategories.includes(catId)) {
-      if (selectedCategories.length === 1) {
-        showNotification('Debe mantener al menos una opción seleccionada.', 'Selección Mínima');
-        return;
-      }
       setSelectedCategories(selectedCategories.filter((c) => c !== catId));
     } else {
       setSelectedCategories([...selectedCategories, catId]);
     }
+  };
+
+  // Helper booleans for dynamic wizard mode
+  const isOnlyLodge = selectedCategories.length === 1 && selectedCategories[0] === 'lodge';
+  const { isRoomBookedForRange } = useLodge();
+
+  const getRoomIdFromProgId = (progId: string): string => {
+    if (progId === 'prog-lodge-1') return 'room-1';
+    if (progId === 'prog-lodge-2') return 'room-2';
+    if (progId === 'prog-lodge-3') return 'room-3';
+    if (progId === 'prog-lodge-4') return 'room-4';
+    return '';
   };
 
   // Single selection of program in Step 2 (Radio behavior: only 1 package at a time)
@@ -500,11 +540,23 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     setSelectedProgramIds([progId]);
   };
 
-  // Filter programs based on Step 1: MUST include ALL selected categories (AND logic)
+  // Filter programs based on Step 1: MUST match the exact selection scope
   const availablePrograms = useMemo(() => {
-    return CATALOG_PROGRAMS.filter((prog) =>
-      selectedCategories.every((catId) => prog.includedAssets.includes(catId))
-    );
+    if (selectedCategories.length === 0) return [];
+
+    return CATALOG_PROGRAMS.filter((prog) => {
+      // Must include every selected category
+      const matchesAll = selectedCategories.every((catId) => prog.includedAssets.includes(catId));
+      if (!matchesAll) return false;
+
+      // If user selected ONLY 1 single category (e.g. ONLY lodge, ONLY vegvisir, ONLY terranova):
+      // Only show programs that belong exclusively to that asset!
+      if (selectedCategories.length === 1) {
+        return prog.includedAssets.length === 1 && prog.includedAssets[0] === selectedCategories[0];
+      }
+
+      return true;
+    });
   }, [selectedCategories]);
 
   // Selected program data
@@ -514,8 +566,20 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   const activeSelectedProgram = selectedProgramsData[0] || availablePrograms[0] || CATALOG_PROGRAMS[0];
 
+  // Check if currently active selected lodge room is booked for the date range
+  const isSelectedLodgeRoomBooked = useMemo(() => {
+    if (!isOnlyLodge || !startDate || !endDate) return false;
+    const targetRoomId = getRoomIdFromProgId(activeSelectedProgram?.id || '');
+    if (!targetRoomId) return false;
+    return isRoomBookedForRange(targetRoomId, startDate, endDate);
+  }, [isOnlyLodge, startDate, endDate, activeSelectedProgram, isRoomBookedForRange]);
+
   // Sync selectedProgramIds when availablePrograms change
   useEffect(() => {
+    if (selectedCategories.length === 0) {
+      setSelectedProgramIds([]);
+      return;
+    }
     if (availablePrograms.length > 0) {
       const hasValidSelection = selectedProgramIds.some((id) =>
         availablePrograms.some((p) => p.id === id)
@@ -526,7 +590,20 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     } else {
       setSelectedProgramIds([]);
     }
-  }, [availablePrograms]);
+  }, [availablePrograms, selectedCategories]);
+
+  // Pre-fill default dates for Lodge when entering Step 3
+  useEffect(() => {
+    if (isOnlyLodge && currentStep === 3 && !startDate) {
+      const todayObj = new Date();
+      const startStr = todayObj.toISOString().split('T')[0];
+      const endObj = new Date();
+      endObj.setDate(endObj.getDate() + 2);
+      const endStr = endObj.toISOString().split('T')[0];
+      setStartDate(startStr);
+      setEndDate(endStr);
+    }
+  }, [isOnlyLodge, currentStep, startDate]);
 
   // Select departure handler in Step 3
   const handleSelectDeparture = (dep: ProgramDeparture) => {
@@ -597,7 +674,7 @@ const formatRut = (value: string): string => {
   // Calculation of Nights
   const calculatedNights = useMemo(() => {
     if (!startDate || !endDate) return 1;
-    const diffTime = Math.abs(new Date(endDate).getTime() - new Date(startDate).getTime());
+    const diffTime = new Date(endDate).getTime() - new Date(startDate).getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return Math.max(1, diffDays);
   }, [startDate, endDate]);
@@ -631,7 +708,10 @@ const formatRut = (value: string): string => {
   const canProceed = () => {
     if (currentStep === 1) return selectedCategories.length > 0;
     if (currentStep === 2) return selectedProgramIds.length > 0;
-    if (currentStep === 3) return Boolean(startDate && endDate && startDate <= endDate);
+    if (currentStep === 3) {
+      if (isOnlyLodge && isSelectedLodgeRoomBooked) return false;
+      return Boolean(startDate && endDate && startDate < endDate);
+    }
     if (currentStep === 4) {
       // Must at least have Passenger 1 (Lead passenger) filled
       const lead = passengers[0];
@@ -646,11 +726,19 @@ const formatRut = (value: string): string => {
       if (currentStep === 4) {
         showNotification('Por favor complete al menos el nombre y correo del pasajero principal (Titular de Reserva).', 'Datos Requeridos');
       } else if (currentStep === 3) {
-        showNotification('Por favor seleccione una fecha de salida programada para continuar.', 'Fecha Requerida');
+        if (isOnlyLodge) {
+          if (isSelectedLodgeRoomBooked) {
+            showNotification(`La cabina "${activeSelectedProgram?.title}" no está disponible en las fechas seleccionadas (${startDate} al ${endDate}) porque ya cuenta con una reserva u ocupación confirmada. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación.`, 'Habitación no disponible');
+          } else {
+            showNotification('Por favor seleccione una fecha de check-in y check-out válida (mínimo 1 noche).', 'Fechas de Estadía Requeridas');
+          }
+        } else {
+          showNotification('Por favor seleccione una fecha de salida programada para continuar.', 'Fecha Requerida');
+        }
       } else if (currentStep === 1) {
         showNotification('Debe seleccionar al menos una opción para continuar.', 'Opciones Requeridas');
       } else if (currentStep === 2) {
-        showNotification('Debe seleccionar un programa o paquete para continuar.', 'Programa Requerido');
+        showNotification(isOnlyLodge ? 'Debe seleccionar una habitación de Lodge para continuar.' : 'Debe seleccionar un programa o paquete para continuar.', 'Selección Requerida');
       } else {
         showNotification('Por favor complete los campos requeridos para continuar.', 'Atención');
       }
@@ -731,8 +819,8 @@ const formatRut = (value: string): string => {
           <div className="grid grid-cols-6 gap-2">
             {[
               { step: 1, label: '1. Opciones' },
-              { step: 2, label: '2. Programas' },
-              { step: 3, label: '3. Fechas' },
+              { step: 2, label: isOnlyLodge ? '2. Cabina' : '2. Programas' },
+              { step: 3, label: isOnlyLodge ? '3. Estadía' : '3. Fechas' },
               { step: 4, label: '4. Pasajeros' },
               { step: 5, label: '5. Pago' },
               { step: 6, label: '6. Resumen' },
@@ -846,26 +934,45 @@ const formatRut = (value: string): string => {
                 })}
               </div>
 
-              <div className="bg-sky-50/70 border border-sky-200/80 p-3.5 rounded-2xl flex items-center justify-center gap-2 text-sky-900 text-xs font-medium max-w-lg mx-auto text-center">
-                <Sparkles className="w-4 h-4 text-sky-600 shrink-0" />
+              <div className={`border p-3.5 rounded-2xl flex items-center justify-center gap-2 text-xs font-medium max-w-lg mx-auto text-center transition-all ${
+                selectedCategories.length > 0
+                  ? 'bg-sky-50/70 border-sky-200/80 text-sky-900'
+                  : 'bg-slate-50 border-slate-200 text-slate-500'
+              }`}>
+                <Sparkles className={`w-4 h-4 shrink-0 ${selectedCategories.length > 0 ? 'text-sky-600' : 'text-slate-400'}`} />
                 <span>
-                  <strong>{selectedCategories.length} opciones seleccionadas</strong>. Presiona <em>Siguiente Paso</em> para ver sus programas.
+                  {selectedCategories.length > 0 ? (
+                    <>
+                      <strong>{selectedCategories.length} {selectedCategories.length === 1 ? 'opción seleccionada' : 'opciones seleccionadas'}</strong>. Presiona <em>Siguiente Paso</em> para ver {isOnlyLodge ? 'las cabinas del Lodge' : 'los programas disponibles'}.
+                    </>
+                  ) : (
+                    'Haz clic en los íconos circulares para comenzar a componer la reserva.'
+                  )}
                 </span>
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 2: PROGRAMAS Y SERVICIOS FILTRADOS */}
+          {/* PASO 2: PROGRAMAS O CABINAS DEL LODGE (DINÁMICO SEGÚN PASO 1) */}
           {/* ========================================================================= */}
           {currentStep === 2 && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] uppercase font-mono font-bold text-sky-800 bg-sky-100/70 border border-sky-200 px-2.5 py-0.5 rounded-full">
+                    {isOnlyLodge ? 'Lodge Rincón de Navegantes' : 'Catálogo Dinámico'}
+                  </span>
+                </div>
                 <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  Paso 2: Selecciona los programas o servicios a incluir
+                  {isOnlyLodge
+                    ? 'Paso 2: Selecciona la cabina o habitación del Lodge'
+                    : 'Paso 2: Selecciona los programas o servicios a incluir'}
                 </h4>
                 <p className="text-slate-500 text-xs font-light">
-                  Se muestran únicamente los ítems disponibles para las opciones elegidas en el paso anterior.
+                  {isOnlyLodge
+                    ? 'Selecciona una de las 4 cabinas privadas frente a Bahía Cumberland para esta estadía.'
+                    : 'Se muestran únicamente los programas disponibles para las opciones elegidas en el paso anterior.'}
                 </p>
               </div>
 
@@ -893,6 +1000,14 @@ const formatRut = (value: string): string => {
                           >
                             {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
+
+                          {/* Icon badge if Lodge or Vessel */}
+                          {isOnlyLodge && (
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-700 shrink-0 shadow-2xs">
+                              <BedDouble className="w-5 h-5" />
+                            </div>
+                          )}
+
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <h5 className="font-serif font-bold text-sm text-[#0f2b48] truncate">
@@ -947,9 +1062,112 @@ const formatRut = (value: string): string => {
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 3: FECHAS Y SALIDAS PROGRAMADAS FIJAS */}
+          {/* PASO 3: FECHAS (DINÁMICO SEGÚN LODGE O EXPEDICIÓN) */}
           {/* ========================================================================= */}
-          {currentStep === 3 && (
+          {currentStep === 3 && isOnlyLodge && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] uppercase font-mono font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                    {activeSelectedProgram?.title || 'Habitación Lodge'}
+                  </span>
+                </div>
+                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                  Paso 3: Selecciona las fechas de estadía (Check-in & Check-out)
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Ingresa las fechas de ingreso y salida en Lodge Rincón de Navegantes para calcular automáticamente las noches y tarifa total.
+                </p>
+              </div>
+
+              {/* DATE PICKERS GRID FOR LODGE */}
+              <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* Check-In */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
+                      Fecha de Check-in (Ingreso) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          const newStart = e.target.value;
+                          setStartDate(newStart);
+                          if (!endDate || endDate <= newStart) {
+                            const d = new Date(newStart);
+                            d.setDate(d.getDate() + 2);
+                            setEndDate(d.toISOString().split('T')[0]);
+                          }
+                        }}
+                        className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Check-Out */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
+                      Fecha de Check-out (Salida) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={endDate}
+                        min={startDate || undefined}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SUMMARY & NIGHTS CALCULATION */}
+                {isSelectedLodgeRoomBooked ? (
+                  <div className="bg-rose-50 border border-rose-200/90 p-4 rounded-2xl flex items-start gap-3 text-rose-900 animate-fadeIn">
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <strong className="font-bold text-xs block text-rose-950">
+                        Habitación no disponible en estas fechas
+                      </strong>
+                      <p className="text-[11px] leading-relaxed text-rose-800">
+                        La cabina <strong>{activeSelectedProgram?.title}</strong> ya cuenta con una reserva u ocupación confirmada entre el <strong>{startDate}</strong> y el <strong>{endDate}</strong>. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación disponible.
+                      </p>
+                    </div>
+                  </div>
+                ) : startDate && endDate && startDate < endDate ? (
+                  <div className="bg-emerald-50/70 border border-emerald-200/80 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-xs text-emerald-950 block">
+                          {calculatedNights} {calculatedNights === 1 ? 'Noche de Estadía' : 'Noches de Estadía'} Calculadas
+                        </span>
+                        <span className="text-[11px] text-emerald-800 font-mono">
+                          Del {startDate} al {endDate} ({activeSelectedProgram?.title})
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-mono font-bold text-emerald-700 block">Subtotal Estadía</span>
+                      <span className="text-base font-mono font-bold text-emerald-950">
+                        ${((activeSelectedProgram?.priceClp || 240000) * calculatedNights).toLocaleString('es-CL')} CLP
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-xs text-slate-500">
+                    Selecciona las fechas de Check-in y Check-out para calcular automáticamente las noches y tarifa.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 3 && !isOnlyLodge && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">

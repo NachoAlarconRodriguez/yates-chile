@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface LoadingScreenProps {
   onComplete: () => void;
-  isVideoReady: boolean;
-  duration?: number; // Minimum loading screen duration in ms
+  isReady?: boolean;
+  isVideoReady?: boolean;
+  minDuration?: number;
 }
 
 const NAUTICAL_MESSAGES = [
@@ -16,54 +17,57 @@ const NAUTICAL_MESSAGES = [
   'Posicionando Vegvisir...'
 ];
 
-export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete, isVideoReady, duration = 3000 }) => {
-  const [progress, setProgress] = useState(0);
+export const LoadingScreen: React.FC<LoadingScreenProps> = ({ 
+  onComplete, 
+  isReady = false, 
+  isVideoReady = false, 
+  minDuration = 500 
+}) => {
+  const [progress, setProgress] = useState(15);
   const [messageIndex, setMessageIndex] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
-
-  // Progress counter
-  useEffect(() => {
-    const startTime = Date.now();
-    const maxTimeout = 8000; // 8 seconds safety limit
-
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      
-      // Calculate target progress.
-      // It moves toward 99% during the duration, and stays there unless isVideoReady is true
-      let targetProgress = (elapsed / duration) * 99;
-      
-      if (isVideoReady || elapsed >= maxTimeout) {
-        // If video is loaded or safety timeout hit, speed up progress to 100%
-        // But only fade out if we've met the minimum duration
-        if (elapsed >= duration) {
-          setProgress(100);
-          clearInterval(interval);
-          setIsExiting(true);
-          setTimeout(() => {
-            onComplete();
-          }, 800);
-          return;
-        } else {
-          // If video loaded early, we still count up to 100% over the remaining min duration
-          targetProgress = (elapsed / duration) * 100;
-        }
-      }
-      
-      setProgress(Math.min(targetProgress, 99));
-    }, 30);
-
-    return () => clearInterval(interval);
-  }, [duration, isVideoReady, onComplete]);
+  const isFinishedRef = React.useRef(false);
 
   // Message cycler
   useEffect(() => {
     const messageInterval = setInterval(() => {
       setMessageIndex((prev) => (prev + 1) % NAUTICAL_MESSAGES.length);
-    }, duration / 4); // Cycle through messages during the load
+    }, 1200);
 
     return () => clearInterval(messageInterval);
-  }, [duration]);
+  }, []);
+
+  // Intelligent dynamic loader
+  useEffect(() => {
+    const startTime = Date.now();
+    const isActuallyReady = isReady || isVideoReady;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+
+      if (isActuallyReady || elapsed >= 2500) {
+        // Ready! Fast transition to exit without waiting
+        if (!isFinishedRef.current) {
+          isFinishedRef.current = true;
+          setProgress(100);
+          clearInterval(interval);
+          
+          const remainingDelay = Math.max(0, minDuration - elapsed);
+          setTimeout(() => {
+            setIsExiting(true);
+            setTimeout(() => {
+              onComplete();
+            }, 600);
+          }, remainingDelay);
+        }
+      } else {
+        // Incrementally advance progress while loading in background
+        setProgress((prev) => Math.min(prev + (95 - prev) * 0.15, 95));
+      }
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [isReady, isVideoReady, minDuration, onComplete]);
 
   return (
     <AnimatePresence>

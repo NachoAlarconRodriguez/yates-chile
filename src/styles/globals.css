@@ -74,10 +74,14 @@
    ========================================================================== */
 
 @layer base {
+  * {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
   html {
     background-color: var(--color-fjord-light);
     color: var(--color-navy-dark);
-    font-family: var(--font-sans);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 112.5%; /* Sets default rem to 18px */
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
@@ -86,16 +90,14 @@
   body {
     background-color: var(--color-fjord-light);
     color: var(--color-navy-body);
-    font-family: var(--font-sans);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow-x: hidden;
   }
 
   /* Headings Setup using Inter Heavy Weights */
-  h1, h2, h3, h4, .font-serif-heading {
-    font-family: var(--font-sans);
-    font-weight: 700;
+  h1, h2, h3, h4, h5, h6, .font-serif, .font-serif-heading {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     letter-spacing: -0.025em;
-    color: var(--color-navy-dark);
   }
 
   /* Accessibility & Touch Target Minimum (48px) */

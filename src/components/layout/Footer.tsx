@@ -61,9 +61,21 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </a>
           </div>
 
-          {/* Social/Contact Icons (Right) */}
-          <div className="flex items-center gap-4">
+          {/* Social/Contact Icons & SERNATUR Accreditation (Right) */}
+          <div className="flex items-center gap-3 sm:gap-4">
             
+            {/* SERNATUR Official Registration Seal (Adelante de WhatsApp, en la misma línea) */}
+            <div 
+              className="shrink-0 flex items-center justify-center p-1 rounded-xl bg-[#0B1528]"
+              title="Prestador de Servicios Turísticos Registrado en SERNATUR • Ministerio de Economía, Fomento y Turismo • Gobierno de Chile"
+            >
+              <img
+                src="/sernatur-logo.png"
+                alt="SERNATUR — Prestador de Servicios Turísticos Registrado"
+                className="h-11 sm:h-12 w-auto object-contain mix-blend-screen drop-shadow-md"
+              />
+            </div>
+
             {/* WhatsApp */}
             <a
               href="https://wa.me/56981312920"
@@ -115,32 +127,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
           </div>
 
-        </div>
-
-        {/* Row 2: SERNATUR Institutional Accreditation Seal */}
-        <div className="py-4 my-2 border-b border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="shrink-0 flex items-center justify-center">
-              <img
-                src="/sernatur-logo.png"
-                alt="Sernatur — Registro Nacional de Servicios Turísticos | Gobierno de Chile"
-                className="h-12 w-auto object-contain drop-shadow-md"
-              />
-            </div>
-            <div className="flex flex-col text-left">
-              <span className="text-[11px] font-semibold text-white tracking-wide">
-                Prestador de Servicios Turísticos Registrado en SERNATUR
-              </span>
-              <span className="text-[9.5px] text-slate-400">
-                Ministerio de Economía, Fomento y Turismo • Gobierno de Chile
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-[10px] text-slate-300 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Registro Oficial de Turismo Aventura & Navegación</span>
-          </div>
         </div>
 
         {/* Row 3: Copyright & Attribution */}

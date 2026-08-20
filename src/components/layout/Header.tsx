@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, PhoneCall, ChevronDown } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface HeaderProps {
   currentPath?: string;
@@ -8,7 +9,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [lang, setLang] = useState<'ES' | 'EN'>('ES');
+  const { language, setLanguage, t } = useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
   const [fleetMenuOpen, setFleetMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -36,8 +37,8 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
   }, []);
 
   const navLinks = [
-    { label: 'El Lodge', path: '/lodge' },
-    { label: 'Expediciones', path: '/expediciones' },
+    { label: t('El Lodge', 'The Lodge'), path: '/lodge' },
+    { label: t('Expediciones', 'Expeditions'), path: '/expediciones' },
   ];
 
   const handleNavClick = (path: string) => {
@@ -95,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                   : 'text-slate-700 border-transparent hover:text-slate-950 hover:border-slate-400'
               }`}
             >
-              Inicio
+              {t('Inicio', 'Home')}
             </a>
 
             {/* La Flota Dropdown */}
@@ -108,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                     : 'text-slate-700 border-transparent hover:text-slate-950 hover:border-slate-400'
                 }`}
               >
-                <span>La Flota</span>
+                <span>{t('La Flota', 'The Fleet')}</span>
                 <ChevronDown className={`w-4 h-4 transition-transform duration-305 ${fleetMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
               </button>
 
@@ -122,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                       currentPath === '/velero-vegvisir' ? 'text-blue-900 bg-blue-50/50' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
                     }`}
                   >
-                    Velero Vegvisir
+                    {t('Velero Vegvisir', 'Vegvisir Sailboat')}
                   </a>
                   <a
                     href="#/yate-terranova"
@@ -131,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                       currentPath === '/yate-terranova' ? 'text-blue-900 bg-blue-50/50' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
                     }`}
                   >
-                    Yate Terranova
+                    {t('Yate Terranova', 'Terranova Yacht')}
                   </a>
                   <div className="border-t border-slate-100 my-1"></div>
                   <a
@@ -141,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                       currentPath === '/flota' ? 'text-blue-900 bg-blue-50/50 font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
                     }`}
                   >
-                    Ver Toda la Flota (3D)
+                    {t('Ver Toda la Flota (3D)', 'View Entire Fleet (3D)')}
                   </a>
                 </div>
               )}
@@ -170,28 +171,28 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
           {/* Right Actions: Language Switcher Only */}
           <div className="hidden lg:flex items-center gap-3">
             <button
-              onClick={() => setLang(lang === 'ES' ? 'EN' : 'ES')}
-              className="inline-flex items-center justify-center rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 transition min-h-[44px] min-w-[44px] shadow-sm"
+              onClick={() => setLanguage(language === 'ES' ? 'EN' : 'ES')}
+              className="inline-flex items-center justify-center rounded-full border border-slate-300 px-3.5 py-1.5 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 transition min-h-[44px] min-w-[44px] shadow-sm cursor-pointer"
               aria-label="Cambiar idioma"
             >
-              <span className={lang === 'ES' ? 'text-slate-950 font-extrabold' : 'text-slate-400'}>ES</span>
+              <span className={language === 'ES' ? 'text-slate-950 font-extrabold' : 'text-slate-400'}>ES</span>
               <span className="mx-1 text-slate-300">·</span>
-              <span className={lang === 'EN' ? 'text-slate-950 font-extrabold' : 'text-slate-400'}>EN</span>
+              <span className={language === 'EN' ? 'text-slate-950 font-extrabold' : 'text-slate-400'}>EN</span>
             </button>
           </div>
 
           {/* Mobile Menu Button */}
           <div className="flex items-center gap-2 lg:hidden">
             <button
-              onClick={() => setLang(lang === 'ES' ? 'EN' : 'ES')}
-              className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-bold text-slate-800 bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              onClick={() => setLanguage(language === 'ES' ? 'EN' : 'ES')}
+              className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-bold text-slate-800 bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
             >
-              {lang}
+              {language}
             </button>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-slate-800 hover:bg-slate-100 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="p-2 rounded-xl text-slate-800 hover:bg-slate-100 transition min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
               aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
