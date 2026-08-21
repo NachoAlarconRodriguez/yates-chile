@@ -855,17 +855,25 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         refreshServices();
       }, 15000);
 
-      // Auto-refresh cuando la ventana o pestaña recupera el foco
-      const handleFocus = () => {
+      // Auto-refresh reactivo instantáneo ante cambios en reservas, expediciones o CRM
+      const handleRealtimeUpdate = () => {
         fetchAllData();
         refreshLodge();
         refreshServices();
       };
-      window.addEventListener('focus', handleFocus);
+      window.addEventListener('yates_expeditions_updated', handleRealtimeUpdate);
+      window.addEventListener('yates_bookings_updated', handleRealtimeUpdate);
+      window.addEventListener('yates_crm_leads_updated', handleRealtimeUpdate);
+      window.addEventListener('storage', handleRealtimeUpdate);
+      window.addEventListener('focus', handleRealtimeUpdate);
 
       return () => {
         clearInterval(interval);
-        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('yates_expeditions_updated', handleRealtimeUpdate);
+        window.removeEventListener('yates_bookings_updated', handleRealtimeUpdate);
+        window.removeEventListener('yates_crm_leads_updated', handleRealtimeUpdate);
+        window.removeEventListener('storage', handleRealtimeUpdate);
+        window.removeEventListener('focus', handleRealtimeUpdate);
       };
     }
   }, [isAuthenticated, content, fetchAllData, refreshLodge, refreshServices, refreshContent]);
@@ -1325,10 +1333,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       };
     }),
     ...expBookings.map((b) => {
-      const route = expRoutes.find((r) => r.id === b.route_id);
-      const vessel = vessels.find((v) => v.id === b.vessel_id);
-      const depDate = (b as any).departure_date || (b as any).start_date || b.created_at;
-      const retDate = (b as any).return_date || (b as any).end_date || depDate;
+      const dep = departures.find((d) => d.id === b.departure_id);
+      const matchedInitial = INITIAL_EXPEDITIONS.find((ie) => ie.id === b.departure_id);
+      const route = expRoutes.find((r) => r.id === (b.route_id || dep?.route_id || matchedInitial?.routeId));
+      const vessel = vessels.find((v) => v.id === (b.vessel_id || dep?.vessel_id || matchedInitial?.vesselId));
+      const depDate = (b as any).departure_date || dep?.departure_date || matchedInitial?.startDate || (b as any).start_date || b.created_at;
+      const retDate = (b as any).return_date || dep?.return_date || matchedInitial?.endDate || (b as any).end_date || depDate;
+      const expName = (b as any).expedition_name || (b as any).expeditionName || dep?.name || route?.title || matchedInitial?.name || (b.booking_type === 'full_charter' ? 'Expedición Charter Completo' : 'Expedición Robinson');
+      const vName = (b as any).vessel_name || (b as any).vesselName || vessel?.name || dep?.vessel?.name || matchedInitial?.vessel || 'Velero Vegvisir';
+
       return {
         id: b.id,
         type: 'expedition' as const,
@@ -1337,16 +1350,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         guest_name: b.guest_name,
         guest_email: b.guest_email || 'navegante@yateschile.cl',
         guest_phone: b.guest_phone || 'Sin contacto',
-        service_title: route ? route.title : (b.booking_type === 'full_charter' ? 'Expedición Charter Completo' : 'Expedición Selkirk'),
-        unit_detail: vessel ? `${vessel.name} (${vessel.type})` : 'Velero Vegvisir',
+        service_title: expName,
+        unit_detail: vName,
         dates: `${formatDateDDMMYYYY(depDate)} ➔ ${formatDateDDMMYYYY(retDate)}`,
         raw_check_in: depDate,
         raw_check_out: retDate,
         channel: 'web_direct' as const,
         status: b.status,
         amount: b.total_amount || 1850000,
-        notes: `Modalidad: ${b.booking_type}`,
+        pax_count: b.pax_count || 1,
+        notes: (b as any).notes || `Modalidad: ${b.booking_type === 'full_charter' ? 'Charter Completo' : `${b.pax_count || 1} PAX`}${b.dietary_medical_notes ? ` | Notas: ${b.dietary_medical_notes}` : ''}`,
         created_at: b.created_at || new Date().toISOString(),
+        passengers: (b as any).passengers || [],
+        doc_id: b.guest_rut_passport,
       };
     }),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

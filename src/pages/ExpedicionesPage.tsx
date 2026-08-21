@@ -3,6 +3,7 @@ import { useExpeditions } from '../hooks/useExpeditions';
 import type { PublicExpedition as Expedition } from '../services/expeditionService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { leadService } from '../services/leadService';
+import { ExpeditionBookingModal } from '../components/modules/ExpeditionBookingModal';
 import { 
   Compass, 
   Download, 
@@ -157,6 +158,9 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
   const [downloadEmail, setDownloadEmail] = useState('');
   const [downloadSent, setDownloadSent] = useState(false);
   const [selectedExpedition, setSelectedExpedition] = useState<Expedition | null>(null);
+  const [bookingModalExpedition, setBookingModalExpedition] = useState<Expedition | null>(null);
+  const [bookingModalInitialStep, setBookingModalInitialStep] = useState<0 | 1>(0);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   const { getSection } = useSiteContent();
   const expHero = getSection('expeditions_hero');
@@ -187,15 +191,16 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
     }, 500);
   };
 
-  const handleBookWhatsApp = (exp: Expedition) => {
-    const text = encodeURIComponent(
-      `Hola, estoy interesado en reservar la expedición:\n\n` +
-      `• Travesía: ${exp.name}\n` +
-      `• Fechas: ${exp.startDate} → ${exp.endDate}\n` +
-      `• Base/Embarcación: ${exp.vessel}\n\n` +
-      `Solicito información de disponibilidad y valores de reserva.`
-    );
-    window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
+  const handleOpenGeneralBooking = () => {
+    setBookingModalExpedition(null);
+    setBookingModalInitialStep(0);
+    setIsBookingModalOpen(true);
+  };
+
+  const handleOpenBookingModal = (exp: Expedition) => {
+    setBookingModalExpedition(exp);
+    setBookingModalInitialStep(1);
+    setIsBookingModalOpen(true);
   };
 
   return (
@@ -226,14 +231,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
 
           <div className="pt-2 flex items-center justify-center gap-3">
             <button
-              onClick={() => {
-                const target = document.getElementById('grid-expediciones');
-                if (target) {
-                  target.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                  window.open('https://wa.me/56981312920?text=Hola%20Yates%20Chile%2C%20deseo%20reservar%20una%20expedici%C3%B3n', '_blank');
-                }
-              }}
+              onClick={handleOpenGeneralBooking}
               className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-xl text-xs border border-white/90 cursor-pointer hover:scale-[1.02]"
             >
               <Compass className="w-4 h-4 text-slate-950" />
@@ -432,7 +430,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                     {/* Botón 2: Reservar Cupo con Concierge */}
                     <button
                       type="button"
-                      onClick={() => handleBookWhatsApp(selectedExpedition)}
+                      onClick={() => handleOpenBookingModal(selectedExpedition)}
                       className="w-full bg-white hover:bg-slate-100 text-slate-950 font-bold py-3.5 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
                     >
                       <span>Reservar Cupo de Expedición</span>
@@ -561,6 +559,14 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
           )}
         </div>
       </section>
+
+      {/* Expedition Booking Modal */}
+      <ExpeditionBookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        expedition={bookingModalExpedition}
+        initialStep={bookingModalInitialStep}
+      />
 
     </div>
   );

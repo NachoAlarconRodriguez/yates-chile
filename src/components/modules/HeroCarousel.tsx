@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Anchor, Compass, Sparkles, Calendar, ArrowRi
 import { useExpeditions } from '../../hooks/useExpeditions';
 import { useLanguage } from '../../context/LanguageContext';
 import type { PublicExpedition } from '../../services/expeditionService';
+import { ExpeditionBookingModal } from './ExpeditionBookingModal';
 
 interface Slide {
   id: string;
@@ -26,6 +27,8 @@ const isMediaVideo = (url?: string | null) => {
 
 export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
+  const [selectedExpedition, setSelectedExpedition] = useState<PublicExpedition | null>(null);
   const { expeditions } = useExpeditions();
   const { t } = useLanguage();
 
@@ -92,16 +95,8 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   };
 
   const handleBookExpedition = (s: Slide) => {
-    const exp = s.expedition;
-    const text = encodeURIComponent(
-      `Hola Yates Chile, deseo reservar cupo para la expedición:\n\n` +
-      `• Expedición: ${exp.name}\n` +
-      `• Embarcación / Base: ${exp.vessel}\n` +
-      `• Fechas: ${exp.startDate} al ${exp.endDate}\n` +
-      `• Ubicación: ${exp.location}\n\n` +
-      `Solicito información de disponibilidad y valores de reserva.`
-    );
-    window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
+    setSelectedExpedition(s.expedition);
+    setIsBookingModalOpen(true);
   };
 
   if (slides.length === 0) return null;
@@ -222,6 +217,13 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
         </button>
 
       </div>
+
+      {/* Expedition Booking Modal */}
+      <ExpeditionBookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        expedition={selectedExpedition}
+      />
 
     </section>
   );

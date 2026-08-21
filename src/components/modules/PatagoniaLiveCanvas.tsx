@@ -1,126 +1,170 @@
-import React, { useState, useEffect } from 'react';
-import { Wind, Moon, Waves, MapPin, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Wind, Waves, MapPin, RefreshCw, Compass, Thermometer } from 'lucide-react';
 import type { WeatherData } from '../../types';
-import { FALLBACK_WEATHER } from '../../lib/constants';
+import { useLanguage } from '../../context/LanguageContext';
+import { WEATHER_LOCATIONS, weatherService, type WeatherLocationOption } from '../../services/weatherService';
 
 export const PatagoniaLiveCanvas: React.FC = () => {
-  const [weather, setWeather] = useState<WeatherData>(FALLBACK_WEATHER);
+  const { language, t } = useLanguage();
+  const lang = (language === 'EN' ? 'EN' : 'ES') as 'ES' | 'EN';
+
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('robinson-crusoe');
+  const [weatherCache, setWeatherCache] = useState<Record<string, WeatherData>>(() => {
+    const initial: Record<string, WeatherData> = {};
+    WEATHER_LOCATIONS.forEach((loc) => {
+      initial[loc.id] = loc.fallback;
+    });
+    return initial;
+  });
   const [loading, setLoading] = useState<boolean>(false);
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
-  // Simulated live refresh (fetches OpenWeatherMap API or applies realistic marine telemetry)
-  const fetchLiveWeather = () => {
-    setLoading(true);
-    setTimeout(() => {
-      // Small realistic variation
-      setWeather({
-        temperature: 13 + Math.floor(Math.random() * 4),
-        windSpeed: 10 + Math.floor(Math.random() * 6),
-        windDirection: 'SO (SudOeste)',
-        tideState: Math.random() > 0.5 ? 'Pleamar' : 'Bajamar',
-        tideHeight: (1.5 + Math.random() * 0.8).toFixed(1) + 'm',
-        moonPhase: 'Gibosa Creciente',
-        location: 'Puerto Montt & Canales Australes',
-        isFallback: false,
-      });
-      setLoading(false);
-    }, 800);
-  };
+  const selectedLoc = WEATHER_LOCATIONS.find((l) => l.id === selectedLocationId) || WEATHER_LOCATIONS[0];
+  const currentWeather = weatherCache[selectedLocationId] || selectedLoc.fallback;
 
+  const fetchLiveWeatherForLocation = useCallback(
+    async (loc: WeatherLocationOption) => {
+      setLoading(true);
+      try {
+        const liveData = await weatherService.fetchLiveWeather(loc, lang);
+        setWeatherCache((prev) => ({
+          ...prev,
+          [loc.id]: liveData,
+        }));
+      } catch (err) {
+        console.warn(`Could not fetch live marine weather for ${loc.name}:`, err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [lang]
+  );
+
+  // Fetch when location changes or component mounts
   useEffect(() => {
-    fetchLiveWeather();
-  }, []);
+    fetchLiveWeatherForLocation(selectedLoc);
+  }, [selectedLoc, fetchLiveWeatherForLocation]);
+
+  // Periodic refresh every 10 minutes
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchLiveWeatherForLocation(selectedLoc);
+    }, 10 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [selectedLoc, fetchLiveWeatherForLocation]);
 
   return (
-    <div className="bg-slate-950/80 text-white text-xs md:text-sm border-y border-blue-550/20 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-        {/* Left: Location Badge & Status */}
-        <div className="flex items-center gap-2">
-          <span className="flex h-2 w-2 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-          </span>
-          <div className="flex items-center gap-1 font-medium tracking-wider uppercase text-[11px] md:text-xs text-blue-350">
-            <MapPin className="w-3.5 h-3.5 text-blue-350" />
-            <span>Cabo de Hornos Live Canvas</span>
+    <div className="bg-slate-950/95 text-white text-xs border-y border-slate-800/80 backdrop-blur-md transition-all overflow-x-auto select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="w-full max-w-[1750px] mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-3 xl:gap-6 flex-nowrap whitespace-nowrap min-w-max">
+        
+        {/* Left Side: Live Beacon & Location Pills */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Live Indicator */}
+          <div className="flex items-center gap-1.5 bg-slate-900 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0 shadow-xs">
+            <span className="flex h-1.5 w-1.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-emerald-400 font-bold">
+              {t('Telemetría en Vivo', 'Live Telemetry')}
+            </span>
           </div>
-          <span className="hidden sm:inline-block text-slate-500">|</span>
-          <span className="hidden sm:inline-block text-slate-300 font-sans text-xs">
-            {weather.location}
+
+          {/* Location Selector Pills (Circular / Rounded-Full design) */}
+          <div className="inline-flex items-center p-0.5 bg-slate-900/90 rounded-full border border-white/10 shadow-inner shrink-0 gap-0.5">
+            {WEATHER_LOCATIONS.map((loc) => {
+              const isSelected = loc.id === selectedLocationId;
+              return (
+                <button
+                  key={loc.id}
+                  onClick={() => setSelectedLocationId(loc.id)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-md font-bold'
+                      : 'text-slate-400 hover:text-white hover:bg-white/10'
+                  }`}
+                  title={`${loc.name} (${loc.coordinatesName})`}
+                >
+                  <MapPin className={`w-2.5 h-2.5 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                  <span>{lang === 'EN' ? loc.nameEn : loc.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <span className="hidden 2xl:inline-block text-slate-700">|</span>
+          <span className="hidden 2xl:inline-block text-slate-400 text-[11px] font-mono shrink-0">
+            {lang === 'EN' ? selectedLoc.subtitleEn : selectedLoc.subtitle}
           </span>
         </div>
 
-        {/* Middle: Weather Telemetry Items */}
-        <div className="hidden md:flex items-center gap-6 text-slate-200">
-          {/* Temperature */}
-          <div className="flex items-center gap-1.5" title="Temperatura del Agua y Aire">
-            <span className="text-blue-300 font-semibold">{weather.temperature}°C</span>
-            <span className="text-slate-400 text-[11px]">Templado</span>
+        {/* Center: Live Weather Telemetry Data (All in 1 Line) */}
+        <div className="flex items-center gap-3.5 sm:gap-4.5 xl:gap-5 text-slate-200 text-xs shrink-0 font-mono">
+          
+          {/* Temperature & Condition */}
+          <div className="flex items-center gap-1.5 shrink-0" title={t('Temperatura del aire y sensación', 'Air temperature and wind chill')}>
+            <Thermometer className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-white font-bold text-xs">{currentWeather.temperature}°C</span>
+            {currentWeather.apparentTemperature !== undefined && (
+              <span className="text-slate-400 text-[10px]">
+                (ST {currentWeather.apparentTemperature}°C)
+              </span>
+            )}
+            <span className="text-blue-300 font-medium text-[10px] bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-800/40 shrink-0">
+              {currentWeather.condition || 'Templado'}
+            </span>
           </div>
 
           {/* Wind Speed & Direction */}
-          <div className="flex items-center gap-1.5" title="Viento en Nudos">
-            <Wind className="w-3.5 h-3.5 text-sky-400" />
-            <span className="font-semibold text-white">{weather.windSpeed} Nudos</span>
-            <span className="text-slate-400 text-[11px]">({weather.windDirection})</span>
+          <div className="flex items-center gap-1.5 shrink-0" title={t('Viento en Nudos y Dirección', 'Wind in knots and direction')}>
+            <Wind className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+            <span className="font-bold text-white text-xs">{currentWeather.windSpeed} kts</span>
+            <span className="text-slate-300 text-[10px]">({currentWeather.windDirection})</span>
+            {currentWeather.windGusts && (
+              <span className="text-amber-300 text-[10px]" title={t('Ráfaga máxima', 'Max gust')}>
+                +{currentWeather.windGusts}kts
+              </span>
+            )}
           </div>
 
+          {/* Marine Waves / Sea State */}
+          {currentWeather.waveHeight && (
+            <div className="flex items-center gap-1.5 shrink-0" title={t('Oleaje y Período Marino', 'Wave height and period')}>
+              <Waves className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+              <span className="font-semibold text-white text-xs">{currentWeather.waveHeight}</span>
+              {currentWeather.wavePeriod && (
+                <span className="text-slate-400 text-[10px]">({currentWeather.wavePeriod})</span>
+              )}
+            </div>
+          )}
+
           {/* Tide */}
-          <div className="flex items-center gap-1.5" title="Estado de Marea">
-            <Waves className="w-3.5 h-3.5 text-teal-400" />
-            <span className="font-semibold text-white">{weather.tideState}</span>
-            <span className="text-slate-400 text-[11px]">({weather.tideHeight})</span>
+          <div className="flex items-center gap-1.5 shrink-0" title={t('Estado de Marea Estimado', 'Estimated Tide State')}>
+            <Compass className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="font-semibold text-white text-xs">{currentWeather.tideState}</span>
+            <span className="text-slate-400 text-[10px]">({currentWeather.tideHeight})</span>
           </div>
 
           {/* Moon Phase */}
-          <div className="flex items-center gap-1.5" title="Fase Lunar Estacional">
-            <Moon className="w-3.5 h-3.5 text-indigo-300" />
-            <span className="text-slate-300 text-xs">{weather.moonPhase}</span>
+          <div className="flex items-center gap-1.5 shrink-0" title={t('Fase Lunar Astronómica', 'Astronomical Moon Phase')}>
+            <span className="text-xs">{currentWeather.moonIcon || '🌔'}</span>
+            <span className="text-slate-300 text-[11px]">{currentWeather.moonPhase}</span>
           </div>
         </div>
 
-        {/* Right: Refresh button & Mobile Expand */}
-        <div className="flex items-center gap-2">
+        {/* Right Side: Refresh button (Circular) */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={fetchLiveWeather}
+            onClick={() => fetchLiveWeatherForLocation(selectedLoc)}
             disabled={loading}
-            aria-label="Actualizar datos meteorológicos"
-            className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-blue-300 transition min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-            title="Actualizar datos marítimos"
+            aria-label={t('Actualizar telemetría meteorológica', 'Refresh weather telemetry')}
+            className="p-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/10 transition flex items-center justify-center cursor-pointer min-h-[30px] min-w-[30px] shadow-sm"
+            title={t('Actualizar datos en vivo', 'Refresh live data')}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-300' : ''}`} />
-          </button>
-
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="md:hidden text-xs text-blue-350 underline min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-          >
-            {isExpanded ? 'Ocultar Clima' : 'Ver Clima'}
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin text-blue-400' : ''}`} />
           </button>
         </div>
+
       </div>
-
-      {/* Mobile Drawer telemetry */}
-      {isExpanded && (
-        <div className="md:hidden border-t border-slate-800 px-4 py-3 bg-slate-950/90 grid grid-cols-2 gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-blue-300 font-bold">{weather.temperature}°C</span>
-            <span className="text-slate-400">Temp. Aire</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Wind className="w-3.5 h-3.5 text-sky-400" />
-            <span className="text-slate-200 font-semibold">{weather.windSpeed} Nudos</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Waves className="w-3.5 h-3.5 text-teal-400" />
-            <span className="text-slate-200">{weather.tideState} ({weather.tideHeight})</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Moon className="w-3.5 h-3.5 text-indigo-300" />
-            <span className="text-slate-300">{weather.moonPhase}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,12 +1,20 @@
 export interface WeatherData {
   temperature: number; // in Celsius
+  apparentTemperature?: number;
+  condition?: string;
   windSpeed: number;   // in Knots
+  windGusts?: number;  // in Knots
   windDirection: string; // e.g. "SSW"
-  tideState: 'Pleamar' | 'Bajamar';
+  tideState: 'Pleamar' | 'Bajamar' | string;
   tideHeight: string;  // e.g. "1.8m"
-  moonPhase: string;   // e.g. "Luna Creciente"
-  location: string;    // e.g. "Puerto Montt / Chiloé"
+  waveHeight?: string; // e.g. "1.5m"
+  wavePeriod?: string; // e.g. "6.9s"
+  moonPhase: string;   // e.g. "Gibosa Creciente"
+  moonIcon?: string;
+  location: string;    // e.g. "Bahía Cumberland & Lodge"
+  coordinates?: string;
   isFallback?: boolean;
+  updatedAt?: string;
 }
 
 export interface VesselHotspot {

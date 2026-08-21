@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, Compass, Users, Sparkles, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { formatPhone, formatRut } from '../lib/formatters';
 
 interface LodgePageProps {
   onNavigate: (path: string) => void;
@@ -1372,7 +1373,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <input
                       type="tel"
                       value={guestPhone}
-                      onChange={(e) => setGuestPhone(e.target.value)}
+                      onChange={(e) => setGuestPhone(formatPhone(e.target.value))}
                       placeholder="+56 9 1234 5678"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                       required
@@ -1386,7 +1387,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <input
                       type="text"
                       value={guestRut}
-                      onChange={(e) => setGuestRut(e.target.value)}
+                      onChange={(e) => setGuestRut(formatRut(e.target.value))}
                       placeholder="12.345.678-9"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                     />

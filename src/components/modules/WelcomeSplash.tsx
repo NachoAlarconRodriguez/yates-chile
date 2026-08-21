@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Wind, Waves, MapPin, Anchor, Ship, Home } from 'lucide-react';
+import { WEATHER_LOCATIONS, weatherService, type WeatherLocationOption } from '../../services/weatherService';
+import type { WeatherData } from '../../types';
 
 interface WelcomeSplashProps {
   onEnterSite: (targetPath?: string) => void;
@@ -10,6 +12,56 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
   // Direct raw video streaming URL converted from Dropbox link
   const videoUrl =
     'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/ALRTDepuSRu5og3r8hMrXqs/Videos/GX010369.MOV?rlkey=dydsj8rbegl4ga5x2062vycj6&st=eewane53&raw=1';
+
+  // Rotating location index: 0 = Cabo de Hornos, 1 = Robinson Crusoe, 2 = Alejandro Selkirk
+  const [currentLocIndex, setCurrentLocIndex] = useState<number>(0);
+  const [weatherMap, setWeatherMap] = useState<Record<string, WeatherData>>(() => {
+    const init: Record<string, WeatherData> = {};
+    WEATHER_LOCATIONS.forEach((l) => {
+      init[l.id] = l.fallback;
+    });
+    return init;
+  });
+  const [isFading, setIsFading] = useState<boolean>(false);
+
+  // Fetch real-time live weather data for all 3 destinations
+  useEffect(() => {
+    let isMounted = true;
+    const loadAllWeather = async () => {
+      for (const loc of WEATHER_LOCATIONS) {
+        try {
+          const live = await weatherService.fetchLiveWeather(loc, 'ES');
+          if (isMounted) {
+            setWeatherMap((prev) => ({ ...prev, [loc.id]: live }));
+          }
+        } catch (_) {}
+      }
+    };
+
+    loadAllWeather();
+    const refreshInterval = setInterval(loadAllWeather, 5 * 60 * 1000); // 5 min background refresh
+
+    return () => {
+      isMounted = false;
+      clearInterval(refreshInterval);
+    };
+  }, []);
+
+  // Rotate between Cabo de Hornos -> Robinson Crusoe -> Alejandro Selkirk every 15 seconds
+  useEffect(() => {
+    const rotateTimer = setInterval(() => {
+      setIsFading(true);
+      setTimeout(() => {
+        setCurrentLocIndex((prev) => (prev + 1) % WEATHER_LOCATIONS.length);
+        setIsFading(false);
+      }, 350);
+    }, 15000);
+
+    return () => clearInterval(rotateTimer);
+  }, []);
+
+  const activeLocation: WeatherLocationOption = WEATHER_LOCATIONS[currentLocIndex] || WEATHER_LOCATIONS[0];
+  const activeWeather: WeatherData = weatherMap[activeLocation.id] || activeLocation.fallback;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col justify-between overflow-hidden">
@@ -52,24 +104,39 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           </div>
         </div>
 
-        {/* Top-Right: Telemetry Capsule (Cabo de Hornos & Alejandro Selkirk) */}
+        {/* Top-Right: Rotating Live Telemetry Capsule (Cabo de Hornos -> Robinson Crusoe -> Alejandro Selkirk every 15s) */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-3.5 bg-slate-950/50 backdrop-blur-md border border-white/20 px-4 py-2 rounded-full text-xs text-white shadow-xl">
-            <div className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-blue-300" />
+          <div
+            className={`flex items-center gap-3.5 bg-slate-950/60 backdrop-blur-md border border-white/20 px-4 py-2 rounded-full text-xs text-white shadow-2xl transition-all duration-350 select-none ${
+              isFading ? 'opacity-0 scale-95 translate-y-[-2px]' : 'opacity-100 scale-100 translate-y-0'
+            }`}
+          >
+            {/* Active Destination */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-blue-400" />
               <span className="font-semibold text-[11px] text-white tracking-wide">
-                Cabo de Hornos & Alejandro Selkirk
+                {activeLocation.name}
               </span>
             </div>
-            <span className="text-white/30">|</span>
-            <div className="flex items-center gap-1.5">
+
+            <span className="text-white/25">|</span>
+
+            {/* Live Wind */}
+            <div className="flex items-center gap-1.5 shrink-0" title={`Viento: ${activeWeather.windSpeed} Nudos ${activeWeather.windDirection}`}>
               <Wind className="w-3.5 h-3.5 text-sky-300" />
-              <span className="font-medium text-slate-200">12 Nudos (SO)</span>
+              <span className="font-medium text-slate-200">
+                {activeWeather.windSpeed} Nudos ({activeWeather.windDirection})
+              </span>
             </div>
-            <span className="text-white/30">|</span>
-            <div className="flex items-center gap-1.5">
+
+            <span className="text-white/25">|</span>
+
+            {/* Live Tide */}
+            <div className="flex items-center gap-1.5 shrink-0" title={`Marea: ${activeWeather.tideState} (${activeWeather.tideHeight})`}>
               <Waves className="w-3.5 h-3.5 text-teal-300" />
-              <span className="font-medium text-slate-200">Pleamar (1.8m)</span>
+              <span className="font-medium text-slate-200">
+                {activeWeather.tideState} ({activeWeather.tideHeight})
+              </span>
             </div>
           </div>
         </div>

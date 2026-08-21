@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import { Compass, Ship, Home, Sparkles, Check, ArrowRight, ArrowLeft, Send, CheckCircle } from 'lucide-react';
 import type { JourneyConfigState } from '../../types';
 import { leadService } from '../../services/leadService';
+import { formatPhone } from '../../lib/formatters';
 
 export const BuildYourJourney: React.FC = () => {
   const [step, setStep] = useState<number>(1);
@@ -376,7 +377,7 @@ export const BuildYourJourney: React.FC = () => {
                         required
                         placeholder="+56 9 1234 5678"
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:border-blue-400 focus:outline-none min-h-[48px]"
                       />
                     </div>

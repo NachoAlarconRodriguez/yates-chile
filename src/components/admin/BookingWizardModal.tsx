@@ -21,6 +21,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useLodge } from '../../hooks/useLodge';
+import { formatPhone, formatRut } from '../../lib/formatters';
 
 export interface BookingWizardData {
   bookingCode: string;
@@ -633,40 +634,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     }
   };
 
-const formatRut = (value: string): string => {
-  const clean = value.replace(/[\s.-]/g, '');
-  if (clean.length === 0) return '';
-  
-  // If it contains non-RUT characters (like international passport with letters), keep upper
-  if (/[^0-9kK]/.test(clean)) {
-    return clean.toUpperCase();
-  }
-  
-  const limited = clean.substring(0, 9);
-  if (limited.length === 1) {
-    return limited.toUpperCase();
-  }
-  
-  const body = limited.slice(0, -1);
-  const dv = limited.slice(-1).toUpperCase();
-  
-  let formattedBody = '';
-  let count = 0;
-  for (let i = body.length - 1; i >= 0; i--) {
-    formattedBody = body.charAt(i) + formattedBody;
-    count++;
-    if (count === 3 && i > 0) {
-      formattedBody = '.' + formattedBody;
-      count = 0;
-    }
-  }
-  
-  return `${formattedBody}-${dv}`;
-};
-
   const updatePassengerField = (index: number, field: string, value: string) => {
     const updated = [...passengers];
-    const finalValue = field === 'rutOrPassport' ? formatRut(value) : value;
+    let finalValue = value;
+    if (field === 'rutOrPassport') {
+      finalValue = formatRut(value);
+    } else if (field === 'phone') {
+      finalValue = formatPhone(value);
+    }
     updated[index] = { ...updated[index], [field]: finalValue };
     setPassengers(updated);
   };

@@ -75,9 +75,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2026-10-14',
     monthsActive: [9, 10],
     year: 2026,
-    spotsLeft: 1,
+    spotsLeft: 4,
     totalSlots: 6,
-    availableSlots: 1,
+    availableSlots: 4,
     pricePerPaxClp: 1850000,
     priceCharterFullClp: 11100000,
     vessel: 'Velero Vegvisir',
@@ -462,23 +462,73 @@ export const expeditionService = {
   },
 
   async getAllBookings(): Promise<ExpeditionBookingRow[]> {
+    let supabaseRows: ExpeditionBookingRow[] = [];
     try {
       const { data, error } = await supabase
         .from('expedition_bookings')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error || !data) return [];
-      return data;
-    } catch {
-      return [];
-    }
+      if (!error && data) {
+        supabaseRows = data;
+      }
+    } catch {}
+
+    // Also get stored local bookings
+    let localRows: ExpeditionBookingRow[] = [];
+    try {
+      const stored = localStorage.getItem('yates_bookings');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          localRows = parsed.map((b: any) => ({
+            id: b.id,
+            booking_code: b.code || b.booking_code || b.id,
+            departure_id: b.departure_id || b.departureId,
+            route_id: b.route_id,
+            vessel_id: b.vessel_id,
+            guest_name: b.fullName || b.guest_name,
+            guest_email: b.email || b.guest_email,
+            guest_phone: b.phone || b.guest_phone,
+            guest_rut_passport: b.docId || b.guest_rut_passport,
+            booking_type: b.booking_type || 'per_pax',
+            pax_count: b.guestsCount || b.pax_count || 1,
+            total_amount: b.totalAmount || b.total_amount || 0,
+            status: b.status === 'pendiente_transferencia' ? 'pending_transfer' : (b.status || 'pending_transfer'),
+            dietary_medical_notes: b.dietaryMedicalNotes || b.dietary_medical_notes,
+            created_at: b.created_at || (b.dateCreated ? `${b.dateCreated}T12:00:00.000Z` : new Date().toISOString()),
+            expedition_name: b.expeditionName || b.expedition_name,
+            vessel_name: b.vesselName || b.vessel_name,
+            departure_date: b.departure_date,
+            return_date: b.return_date,
+            passengers: b.passengers || [],
+          })) as any;
+        }
+      }
+    } catch {}
+
+    // Merge and deduplicate by booking_code / id
+    const map = new Map<string, ExpeditionBookingRow>();
+    [...supabaseRows, ...localRows].forEach((item) => {
+      const key = item.booking_code || item.id;
+      if (!map.has(key)) {
+        map.set(key, item);
+      }
+    });
+
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
+    );
   },
 
   async createBooking(params: {
     departureId?: string;
     routeId?: string;
     vesselId?: string;
+    expeditionName?: string;
+    vesselName?: string;
+    departureDate?: string;
+    returnDate?: string;
     guestName: string;
     guestEmail: string;
     guestPhone: string;
@@ -492,8 +542,9 @@ export const expeditionService = {
     try {
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const bookingCode = `EXP-${new Date().getFullYear()}-${randomSuffix}`;
+      let createdId = `res-${Date.now()}`;
 
-      // Try Supabase first
+      // 1. Try Supabase first
       try {
         const { data: booking, error: bookErr } = await supabase
           .from('expedition_bookings')
@@ -516,6 +567,7 @@ export const expeditionService = {
           .single();
 
         if (!bookErr && booking) {
+          createdId = booking.id;
           if (params.passengers && params.passengers.length > 0) {
             const passengerRows = params.passengers.map((p) => ({
               booking_id: booking.id,
@@ -551,16 +603,34 @@ export const expeditionService = {
             },
           ]);
 
-          return { success: true, bookingCode, bookingId: booking.id };
+          // Deduct spots in Supabase departure row
+          if (params.departureId) {
+            const { data: depData } = await supabase
+              .from('expedition_departures')
+              .select('available_slots, total_slots')
+              .eq('id', params.departureId)
+              .single();
+            if (depData) {
+              const currentAvail = depData.available_slots ?? depData.total_slots ?? 8;
+              const nextAvail = Math.max(0, currentAvail - params.paxCount);
+              await supabase
+                .from('expedition_departures')
+                .update({ available_slots: nextAvail })
+                .eq('id', params.departureId);
+            }
+          }
         }
-      } catch {}
+      } catch (sbErr) {
+        console.warn('Supabase booking insert notice:', sbErr);
+      }
 
-      // Fallback update slots locally
+      // 2. Always deduct spots in local storage departures
       if (params.departureId) {
         const stored = getStoredDepartures();
         const updated = stored.map((e) => {
           if (e.id === params.departureId) {
-            const nextAvail = Math.max(0, e.availableSlots - params.paxCount);
+            const currentSlots = typeof e.availableSlots === 'number' ? e.availableSlots : (typeof e.spotsLeft === 'number' ? e.spotsLeft : e.totalSlots);
+            const nextAvail = Math.max(0, currentSlots - params.paxCount);
             return {
               ...e,
               availableSlots: nextAvail,
@@ -572,7 +642,56 @@ export const expeditionService = {
         saveStoredDepartures(updated);
       }
 
-      return { success: true, bookingCode, bookingId: `local-${Date.now()}` };
+      // 3. Always save booking into localStorage for local instant sync & admin view
+      try {
+        const storedBookings = localStorage.getItem('yates_bookings');
+        const bookingsList = storedBookings ? JSON.parse(storedBookings) : [];
+        const newBookingItem = {
+          id: createdId,
+          code: bookingCode,
+          booking_code: bookingCode,
+          departure_id: params.departureId,
+          route_id: params.routeId,
+          vessel_id: params.vesselId,
+          expeditionName: params.expeditionName,
+          expedition_name: params.expeditionName,
+          vesselName: params.vesselName,
+          vessel_name: params.vesselName,
+          departure_date: params.departureDate,
+          return_date: params.returnDate,
+          fullName: params.guestName,
+          guest_name: params.guestName,
+          docId: params.guestRutPassport,
+          guest_rut_passport: params.guestRutPassport,
+          phone: params.guestPhone,
+          guest_phone: params.guestPhone,
+          email: params.guestEmail,
+          guest_email: params.guestEmail,
+          booking_type: params.bookingType,
+          guestsCount: params.paxCount,
+          pax_count: params.paxCount,
+          passengers: params.passengers || [],
+          totalAmount: params.totalAmount,
+          total_amount: params.totalAmount,
+          depositAmount: Math.round(params.totalAmount * 0.5),
+          deposit_amount: Math.round(params.totalAmount * 0.5),
+          dietary_medical_notes: params.dietaryMedicalNotes,
+          dateCreated: new Date().toISOString().split('T')[0],
+          created_at: new Date().toISOString(),
+          status: 'pending_transfer',
+        };
+        bookingsList.unshift(newBookingItem);
+        localStorage.setItem('yates_bookings', JSON.stringify(bookingsList));
+      } catch (_) {}
+
+      // 4. Dispatch events for real-time reactive UI updates
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
+        window.dispatchEvent(new CustomEvent('yates_bookings_updated'));
+        window.dispatchEvent(new CustomEvent('storage'));
+      }
+
+      return { success: true, bookingCode, bookingId: createdId };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message || 'Error al crear reserva.' };
     }
