@@ -20,6 +20,7 @@ import {
   ShieldAlert,
   AlertCircle,
   AlertTriangle,
+  FileSpreadsheet,
   Sparkles,
   Tag,
   ExternalLink,
@@ -90,6 +91,7 @@ import {
 import { formatRut, formatPhone } from '../lib/formatters';
 import { LuxuryDatePicker } from '../components/admin/LuxuryDatePicker';
 import { CountryPhoneInput } from '../components/admin/CountryPhoneInput';
+import { exportBookingsToExcel } from '../lib/excelExport';
 
 const AirbnbIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <img src="/airbnb-logo.png" alt="Airbnb" className={`${className} object-contain`} />
@@ -4662,6 +4664,26 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       aria-label="Nueva Reserva"
                     >
                       <Plus className="w-4 h-4 text-sky-300" />
+                    </button>
+
+                    {/* Botón Exportar a Excel (Descarga de la vista/filtro actual) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        exportBookingsToExcel(filteredUnifiedBookings, {
+                          formatDate: formatDateDDMMYYYY,
+                          calculateDays: calculateDurationDays,
+                          getStatus: getUnifiedBookingStatus,
+                          getPendingBalance: getPendingBalanceAmount,
+                          getNextPayment: getExpeditionPaymentDeadline,
+                        });
+                      }}
+                      disabled={filteredUnifiedBookings.length === 0}
+                      className="h-8.5 px-3.5 rounded-full bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300/80 hover:border-emerald-600 transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed group"
+                      title="Descargar tabla filtrada en formato Excel (.xlsx)"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 group-hover:text-white transition-colors" />
+                      <span className="font-mono text-[11px] font-bold">Descargar Excel</span>
                     </button>
                   </div>
                 </div>
