@@ -17,6 +17,7 @@ import {
   KeyRound,
   Mail,
   ShieldCheck,
+  ShieldAlert,
   AlertCircle,
   AlertTriangle,
   Sparkles,
@@ -133,6 +134,66 @@ const formatDateDDMMYYYY = (d?: any): string => {
     return `${day}/${month}/${year}`;
   }
   return str;
+};
+
+const calculateDurationDays = (start?: any, end?: any): number => {
+  if (!start || !end) return 1;
+  const parseToDate = (val: any): Date | null => {
+    if (!val) return null;
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+    const str = String(val).trim();
+    if (!str) return null;
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) return d;
+    const parts = str.split(/[/.-]/);
+    if (parts.length === 3) {
+      if (parts[2].length === 4) {
+        const parsed = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+    }
+    return null;
+  };
+
+  const d1 = parseToDate(start);
+  const d2 = parseToDate(end);
+  if (!d1 || !d2) return 1;
+  const diffDays = Math.round(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : 1;
+};
+
+const getUnifiedBookingStatus = (b: any): 'confirmed' | 'reserved' | 'scheduled' | 'blocked' => {
+  if (b.status === 'blocked') return 'blocked';
+  const notes = (b.notes || '').toLowerCase();
+  const statusStr = String(b.status || '').toLowerCase();
+  
+  if (statusStr === '50_reserved' || statusStr === 'partial' || notes.includes('50%') || notes.includes('reservado')) {
+    return 'reserved';
+  }
+  if (statusStr === 'approved' || statusStr === 'confirmed' || statusStr === '100_paid' || notes.includes('100%')) {
+    return 'confirmed';
+  }
+  return 'scheduled';
+};
+
+const getPendingBalanceAmount = (b: any): number => {
+  const status = getUnifiedBookingStatus(b);
+  if (status === 'confirmed') return 0;
+  if (status === 'reserved') return Math.round(b.amount * 0.5);
+  return b.amount;
+};
+
+const getExpeditionPaymentDeadline = (b: any): string => {
+  if (b.type !== 'expedition') return '-';
+  const status = getUnifiedBookingStatus(b);
+  if (status === 'confirmed') return 'Completado';
+  
+  const rawDate = b.raw_check_in;
+  if (!rawDate) return '-';
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return '-';
+  const deadline = new Date(d.getTime() - 60 * 24 * 60 * 60 * 1000);
+  return formatDateDDMMYYYY(deadline);
 };
 
 export interface UpcomingExpeditionItem {
@@ -568,7 +629,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Estados de la pestaña dedicada de Reservas
   const [bookingsTypeFilter, setBookingsTypeFilter] = useState<'all' | 'lodge' | 'expedition' | 'service'>('all');
-  const [bookingsStatusFilter, setBookingsStatusFilter] = useState<'all' | 'approved' | 'pending_transfer' | 'blocked'>('all');
+  const [bookingsStatusFilter, setBookingsStatusFilter] = useState<'all' | 'approved' | 'confirmed' | 'reserved' | 'scheduled' | 'pending_transfer' | 'blocked'>('all');
   const [bookingsSearchQuery, setBookingsSearchQuery] = useState('');
   const [bookingsViewMode, setBookingsViewMode] = useState<'list' | 'grid'>('list');
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState<any | null>(null);
@@ -1644,9 +1705,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     if (bookingsTypeFilter !== 'all' && b.type !== bookingsTypeFilter) return false;
     // Status filter
     if (bookingsStatusFilter !== 'all') {
-      if (bookingsStatusFilter === 'approved' && b.status !== 'approved') return false;
-      if (bookingsStatusFilter === 'pending_transfer' && b.status !== 'pending_transfer') return false;
-      if (bookingsStatusFilter === 'blocked' && b.status !== 'blocked') return false;
+      const uStatus = getUnifiedBookingStatus(b);
+      if (bookingsStatusFilter === 'approved' || bookingsStatusFilter === 'confirmed') {
+        if (uStatus !== 'confirmed') return false;
+      } else if (bookingsStatusFilter === 'reserved') {
+        if (uStatus !== 'reserved') return false;
+      } else if (bookingsStatusFilter === 'pending_transfer' || bookingsStatusFilter === 'scheduled') {
+        if (uStatus !== 'scheduled') return false;
+      } else if (bookingsStatusFilter === 'blocked') {
+        if (uStatus !== 'blocked') return false;
+      }
     }
     // Search filter
     if (bookingsSearchQuery.trim()) {
@@ -4525,21 +4593,30 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </button>
                       <button
                         type="button"
-                        onClick={() => setBookingsStatusFilter('approved')}
+                        onClick={() => setBookingsStatusFilter('confirmed')}
                         className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
-                          bookingsStatusFilter === 'approved' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-emerald-700'
+                          bookingsStatusFilter === 'confirmed' || bookingsStatusFilter === 'approved' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-emerald-700'
                         }`}
                       >
                         Confirmadas
                       </button>
                       <button
                         type="button"
-                        onClick={() => setBookingsStatusFilter('pending_transfer')}
+                        onClick={() => setBookingsStatusFilter('reserved')}
                         className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
-                          bookingsStatusFilter === 'pending_transfer' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-amber-700'
+                          bookingsStatusFilter === 'reserved' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-amber-700'
                         }`}
                       >
-                        Pendientes
+                        Reservadas (50%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookingsStatusFilter('scheduled')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                          bookingsStatusFilter === 'scheduled' || bookingsStatusFilter === 'pending_transfer' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 hover:text-sky-700'
+                        }`}
+                      >
+                        Agendadas (0%)
                       </button>
                       <button
                         type="button"
@@ -4642,47 +4719,82 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <table className="w-full text-left text-xs">
                       <thead>
                         <tr className="bg-[#fbfcfd] border-b border-slate-100 text-[10px] uppercase font-mono font-bold text-slate-400 tracking-wider">
-                          <th className="px-6 py-4 whitespace-nowrap">Tipo</th>
-                          <th className="px-6 py-4 whitespace-nowrap">Huésped / Pasajero</th>
-                          <th className="px-6 py-4 whitespace-nowrap">Habitación / Servicio</th>
-                          <th className="px-6 py-4 whitespace-nowrap">Inicio</th>
-                          <th className="px-6 py-4 whitespace-nowrap">Fin</th>
-                          <th className="px-6 py-4 whitespace-nowrap">Monto Total</th>
-                          <th className="px-6 py-4 whitespace-nowrap">Estado</th>
-                          <th className="px-6 py-4 whitespace-nowrap text-right">Acciones</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap">Tipo</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap">Expedición / Habitación</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap">Inicio</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap">Fin</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap text-center">Días</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap">Huésped / Pasajero</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap">Estado</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap font-mono">Precio</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap font-mono">Saldo Pendiente</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap">Próximo Pago</th>
+                          <th className="px-5 py-3.5 whitespace-nowrap text-right">Acciones</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700">
                         {filteredUnifiedBookings.map((b) => {
                           const cleanPhone = (b.guest_phone || '').replace(/[^0-9]/g, '');
+                          const durationDays = calculateDurationDays(b.raw_check_in, b.raw_check_out);
+                          const uStatus = getUnifiedBookingStatus(b);
+                          const pendingAmount = getPendingBalanceAmount(b);
+                          const nextPayment = getExpeditionPaymentDeadline(b);
+
                           return (
                             <tr
                               key={`${b.type}-${b.id}`}
                               className="hover:bg-slate-50/80 transition-colors duration-150 group cursor-pointer"
                               onClick={() => setSelectedBookingForDetail(b)}
                             >
-                              {/* Tipo */}
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              {/* 1. Tipo */}
+                              <td className="px-5 py-3.5 whitespace-nowrap">
                                 <span
-                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold ${
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold ${
                                     b.type === 'lodge'
                                       ? 'bg-purple-50 text-purple-900 border border-purple-200/80'
                                       : 'bg-sky-50 text-sky-900 border border-sky-200/80'
                                   }`}
                                 >
                                   {b.type === 'lodge' ? (
-                                    <BedDouble className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                                    <BedDouble className="w-3 h-3 text-purple-700 shrink-0" />
                                   ) : (
-                                    <Ship className="w-3.5 h-3.5 text-sky-700 shrink-0" />
+                                    <Ship className="w-3 h-3 text-sky-700 shrink-0" />
                                   )}
                                   <span>{b.type_label}</span>
                                 </span>
                               </td>
 
-                              {/* Huésped */}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="space-y-1">
-                                  <strong className="text-[#0b192c] font-semibold text-xs block">
+                              {/* 2. Expedición o Habitación */}
+                              <td className="px-5 py-3.5 whitespace-nowrap text-xs text-[#0b192c] font-semibold">
+                                <span>{b.service_title}</span>
+                                {b.unit_detail && b.unit_detail !== b.service_title && (
+                                  <span className="block text-[10px] font-normal text-slate-400 font-sans">
+                                    {b.unit_detail}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* 3. Fecha Inicio */}
+                              <td className="px-5 py-3.5 whitespace-nowrap font-mono text-xs text-slate-600">
+                                {formatDateDDMMYYYY(b.raw_check_in)}
+                              </td>
+
+                              {/* 4. Fecha Fin */}
+                              <td className="px-5 py-3.5 whitespace-nowrap font-mono text-xs text-slate-600">
+                                {formatDateDDMMYYYY(b.raw_check_out)}
+                              </td>
+
+                              {/* 5. Cantidad de Días */}
+                              <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                                <span className="inline-block bg-slate-100 font-mono text-slate-700 font-bold px-2 py-0.5 rounded-md text-[11px] border border-slate-200/60">
+                                  {durationDays} {durationDays === 1 ? 'día' : 'días'}
+                                </span>
+                              </td>
+
+                              {/* 6. Huésped / Pasajero con Botón WhatsApp */}
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <strong className="text-[#0b192c] font-semibold text-xs">
                                     {b.guest_name}
                                   </strong>
                                   {cleanPhone && cleanPhone !== 'Sin contacto' && !cleanPhone.includes('00000000') && (
@@ -4693,10 +4805,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       onClick={(e) => e.stopPropagation()}
-                                      className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200 transition-all shadow-2xs group/wa cursor-pointer"
-                                      title={`Abrir WhatsApp de ${b.guest_name} (${b.guest_phone})`}
+                                      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200 transition-all shadow-2xs group/wa cursor-pointer"
+                                      title={`WhatsApp ${b.guest_phone}`}
                                     >
-                                      <svg className="w-3 h-3 fill-current transition-colors shrink-0" viewBox="0 0 24 24">
+                                      <svg className="w-2.5 h-2.5 fill-current transition-colors shrink-0" viewBox="0 0 24 24">
                                         <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
                                       </svg>
                                     </a>
@@ -4704,60 +4816,94 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </div>
                               </td>
 
-                              {/* Servicio / Habitación */}
-                              <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-800 font-medium">
-                                <span>{b.service_title}</span>
+                              {/* 7. Estado de Reserva */}
+                              <td className="px-5 py-3.5 whitespace-nowrap">
+                                {uStatus === 'confirmed' && (
+                                  <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Confirmada</span>
+                                  </span>
+                                )}
+                                {uStatus === 'reserved' && (
+                                  <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-200">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    <span>Reservada (50%)</span>
+                                  </span>
+                                )}
+                                {uStatus === 'scheduled' && (
+                                  <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 bg-sky-50 text-sky-800 border border-sky-200">
+                                    <Clock className="w-3 h-3 text-sky-600" />
+                                    <span>Agendada (0%)</span>
+                                  </span>
+                                )}
+                                {uStatus === 'blocked' && (
+                                  <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 bg-purple-50 text-purple-900 border border-purple-200">
+                                    <ShieldAlert className="w-3 h-3 text-purple-700" />
+                                    <span>Bloqueo</span>
+                                  </span>
+                                )}
                               </td>
 
-                              {/* Fecha Inicio */}
-                              <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-600">
-                                {formatDateDDMMYYYY(b.raw_check_in)}
-                              </td>
-
-                              {/* Fecha Fin */}
-                              <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-600">
-                                {formatDateDDMMYYYY(b.raw_check_out)}
-                              </td>
-
-                              {/* Monto */}
-                              <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-xs text-[#0b192c]">
+                              {/* 8. Precio Cobrado */}
+                              <td className="px-5 py-3.5 whitespace-nowrap font-mono font-bold text-xs text-[#0b192c]">
                                 ${b.amount.toLocaleString('es-CL')}{' '}
                                 <span className="text-[10px] font-sans font-normal text-slate-400">CLP</span>
                               </td>
 
-                              {/* Estado */}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span
-                                  className={`text-[10px] font-bold font-mono px-3 py-1 rounded-full uppercase inline-flex items-center gap-1.5 whitespace-nowrap ${
-                                    b.status === 'approved'
-                                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                      : b.status === 'blocked'
-                                      ? 'bg-purple-50 text-purple-900 border border-purple-200'
-                                      : 'bg-rose-50 text-rose-800 border border-rose-200'
-                                  }`}
-                                >
-                                  {b.status === 'approved' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-                                  {b.status === 'pending_transfer' && <Clock className="w-3.5 h-3.5 text-rose-600" />}
-                                  {b.status === 'approved'
-                                    ? 'Confirmada'
-                                    : b.status === 'blocked'
-                                    ? 'Bloqueo'
-                                    : 'Pendiente Pago'}
-                                </span>
+                              {/* 9. Saldo Pendiente */}
+                              <td className="px-5 py-3.5 whitespace-nowrap font-mono font-bold text-xs">
+                                {pendingAmount === 0 ? (
+                                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 font-semibold">
+                                    $0 CLP
+                                  </span>
+                                ) : uStatus === 'reserved' ? (
+                                  <span className="text-amber-700">
+                                    ${pendingAmount.toLocaleString('es-CL')}{' '}
+                                    <span className="text-[10px] font-sans font-normal text-slate-400">CLP</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-rose-700">
+                                    ${pendingAmount.toLocaleString('es-CL')}{' '}
+                                    <span className="text-[10px] font-sans font-normal text-slate-400">CLP</span>
+                                  </span>
+                                )}
                               </td>
 
-                              {/* Acciones */}
-                              <td className="px-6 py-4 whitespace-nowrap text-right">
-                                <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                              {/* 10. Próximo Pago */}
+                              <td className="px-5 py-3.5 whitespace-nowrap font-mono text-xs">
+                                {b.type === 'expedition' ? (
+                                  uStatus === 'confirmed' ? (
+                                    <span className="text-emerald-700 font-semibold flex items-center gap-1 text-[11px]">
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                      <span>Completado</span>
+                                    </span>
+                                  ) : (
+                                    <div className="space-y-0.5">
+                                      <span className="text-amber-900 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 inline-block text-[11px]" title="60 días antes de la fecha de inicio">
+                                        {nextPayment}
+                                      </span>
+                                      <span className="block text-[9px] font-sans text-slate-400">
+                                        (60 días antes)
+                                      </span>
+                                    </div>
+                                  )
+                                ) : (
+                                  <span className="text-slate-400 font-normal">-</span>
+                                )}
+                              </td>
+
+                              {/* 11. Acciones */}
+                              <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                                <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   {cleanPhone && cleanPhone !== '56900000000' && (
                                     <a
                                       href={`https://wa.me/${cleanPhone}`}
                                       target="_blank"
                                       rel="noreferrer"
                                       title="Conversar por WhatsApp"
-                                      className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-[#25D366] flex items-center justify-center transition border border-emerald-200 cursor-pointer shadow-2xs"
+                                      className="w-7.5 h-7.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-[#25D366] flex items-center justify-center transition border border-emerald-200 cursor-pointer shadow-2xs"
                                     >
-                                      <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                      <svg className="w-3.5 h-3.5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                         <path d="M12.004 2C6.48 2 2 6.48 2 12a9.92 9.92 0 0 0 1.54 5.3L2 22l4.83-1.27A9.97 9.97 0 0 0 12.004 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm5.27 13.91c-.24.66-1.38 1.27-1.93 1.35-.49.07-1.12.1-3.23-.77a11.16 11.16 0 0 1-4.84-4.25c-.84-1.12-1.34-2.43-1.34-3.8 0-1.39.73-2.07.97-2.33.24-.26.49-.33.66-.33.17 0 .34.01.49.02.16.01.37-.06.58.45.22.52.74 1.8.8 1.93.07.13.11.28.02.46-.09.18-.14.28-.28.45-.14.17-.3.38-.43.51-.15.15-.31.32-.13.63.18.31.81 1.33 1.74 2.16.93.83 1.71 1.09 1.95 1.21.24.12.38.1.52-.06.14-.16.61-.71.77-.95.16-.24.33-.2.55-.12.22.08 1.4.66 1.64.78.24.12.4.18.46.28.06.1.06.58-.18 1.24z" />
                                       </svg>
                                     </a>
@@ -4765,9 +4911,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   <button
                                     onClick={() => setSelectedBookingForDetail(b)}
                                     title="Ver Ficha Completa"
-                                    className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-[#0b192c] flex items-center justify-center transition border border-slate-200/80 cursor-pointer shadow-2xs"
+                                    className="w-7.5 h-7.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-[#0b192c] flex items-center justify-center transition border border-slate-200/80 cursor-pointer shadow-2xs"
                                   >
-                                    <Eye className="w-4 h-4" />
+                                    <Eye className="w-3.5 h-3.5" />
                                   </button>
                                   {b.type === 'lodge' && (
                                     <button
@@ -4777,9 +4923,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         }
                                       }}
                                       title="Liberar / Cancelar Reserva"
-                                      className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition border border-rose-200/80 cursor-pointer shadow-2xs"
+                                      className="w-7.5 h-7.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition border border-rose-200/80 cursor-pointer shadow-2xs"
                                     >
-                                      <Trash2 className="w-4 h-4" />
+                                      <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   )}
                                 </div>
@@ -4796,6 +4942,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {filteredUnifiedBookings.map((b) => {
                     const cleanPhone = (b.guest_phone || '').replace(/[^0-9]/g, '');
+                    const durationDays = calculateDurationDays(b.raw_check_in, b.raw_check_out);
+                    const uStatus = getUnifiedBookingStatus(b);
+                    const pendingAmount = getPendingBalanceAmount(b);
+                    const nextPayment = getExpeditionPaymentDeadline(b);
+
                     return (
                       <div
                         key={`${b.type}-${b.id}`}
@@ -4819,17 +4970,26 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 {b.booking_code}
                               </span>
                             </div>
-                            <span
-                              className={`text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase ${
-                                b.status === 'approved'
-                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                  : b.status === 'blocked'
-                                  ? 'bg-slate-100 text-slate-700 border border-slate-200'
-                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
-                              }`}
-                            >
-                              {b.status === 'approved' ? 'Confirmada' : b.status === 'blocked' ? 'Bloqueo' : 'Pendiente'}
-                            </span>
+                            {uStatus === 'confirmed' && (
+                              <span className="text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                Confirmada
+                              </span>
+                            )}
+                            {uStatus === 'reserved' && (
+                              <span className="text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase bg-amber-50 text-amber-800 border border-amber-200">
+                                Reservada (50%)
+                              </span>
+                            )}
+                            {uStatus === 'scheduled' && (
+                              <span className="text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase bg-sky-50 text-sky-800 border border-sky-200">
+                                Agendada (0%)
+                              </span>
+                            )}
+                            {uStatus === 'blocked' && (
+                              <span className="text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase bg-purple-50 text-purple-900 border border-purple-200">
+                                Bloqueo
+                              </span>
+                            )}
                           </div>
 
                           {/* Guest Info */}
@@ -4845,15 +5005,31 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           {/* Details Strip */}
                           <div className="p-4 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl space-y-2">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Fechas</span>
-                              <span className="font-mono text-slate-700 font-medium">{b.dates}</span>
+                              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Fechas & Duración</span>
+                              <span className="font-mono text-slate-700 font-medium">
+                                {b.dates} <strong className="text-[#0b192c]">({durationDays}d)</strong>
+                              </span>
                             </div>
                             <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
-                              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Tarifa Total</span>
+                              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Precio Total</span>
                               <span className="font-mono font-bold text-[#0b192c]">
                                 ${b.amount.toLocaleString('es-CL')} CLP
                               </span>
                             </div>
+                            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/60">
+                              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Saldo Pendiente</span>
+                              <span className={`font-mono font-bold ${pendingAmount === 0 ? 'text-emerald-700' : uStatus === 'reserved' ? 'text-amber-700' : 'text-rose-700'}`}>
+                                ${pendingAmount.toLocaleString('es-CL')} CLP
+                              </span>
+                            </div>
+                            {b.type === 'expedition' && uStatus !== 'confirmed' && (
+                              <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/60">
+                                <span className="text-[10px] font-mono text-amber-800 font-bold uppercase">Próximo Pago (60d)</span>
+                                <span className="font-mono font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[11px]">
+                                  {nextPayment}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           {b.notes && (
@@ -4874,13 +5050,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           </button>
                           {cleanPhone && (
                             <a
-                              href={`https://wa.me/${cleanPhone}`}
+                              href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+                                `Hola estimado/a ${b.guest_name}, le contactamos desde Yates Chile respecto a su reserva ${b.booking_code}.`
+                              )}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition flex items-center justify-center cursor-pointer shadow-2xs"
-                              title="Chat de WhatsApp"
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-[#25D366] border border-emerald-200 transition flex items-center justify-center cursor-pointer shadow-2xs"
+                              title="WhatsApp"
                             >
-                              <MessageSquare className="w-3.5 h-3.5" />
+                              <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M12.004 2C6.48 2 2 6.48 2 12a9.92 9.92 0 0 0 1.54 5.3L2 22l4.83-1.27A9.97 9.97 0 0 0 12.004 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm5.27 13.91c-.24.66-1.38 1.27-1.93 1.35-.49.07-1.12.1-3.23-.77a11.16 11.16 0 0 1-4.84-4.25c-.84-1.12-1.34-2.43-1.34-3.8 0-1.39.73-2.07.97-2.33.24-.26.49-.33.66-.33.17 0 .34.01.49.02.16.01.37-.06.58.45.22.52.74 1.8.8 1.93.07.13.11.28.02.46-.09.18-.14.28-.28.45-.14.17-.3.38-.43.51-.15.15-.31.32-.13.63.18.31.81 1.33 1.74 2.16.93.83 1.71 1.09 1.95 1.21.24.12.38.1.52-.06.14-.16.61-.71.77-.95.16-.24.33-.2.55-.12.22.08 1.4.66 1.64.78.24.12.4.18.46.28.06.1.06.58-.18 1.24z" />
+                              </svg>
                             </a>
                           )}
                         </div>
