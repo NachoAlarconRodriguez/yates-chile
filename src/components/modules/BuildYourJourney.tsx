@@ -222,9 +222,9 @@ export const BuildYourJourney: React.FC = () => {
                         {formData.experienceType === 'lodge' && <Check className="w-5 h-5 text-blue-400" />}
                       </div>
                       <div>
-                        <h4 className="font-serif font-bold text-lg text-white">Solo Estadía Lodge</h4>
+                        <h4 className="font-serif font-bold text-lg text-white">Estadía en Lodge & Excursiones</h4>
                         <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                          Refugio privado en tierra en el Lodge Rincón de Navegantes.
+                          Refugio frente al mar en Bahía Cumberland con excursiones opcionales de buceo, cabalgatas y gastronomía.
                         </p>
                       </div>
                     </button>

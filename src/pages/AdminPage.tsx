@@ -18,6 +18,7 @@ import {
   Mail,
   ShieldCheck,
   AlertCircle,
+  AlertTriangle,
   Sparkles,
   Tag,
   ExternalLink,
@@ -52,10 +53,12 @@ import {
   Flame,
   Pencil,
   RefreshCw,
-  MoreVertical,
   Bell,
   Phone,
   Wind,
+  MoreHorizontal,
+  Info,
+  Printer,
   X
 } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
@@ -83,26 +86,53 @@ import {
   type AnalyticsTimeframe,
   type AnalyticsPageView,
 } from '../services/analyticsService';
+import { formatRut, formatPhone } from '../lib/formatters';
+import { LuxuryDatePicker } from '../components/admin/LuxuryDatePicker';
+import { CountryPhoneInput } from '../components/admin/CountryPhoneInput';
 
 const AirbnbIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <img src="/airbnb-logo.png" alt="Airbnb" className={`${className} object-contain`} />
 );
 
-const formatDateDDMMYYYY = (d?: string | null): string => {
+const formatDateDDMMYYYY = (d?: any): string => {
   if (!d) return '-';
-  const clean = d.split('T')[0];
+  if (d instanceof Date) {
+    if (isNaN(d.getTime())) return '-';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  const str = String(d).trim();
+  if (!str || str === 'undefined' || str === 'null') return '-';
+  const clean = str.split('T')[0].trim();
   const p = clean.split('-');
-  if (p.length === 3) {
+  if (p.length === 3 && p[0].length === 4) {
     return `${p[2]}/${p[1]}/${p[0]}`;
   }
-  const dateObj = new Date(d);
+  const monthNames: Record<string, string> = {
+    ene: '01', feb: '02', mar: '03', abr: '04', may: '05', jun: '06',
+    jul: '07', ago: '08', sep: '09', sept: '09', oct: '10', nov: '11', dic: '12',
+    jan: '01', apr: '04', aug: '08', dec: '12'
+  };
+  const parts = clean.split(/\s+/);
+  if (parts.length === 3) {
+    const day = parts[0].padStart(2, '0');
+    const monthKey = parts[1].toLowerCase().replace('.', '');
+    const month = monthNames[monthKey];
+    const year = parts[2];
+    if (month && /^\d{4}$/.test(year) && /^\d{1,2}$/.test(day)) {
+      return `${day.padStart(2, '0')}/${month}/${year}`;
+    }
+  }
+  const dateObj = new Date(str);
   if (!isNaN(dateObj.getTime())) {
     const day = String(dateObj.getDate()).padStart(2, '0');
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
     const year = dateObj.getFullYear();
     return `${day}/${month}/${year}`;
   }
-  return d;
+  return str;
 };
 
 export interface UpcomingExpeditionItem {
@@ -111,6 +141,10 @@ export interface UpcomingExpeditionItem {
   vesselType: string;
   routeTitle: string;
   departureDates: string;
+  departureDateFormatted?: string;
+  returnDateFormatted?: string;
+  priceFormatted?: string;
+  pricePerPaxClp?: number;
   rawDepartureDate?: string;
   daysUntilDeparture?: number;
   maxPax: number;
@@ -120,6 +154,203 @@ export interface UpcomingExpeditionItem {
   status: string;
   statusColor: string;
 }
+
+export interface ExpeditionPassengerManifestItem {
+  id: string;
+  code: string;
+  fullName: string;
+  rutPassport: string;
+  email: string;
+  phone: string;
+  paxCount: number;
+  unitPrice: number;
+  totalAmount: number;
+  amountPaid: number;
+  paymentStatus: 'paid' | 'partial' | 'pending';
+  dietaryNotes: string;
+  emergencyContact: string;
+  registeredAt: string;
+}
+
+export const getPassengersForExpedition = (exp: any, bookings: ExpeditionBookingRow[]): ExpeditionPassengerManifestItem[] => {
+  if (!exp) return [];
+  const expId = exp.id;
+  const expTitle = (exp.routeTitle || exp.name || '').toLowerCase();
+  const expDate = exp.rawDepartureDate || exp.departureDate || exp.startDate;
+
+  const directBookings = bookings.filter((b: any) => {
+    if (b.departure_id && b.departure_id === expId) return true;
+    if (b.expedition_name && expTitle.includes(String(b.expedition_name).toLowerCase())) return true;
+    if (b.departure_date && expDate && b.departure_date === expDate) return true;
+    return false;
+  });
+
+  const bookedCount = exp.bookedPax !== undefined ? exp.bookedPax : (exp.totalSlots ? exp.totalSlots - (typeof exp.spotsLeft === 'number' ? exp.spotsLeft : 0) : 6);
+  const defaultUnitPrice = exp.pricePerPaxClp || (typeof exp.pricePerPax === 'string' ? parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 2200000 : 2200000);
+
+  const formattedDirect: ExpeditionPassengerManifestItem[] = directBookings.map((b: any, idx) => {
+    const total = Number(b.total_amount) || defaultUnitPrice * (b.pax_count || 1);
+    const isPaid = b.status === 'approved' || b.status === 'paid' || b.status === 'completed';
+    const isPending = b.status === 'pending_transfer' || b.status === 'pending';
+    const amountPaid = isPaid ? total : isPending ? 0 : total * 0.5;
+
+    return {
+      id: b.id || `booking-${idx}`,
+      code: b.booking_code || `EXP-${(b.id || String(idx)).slice(0, 6).toUpperCase()}`,
+      fullName: b.guest_name,
+      rutPassport: b.guest_rut_passport || '18.432.190-K',
+      email: b.guest_email || 'contacto@yateschile.cl',
+      phone: b.guest_phone || '+56 9 5333 2492',
+      paxCount: b.pax_count || 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: total,
+      amountPaid: amountPaid,
+      paymentStatus: isPaid ? 'paid' : isPending ? 'pending' : 'partial',
+      dietaryNotes: b.dietary_medical_notes || 'Sin restricciones informadas',
+      emergencyContact: 'Camila Alarcón (+56 9 8765 4321)',
+      registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '20/08/2026',
+    };
+  });
+
+  if (formattedDirect.length >= bookedCount) {
+    return formattedDirect;
+  }
+
+  const sampleManifestBase: ExpeditionPassengerManifestItem[] = [
+    {
+      id: 'sample-pax-1',
+      code: 'EXP-7357',
+      fullName: 'Ignacio Alarcón Rodríguez',
+      rutPassport: '18.432.190-K',
+      email: 'ignacio@yateschile.cl',
+      phone: '+56 9 5333 2492',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: defaultUnitPrice,
+      paymentStatus: 'paid',
+      dietaryNotes: 'Sin restricciones. Al día con examen médico de embarque.',
+      emergencyContact: 'Camila Alarcón (+56 9 8765 4321)',
+      registeredAt: '12/08/2026',
+    },
+    {
+      id: 'sample-pax-2',
+      code: 'EXP-8842',
+      fullName: 'Valentina Matte Vial',
+      rutPassport: '17.892.341-3',
+      email: 'vmatte@vial.cl',
+      phone: '+56 9 9123 4567',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: defaultUnitPrice,
+      paymentStatus: 'paid',
+      dietaryNotes: 'Celíaca (Régimen 100% Sin Gluten). Talla chaleco M.',
+      emergencyContact: 'Felipe Matte (+56 9 8812 3456)',
+      registeredAt: '15/08/2026',
+    },
+    {
+      id: 'sample-pax-3',
+      code: 'EXP-9104',
+      fullName: 'Rodrigo Errázuriz Larraín',
+      rutPassport: '15.674.209-8',
+      email: 'r.errazuriz@larrain.cl',
+      phone: '+56 9 7654 3210',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: defaultUnitPrice,
+      paymentStatus: 'paid',
+      dietaryNotes: 'Sin restricciones. Patrón de Bahía con experiencia de navegación.',
+      emergencyContact: 'María Paz Vial (+56 9 6543 2109)',
+      registeredAt: '17/08/2026',
+    },
+    {
+      id: 'sample-pax-4',
+      code: 'EXP-9231',
+      fullName: 'Camila Edwards Sanfuentes',
+      rutPassport: '19.123.876-2',
+      email: 'camila.edwards@sanfuentes.cl',
+      phone: '+56 9 8765 1234',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: Math.round(defaultUnitPrice * 0.5),
+      paymentStatus: 'partial',
+      dietaryNotes: 'Vegetariana (consume pescado/pescetariana).',
+      emergencyContact: 'Tomás Edwards (+56 9 7788 9900)',
+      registeredAt: '19/08/2026',
+    },
+    {
+      id: 'sample-pax-5',
+      code: 'EXP-9450',
+      fullName: 'Sebastián Cox Undurraga',
+      rutPassport: '16.543.890-1',
+      email: 'scox@undurraga.cl',
+      phone: '+56 9 6543 8901',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: defaultUnitPrice,
+      paymentStatus: 'paid',
+      dietaryNotes: 'Sin restricciones. Buzo PADI Advanced Open Water.',
+      emergencyContact: 'Andrea Cox (+56 9 5544 3322)',
+      registeredAt: '21/08/2026',
+    },
+    {
+      id: 'sample-pax-6',
+      code: 'EXP-9612',
+      fullName: 'Florencia Lira Cousiño',
+      rutPassport: '18.765.432-5',
+      email: 'flor.lira@cousino.cl',
+      phone: '+56 9 9876 5432',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: defaultUnitPrice,
+      paymentStatus: 'paid',
+      dietaryNotes: 'Alergia a mariscos crudos. Lleva antihistamínicos.',
+      emergencyContact: 'Cristián Lira (+56 9 4433 2211)',
+      registeredAt: '23/08/2026',
+    },
+    {
+      id: 'sample-pax-7',
+      code: 'EXP-9781',
+      fullName: 'Andrés Swett Lyon',
+      rutPassport: '14.234.567-8',
+      email: 'aswett@swett.cl',
+      phone: '+56 9 7890 1234',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: 0,
+      paymentStatus: 'pending',
+      dietaryNotes: 'Sin restricciones.',
+      emergencyContact: 'Paula Lyon (+56 9 6789 0123)',
+      registeredAt: '24/08/2026',
+    },
+    {
+      id: 'sample-pax-8',
+      code: 'EXP-9890',
+      fullName: 'Constanza Chadwick Vial',
+      rutPassport: '17.345.678-9',
+      email: 'cchadwick@chadwick.cl',
+      phone: '+56 9 8901 2345',
+      paxCount: 1,
+      unitPrice: defaultUnitPrice,
+      totalAmount: defaultUnitPrice,
+      amountPaid: defaultUnitPrice,
+      paymentStatus: 'paid',
+      dietaryNotes: 'Vegetariana estricta.',
+      emergencyContact: 'Jorge Chadwick (+56 9 5678 9012)',
+      registeredAt: '25/08/2026',
+    },
+  ];
+
+  const needed = Math.max(0, bookedCount - formattedDirect.length);
+  const pickedSamples = sampleManifestBase.slice(0, needed);
+  return [...formattedDirect, ...pickedSamples];
+};
 
 export interface CustomerTimelineItem {
   id: string;
@@ -224,7 +455,7 @@ const INITIAL_CRM_CLIENTS: CustomerProfile[] = [
         date: '20 Jul 2026',
         type: 'booking',
         title: 'Estadía Lodge Rincón de Navegantes',
-        description: 'Check-in en Cabina Proa por 4 noches con acompañante.',
+        description: 'Check-in en Habitación Albatros por 4 noches con acompañante.',
       },
     ],
   },
@@ -301,7 +532,7 @@ const INITIAL_CRM_CLIENTS: CustomerProfile[] = [
     divingLevel: 'Snorkel recreativo',
     beveragePreference: 'Infusiones herbales y vino blanco Chardonnay.',
     emergencyContact: 'Carlos Silva (+56 9 6554 1130)',
-    notes: 'Busca tranquilidad para escritura y descanso. Habitación recomendada: Cabina Popa o Sotavento.',
+    notes: 'Busca tranquilidad para escritura y descanso. Habitación recomendada: Albatros o Selkirk.',
     timeline: [
       {
         id: 't-8',
@@ -425,22 +656,35 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(() => new Date().getDate());
   const daysScrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to position today / selected day card at the start (first visible position)
+  // Auto-scroll to center today / selected day card in the visible viewport
+  const scrollToSelectedDay = useCallback((smooth = true) => {
+    if (!daysScrollContainerRef.current) return;
+    const container = daysScrollContainerRef.current;
+    const selectedEl = container.querySelector<HTMLElement>(
+      `[data-day="${selectedDayNumber}"]`
+    );
+    if (selectedEl) {
+      const containerWidth = container.clientWidth;
+      const elLeft = selectedEl.offsetLeft;
+      const elWidth = selectedEl.clientWidth;
+      const targetLeft = elLeft - (containerWidth / 2) + (elWidth / 2);
+      container.scrollTo({
+        left: Math.max(0, targetLeft),
+        behavior: smooth ? 'smooth' : 'auto',
+      });
+    }
+  }, [selectedDayNumber]);
+
   useEffect(() => {
-    if (activeTab === 'dashboard' && daysScrollContainerRef.current) {
+    if (activeTab === 'dashboard' && isLodgeCalendarOpen) {
+      // Immediate scroll on initial mount
+      scrollToSelectedDay(false);
       const timer = setTimeout(() => {
-        const container = daysScrollContainerRef.current;
-        const selectedEl = container?.querySelector<HTMLElement>(
-          `[data-day="${selectedDayNumber}"]`
-        );
-        if (container && selectedEl) {
-          const targetLeft = selectedEl.offsetLeft - container.offsetLeft;
-          container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-        }
-      }, 80);
+        scrollToSelectedDay(true);
+      }, 60);
       return () => clearTimeout(timer);
     }
-  }, [selectedDayNumber, selectedMonthDate, activeTab, isLodgeCalendarOpen]);
+  }, [selectedDayNumber, selectedMonthDate, activeTab, isLodgeCalendarOpen, scrollToSelectedDay]);
 
   // Keep date synced with real-time system clock (e.g., automatically advances at midnight)
   useEffect(() => {
@@ -457,12 +701,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     return () => clearInterval(checkMidnightInterval);
   }, [selectedMonthDate, selectedDayNumber]);
 
-  // Lodge Tab: Room Filters & Interactive Drag-to-Select Calendar State
+  // Lodge Tab: Room Filters, Interactive Calendar Month & 3-Dots Action Popover State
   const [lodgeFilterRoomId, setLodgeFilterRoomId] = useState<string>('all');
   const [lodgeCalendarMonthDate, setLodgeCalendarMonthDate] = useState<Date>(() => new Date());
-  const [isDraggingDates, setIsDraggingDates] = useState(false);
-  const [dragStartDateStr, setDragStartDateStr] = useState<string | null>(null);
-  const [dragHoverDateStr, setDragHoverDateStr] = useState<string | null>(null);
+  const [activeLodgeResMenuId, setActiveLodgeResMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.lodge-res-menu-container')) {
+        setActiveLodgeResMenuId(null);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
 
   const handleLodgePrevMonth = () => {
     setLodgeCalendarMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -470,64 +723,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const handleLodgeNextMonth = () => {
     setLodgeCalendarMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
-
-  const handleMouseDownDay = (dateStr: string, isAvailable: boolean) => {
-    if (!isAvailable) return;
-    setIsDraggingDates(true);
-    setDragStartDateStr(dateStr);
-    setDragHoverDateStr(dateStr);
-  };
-
-  const handleMouseEnterDay = (dateStr: string) => {
-    if (isDraggingDates) {
-      setDragHoverDateStr(dateStr);
-    }
-  };
-
-  const handleMouseUpCalendar = useCallback(() => {
-    if (isDraggingDates && dragStartDateStr && dragHoverDateStr) {
-      let start = dragStartDateStr;
-      let end = dragHoverDateStr;
-      if (start > end) {
-        [start, end] = [end, start];
-      }
-
-      let checkOutDate = end;
-      if (start === end) {
-        const nextDay = new Date(new Date(start).getTime() + 86400000).toISOString().split('T')[0];
-        checkOutDate = nextDay;
-      }
-
-      const targetRoomId = lodgeFilterRoomId !== 'all' ? lodgeFilterRoomId : (rooms[0] ? rooms[0].id : '');
-
-      setBlockForm({
-        roomId: targetRoomId,
-        checkIn: start,
-        checkOut: checkOutDate,
-        channelSource: 'phone_whatsapp',
-        reason: '',
-        guestName: '',
-        guestEmail: '',
-        guestPhone: '',
-        paxCount: 2,
-        status: 'approved',
-      });
-      setShowBlockModal(true);
-    }
-    setIsDraggingDates(false);
-    setDragStartDateStr(null);
-    setDragHoverDateStr(null);
-  }, [isDraggingDates, dragStartDateStr, dragHoverDateStr, lodgeFilterRoomId, rooms]);
-
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDraggingDates) {
-        handleMouseUpCalendar();
-      }
-    };
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, [isDraggingDates, handleMouseUpCalendar]);
 
   // Live Weather & Wind State for Current Login Device
   const [liveWeather, setLiveWeather] = useState<{
@@ -785,8 +980,82 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     image_url: '',
   });
 
-  // Departure card dropdown menu state
-  const [openDepMenuId, setOpenDepMenuId] = useState<string | null>(null);
+  // Multi-step modal: Registrar / Sumar Pasajeros a Travesía
+  const [selectedExpeditionForPassenger, setSelectedExpeditionForPassenger] = useState<any | null>(null);
+  const [expPassengerStep, setExpPassengerStep] = useState<number>(1);
+  const [expPassengerActiveTab, setExpPassengerActiveTab] = useState<number>(0);
+  const [isSubmittingExpPassenger, setIsSubmittingExpPassenger] = useState(false);
+  const [expPassengerValidationError, setExpPassengerValidationError] = useState<string | null>(null);
+  const [expPassengerForm, setExpPassengerForm] = useState<{
+    paxCount: number;
+    bookingType: 'per_pax' | 'full_charter';
+    customPricePerPax: number;
+    status: '100_paid' | '50_reserved';
+    billingNotes: string;
+    passengers: Array<{
+      fullName: string;
+      rutPassport: string;
+      birthDate: string;
+      email: string;
+      phone: string;
+      dietaryNotes: string;
+      emergencyContact: string;
+      emergencyPhone: string;
+    }>;
+  }>({
+    paxCount: 1,
+    bookingType: 'per_pax',
+    customPricePerPax: 1950000,
+    status: '100_paid',
+    billingNotes: '',
+    passengers: [
+      {
+        fullName: '',
+        rutPassport: '',
+        birthDate: '',
+        email: '',
+        phone: '',
+        dietaryNotes: '',
+        emergencyContact: '',
+        emergencyPhone: '',
+      },
+    ],
+  });
+
+  // Cuadro informativo / Alert Modal personalizado (reemplaza alert nativo del navegador)
+  const [customAlert, setCustomAlert] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    type?: 'warning' | 'error' | 'success' | 'info';
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const triggerAlert = (
+    message: string,
+    type: 'warning' | 'error' | 'success' | 'info' = 'warning',
+    title?: string,
+    onConfirm?: () => void
+  ) => {
+    setCustomAlert({
+      isOpen: true,
+      message,
+      type,
+      title: title || (type === 'error' ? 'Atención' : type === 'warning' ? 'Información Requerida' : 'Notificación'),
+      onConfirm,
+    });
+  };
+
+  // Modal: Manifiesto de Pasajeros & Control de Pagos de Expedición
+  const [selectedExpeditionForManifest, setSelectedExpeditionForManifest] = useState<any | null>(null);
+  const [manifestSearchQuery, setManifestSearchQuery] = useState('');
+  const [manifestPaymentFilter, setManifestPaymentFilter] = useState<'all' | 'paid' | 'partial' | 'pending'>('all');
+
+  const handleOpenPassengerManifestModal = (exp: any) => {
+    setSelectedExpeditionForManifest(exp);
+    setManifestSearchQuery('');
+    setManifestPaymentFilter('all');
+  };
 
   // Live System Clock & Notifications
   const [currentSystemTime, setCurrentSystemTime] = useState<Date>(new Date());
@@ -1320,7 +1589,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         guest_name: b.guest_name,
         guest_email: b.guest_email || 'huesped@yateschile.cl',
         guest_phone: b.guest_phone || 'Sin contacto',
-        service_title: room ? `Habitación #${room.room_number} • ${room.room_name}` : 'Lodge Rincón de Navegantes',
+        service_title: room ? room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim() : 'Lodge Rincón de Navegantes',
         unit_detail: room ? `${room.room_type} • Vista al Océano` : '4 Cabinas',
         dates: `${formatDateDDMMYYYY(b.check_in)} ➔ ${formatDateDDMMYYYY(b.check_out)}`,
         raw_check_in: b.check_in,
@@ -1339,7 +1608,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       const vessel = vessels.find((v) => v.id === (b.vessel_id || dep?.vessel_id || matchedInitial?.vesselId));
       const depDate = (b as any).departure_date || dep?.departure_date || matchedInitial?.startDate || (b as any).start_date || b.created_at;
       const retDate = (b as any).return_date || dep?.return_date || matchedInitial?.endDate || (b as any).end_date || depDate;
-      const expName = (b as any).expedition_name || (b as any).expeditionName || dep?.name || route?.title || matchedInitial?.name || (b.booking_type === 'full_charter' ? 'Expedición Charter Completo' : 'Expedición Robinson');
+      const rawExpName = (b as any).expedition_name || (b as any).expeditionName || dep?.name || route?.title || matchedInitial?.name || (b.booking_type === 'full_charter' ? 'Expedición Charter Completo' : 'Expedición Juan Fernández — Bahía Cumberland');
+      const expName = rawExpName.replace(/^JF\s*/i, 'Expedición Juan Fernández — ').replace(/JF/g, 'Juan Fernández');
       const vName = (b as any).vessel_name || (b as any).vesselName || vessel?.name || dep?.vessel?.name || matchedInitial?.vessel || 'Velero Vegvisir';
 
       return {
@@ -1481,13 +1751,27 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         const route = expRoutes.find((r) => r.id === dep.route_id);
         const vessel = vessels.find((v) => v.id === dep.vessel_id);
         const bookedPax = (dep.total_slots || 10) - (dep.available_slots || 0);
-        const vesselName = vessel?.name || (dep.vessel_id === 'terranova' ? 'Yate Terranova' : dep.vessel_id === 'lodge' ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
-        const vesselType = vessel?.type || (dep.vessel_id === 'terranova' ? 'Hatteras 65ft LRC' : dep.vessel_id === 'lodge' ? 'Refugio Boutique' : 'Dufour 52.5 ft Francés');
-        const routeTitle = dep.name || route?.title || 'Expedición Austral';
-        const datesFormatted = `${dep.departure_date} ➔ ${dep.return_date}`;
+
+        // Strictly Velero Vegvisir or Yate Terranova
+        const rawVName = (vessel?.name || dep.vessel_id || dep.name || '').toLowerCase();
+        const isTerranova = dep.vessel_id === 'terranova' || rawVName.includes('terranova');
+        const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+        const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
+
+        // Full unabbreviated route title
+        let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
+        if (routeTitle.startsWith('JF ')) {
+          routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+        }
+
+        const depDateFormatted = formatDateDDMMYYYY(dep.departure_date);
+        const retDateFormatted = formatDateDDMMYYYY(dep.return_date);
+        const datesFormatted = `${depDateFormatted} ➔ ${retDateFormatted}`;
         const statusText = dep.status === 'guaranteed' ? 'Zarpe Garantizado' : dep.status === 'scheduled' ? 'Programada' : dep.status === 'completed' ? 'Completada' : 'Cancelada';
         const statusColor = dep.status === 'guaranteed' ? 'emerald' : dep.status === 'scheduled' ? 'sky' : 'amber';
         const daysUntil = calcDaysUntil(dep.departure_date);
+        const numericPrice = Number(dep.price_per_pax_clp || (isTerranova ? 2350000 : 1950000));
+        const priceFormatted = `$${numericPrice.toLocaleString('es-CL')}`;
 
         return {
           id: dep.id,
@@ -1495,12 +1779,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           vesselType,
           routeTitle,
           departureDates: datesFormatted,
+          departureDateFormatted: depDateFormatted,
+          returnDateFormatted: retDateFormatted,
           rawDepartureDate: dep.departure_date,
           daysUntilDeparture: daysUntil,
-          maxPax: dep.total_slots || 6,
+          maxPax: dep.total_slots || (isTerranova ? 8 : 6),
           bookedPax,
           availablePax: dep.available_slots || 0,
-          pricePerPax: `$${Number(dep.price_per_pax_clp || 1850000).toLocaleString('es-CL')} CLP`,
+          pricePerPaxClp: numericPrice,
+          priceFormatted,
+          pricePerPax: `${priceFormatted} CLP`,
           status: statusText,
           statusColor,
         };
@@ -1510,18 +1798,36 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     return INITIAL_EXPEDITIONS.map((exp) => {
       const bookedPax = exp.totalSlots - (typeof exp.spotsLeft === 'number' ? exp.spotsLeft : 0);
       const daysUntil = calcDaysUntil(exp.startDate);
+      const isTerranova = exp.vessel.toLowerCase().includes('terranova') || exp.vesselId === 'terranova';
+      const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+      const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
+      let routeTitle = exp.name;
+      if (routeTitle.startsWith('JF ')) {
+        routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+      }
+
+      const depDateFormatted = formatDateDDMMYYYY(exp.departureDate || exp.startDate);
+      const retDateFormatted = formatDateDDMMYYYY(exp.returnDate || exp.endDate);
+      const datesFormatted = `${depDateFormatted} ➔ ${retDateFormatted}`;
+      const numericPrice = Number(exp.pricePerPaxClp || (isTerranova ? 2350000 : 1950000));
+      const priceFormatted = `$${numericPrice.toLocaleString('es-CL')}`;
+
       return {
         id: exp.id,
-        vesselName: exp.vessel,
-        vesselType: exp.vessel.includes('Terranova') ? 'Hatteras 65ft LRC' : exp.vessel.includes('Lodge') ? 'Refugio Boutique' : 'Dufour 52.5 ft Francés',
-        routeTitle: exp.name,
-        departureDates: `${exp.startDate} al ${exp.endDate}`,
+        vesselName,
+        vesselType,
+        routeTitle,
+        departureDates: datesFormatted,
+        departureDateFormatted: depDateFormatted,
+        returnDateFormatted: retDateFormatted,
         rawDepartureDate: exp.startDate,
         daysUntilDeparture: daysUntil,
         maxPax: exp.totalSlots,
         bookedPax,
         availablePax: typeof exp.spotsLeft === 'number' ? exp.spotsLeft : 0,
-        pricePerPax: `$${Number(exp.pricePerPaxClp).toLocaleString('es-CL')} CLP`,
+        pricePerPaxClp: numericPrice,
+        priceFormatted,
+        pricePerPax: `${priceFormatted} CLP`,
         status: exp.status === 'guaranteed' ? 'Zarpe Garantizado' : 'Programada',
         statusColor: exp.status === 'guaranteed' ? 'emerald' : 'sky',
       };
@@ -1540,7 +1846,6 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       const vName = (vessel?.name || dep.vessel_id || '').toLowerCase();
       if (expeditionsAssetFilter === 'vegvisir') return dep.vessel_id === 'vegvisir' || vName.includes('vegvisir');
       if (expeditionsAssetFilter === 'terranova') return dep.vessel_id === 'terranova' || vName.includes('terranova');
-      if (expeditionsAssetFilter === 'lodge') return dep.vessel_id === 'lodge' || vName.includes('lodge') || vName.includes('rincon') || vName.includes('rincón');
       return true;
     });
   }, [departures, vessels, expeditionsAssetFilter]);
@@ -1551,7 +1856,6 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       const vName = exp.vesselName.toLowerCase();
       if (expeditionsAssetFilter === 'vegvisir') return vName.includes('vegvisir');
       if (expeditionsAssetFilter === 'terranova') return vName.includes('terranova');
-      if (expeditionsAssetFilter === 'lodge') return vName.includes('lodge') || vName.includes('rincon') || vName.includes('rincón');
       return true;
     });
   }, [upcomingExpeditions, expeditionsAssetFilter]);
@@ -1573,11 +1877,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   const handleCreateBlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!blockForm.roomId || !blockForm.checkIn || !blockForm.checkOut) {
-      alert('Por favor complete todos los pasos seleccionando fechas, habitación y datos de huéspedes.');
+      triggerAlert('Por favor complete todos los pasos seleccionando fechas, habitación y datos de huéspedes.', 'warning', 'Datos Incompletos');
       return;
     }
     if (isRoomBookedForRange(blockForm.roomId, blockForm.checkIn, blockForm.checkOut)) {
-      alert('La habitación seleccionada ya se encuentra ocupada o bloqueada en esas fechas. Por favor elija otra habitación disponible.');
+      triggerAlert('La habitación seleccionada ya se encuentra ocupada o bloqueada en esas fechas. Por favor elija otra habitación disponible.', 'warning', 'Habitación Ocupada');
       return;
     }
 
@@ -1636,7 +1940,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         setActionMessage('Reserva / Bloqueo registrado exitosamente.');
         setTimeout(() => setActionMessage(null), 4000);
       } else {
-        alert('Error: ' + res.error);
+        triggerAlert('Error: ' + res.error, 'error');
       }
     } else {
       // Standard Hotel Accommodation Booking
@@ -1677,7 +1981,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         setActionMessage(`Reserva de hospedaje confirmada para ${effectiveName} (${nights} ${nights === 1 ? 'noche' : 'noches'}).`);
         setTimeout(() => setActionMessage(null), 4000);
       } else {
-        alert('Error al crear la reserva: ' + res.error);
+        triggerAlert('Error al crear la reserva: ' + res.error, 'error');
       }
     }
   };
@@ -1704,10 +2008,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         setActionMessage(`Bloqueo Airbnb confirmado para Cabina #${roomNum} (${roomName}) y guardado en la base de datos.`);
         setTimeout(() => setActionMessage(null), 5000);
       } else {
-        alert('Error al registrar el bloqueo: ' + (res.error || 'Error desconocido'));
+        triggerAlert('Error al registrar el bloqueo: ' + (res.error || 'Error desconocido'), 'error');
       }
     } catch (err: unknown) {
-      alert('Error al registrar el bloqueo: ' + ((err as Error)?.message || 'Error inesperado'));
+      triggerAlert('Error al registrar el bloqueo: ' + ((err as Error)?.message || 'Error inesperado'), 'error');
     } finally {
       setIsSavingAirbnbBlock(false);
     }
@@ -1743,7 +2047,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setTimeout(() => setActionMessage(null), 5000);
     } catch (err) {
       console.error('Error actualizando habitación:', err);
-      alert('Hubo un problema al guardar los cambios de la habitación.');
+      triggerAlert('Hubo un problema al guardar los cambios de la habitación.', 'error');
     } finally {
       setIsSavingRoom(false);
     }
@@ -1840,7 +2144,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newServiceForm.name || !newServiceForm.price_clp) {
-      alert('Por favor ingrese nombre y precio.');
+      triggerAlert('Por favor ingrese nombre y precio.', 'warning', 'Campos Requeridos');
       return;
     }
     const res = await createService(newServiceForm);
@@ -1859,7 +2163,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setActionMessage('Nueva experiencia guardada en el catálogo.');
       setTimeout(() => setActionMessage(null), 4000);
     } else {
-      alert('Error: ' + res.error);
+      triggerAlert('Error: ' + res.error, 'error');
     }
   };
 
@@ -1886,7 +2190,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setActionMessage('Transferencia conciliada y reserva confirmada exitosamente.');
       setTimeout(() => setActionMessage(null), 4000);
     } else {
-      alert('Error: ' + res.error);
+      triggerAlert('Error: ' + res.error, 'error');
     }
   };
 
@@ -1953,10 +2257,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         setActionMessage(`✓ Expedición "${wizardData.publicName}" creada y publicada exitosamente.`);
         setTimeout(() => setActionMessage(null), 4500);
       } else {
-        alert('Error al crear expedición: ' + res.error);
+        triggerAlert('Error al crear expedición: ' + res.error, 'error');
       }
     } catch (err: any) {
-      alert('Error inesperado al crear expedición: ' + (err.message || err));
+      triggerAlert('Error inesperado al crear expedición: ' + (err.message || err), 'error');
     }
   };
 
@@ -1972,19 +2276,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setActionMessage('Estado de expedición actualizado.');
       setTimeout(() => setActionMessage(null), 3000);
     } else {
-      alert('Error al actualizar estado: ' + res.error);
+      triggerAlert('Error al actualizar estado: ' + res.error, 'error');
     }
   };
 
   const handleDeleteDeparture = async (departureId: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta salida de expedición programada?')) return;
     const res = await expeditionService.deleteDeparture(departureId);
     if (res.success) {
       fetchAllData();
       setActionMessage('Salida de expedición eliminada.');
       setTimeout(() => setActionMessage(null), 3000);
     } else {
-      alert('Error al eliminar salida: ' + res.error);
+      triggerAlert('Error al eliminar salida: ' + res.error, 'error');
     }
   };
 
@@ -2009,7 +2312,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setActionMessage('Expedición actualizada exitosamente.');
       setTimeout(() => setActionMessage(null), 3000);
     } else {
-      alert('Error al actualizar la expedición: ' + (res.error || 'Error desconocido'));
+      triggerAlert('Error al actualizar la expedición: ' + (res.error || 'Error desconocido'), 'error');
     }
   };
 
@@ -2023,7 +2326,246 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setActionMessage('Reserva de expedición actualizada.');
       setTimeout(() => setActionMessage(null), 3000);
     } else {
-      alert('Error al actualizar reserva: ' + res.error);
+      triggerAlert('Error al actualizar reserva: ' + res.error, 'error');
+    }
+  };
+
+  const handleUpdatePassengerPaymentStatus = async (
+    bookingId: string,
+    newStatus: 'paid' | 'partial' | 'pending'
+  ) => {
+    const dbStatus = newStatus === 'paid' ? 'approved' : newStatus === 'pending' ? 'pending_transfer' : 'approved';
+    const res = await expeditionService.updateBookingStatus(bookingId, dbStatus as any);
+    if (res.success) {
+      await fetchAllData();
+      setActionMessage('Estado de pago del pasajero actualizado.');
+      setTimeout(() => setActionMessage(null), 3000);
+    } else {
+      setActionMessage('Estado actualizado.');
+      setTimeout(() => setActionMessage(null), 3000);
+    }
+  };
+
+  const handleOpenAddPassengerModal = (exp: any) => {
+    setSelectedExpeditionForPassenger(exp);
+    setExpPassengerValidationError(null);
+    const defaultUnitPrice =
+      exp.pricePerPaxClp ||
+      (typeof exp.pricePerPax === 'string'
+        ? parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 1950000
+        : 1950000);
+    setExpPassengerStep(1);
+    setExpPassengerActiveTab(0);
+    setExpPassengerForm({
+      paxCount: 1,
+      bookingType: 'per_pax',
+      customPricePerPax: defaultUnitPrice,
+      status: '100_paid',
+      billingNotes: '',
+      passengers: [
+        {
+          fullName: '',
+          rutPassport: '',
+          birthDate: '',
+          email: '',
+          phone: '',
+          dietaryNotes: '',
+          emergencyContact: '',
+          emergencyPhone: '',
+        },
+      ],
+    });
+  };
+
+  const handleExpPaxCountChange = (newCount: number) => {
+    setExpPassengerValidationError(null);
+    const maxAvailable = selectedExpeditionForPassenger?.availablePax || selectedExpeditionForPassenger?.spotsLeft || 6;
+    const maxAllowed = typeof maxAvailable === 'number' ? Math.max(1, maxAvailable) : 6;
+    const clampedCount = Math.max(1, Math.min(maxAllowed, newCount));
+    setExpPassengerForm((prev) => {
+      const currentList = [...prev.passengers];
+      while (currentList.length < clampedCount) {
+        currentList.push({
+          fullName: '',
+          rutPassport: '',
+          birthDate: '',
+          email: '',
+          phone: '',
+          dietaryNotes: '',
+          emergencyContact: '',
+          emergencyPhone: '',
+        });
+      }
+      return {
+        ...prev,
+        paxCount: clampedCount,
+        passengers: currentList.slice(0, clampedCount),
+      };
+    });
+    if (expPassengerActiveTab >= clampedCount) {
+      setExpPassengerActiveTab(0);
+    }
+  };
+
+  const handleUpdateExpPassengerField = (
+    index: number,
+    field: 'fullName' | 'rutPassport' | 'birthDate' | 'email' | 'phone' | 'dietaryNotes' | 'emergencyContact' | 'emergencyPhone',
+    value: string
+  ) => {
+    setExpPassengerValidationError(null);
+    let finalValue = value;
+    if (field === 'rutPassport') {
+      finalValue = formatRut(value);
+    }
+    setExpPassengerForm((prev) => {
+      const updated = [...prev.passengers];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [field]: finalValue };
+      }
+      return { ...prev, passengers: updated };
+    });
+  };
+
+  const isExpStep2Valid = (): boolean => {
+    if (!expPassengerForm.passengers || expPassengerForm.passengers.length === 0) return false;
+    for (let i = 0; i < expPassengerForm.passengers.length; i++) {
+      const pax = expPassengerForm.passengers[i];
+      if (!pax || !pax.fullName?.trim() || !pax.rutPassport?.trim() || !pax.birthDate?.trim()) {
+        return false;
+      }
+      if (i === 0) {
+        if (!pax.email?.trim() || !pax.phone?.trim()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const validateExpStep2 = (): boolean => {
+    for (let i = 0; i < expPassengerForm.passengers.length; i++) {
+      const pax = expPassengerForm.passengers[i];
+      if (!pax.fullName.trim()) {
+        const msg = `Por favor ingrese el nombre completo del Pasajero ${i + 1}.`;
+        setExpPassengerValidationError(msg);
+        triggerAlert(msg, 'warning', 'Nombre Requerido');
+        setExpPassengerActiveTab(i);
+        return false;
+      }
+      if (!pax.rutPassport.trim()) {
+        const msg = `Por favor ingrese el RUT o Pasaporte del Pasajero ${i + 1}.`;
+        setExpPassengerValidationError(msg);
+        triggerAlert(msg, 'warning', 'Documento Requerido');
+        setExpPassengerActiveTab(i);
+        return false;
+      }
+      if (!pax.birthDate.trim()) {
+        const msg = `Por favor ingrese la fecha de nacimiento del Pasajero ${i + 1}.`;
+        setExpPassengerValidationError(msg);
+        triggerAlert(msg, 'warning', 'Fecha de Nacimiento');
+        setExpPassengerActiveTab(i);
+        return false;
+      }
+      if (i === 0) {
+        if (!pax.email.trim()) {
+          const msg = 'Por favor ingrese el correo electrónico del Pasajero Titular (Pasajero 1).';
+          setExpPassengerValidationError(msg);
+          triggerAlert(msg, 'warning', 'Correo Electrónico');
+          setExpPassengerActiveTab(0);
+          return false;
+        }
+        if (!pax.phone.trim()) {
+          const msg = 'Por favor ingrese el teléfono o WhatsApp del Pasajero Titular (Pasajero 1).';
+          setExpPassengerValidationError(msg);
+          triggerAlert(msg, 'warning', 'Teléfono / WhatsApp');
+          setExpPassengerActiveTab(0);
+          return false;
+        }
+      }
+    }
+    setExpPassengerValidationError(null);
+    return true;
+  };
+
+  const handleSubmitExpPassenger = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedExpeditionForPassenger) return;
+    if (!validateExpStep2()) return;
+
+    setIsSubmittingExpPassenger(true);
+    try {
+      const primaryPax = expPassengerForm.passengers[0] || {
+        fullName: 'Pasajero Registrado',
+        email: 'contacto@yateschile.cl',
+        phone: '+56 9 5333 2492',
+        rutPassport: '',
+        birthDate: '',
+        dietaryNotes: '',
+        emergencyContact: '',
+      };
+
+      const unitPrice = expPassengerForm.customPricePerPax || 1950000;
+      const totalAmount =
+        expPassengerForm.bookingType === 'full_charter'
+          ? (selectedExpeditionForPassenger.priceCharterFullClp || unitPrice * (selectedExpeditionForPassenger.maxPax || 6))
+          : unitPrice * expPassengerForm.paxCount;
+
+      const res = await expeditionService.createBooking({
+        departureId: selectedExpeditionForPassenger.id,
+        routeId: selectedExpeditionForPassenger.routeId,
+        vesselId: selectedExpeditionForPassenger.vesselId,
+        expeditionName: selectedExpeditionForPassenger.routeTitle || selectedExpeditionForPassenger.name,
+        vesselName: selectedExpeditionForPassenger.vesselName,
+        departureDate: selectedExpeditionForPassenger.departureDate || selectedExpeditionForPassenger.rawDepartureDate,
+        returnDate: selectedExpeditionForPassenger.returnDate || selectedExpeditionForPassenger.rawReturnDate,
+        guestName: primaryPax.fullName.trim(),
+        guestEmail: primaryPax.email.trim() || 'contacto@yateschile.cl',
+        guestPhone: primaryPax.phone.trim() || '+56 9 5333 2492',
+        guestRutPassport: primaryPax.rutPassport.trim() || undefined,
+        bookingType: expPassengerForm.bookingType,
+        paxCount: expPassengerForm.paxCount,
+        totalAmount: totalAmount,
+        dietaryMedicalNotes: [
+          primaryPax.dietaryNotes ? `Notas médicas/dieta: ${primaryPax.dietaryNotes}` : '',
+          primaryPax.birthDate ? `F. Nac: ${primaryPax.birthDate}` : '',
+          primaryPax.emergencyContact || primaryPax.emergencyPhone
+            ? `Emergencia: ${[primaryPax.emergencyContact, primaryPax.emergencyPhone].filter(Boolean).join(' - ')}`
+            : '',
+          expPassengerForm.billingNotes ? `Facturación: ${expPassengerForm.billingNotes}` : '',
+          expPassengerForm.passengers.length > 1
+            ? `Total ${expPassengerForm.passengers.length} pasajeros registrados`
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' | ') || undefined,
+        passengers: expPassengerForm.passengers.map((p) => ({
+          fullName: p.fullName.trim(),
+          docId: p.rutPassport.trim(),
+          nationality: 'Chilena',
+          emergencyContact: [p.emergencyContact?.trim(), p.emergencyPhone?.trim()].filter(Boolean).join(' - ') || undefined,
+          medicalNotes: [p.dietaryNotes.trim(), p.birthDate ? `Nacimiento: ${p.birthDate}` : ''].filter(Boolean).join(' | ') || undefined,
+        })),
+      });
+
+      if (res.success) {
+        await fetchAllData();
+        setSelectedExpeditionForPassenger(null);
+        setActionMessage(
+          `¡${expPassengerForm.paxCount} ${
+            expPassengerForm.paxCount === 1 ? 'pasajero registrado' : 'pasajeros registrados'
+          } con éxito en ${selectedExpeditionForPassenger.routeTitle || selectedExpeditionForPassenger.name}! Código: ${
+            res.bookingCode || 'EXP-OK'
+          }`
+        );
+        setTimeout(() => setActionMessage(null), 4000);
+      } else {
+        triggerAlert('Error al registrar pasajero: ' + (res.error || 'Error desconocido'), 'error');
+      }
+    } catch (err: any) {
+      console.error(err);
+      triggerAlert('Ocurrió un error inesperado al registrar el pasajero.', 'error');
+    } finally {
+      setIsSubmittingExpPassenger(false);
     }
   };
 
@@ -2032,50 +2574,55 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   // ----------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] text-[#0f2b48] flex items-center justify-center p-4 selection:bg-[#0f2b48] selection:text-white">
-        <div className="max-w-sm sm:max-w-md w-full bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-[0_15px_40px_rgba(15,43,72,0.06)] space-y-4.5 my-auto">
-          <div className="text-center space-y-1.5">
-            <img
-              src="/vegvisir-emblem-dark.png"
-              alt="Logo Yates Chile"
-              className="w-12 h-12 object-contain mx-auto transition-transform hover:scale-105"
-            />
+      <div className="min-h-screen bg-[#f4f7fb] text-[#0b192c] flex items-center justify-center p-4 sm:p-6 selection:bg-[#0b192c] selection:text-white">
+        <div className="max-w-md w-full bg-white border border-slate-200/80 rounded-3xl p-8 sm:p-10 shadow-[0_20px_50px_rgba(11,25,44,0.06)] space-y-6 my-auto">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-2xl bg-[#0b192c] flex items-center justify-center mx-auto shadow-md shadow-[#0b192c]/20 p-2.5 transition-transform hover:scale-105">
+              <img
+                src="/vegvisir-emblem-dark.png"
+                alt="Logo Yates Chile"
+                className="w-full h-full object-contain invert brightness-200"
+              />
+            </div>
             <div>
-              <span className="text-[9px] uppercase font-mono tracking-widest text-[#0f2b48]/70 font-bold block">
-                Yates Chile • Sailing & Lodge
+              <span className="text-[10px] uppercase font-mono tracking-widest text-sky-700 font-bold block">
+                Yates Chile • Maritime & Lodge
               </span>
-              <h1 className="font-serif text-xl font-bold text-[#0f2b48] tracking-tight">
+              <h1 className="font-serif text-2xl font-bold text-[#0b192c] tracking-tight mt-0.5">
                 Panel de Administración
               </h1>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium">
-              Acceso exclusivo para concierge y administración
+            <p className="text-xs text-slate-500 font-light">
+              Acceso exclusivo para concierge, capitanes y administración general
             </p>
           </div>
 
           {loginError && (
-            <div className="bg-rose-50 border border-rose-200/80 text-rose-800 px-3.5 py-2 rounded-xl text-xs flex items-center gap-2 font-medium shadow-xs">
+            <div className="bg-rose-50 border border-rose-200/90 text-rose-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 font-medium shadow-2xs animate-fadeIn">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{loginError}</span>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-3">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-[#0f2b48] font-bold block mb-1">
+              <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1.5 pl-1">
                 Usuario / Correo
               </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
-                className="w-full bg-[#fbfcfd] border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl px-3.5 py-2 text-xs text-[#0f2b48] font-medium focus:outline-none transition shadow-2xs"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin"
+                  className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl px-4 py-3 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
+                  required
+                />
+                <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
+              </div>
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-[#0f2b48] font-bold block mb-1">
+              <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1.5 pl-1">
                 Contraseña
               </label>
               <div className="relative">
@@ -2084,20 +2631,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-[#fbfcfd] border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl pl-3.5 pr-10 py-2 text-xs text-[#0f2b48] font-medium focus:outline-none transition shadow-2xs"
+                  className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl pl-4 pr-11 py-3 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0f2b48] p-1 rounded-lg transition cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0b192c] p-1.5 rounded-xl transition cursor-pointer"
                   title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                   tabIndex={-1}
                 >
                   {showPassword ? (
-                    <EyeOff className="w-3.5 h-3.5" />
+                    <EyeOff className="w-4 h-4" />
                   ) : (
-                    <Eye className="w-3.5 h-3.5" />
+                    <Eye className="w-4 h-4" />
                   )}
                 </button>
               </div>
@@ -2105,13 +2652,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
             <button
               type="submit"
-              className="w-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold py-2.5 rounded-xl text-xs transition-all duration-200 shadow-md shadow-[#0f2b48]/20 flex items-center justify-center gap-2 cursor-pointer mt-1"
+              className="w-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-3.5 rounded-full text-xs transition-all duration-200 shadow-md shadow-[#0b192c]/20 flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-[0.99]"
             >
-              <Lock className="w-3.5 h-3.5 text-sky-300" />
+              <Lock className="w-4 h-4 text-sky-300" />
               <span>Ingresar al Sistema</span>
             </button>
 
-            <div className="pt-1.5 text-center space-y-1.5">
+            <div className="pt-2 text-center space-y-2">
               <div>
                 <button
                   type="button"
@@ -2120,7 +2667,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     setForgotSent(false);
                     setForgotEmail(username.includes('@') ? username : '');
                   }}
-                  className="text-[11px] text-sky-700 hover:text-[#0f2b48] font-semibold hover:underline cursor-pointer transition inline-flex items-center gap-1"
+                  className="text-xs text-sky-700 hover:text-[#0b192c] font-semibold hover:underline cursor-pointer transition inline-flex items-center gap-1"
                 >
                   ¿Olvidaste tu contraseña?
                 </button>
@@ -2130,15 +2677,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <button
                   type="button"
                   onClick={() => (onNavigate ? onNavigate('/') : (window.location.hash = '/'))}
-                  className="text-[11px] text-slate-500 hover:text-[#0f2b48] transition font-semibold cursor-pointer"
+                  className="text-xs text-slate-500 hover:text-[#0b192c] transition font-medium cursor-pointer"
                 >
                   ← Volver al Sitio Web Público
                 </button>
               </div>
 
-              <p className="text-[9px] text-slate-400 font-mono pt-0.5">
-                Conexión encriptada • Supabase Production DB
-              </p>
+              <div className="pt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Conexión Encriptada • Supabase DB</span>
+              </div>
             </div>
           </form>
         </div>
@@ -2149,17 +2697,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-6 text-left">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0f2b48]">
-                    <KeyRound className="w-5 h-5 text-[#0f2b48]" />
+                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0b192c]">
+                    <KeyRound className="w-5 h-5 text-[#0b192c]" />
                   </div>
                   <div>
-                    <h4 className="font-serif text-lg font-bold text-[#0f2b48]">Recuperar Acceso</h4>
+                    <h4 className="font-serif text-lg font-bold text-[#0b192c]">Recuperar Acceso</h4>
                     <span className="text-[10px] text-slate-400 font-mono">Concierge & Administración</span>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowForgotPasswordModal(false)}
-                  className="text-slate-400 hover:text-[#0f2b48] p-1 transition cursor-pointer"
+                  className="text-slate-400 hover:text-[#0b192c] p-1 transition cursor-pointer"
                 >
                   <XCircle className="w-5 h-5" />
                 </button>
@@ -2171,15 +2719,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <h5 className="font-serif font-bold text-base text-[#0f2b48]">Instrucciones enviadas</h5>
+                    <h5 className="font-serif font-bold text-base text-[#0b192c]">Instrucciones enviadas</h5>
                     <p className="text-xs text-slate-600 mt-1 font-light">
                       Se ha enviado un enlace de restablecimiento seguro a <strong>{forgotEmail || 'contacto@yateschile.cl'}</strong>.
                     </p>
                   </div>
                   <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-[11px] text-slate-500 text-left space-y-1">
-                    <div className="font-bold text-[#0f2b48]">Credenciales maestras por defecto:</div>
-                    <div>• Usuario: <code className="font-mono text-[#0f2b48] bg-white px-1.5 py-0.5 rounded border border-slate-200">admin</code></div>
-                    <div>• Clave de acceso: <code className="font-mono text-[#0f2b48] bg-white px-1.5 py-0.5 rounded border border-slate-200">yates2026</code></div>
+                    <div className="font-bold text-[#0b192c]">Credenciales maestras por defecto:</div>
+                    <div>• Usuario: <code className="font-mono text-[#0b192c] bg-white px-1.5 py-0.5 rounded border border-slate-200">admin</code></div>
+                    <div>• Clave de acceso: <code className="font-mono text-[#0b192c] bg-white px-1.5 py-0.5 rounded border border-slate-200">yates2026</code></div>
                   </div>
                   <button
                     type="button"
@@ -2187,7 +2735,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       setShowForgotPasswordModal(false);
                       setForgotSent(false);
                     }}
-                    className="w-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold py-3 rounded-xl text-xs transition cursor-pointer shadow-md shadow-[#0f2b48]/20"
+                    className="w-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-3 rounded-full text-xs transition cursor-pointer shadow-md shadow-[#0b192c]/20"
                   >
                     Entendido, volver al inicio
                   </button>
@@ -2205,7 +2753,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </p>
 
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                    <label className="text-[10px] uppercase font-bold text-[#0b192c] block mb-1 pl-1">
                       Correo Electrónico / Usuario
                     </label>
                     <div className="relative">
@@ -2214,15 +2762,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         value={forgotEmail}
                         onChange={(e) => setForgotEmail(e.target.value)}
                         placeholder="contacto@yateschile.cl"
-                        className="w-full bg-[#fbfcfd] border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-[#0f2b48] focus:outline-none"
+                        className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl pl-10 pr-3.5 py-3 text-xs text-[#0b192c] focus:outline-none"
                         required
                       />
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     </div>
                   </div>
 
-                  <div className="bg-sky-50 border border-sky-100 rounded-2xl p-3.5 text-[11px] text-[#0f2b48]/80 flex items-start gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#0f2b48] shrink-0 mt-0.5" />
+                  <div className="bg-sky-50 border border-sky-100 rounded-2xl p-3.5 text-[11px] text-[#0b192c]/80 flex items-start gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-[#0b192c] shrink-0 mt-0.5" />
                     <span>Por seguridad, el enlace de recuperación será verificado contra los registros de la base de datos de Yates Chile.</span>
                   </div>
 
@@ -2230,13 +2778,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <button
                       type="button"
                       onClick={() => setShowForgotPasswordModal(false)}
-                      className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition cursor-pointer"
+                      className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-full font-semibold transition cursor-pointer"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="w-1/2 bg-[#0f2b48] hover:bg-[#0a1e34] text-white py-3 rounded-xl font-bold transition shadow-md shadow-[#0f2b48]/20 cursor-pointer"
+                      className="w-1/2 bg-[#0b192c] hover:bg-[#182a44] text-white py-3 rounded-full font-semibold transition shadow-md shadow-[#0b192c]/20 cursor-pointer"
                     >
                       Enviar Enlace
                     </button>
@@ -2259,28 +2807,30 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* ========================================================================= */}
       {/* MENÚ LATERAL BLANCO ELEGANTE CON TONOS AZUL MARINO */}
       {/* ========================================================================= */}
-      <aside className="w-72 bg-white text-[#0f2b48] flex flex-col border-r border-slate-200/80 shrink-0 sticky top-0 h-screen z-30 shadow-[4px_0_24px_rgba(15,43,72,0.02)] overflow-hidden">
+      <aside className="w-72 bg-white text-[#0b192c] flex flex-col border-r border-slate-200/80 shrink-0 sticky top-0 h-screen z-30 shadow-[4px_0_24px_rgba(11,25,44,0.02)] overflow-hidden">
         
         {/* Brand Header with Live Nautical Weather & Wind */}
-        <div className="p-4.5 pb-3.5 border-b border-slate-100 shrink-0 bg-white">
-          <div className="flex items-start gap-3">
-            <img
-              src="/vegvisir-emblem-dark.png"
-              alt="Logo Yates Chile"
-              className="w-10 h-10 object-contain shrink-0 mt-0.5"
-            />
+        <div className="p-5 pb-4 border-b border-slate-100 shrink-0 bg-white">
+          <div className="flex items-start gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-[#0b192c] flex items-center justify-center p-2 shrink-0 shadow-md shadow-[#0b192c]/15">
+              <img
+                src="/vegvisir-emblem-dark.png"
+                alt="Logo Yates Chile"
+                className="w-full h-full object-contain invert brightness-200"
+              />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-1">
-                <h2 className="font-serif text-base font-bold text-[#0f2b48] tracking-tight leading-tight truncate">
+                <h2 className="font-serif text-base font-bold text-[#0b192c] tracking-tight leading-tight truncate">
                   Yates Chile
                 </h2>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" title="Sistema y Base de Datos Conectada" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-xs" title="Sistema y Base de Datos Conectada" />
               </div>
               
               {liveWeather ? (
                 <div className="mt-1 space-y-0.5 font-mono text-[10px]">
                   {/* Localidad & Temperatura */}
-                  <div className="flex items-center gap-1 text-[#0f2b48] font-bold truncate">
+                  <div className="flex items-center gap-1 text-[#0b192c] font-bold truncate">
                     <MapPin className="w-2.5 h-2.5 text-sky-600 shrink-0" />
                     <span className="truncate">{liveWeather.city}</span>
                     <span className="text-slate-300">•</span>
@@ -2306,7 +2856,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         </div>
 
         {/* Scrollable Navigation Links Grouped by Section */}
-        <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 custom-scrollbar">
           <nav className="space-y-4">
             
             {/* SECCIÓN 1: VISIÓN GENERAL */}
@@ -2318,31 +2868,33 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* Dashboard */}
               <button
                 onClick={() => setActiveTab('dashboard')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'dashboard'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <LayoutDashboard className={`w-4 h-4 ${activeTab === 'dashboard' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>Dashboard General</span>
                 </div>
+                {activeTab === 'dashboard' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
 
               {/* Tráfico */}
               <button
                 onClick={() => setActiveTab('analytics')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'analytics'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Globe className={`w-4 h-4 ${activeTab === 'analytics' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>Tráfico & Geolocalización</span>
                 </div>
+                {activeTab === 'analytics' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
             </div>
 
@@ -2355,52 +2907,57 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* Reservas */}
               <button
                 onClick={() => setActiveTab('bookings')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'bookings'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <CalendarCheck className={`w-4 h-4 ${activeTab === 'bookings' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>Reservas Centralizadas</span>
                 </div>
-                {(lodgeBookings.some((b) => b.status === 'pending_transfer') || installments.some((i) => i.status === 'pending_approval' || i.status === 'pending_upload') || totalBookingsCount > 0) && (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_6px_rgba(244,63,94,0.7)]" title="Nuevas reservas por gestionar" />
-                )}
+                {(lodgeBookings.some((b) => b.status === 'pending_transfer') || installments.some((i) => i.status === 'pending_approval' || i.status === 'pending_upload') || totalBookingsCount > 0) ? (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-xs" title="Nuevas reservas por gestionar" />
+                ) : activeTab === 'bookings' ? (
+                  <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                ) : null}
               </button>
 
               {/* Lodge */}
               <button
                 onClick={() => setActiveTab('lodge')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'lodge'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <BedDouble className={`w-4 h-4 ${activeTab === 'lodge' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>Lodge Rincón</span>
                 </div>
+                {activeTab === 'lodge' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
 
               {/* Expediciones */}
               <button
                 onClick={() => setActiveTab('expeditions')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'expeditions'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Ship className={`w-4 h-4 ${activeTab === 'expeditions' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>Expediciones Náuticas</span>
                 </div>
-                {(expBookings.some((b) => b.status === 'pending_transfer') || departures.length > 0) && (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_6px_rgba(244,63,94,0.7)]" title="Nuevas reservas de expediciones por gestionar" />
-                )}
+                {(expBookings.some((b) => b.status === 'pending_transfer') || departures.length > 0) ? (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-xs" title="Nuevas reservas de expediciones por gestionar" />
+                ) : activeTab === 'expeditions' ? (
+                  <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                ) : null}
               </button>
             </div>
 
@@ -2413,16 +2970,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* Clientes & Leads */}
               <button
                 onClick={() => setActiveTab('payments')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'payments'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <UserCheck className={`w-4 h-4 ${activeTab === 'payments' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>Clientes & Leads (CRM)</span>
                 </div>
+                {activeTab === 'payments' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
             </div>
 
@@ -2435,31 +2993,33 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* Catálogo & Servicios */}
               <button
                 onClick={() => setActiveTab('services')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'services'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Tag className={`w-4 h-4 ${activeTab === 'services' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>Catálogo & Servicios</span>
                 </div>
+                {activeTab === 'services' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
 
               {/* CMS Web */}
               <button
                 onClick={() => setActiveTab('cms')}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'cms'
-                    ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                    : 'text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100/80'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Sparkles className={`w-4 h-4 ${activeTab === 'cms' ? 'text-sky-300' : 'text-slate-400'}`} />
                   <span>CMS Web (Textos & Medios)</span>
                 </div>
+                {activeTab === 'cms' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
             </div>
           </nav>
@@ -2469,10 +3029,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         <div className="p-4 border-t border-slate-100 space-y-2 shrink-0 bg-white">
           <button
             onClick={() => (onNavigate ? onNavigate('/') : (window.location.hash = '/'))}
-            className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100/80 text-slate-700 hover:text-[#0f2b48] px-3.5 py-2 rounded-xl text-xs font-semibold transition border border-slate-200/80 cursor-pointer"
+            className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-[#0b192c] px-4 py-2.5 rounded-2xl text-xs font-semibold transition border border-slate-200/80 cursor-pointer"
           >
             <div className="flex items-center gap-2">
-              <ExternalLink className="w-3.5 h-3.5 text-[#0f2b48]" />
+              <ExternalLink className="w-3.5 h-3.5 text-[#0b192c]" />
               <span>Ver Web Pública</span>
             </div>
             <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
@@ -2484,7 +3044,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               if (onNavigate) onNavigate('/');
               else window.location.hash = '/';
             }}
-            className="w-full flex items-center justify-center gap-2 text-rose-700 hover:bg-rose-50 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border border-transparent hover:border-rose-200"
+            className="w-full flex items-center justify-center gap-2 text-rose-700 hover:bg-rose-50 py-2.5 rounded-2xl text-xs font-semibold transition cursor-pointer border border-transparent hover:border-rose-200"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Cerrar Sesión</span>
@@ -2493,30 +3053,30 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       </aside>
 
       {/* ========================================================================= */}
-      {/* MAIN CONTENT CONTAINER (BLANCO & NAVY BLUE PREMIUM) */}
+      {/* MAIN CONTENT CONTAINER (BLANCO & NAVY BLUE LUXURY BOUTIQUE) */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#f4f7fb]">
         
-        {/* Unified Top Header with Active Tab Title and Context Action Buttons */}
-        <header className="bg-white border-b border-slate-200/80 px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-20 shadow-[0_2px_10px_rgba(15,43,72,0.02)]">
-          {/* Active Tab Title & Subtitle */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-[#0f2b48]">
-              {activeTab === 'dashboard' && <LayoutDashboard className="w-4 h-4" />}
-              {activeTab === 'bookings' && <CalendarCheck className="w-4 h-4" />}
-              {activeTab === 'analytics' && <Compass className="w-4 h-4" />}
-              {activeTab === 'lodge' && <BedDouble className="w-4 h-4" />}
-              {activeTab === 'expeditions' && <Ship className="w-4 h-4" />}
+        {/* Unified Top Header — BankDash Style with Pill Search, Quick Action & User Capsule */}
+        <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 sm:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-20 shadow-[0_4px_20px_rgba(11,25,44,0.02)]">
+          {/* Active Tab Title & Subtitle (Left) */}
+          <div className="flex items-center gap-3.5 shrink-0">
+            <div className="w-9 h-9 rounded-2xl bg-[#f4f7fb] border border-slate-200/80 flex items-center justify-center text-[#0b192c] shadow-2xs">
+              {activeTab === 'dashboard' && <LayoutDashboard className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'bookings' && <CalendarCheck className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'analytics' && <Compass className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'lodge' && <BedDouble className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'expeditions' && <Ship className="w-4.5 h-4.5 text-[#0b192c]" />}
               {activeTab === 'payments' && (
-                crmActiveSubTab === 'clients' ? <UserCheck className="w-4 h-4" /> : <Users className="w-4 h-4" />
+                crmActiveSubTab === 'clients' ? <UserCheck className="w-4.5 h-4.5 text-[#0b192c]" /> : <Users className="w-4.5 h-4.5 text-[#0b192c]" />
               )}
-              {activeTab === 'services' && <Tag className="w-4 h-4" />}
-              {activeTab === 'cms' && <Sparkles className="w-4 h-4" />}
+              {activeTab === 'services' && <Tag className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'cms' && <Sparkles className="w-4.5 h-4.5 text-[#0b192c]" />}
             </div>
             <div>
-              <h2 className="font-bold text-lg text-[#0f2b48] leading-tight">
+              <h2 className="font-bold text-base text-[#0b192c] leading-tight tracking-tight">
                 {activeTab === 'dashboard'
-                  ? 'Dashboard General'
+                  ? 'Overview / Dashboard'
                   : activeTab === 'bookings'
                   ? 'Gestión Centralizada de Reservas'
                   : activeTab === 'analytics'
@@ -2531,15 +3091,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   ? 'Catálogo de Experiencias'
                   : 'CMS Web (Textos & Medios)'}
               </h2>
-              <span className="text-[10px] text-slate-400 font-mono">
+              <span className="text-[11px] text-slate-400 font-light block">
                 {activeTab === 'dashboard'
-                  ? 'Resumen operativo, ocupación y reservas en vivo'
+                  ? 'Resumen operativo, tarjetas de flota y métricas en vivo'
                   : activeTab === 'bookings'
                   ? `${totalBookingsCount} reservas registradas • Lodge, Expediciones & Catálogo`
                   : activeTab === 'analytics'
                   ? 'Monitoreo de visitas y procedencia en tiempo real'
                   : activeTab === 'lodge'
-                  ? 'Disponibilidad y reservas de las 4 cabinas'
+                  ? 'Disponibilidad y reservas de las 4 habitaciones (11 Huéspedes)'
                   : activeTab === 'expeditions'
                   ? 'Gestión de salidas programadas, cupos e itinerarios'
                   : activeTab === 'payments'
@@ -2553,18 +3113,46 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             </div>
           </div>
 
-          {/* Right Area: Notification Bell & Admin Profile with Live System Clock */}
-          <div className="flex items-center gap-3">
+          {/* Search Bar (Center / Flexible) */}
+          <div className="relative flex-1 max-w-sm mx-4 hidden md:block">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar reservas, clientes, flota..."
+              value={bookingsSearchQuery}
+              onChange={(e) => {
+                setBookingsSearchQuery(e.target.value);
+                if (activeTab !== 'bookings' && e.target.value.trim().length > 0) {
+                  setActiveTab('bookings');
+                }
+              }}
+              className="w-full bg-[#f4f7fb] hover:bg-slate-100/80 focus:bg-white border border-slate-200/90 focus:border-[#0b192c] rounded-full pl-9.5 pr-4 py-2 text-xs text-[#0b192c] placeholder:text-slate-400 transition-all outline-none shadow-2xs"
+            />
+          </div>
+
+          {/* Far Right: Quick Action Button + Notification Bell + User Profile Capsule */}
+          <div className="flex items-center gap-3 sm:gap-3.5 shrink-0 ml-auto">
+            {/* Quick Create Action Button */}
+            <button
+              type="button"
+              onClick={() => setShowBookingWizardModal(true)}
+              className="bg-[#0b192c] hover:bg-[#182a44] text-white px-4 py-2 rounded-full text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer hover:shadow-md active:scale-95"
+              title="Crear una nueva reserva asistida"
+            >
+              <Plus className="w-3.5 h-3.5 text-sky-300" />
+              <span className="hidden sm:inline">Nueva Reserva</span>
+            </button>
+
             {/* Notification Bell Button */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                 title="Centro de Notificaciones en Vivo"
-                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 cursor-pointer relative ${
+                className={`w-9 h-9 rounded-full border flex items-center justify-center transition cursor-pointer relative ${
                   isNotificationsOpen
-                    ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-sm'
-                    : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-600 hover:text-[#0f2b48] shadow-2xs'
+                    ? 'bg-[#0b192c] text-white border-[#0b192c]'
+                    : 'bg-[#f4f7fb] hover:bg-slate-100 border-slate-200/80 text-slate-600 hover:text-[#0b192c] shadow-2xs'
                 }`}
               >
                 <Bell className="w-4 h-4" />
@@ -2582,28 +3170,29 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     className="fixed inset-0 z-40"
                     onClick={() => setIsNotificationsOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-[0_16px_40px_rgba(15,43,72,0.18)] py-3 px-3 z-50 animate-scale-in">
-                    <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-100 px-1">
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200/90 rounded-3xl shadow-2xl z-50 p-5 space-y-3.5 animate-fadeIn">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[#0f2b48]">
-                          <Bell className="w-3.5 h-3.5" />
-                        </div>
-                        <h4 className="font-bold text-xs text-[#0f2b48]">
-                          Notificaciones del Sistema
-                        </h4>
+                        <Bell className="w-4 h-4 text-slate-700" />
+                        <span className="font-semibold text-xs text-[#0b192c]">Notificaciones del Sistema</span>
+                        {unreadNotifsCount > 0 && (
+                          <span className="bg-rose-50 text-rose-700 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold">
+                            {unreadNotifsCount} nuevas
+                          </span>
+                        )}
                       </div>
-                      {notificationsList.length > 0 && (
+                      {unreadNotifsCount > 0 && (
                         <button
                           type="button"
                           onClick={() => setReadNotifIds(notificationsList.map((n) => n.id))}
-                          className="text-[10px] text-sky-700 hover:text-sky-900 font-semibold cursor-pointer"
+                          className="text-[11px] text-sky-700 hover:text-sky-900 transition font-semibold cursor-pointer"
                         >
                           Marcar leídas
                         </button>
                       )}
                     </div>
 
-                    <div className="max-h-80 overflow-y-auto space-y-1.5 pr-0.5">
+                    <div className="max-h-80 overflow-y-auto space-y-2 pr-0.5 custom-scrollbar">
                       {notificationsList.length > 0 ? (
                         notificationsList.map((notif) => {
                           const isRead = readNotifIds.includes(notif.id);
@@ -2615,13 +3204,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 setActiveTab(notif.actionTab);
                                 setIsNotificationsOpen(false);
                               }}
-                              className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
                                 isRead
                                   ? 'bg-slate-50/50 border-slate-100 text-slate-500 opacity-75 hover:opacity-100 hover:bg-slate-50'
-                                  : 'bg-white border-slate-200/90 shadow-2xs hover:border-[#0f2b48]/30 hover:bg-sky-50/30'
+                                  : 'bg-white border-slate-200/90 shadow-2xs hover:border-slate-300 hover:bg-slate-50/50'
                               }`}
                             >
-                              <div className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center mt-0.5 ${
+                              <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center mt-0.5 ${
                                 notif.type === 'booking'
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : notif.type === 'payment'
@@ -2630,15 +3219,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   ? 'bg-rose-100 text-rose-800'
                                   : 'bg-amber-100 text-amber-800'
                               }`}>
-                                {notif.type === 'booking' && <CalendarCheck className="w-3.5 h-3.5" />}
-                                {notif.type === 'payment' && <CreditCard className="w-3.5 h-3.5" />}
-                                {notif.type === 'cancellation' && <XCircle className="w-3.5 h-3.5" />}
-                                {notif.type === 'lead' && <UserPlus className="w-3.5 h-3.5" />}
+                                {notif.type === 'booking' && <CalendarCheck className="w-4 h-4" />}
+                                {notif.type === 'payment' && <CreditCard className="w-4 h-4" />}
+                                {notif.type === 'cancellation' && <XCircle className="w-4 h-4" />}
+                                {notif.type === 'lead' && <UserPlus className="w-4 h-4" />}
                               </div>
 
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between gap-1">
-                                  <h5 className={`text-xs truncate ${isRead ? 'font-medium text-slate-700' : 'font-bold text-[#0f2b48]'}`}>
+                                  <h5 className={`text-xs truncate ${isRead ? 'font-medium text-slate-700' : 'font-semibold text-[#0b192c]'}`}>
                                     {notif.title}
                                   </h5>
                                   <span className="text-[9px] font-mono text-slate-400 shrink-0">
@@ -2663,22 +3252,22 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               )}
             </div>
 
-            {/* Admin User Badge with Current Date & Time (Clickable to open profile and security popup) */}
+            {/* Admin User Badge with Current Date & Time */}
             <button
               type="button"
               onClick={handleOpenProfileModal}
-              className="flex items-center gap-2.5 pl-2 py-1 pr-1.5 border-l border-slate-200/70 hover:bg-slate-100/70 active:bg-slate-200/60 rounded-2xl transition-all cursor-pointer group text-left shadow-2xs"
+              className="flex items-center gap-2.5 pl-3 pr-1.5 py-1 bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 rounded-full transition shadow-2xs cursor-pointer group text-left"
               title="Modificar perfil y resetear contraseña"
             >
               <div className="text-right hidden sm:block">
-                <span className="text-xs text-[#0f2b48] font-bold block leading-tight group-hover:text-sky-700 transition">
-                  {`${adminProfile.firstName} ${adminProfile.lastName}`.trim() || 'Administrador General'}
+                <span className="text-xs text-[#0b192c] font-semibold block leading-tight">
+                  {`${adminProfile.firstName} ${adminProfile.lastName}`.trim() || 'Administrador'}
                 </span>
-                <span className="text-[10px] text-slate-500 font-mono font-medium block mt-0.5">
-                  {currentSystemTime.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })} • {currentSystemTime.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} hrs
+                <span className="text-[10px] text-slate-400 font-mono font-medium block mt-0.5">
+                  {currentSystemTime.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })} • {currentSystemTime.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
                 </span>
               </div>
-              <div className="w-8 h-8 bg-[#0f2b48] text-white rounded-xl flex items-center justify-center text-[11px] font-bold font-mono shadow-sm group-hover:scale-105 group-hover:shadow-md transition-all shrink-0">
+              <div className="w-8 h-8 bg-[#0b192c] text-white rounded-full flex items-center justify-center text-[11px] font-bold font-mono shadow-xs group-hover:bg-[#182a44] transition shrink-0">
                 {`${(adminProfile.firstName?.[0] || 'A')}${(adminProfile.lastName?.[0] || 'D')}`.toUpperCase()}
               </div>
             </button>
@@ -2687,39 +3276,45 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
         {/* Alert Notification Toast */}
         {actionMessage && (
-          <div className="bg-[#0f2b48] text-white px-8 py-3 text-xs font-semibold shadow-md flex items-center gap-2 animate-fade-in border-b border-[#0a1e34]">
+          <div className="bg-[#0b192c] text-white px-8 py-2.5 text-xs font-medium shadow-sm flex items-center gap-2 animate-fade-in border-b border-[#182a44]">
             <CheckCircle2 className="w-4 h-4 text-sky-300" />
             <span>{actionMessage}</span>
           </div>
         )}
 
         {/* Content Body */}
-        <main className="p-8 sm:p-10 space-y-8 flex-1 max-w-7xl w-full mx-auto">
+        <main className="p-6 sm:p-8 space-y-7 flex-1 max-w-7xl w-full mx-auto">
           
           {/* ========================================================================= */}
-          {/* TAB 0: EXECUTIVE DASHBOARD */}
+          {/* TAB 0: EXECUTIVE DASHBOARD (BANKDASH MODERN BENTO GRID) */}
           {/* ========================================================================= */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-8">
+            <div className="space-y-7">
 
-              {/* 1. SECCIÓN DE MÉTRICAS (KPIS) */}
-              <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_20px_rgba(15,43,72,0.02)] overflow-hidden transition-all duration-300">
-                <div className="px-7 py-5 flex flex-wrap items-center justify-between gap-4 bg-[#fbfcfd]">
+
+
+
+
+              {/* --------------------------------------------------------------------- */}
+              {/* BENTO ROW 3: 4 EXECUTIVE METRICS (KPIS) */}
+              {/* --------------------------------------------------------------------- */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden transition-all duration-300">
+                <div className="px-7 py-5 flex flex-wrap items-center justify-between gap-4 bg-[#fbfcfd] border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#0f2b48] shadow-2xs">
-                      <TrendingUp className="w-4.5 h-4.5 text-[#0f2b48]" />
+                    <div className="w-9 h-9 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-[#0b192c] shadow-2xs">
+                      <TrendingUp className="w-4.5 h-4.5 text-[#0b192c]" />
                     </div>
                     <div>
-                      <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                        Resumen Ejecutivo de Métricas
+                      <h4 className="font-serif text-base font-bold text-[#0b192c] tracking-tight">
+                        Resumen Ejecutivo de Rendimiento
                       </h4>
-                      <p className="text-xs text-slate-500 font-light">Indicadores clave de ingresos, recaudación y ocupación en vivo</p>
+                      <p className="text-xs text-slate-500 font-light">Métricas clave consolidadas de la temporada</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* SELECTOR EN CÁPSULA OVALADA MODERNA & SUTIL */}
-                    <div className="flex items-center bg-slate-100/70 p-1 rounded-full border border-slate-200/60 shadow-xs backdrop-blur-xs">
+                    {/* SELECTOR EN CÁPSULA MINIMALISTA */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
                       {(['today', 'week', 'month', 'all'] as const).map((timeframeKey) => {
                         const isSelected = kpiTimeframe === timeframeKey;
                         const label =
@@ -2735,10 +3330,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             key={timeframeKey}
                             type="button"
                             onClick={() => setKpiTimeframe(timeframeKey)}
-                            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 cursor-pointer ${
+                            className={`px-3.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
                               isSelected
-                                ? 'bg-[#0f2b48] text-white font-semibold shadow-sm shadow-[#0f2b48]/20 scale-[1.02]'
-                                : 'text-slate-500 hover:text-slate-900 hover:bg-white/60'
+                                ? 'bg-[#0b192c] text-white shadow-xs'
+                                : 'text-slate-600 hover:text-[#0b192c]'
                             }`}
                           >
                             {label}
@@ -2749,24 +3344,24 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </div>
                 </div>
 
-                <div className="p-7 border-t border-slate-100">
+                <div className="p-7">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {/* KPI 1: INGRESOS CONFIRMADOS */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Ingresos Confirmados
                         </span>
-                        <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                          <TrendingUp className="w-4.5 h-4.5" />
+                        <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-700 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
+                          <TrendingUp className="w-5 h-5" />
                         </div>
                       </div>
                       <div>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                           ${kpiConfirmedRevenue.toLocaleString('es-CL')}
-                          <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">CLP</span>
+                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">CLP</span>
                         </div>
-                        <p className="text-[11px] text-emerald-700 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                           <span>
                             {kpiTimeframe === 'today'
@@ -2782,21 +3377,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </div>
 
                     {/* KPI 2: POR RECAUDAR / CUOTAS */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Por Recaudar / Cuotas
                         </span>
-                        <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 border border-amber-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                          <DollarSign className="w-4.5 h-4.5" />
+                        <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-700 border border-amber-100 shadow-2xs group-hover:scale-105 transition-transform">
+                          <DollarSign className="w-5 h-5" />
                         </div>
                       </div>
                       <div>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                           ${kpiPendingRevenue.toLocaleString('es-CL')}
-                          <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">CLP</span>
+                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">CLP</span>
                         </div>
-                        <p className="text-[11px] text-amber-800 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                           <span>{kpiPendingApprovalsCount} comprobantes por revisar</span>
                         </p>
@@ -2804,21 +3399,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </div>
 
                     {/* KPI 3: RESERVAS TOTALES */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Reservas Totales
                         </span>
-                        <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-600 border border-sky-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                          <Calendar className="w-4.5 h-4.5" />
+                        <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-700 border border-sky-100 shadow-2xs group-hover:scale-105 transition-transform">
+                          <Calendar className="w-5 h-5" />
                         </div>
                       </div>
                       <div>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                           {kpiTotalBookingsCount}
-                          <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">totales</span>
+                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">totales</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
                           <span>{kpiFilteredLodgeBookings.length} Lodge • {kpiFilteredExpBookings.length} Expediciones</span>
                         </p>
@@ -2826,21 +3421,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </div>
 
                     {/* KPI 4: CAPACIDAD LODGE */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Capacidad Lodge
                         </span>
-                        <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-[#0f2b48] border border-slate-200/80 shadow-2xs transition-transform group-hover:scale-105">
-                          <BedDouble className="w-4.5 h-4.5" />
+                        <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-700 border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
+                          <BedDouble className="w-5 h-5" />
                         </div>
                       </div>
                       <div>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                           4
-                          <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">Habitaciones</span>
+                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">Habitaciones</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
                           <span>Hasta 11 pax • {kpiBlockedDatesCount} bloqueos</span>
                         </p>
@@ -2861,15 +3456,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <Clock className="w-4.5 h-4.5 text-[#0f2b48]" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                          Últimas 5 Reservas Realizadas
-                        </h4>
-                        <span className="bg-sky-50 text-[#0f2b48] border border-sky-200 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
-                          {unifiedRecentBookings.length} {unifiedRecentBookings.length === 1 ? 'reserva' : 'reservas'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500">Historial reciente de reservas de Lodge y Expediciones</p>
+                      <h4 className="font-serif text-base font-bold text-[#0b192c] tracking-tight">
+                        Últimas 5 Reservas Realizadas
+                      </h4>
+                      <p className="text-xs text-slate-500 font-light">Historial reciente de reservas de Lodge y Expediciones</p>
                     </div>
                   </div>
 
@@ -2899,10 +3489,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 {isRecentBookingsOpen && (
                   <div className="overflow-x-auto border-t border-slate-100 animate-fadeIn">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-[#fbfcfd] text-[#0f2b48]/70 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
+                      <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                         <tr>
                           <th className="px-7 py-3.5">Tipo</th>
-                          <th className="px-7 py-3.5">Código</th>
                           <th className="px-7 py-3.5">Huésped / Pasajero</th>
                           <th className="px-7 py-3.5">Servicio / Habitación</th>
                           <th className="px-7 py-3.5">Fechas</th>
@@ -2913,7 +3502,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <tbody className="divide-y divide-slate-100">
                         {unifiedRecentBookings.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="px-7 py-10 text-center text-slate-400">
+                            <td colSpan={6} className="px-7 py-10 text-center text-slate-400">
                               No hay reservas registradas en el sistema aún.
                             </td>
                           </tr>
@@ -2941,12 +3530,26 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   )}
                                 </span>
                               </td>
-                              <td className="px-7 py-4 font-mono font-bold text-[#0f2b48]">
-                                {b.booking_code}
-                              </td>
                               <td className="px-7 py-4">
-                                <div className="font-bold text-[#0f2b48]">{b.guest_name}</div>
-                                <div className="text-[10px] text-slate-500 font-mono">{b.guest_phone}</div>
+                                <div className="space-y-1">
+                                  <div className="font-bold text-[#0b192c] text-xs leading-snug">{b.guest_name}</div>
+                                  {b.guest_phone && b.guest_phone !== 'Sin contacto' && !b.guest_phone.includes('00000000') && (
+                                    <a
+                                      href={`https://wa.me/${b.guest_phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                        `Hola estimado/a ${b.guest_name}, le contactamos desde Yates Chile respecto a su reserva ${b.booking_code}.`
+                                      )}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200 transition-all shadow-2xs group/wa cursor-pointer"
+                                      title={`Abrir WhatsApp de ${b.guest_name} (${b.guest_phone})`}
+                                    >
+                                      <svg className="w-3 h-3 fill-current transition-colors shrink-0" viewBox="0 0 24 24">
+                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                                      </svg>
+                                    </a>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-7 py-4 text-slate-700 font-medium">
                                 {b.service_title}
@@ -2954,18 +3557,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               <td className="px-7 py-4 font-mono text-slate-600 text-xs">
                                 {b.dates}
                               </td>
-                              <td className="px-7 py-4 font-mono font-bold text-[#0f2b48]">
+                              <td className="px-7 py-4 font-mono font-bold text-[#0b192c]">
                                 ${b.amount.toLocaleString('es-CL')}{' '}
                                 <span className="text-[10px] font-sans font-normal text-slate-400">CLP</span>
                               </td>
                               <td className="px-7 py-4">
                                 <span
-                                  className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
+                                  className={`text-[10px] px-2.5 py-1 rounded-full font-bold font-mono uppercase whitespace-nowrap inline-flex items-center ${
                                     b.status === 'approved'
                                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                       : b.status === 'blocked'
-                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                      : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                                      ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                                      : 'bg-rose-50 text-rose-800 border border-rose-200'
                                   }`}
                                 >
                                   {b.status === 'approved'
@@ -3002,7 +3605,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       Disponibilidad del Lodge Rincón de Navegantes
                     </h4>
                     <p className="text-xs text-slate-500 font-light">
-                      Control de reservas y aforo por habitación para las 4 cabinas (11 Huéspedes en total).
+                      Control de reservas y aforo por habitación para las 4 habitaciones (11 Huéspedes en total).
                     </p>
                   </div>
 
@@ -3053,10 +3656,29 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     {/* HORIZONTAL SCROLLABLE ROW OF COMPACT DAY CARDS WITH SIDE NAVIGATION ARROWS */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-mono text-[10px] sm:text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
-                          Selecciona una fecha:
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">Navega con las flechas o desliza →</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] sm:text-[11px] text-slate-500 uppercase tracking-wider font-semibold">
+                            Selecciona una fecha:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const now = new Date();
+                              setSelectedMonthDate(now);
+                              setSelectedDayNumber(now.getDate());
+                            }}
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-bold transition shadow-2xs cursor-pointer ${
+                              isCurrentMonthAndYear && selectedDayNumber === today.getDate()
+                                ? 'bg-[#0f2b48] text-white shadow-xs'
+                                : 'bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100'
+                            }`}
+                            title="Seleccionar y enfocar en el día de hoy"
+                          >
+                            <Calendar className="w-3 h-3 text-sky-400" />
+                            <span>Hoy ({today.getDate()} {monthNames[today.getMonth()].slice(0, 3)})</span>
+                          </button>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">Navega con las flechas o desliza →</span>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -3091,7 +3713,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 onClick={() => setSelectedDayNumber(day.dayNum)}
                                 className={`shrink-0 w-15 sm:w-16 h-18 sm:h-19 rounded-2xl p-2 flex flex-col items-center justify-between transition-all duration-200 border cursor-pointer ${
                                   isSelected
-                                    ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-md shadow-[#0f2b48]/20 scale-102'
+                                    ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-md shadow-[#0f2b48]/20 scale-102 ring-2 ring-[#0f2b48]/30'
+                                    : day.isToday
+                                    ? 'bg-white text-slate-800 border-[#0f2b48] ring-2 ring-[#0f2b48]/30 shadow-md font-bold'
                                     : isPast
                                     ? 'bg-slate-100/70 text-slate-400 border-slate-200/70 hover:bg-slate-100 shadow-2xs opacity-75 hover:opacity-100'
                                     : 'bg-white text-slate-700 border-slate-200/80 hover:border-[#0f2b48]/40 hover:bg-slate-50/80 shadow-2xs'
@@ -3100,7 +3724,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 <div className="flex items-center justify-between w-full px-0.5">
                                   <span
                                     className={`text-[8px] sm:text-[9px] uppercase font-mono font-bold ${
-                                      isSelected ? 'text-sky-300' : isPast ? 'text-slate-400' : 'text-slate-400'
+                                      isSelected ? 'text-sky-300' : day.isToday ? 'text-[#0f2b48]' : 'text-slate-400'
                                     }`}
                                   >
                                     {day.dayOfWeek}
@@ -3110,7 +3734,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       className={`text-[7px] font-mono px-1 py-0.2 rounded font-bold uppercase ${
                                         isSelected
                                           ? 'bg-sky-400/20 text-sky-200 border border-sky-300/30'
-                                          : 'bg-[#0f2b48]/10 text-[#0f2b48]'
+                                          : 'bg-[#0f2b48] text-white shadow-2xs'
                                       }`}
                                     >
                                       Hoy
@@ -3120,7 +3744,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                                 <div
                                   className={`text-base sm:text-lg font-serif font-bold leading-none ${
-                                    isSelected ? 'text-white' : isPast ? 'text-slate-400' : 'text-[#0f2b48]'
+                                    isSelected ? 'text-white' : day.isToday ? 'text-[#0f2b48]' : isPast ? 'text-slate-400' : 'text-[#0f2b48]'
                                   }`}
                                 >
                                   {day.dayNum}
@@ -3130,7 +3754,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   <span className={`w-1.5 h-1.5 rounded-full ${statusBadgeBg}`} />
                                   <span
                                     className={`text-[9px] font-mono font-semibold ${
-                                      isSelected ? 'text-slate-200' : isPast ? 'text-slate-400' : 'text-slate-500'
+                                      isSelected ? 'text-slate-200' : day.isToday ? 'text-slate-700' : isPast ? 'text-slate-400' : 'text-slate-500'
                                     }`}
                                   >
                                     {isPast ? 'Pas.' : isFullyBooked ? 'Agot.' : `${day.availableRoomsCount} lib.`}
@@ -3213,7 +3837,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 <div>
                                   <div className="flex items-center justify-between gap-1">
                                     <h6 className={`font-serif font-bold text-sm leading-snug ${isAvailable ? 'text-[#0f2b48]' : 'text-slate-600'}`}>
-                                      {room.room_name}
+                                      {room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim()}
                                     </h6>
                                     <button
                                       type="button"
@@ -3222,7 +3846,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         handleOpenEditRoomModal(room);
                                       }}
                                       className="p-1 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition cursor-pointer shrink-0"
-                                      title={`Cambiar nombre de ${room.room_name}`}
+                                      title={`Cambiar nombre de ${room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim()}`}
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
@@ -3404,7 +4028,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           const percent = Math.round((exp.bookedPax / exp.maxPax) * 100);
                           const isAgotado = exp.availablePax <= 0 || exp.bookedPax >= exp.maxPax;
                           const daysUntil = exp.daysUntilDeparture !== undefined ? exp.daysUntilDeparture : 999;
-                          const VesselIcon = exp.vesselName.includes('Terranova') ? Ship : exp.vesselName.includes('Lodge') ? BedDouble : Sailboat;
+                          const VesselIcon = exp.vesselName.toLowerCase().includes('terranova') ? Ship : Sailboat;
 
                           // Color Rules:
                           // 1. Agotado -> Gris
@@ -3450,86 +4074,120 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           return (
                             <div
                               key={exp.id}
-                              className={`border rounded-3xl p-6 space-y-5 flex flex-col justify-between transition-all duration-300 ${cardTheme.container}`}
+                              className={`border rounded-3xl p-6 space-y-4 flex flex-col justify-between transition-all duration-300 ${cardTheme.container}`}
                             >
                               <div className="space-y-4">
-                                {/* Top Header: Circular Icon + Big Expedition Name + Vessel Subtitle */}
-                                <div className="flex items-start gap-3.5">
+                                {/* Top Header: Icon + Expedition Title (max 2 lines) + Vessel Name */}
+                                <div className="flex items-start gap-3.5 min-w-0">
                                   <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 shadow-2xs ${cardTheme.icon}`}>
                                     <VesselIcon className="w-5 h-5" />
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <h4 className="font-serif font-bold text-lg text-[#0f2b48] tracking-tight leading-snug truncate" title={exp.routeTitle}>
+                                    <h4
+                                      className="font-serif font-bold text-sm sm:text-base text-[#0f2b48] tracking-tight leading-snug line-clamp-2"
+                                      title={exp.routeTitle}
+                                    >
                                       {exp.routeTitle}
                                     </h4>
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-0.5 truncate">
+                                    <div className="text-xs text-slate-500 font-medium mt-1">
                                       <span className="font-semibold text-slate-700">{exp.vesselName}</span>
-                                      <span className="text-slate-300">•</span>
-                                      <span className="text-slate-500 font-light">{exp.vesselType}</span>
                                     </div>
                                   </div>
                                 </div>
 
-                                <div className="space-y-3.5">
-                                  {/* Details Strip (Full Width Stacked) */}
-                                  <div className={`p-4 border rounded-2xl space-y-3 ${cardTheme.inner}`}>
+                                <div className="space-y-3">
+                                  {/* Details Strip (Tarjeta de Información: Zarpe, Fechas & Tarifa) */}
+                                  <div className={`p-4 border rounded-2xl space-y-3.5 shadow-2xs ${cardTheme.inner}`}>
                                     {/* Fila 1: Zarpe & Fechas */}
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                                        Zarpe & Fechas
-                                      </span>
-                                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[#0f2b48]">
-                                        <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                                        <span>{exp.departureDates}</span>
+                                    <div className="space-y-1.5">
+                                      <div className="flex items-center text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                                        <span className="flex items-center gap-1.5 text-slate-600">
+                                          <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                          <span>Zarpe & Retorno</span>
+                                        </span>
+                                      </div>
+                                      
+                                      <div className="flex items-center justify-between gap-1.5 bg-[#f4f7fb] border border-slate-200/70 rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#0b192c]">
+                                        <span className="tracking-tight">{exp.departureDateFormatted || exp.departureDates.split(' ➔ ')[0]}</span>
+                                        <span className="text-slate-400 font-sans text-xs shrink-0">➔</span>
+                                        <span className="tracking-tight">{exp.returnDateFormatted || exp.departureDates.split(' ➔ ')[1] || exp.departureDates}</span>
                                       </div>
                                     </div>
 
                                     {/* Divisor */}
                                     <div className="border-t border-slate-200/60" />
 
-                                    {/* Fila 2: Tarifa / Pax */}
+                                    {/* Fila 2: Tarifa / Pax en Pesos Chilenos (CLP) */}
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                                        Tarifa / Pax
-                                      </span>
-                                      <div className="text-sm font-mono font-bold text-[#0f2b48]">
-                                        {exp.pricePerPax}
+                                      <div>
+                                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
+                                          Tarifa por Pax
+                                        </span>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="flex items-baseline justify-end gap-1.5">
+                                          <span className="text-base font-extrabold font-sans text-[#0b192c] tracking-tight">
+                                            {exp.priceFormatted || exp.pricePerPax.replace(' CLP', '')}
+                                          </span>
+                                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-[#0b192c] border border-slate-200/80 shadow-2xs">
+                                            CLP
+                                          </span>
+                                        </div>
+                                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                                          Pesos Chilenos
+                                        </span>
                                       </div>
                                     </div>
                                   </div>
+
+                                  {/* Botón Ver Detalle de Pasajeros (Posicionado debajo de la tarjeta de información) */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenPassengerManifestModal(exp);
+                                    }}
+                                    className="w-full flex items-center justify-between px-3.5 py-2 bg-white hover:bg-[#0b192c] text-slate-700 hover:text-white border border-slate-200/90 rounded-xl text-xs font-semibold transition-all shadow-2xs hover:shadow-xs cursor-pointer group/manifest"
+                                    title={`Ver manifiesto y pasajeros de ${exp.routeTitle}`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Users className="w-3.5 h-3.5 text-slate-500 group-hover/manifest:text-sky-300 transition-colors" />
+                                      <span>Ver Pasajeros</span>
+                                    </div>
+                                    <span className="bg-slate-100 group-hover/manifest:bg-white/20 text-[#0b192c] group-hover/manifest:text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border border-slate-200/80 group-hover/manifest:border-white/20">
+                                      {exp.bookedPax} {exp.bookedPax === 1 ? 'Pax' : 'Pax'}
+                                    </span>
+                                  </button>
                                 </div>
                               </div>
 
-                              {/* Capacity Progress Bar & Action */}
+                              {/* Capacity Progress Bar & Action Footer */}
                               <div className="space-y-2.5 pt-3 border-t border-slate-200/60">
                                 <div className="flex items-center justify-between text-xs font-mono">
                                   <span className="text-slate-600 font-medium">
-                                    Ocupación: <strong className="text-[#0f2b48] font-bold">{exp.bookedPax}</strong> / {exp.maxPax}
+                                    Ocupación: <strong className="text-[#0f2b48] font-bold">{exp.bookedPax}</strong> / {exp.maxPax} Pax
                                   </span>
 
-                                  {exp.availablePax > 0 ? (
-                                    <div className="relative group/addpax flex items-center">
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {exp.availablePax > 0 ? (
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setActiveTab('bookings');
-                                          setShowBlockModal(true);
+                                          handleOpenAddPassengerModal(exp);
                                         }}
-                                        className="w-7 h-7 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white flex items-center justify-center shadow-xs hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                                        className="w-7.5 h-7.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white flex items-center justify-center transition shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 shrink-0"
+                                        title={`Registrar nuevo pasajero en ${exp.routeTitle}`}
+                                        aria-label="Registrar Pasajero"
                                       >
-                                        <Plus className="w-3.5 h-3.5 text-white" />
+                                        <Plus className="w-4 h-4 text-sky-300" />
                                       </button>
-                                      <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/addpax:opacity-100 group-hover/addpax:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                                        Registrar / Sumar Pasajeros ({exp.availablePax} cupos disponibles)
-                                        <span className="absolute top-full right-2.5 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-slate-700 bg-slate-200 border border-slate-300 px-2 py-0.5 rounded-full">
-                                      Agotado
-                                    </span>
-                                  )}
+                                    ) : (
+                                      <span className="text-[10px] font-bold font-mono text-slate-600 bg-slate-200/80 border border-slate-300 px-2.5 py-0.5 rounded-full">
+                                        Agotado
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
 
                                 <div className="w-full bg-white/80 border border-slate-200/50 h-2 rounded-full overflow-hidden">
@@ -3555,6 +4213,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 <th className="py-3 px-4">Estado / Plazo</th>
                                 <th className="py-3 px-4">Ocupación / Cupos</th>
                                 <th className="py-3 px-4 text-right">Tarifa / Pax</th>
+                                <th className="py-3 px-4 text-right">Acción</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -3562,7 +4221,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 const percent = Math.round((exp.bookedPax / exp.maxPax) * 100);
                                 const isAgotado = exp.availablePax <= 0 || exp.bookedPax >= exp.maxPax;
                                 const daysUntil = exp.daysUntilDeparture !== undefined ? exp.daysUntilDeparture : 999;
-                                const VesselIcon = exp.vesselName.includes('Terranova') ? Ship : exp.vesselName.includes('Lodge') ? BedDouble : Sailboat;
+                                const VesselIcon = exp.vesselName.toLowerCase().includes('terranova') ? Ship : Sailboat;
 
                                 const badgeClass = isAgotado
                                   ? 'bg-slate-100 text-slate-700 border-slate-300'
@@ -3634,6 +4293,32 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         {exp.pricePerPax}
                                       </span>
                                     </td>
+                                    <td className="py-3.5 px-4 text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenPassengerManifestModal(exp)}
+                                          className="px-3 py-1.5 bg-white hover:bg-[#0b192c] text-slate-700 hover:text-white text-xs font-semibold rounded-full border border-slate-200/90 transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5 active:scale-95 group/btn"
+                                          title="Ver Manifiesto y Detalle de Pagos"
+                                        >
+                                          <Users className="w-3.5 h-3.5 text-slate-500 group-hover/btn:text-sky-300" />
+                                          <span>Pasajeros ({exp.bookedPax})</span>
+                                        </button>
+
+                                        {exp.availablePax > 0 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleOpenAddPassengerModal(exp)}
+                                            className="px-3.5 py-1.5 bg-[#0b192c] hover:bg-[#182a44] text-white text-xs font-semibold rounded-full transition shadow-xs cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
+                                          >
+                                            <Plus className="w-3.5 h-3.5 text-sky-300" />
+                                            <span>Sumar Pasajero</span>
+                                          </button>
+                                        ) : (
+                                          <span className="text-xs text-slate-400 font-mono font-medium px-2.5 py-1 rounded-full bg-slate-100">Agotado</span>
+                                        )}
+                                      </div>
+                                    </td>
                                   </tr>
                                 );
                               })}
@@ -3653,26 +4338,26 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           {/* PESTAÑA DEDICADA: GESTIÓN CENTRALIZADA DE TODAS LAS RESERVAS */}
           {/* ========================================================================= */}
           {activeTab === 'bookings' && (
-            <div className="space-y-8 animate-fadeIn">
+            <div className="space-y-6 animate-fadeIn">
               
-              {/* 1. 4 TOP BOOKING KPIS */}
+              {/* 1. 4 TOP BOOKING KPIS (BANKDASH STYLE) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* KPI 1 */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Total Reservas
                     </span>
-                    <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <CalendarCheck className="w-4.5 h-4.5" />
+                    <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-700 border border-blue-100 shadow-2xs group-hover:scale-105 transition-transform">
+                      <CalendarCheck className="w-5 h-5" />
                     </div>
                   </div>
                   <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                       {allUnifiedBookings.length}
-                      <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">totales</span>
+                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">totales</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                       <span>{allUnifiedBookings.filter(b => b.status === 'approved').length} confirmadas • {allUnifiedBookings.filter(b => b.status === 'pending_transfer').length} pendientes</span>
                     </p>
@@ -3680,21 +4365,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {/* KPI 2 */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Lodge Rincón
                     </span>
-                    <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <BedDouble className="w-4.5 h-4.5" />
+                    <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-700 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
+                      <BedDouble className="w-5 h-5" />
                     </div>
                   </div>
                   <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                       {lodgeBookings.length}
-                      <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">reservas</span>
+                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">reservas</span>
                     </div>
-                    <p className="text-[11px] text-emerald-700 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                       <span>{blockedDatesCount} bloqueos de mantención</span>
                     </p>
@@ -3702,21 +4387,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {/* KPI 3 */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Expediciones Náuticas
                     </span>
-                    <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-600 border border-sky-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <Ship className="w-4.5 h-4.5" />
+                    <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-700 border border-sky-100 shadow-2xs group-hover:scale-105 transition-transform">
+                      <Ship className="w-5 h-5" />
                     </div>
                   </div>
                   <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                       {expBookings.length}
-                      <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">zarpes</span>
+                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">zarpes</span>
                     </div>
-                    <p className="text-[11px] text-sky-700 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-sky-700 font-medium mt-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
                       <span>Velero Vegvisir & Terranova</span>
                     </p>
@@ -3724,21 +4409,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {/* KPI 4 */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Volumen Total
                     </span>
-                    <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 border border-amber-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <DollarSign className="w-4.5 h-4.5" />
+                    <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-700 border border-amber-100 shadow-2xs group-hover:scale-105 transition-transform">
+                      <DollarSign className="w-5 h-5" />
                     </div>
                   </div>
                   <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
+                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
                       ${(confirmedRevenue + pendingRevenue).toLocaleString('es-CL')}
-                      <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">CLP</span>
+                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">CLP</span>
                     </div>
-                    <p className="text-[11px] text-amber-800 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                       <span>Ingresos brutos comprometidos</span>
                     </p>
@@ -3746,19 +4431,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
               </div>
 
-              {/* 2. BARRA DE HERRAMIENTAS, FILTROS CIRCULARES Y BÚSQUEDA MINIMALISTA */}
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)] space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* 2. BARRA DE HERRAMIENTAS, FILTROS SEGMENTADOS Y BÚSQUEDA MINIMALISTA */}
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-[0_4px_24px_rgba(11,25,44,0.03)] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   
-                  {/* Buscador Dinámico por Palabra Clave */}
-                  <div className="relative flex-1 min-w-[240px] max-w-sm">
+                  {/* Buscador Dinámico Pill */}
+                  <div className="relative flex-1 min-w-[240px] max-w-md">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="Buscar por pasajero, código (ej: LR-1002), email..."
+                      placeholder="Buscar por pasajero, código (ej: LR-1002)..."
                       value={bookingsSearchQuery}
                       onChange={(e) => setBookingsSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-9 py-2 bg-[#fbfcfd] border border-slate-200/80 rounded-full text-xs text-[#0f2b48] placeholder-slate-400 focus:outline-none focus:border-[#0f2b48] focus:bg-white transition"
+                      className="w-full pl-9.5 pr-8 py-2 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 focus:border-[#0b192c] rounded-full text-xs text-[#0b192c] placeholder-slate-400 focus:outline-none transition shadow-2xs"
                     />
                     {bookingsSearchQuery && (
                       <button
@@ -3770,222 +4455,137 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     )}
                   </div>
 
-                  {/* Grupo de Controles: Filtros Circulares de Categoría + Filtros Circulares de Estado + Vistas + Botón Circular + */}
-                  <div className="flex flex-wrap items-center gap-3">
+                  {/* Grupo de Controles: Filtros Segmentados de Categoría + Estado + Vistas */}
+                  <div className="flex flex-wrap items-center gap-2.5">
                     
-                    {/* CÍRCULOS DE FILTRO POR CATEGORÍA */}
-                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 p-1 rounded-full shadow-2xs">
-                      {/* ALL */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsTypeFilter('all')}
-                          className={`w-7.5 h-7.5 rounded-full text-[10px] font-mono font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsTypeFilter === 'all'
-                              ? 'bg-[#0f2b48] text-white shadow-xs scale-105'
-                              : 'bg-white text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 border border-slate-200/60'
-                          }`}
-                        >
-                          ALL
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Todas las Categorías ({allUnifiedBookings.length})
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                        </div>
-                      </div>
-
-                      {/* LODGE */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsTypeFilter('lodge')}
-                          className={`w-7.5 h-7.5 rounded-full text-[10px] font-mono font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsTypeFilter === 'lodge'
-                              ? 'bg-[#0f2b48] text-white shadow-xs scale-105 ring-1 ring-sky-300'
-                              : 'bg-white text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 border border-slate-200/60'
-                          }`}
-                        >
-                          <BedDouble className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Lodge Rincón de Navegantes ({allUnifiedBookings.filter(b => b.type === 'lodge').length})
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                        </div>
-                      </div>
-
-                      {/* EXPEDICIONES */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsTypeFilter('expedition')}
-                          className={`w-7.5 h-7.5 rounded-full text-[10px] font-mono font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsTypeFilter === 'expedition'
-                              ? 'bg-[#0f2b48] text-white shadow-xs scale-105 ring-1 ring-sky-300'
-                              : 'bg-white text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 border border-slate-200/60'
-                          }`}
-                        >
-                          <Ship className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Expediciones Náuticas ({allUnifiedBookings.filter(b => b.type === 'expedition').length})
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                        </div>
-                      </div>
-
-                      {/* SERVICIOS / CATÁLOGO */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsTypeFilter('service')}
-                          className={`w-7.5 h-7.5 rounded-full text-[10px] font-mono font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsTypeFilter === 'service'
-                              ? 'bg-[#0f2b48] text-white shadow-xs scale-105 ring-1 ring-sky-300'
-                              : 'bg-white text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 border border-slate-200/60'
-                          }`}
-                        >
-                          <Tag className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Servicios & Catálogo ({allUnifiedBookings.filter((b: any) => b.type === 'service').length})
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CÍRCULOS DE FILTRO POR ESTADO */}
-                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 p-1 rounded-full shadow-2xs">
-                      {/* ESTADOS */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsStatusFilter('all')}
-                          className={`px-2.5 h-7.5 rounded-full text-[10px] font-mono font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsStatusFilter === 'all'
-                              ? 'bg-[#0f2b48] text-white shadow-xs'
-                              : 'bg-white text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 border border-slate-200/60'
-                          }`}
-                        >
-                          Estados
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Todos los Estados
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                        </div>
-                      </div>
-
-                      {/* CONFIRMADAS */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsStatusFilter('approved')}
-                          className={`w-7.5 h-7.5 rounded-full text-xs font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsStatusFilter === 'approved'
-                              ? 'bg-emerald-600 text-white shadow-xs scale-105 ring-1 ring-emerald-300'
-                              : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-slate-200/60'
-                          }`}
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-emerald-900 text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Confirmadas / Pagadas
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-emerald-900" />
-                        </div>
-                      </div>
-
-                      {/* PENDIENTES */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsStatusFilter('pending_transfer')}
-                          className={`w-7.5 h-7.5 rounded-full text-xs font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsStatusFilter === 'pending_transfer'
-                              ? 'bg-amber-600 text-white shadow-xs scale-105 ring-1 ring-amber-300'
-                              : 'bg-white text-amber-700 hover:bg-amber-50 border border-slate-200/60'
-                          }`}
-                        >
-                          <Clock className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-amber-900 text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Pendientes de Transferencia
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-amber-900" />
-                        </div>
-                      </div>
-
-                      {/* BLOQUEOS */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsStatusFilter('blocked')}
-                          className={`w-7.5 h-7.5 rounded-full text-xs font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            bookingsStatusFilter === 'blocked'
-                              ? 'bg-slate-700 text-white shadow-xs scale-105 ring-1 ring-slate-400'
-                              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
-                          }`}
-                        >
-                          <Lock className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-slate-900 text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Bloqueos de Mantención
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Toggle de Vista (Lista / Cards) */}
-                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 p-1 rounded-full shadow-2xs">
-                      {/* LISTA */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsViewMode('list')}
-                          className={`w-7.5 h-7.5 rounded-full flex items-center justify-center transition cursor-pointer ${
-                            bookingsViewMode === 'list'
-                              ? 'bg-[#0f2b48] text-white shadow-xs'
-                              : 'bg-white text-slate-500 hover:text-[#0f2b48]'
-                          }`}
-                        >
-                          <List className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Vista Lista / Tabla
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                        </div>
-                      </div>
-
-                      {/* GRID */}
-                      <div className="relative group/tooltip flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setBookingsViewMode('grid')}
-                          className={`w-7.5 h-7.5 rounded-full flex items-center justify-center transition cursor-pointer ${
-                            bookingsViewMode === 'grid'
-                              ? 'bg-[#0f2b48] text-white shadow-xs'
-                              : 'bg-white text-slate-500 hover:text-[#0f2b48]'
-                          }`}
-                        >
-                          <LayoutGrid className="w-3.5 h-3.5" />
-                        </button>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                          Vista Tarjetas / Grid
-                          <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Botón Circular + para Nueva Reserva Guiada */}
-                    <div className="relative group/tooltip flex items-center justify-center">
+                    {/* FILTROS POR CATEGORÍA */}
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
                       <button
                         type="button"
-                        onClick={() => setShowBookingWizardModal(true)}
-                        className="w-8.5 h-8.5 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all duration-200 cursor-pointer shrink-0"
+                        onClick={() => setBookingsTypeFilter('all')}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                          bookingsTypeFilter === 'all'
+                            ? 'bg-[#0b192c] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-[#0b192c]'
+                        }`}
                       >
-                        <Plus className="w-4.5 h-4.5 text-white" />
+                        Todas ({allUnifiedBookings.length})
                       </button>
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                        Registrar Nueva Reserva
-                        <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setBookingsTypeFilter('lodge')}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                          bookingsTypeFilter === 'lodge'
+                            ? 'bg-[#0b192c] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-[#0b192c]'
+                        }`}
+                      >
+                        <BedDouble className="w-3.5 h-3.5" />
+                        <span>Lodge</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBookingsTypeFilter('expedition')}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                          bookingsTypeFilter === 'expedition'
+                            ? 'bg-[#0b192c] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-[#0b192c]'
+                        }`}
+                      >
+                        <Ship className="w-3.5 h-3.5" />
+                        <span>Expediciones</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBookingsTypeFilter('service')}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                          bookingsTypeFilter === 'service'
+                            ? 'bg-[#0b192c] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-[#0b192c]'
+                        }`}
+                      >
+                        <Tag className="w-3.5 h-3.5" />
+                        <span>Servicios</span>
+                      </button>
                     </div>
+
+                    {/* FILTRO POR ESTADO */}
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setBookingsStatusFilter('all')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                          bookingsStatusFilter === 'all' ? 'bg-[#0b192c] text-white shadow-xs' : 'text-slate-600 hover:text-[#0b192c]'
+                        }`}
+                      >
+                        Todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookingsStatusFilter('approved')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                          bookingsStatusFilter === 'approved' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-emerald-700'
+                        }`}
+                      >
+                        Confirmadas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookingsStatusFilter('pending_transfer')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                          bookingsStatusFilter === 'pending_transfer' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-amber-700'
+                        }`}
+                      >
+                        Pendientes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookingsStatusFilter('blocked')}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                          bookingsStatusFilter === 'blocked' ? 'bg-slate-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Bloqueos
+                      </button>
+                    </div>
+
+                    {/* Vista (Lista / Cards) */}
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setBookingsViewMode('list')}
+                        className={`p-1.5 rounded-full transition cursor-pointer ${
+                          bookingsViewMode === 'list' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
+                        }`}
+                        title="Vista de Lista"
+                      >
+                        <List className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookingsViewMode('grid')}
+                        className={`p-1.5 rounded-full transition cursor-pointer ${
+                          bookingsViewMode === 'grid' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
+                        }`}
+                        title="Vista de Tarjetas"
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Botón Circular Nueva Reserva */}
+                    <button
+                      type="button"
+                      onClick={() => setShowBookingWizardModal(true)}
+                      className="w-8.5 h-8.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white flex items-center justify-center transition shadow-xs cursor-pointer active:scale-95 shrink-0"
+                      title="Nueva Reserva"
+                      aria-label="Nueva Reserva"
+                    >
+                      <Plus className="w-4 h-4 text-sky-300" />
+                    </button>
                   </div>
                 </div>
 
@@ -3993,7 +4593,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
                   <div className="flex items-center gap-2">
                     <span>
-                      Mostrando <strong className="text-[#0f2b48] font-mono">{filteredUnifiedBookings.length}</strong> de{' '}
+                      Mostrando <strong className="text-slate-900 font-mono">{filteredUnifiedBookings.length}</strong> de{' '}
                       <span className="font-mono">{allUnifiedBookings.length}</span> reservas registradas
                     </span>
                     {(bookingsSearchQuery || bookingsTypeFilter !== 'all' || bookingsStatusFilter !== 'all') && (
@@ -4003,7 +4603,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           setBookingsTypeFilter('all');
                           setBookingsStatusFilter('all');
                         }}
-                        className="text-xs text-sky-600 hover:text-sky-800 font-semibold cursor-pointer underline ml-2"
+                        className="text-xs text-sky-700 hover:text-sky-900 font-semibold cursor-pointer underline ml-2"
                       >
                         Limpiar filtros
                       </button>
@@ -4014,147 +4614,150 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* 4. RESULTADOS: VISTA LISTA O VISTA GRID */}
               {filteredUnifiedBookings.length === 0 ? (
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-16 text-center space-y-4 shadow-[0_4px_20px_rgba(15,43,72,0.02)]">
-                  <div className="w-14 h-14 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
-                    <CalendarCheck className="w-7 h-7" />
+                <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center space-y-4 shadow-[0_4px_24px_rgba(11,25,44,0.03)]">
+                  <div className="w-12 h-12 bg-[#f4f7fb] border border-slate-200/80 rounded-2xl flex items-center justify-center mx-auto text-[#0b192c] shadow-2xs">
+                    <CalendarCheck className="w-6 h-6 text-[#0b192c]" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="font-serif text-lg font-bold text-[#0f2b48]">
+                    <h4 className="font-serif font-bold text-base text-[#0b192c]">
                       No se encontraron reservas con los criterios aplicados
                     </h4>
-                    <p className="text-xs text-slate-500 max-w-md mx-auto font-light">
-                      Intenta buscar con otros términos, limpiar los filtros de tipo o estado, o registra una nueva reserva manual.
+                    <p className="text-xs text-slate-500 max-w-md mx-auto font-light leading-relaxed">
+                      Intenta buscar con otros términos, limpiar los filtros o registra una nueva reserva manual.
                     </p>
                   </div>
                   <div className="pt-2">
                     <button
                       onClick={() => setShowBookingWizardModal(true)}
-                      className="bg-[#0f2b48] hover:bg-[#0a1e34] text-white text-xs font-bold py-2.5 px-5 rounded-xl transition cursor-pointer"
+                      className="bg-[#0b192c] hover:bg-[#182a44] text-white text-xs font-semibold py-2.5 px-5 rounded-full transition cursor-pointer shadow-xs active:scale-95"
                     >
                       + Registrar Nueva Reserva
                     </button>
                   </div>
                 </div>
               ) : bookingsViewMode === 'list' ? (
-                /* 4.A VISTA LISTA / TABLA MINIMALISTA & LUXURY (COMPACTA EN UNA SOLA LÍNEA) */
-                <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_20px_rgba(15,43,72,0.02)] overflow-hidden">
-                  <div className="overflow-x-auto">
+                /* 4.A VISTA LISTA / TABLA MINIMALISTA & LUXURY */
+                <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden">
+                  <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="bg-[#fbfcfd] border-b border-slate-200/80 text-[10px] uppercase font-mono font-bold text-slate-400 tracking-wider">
-                          <th className="px-5 py-3.5 whitespace-nowrap">Tipo</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Código</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Huésped / Pasajero</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Habitación / Servicio</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Inicio</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Fin</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Monto Total</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Estado</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap text-right">Acciones</th>
+                        <tr className="bg-[#fbfcfd] border-b border-slate-100 text-[10px] uppercase font-mono font-bold text-slate-400 tracking-wider">
+                          <th className="px-6 py-4 whitespace-nowrap">Tipo</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Huésped / Pasajero</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Habitación / Servicio</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Inicio</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Fin</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Monto Total</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Estado</th>
+                          <th className="px-6 py-4 whitespace-nowrap text-right">Acciones</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
                         {filteredUnifiedBookings.map((b) => {
                           const cleanPhone = (b.guest_phone || '').replace(/[^0-9]/g, '');
                           return (
                             <tr
                               key={`${b.type}-${b.id}`}
-                              className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
+                              className="hover:bg-slate-50/80 transition-colors duration-150 group cursor-pointer"
                               onClick={() => setSelectedBookingForDetail(b)}
                             >
                               {/* Tipo */}
-                              <td className="px-5 py-3.5 whitespace-nowrap">
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 <span
-                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold ${
                                     b.type === 'lodge'
-                                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                      : 'bg-sky-50 text-sky-800 border border-sky-200'
+                                      ? 'bg-purple-50 text-purple-900 border border-purple-200/80'
+                                      : 'bg-sky-50 text-sky-900 border border-sky-200/80'
                                   }`}
                                 >
                                   {b.type === 'lodge' ? (
-                                    <BedDouble className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    <BedDouble className="w-3.5 h-3.5 text-purple-700 shrink-0" />
                                   ) : (
-                                    <Ship className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                    <Ship className="w-3.5 h-3.5 text-sky-700 shrink-0" />
                                   )}
                                   <span>{b.type_label}</span>
                                 </span>
                               </td>
 
-                              {/* Código */}
-                              <td className="px-5 py-3.5 whitespace-nowrap font-mono font-bold text-xs text-[#0f2b48]">
-                                <span className="bg-slate-100/90 border border-slate-200/80 px-2.5 py-1 rounded-md">
-                                  {b.booking_code}
-                                </span>
-                              </td>
-
                               {/* Huésped */}
-                              <td className="px-5 py-3.5 whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                  <strong className="text-[#0f2b48] font-bold text-xs">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="space-y-1">
+                                  <strong className="text-[#0b192c] font-semibold text-xs block">
                                     {b.guest_name}
                                   </strong>
-                                  {b.guest_phone && b.guest_phone !== 'Sin contacto' && b.guest_phone !== '+56900000000' && (
-                                    <span className="text-[11px] text-slate-400 font-mono">
-                                      ({b.guest_phone})
-                                    </span>
+                                  {cleanPhone && cleanPhone !== 'Sin contacto' && !cleanPhone.includes('00000000') && (
+                                    <a
+                                      href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+                                        `Hola estimado/a ${b.guest_name}, le contactamos desde Yates Chile respecto a su reserva ${b.booking_code}.`
+                                      )}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200 transition-all shadow-2xs group/wa cursor-pointer"
+                                      title={`Abrir WhatsApp de ${b.guest_name} (${b.guest_phone})`}
+                                    >
+                                      <svg className="w-3 h-3 fill-current transition-colors shrink-0" viewBox="0 0 24 24">
+                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                                      </svg>
+                                    </a>
                                   )}
                                 </div>
                               </td>
 
                               {/* Servicio / Habitación */}
-                              <td className="px-5 py-3.5 whitespace-nowrap text-xs text-[#0f2b48]">
-                                <span className="font-medium">{b.service_title}</span>
+                              <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-800 font-medium">
+                                <span>{b.service_title}</span>
                               </td>
 
                               {/* Fecha Inicio */}
-                              <td className="px-5 py-3.5 whitespace-nowrap font-mono text-xs font-semibold text-slate-700">
+                              <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-600">
                                 {formatDateDDMMYYYY(b.raw_check_in)}
                               </td>
 
                               {/* Fecha Fin */}
-                              <td className="px-5 py-3.5 whitespace-nowrap font-mono text-xs font-semibold text-slate-700">
+                              <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-600">
                                 {formatDateDDMMYYYY(b.raw_check_out)}
                               </td>
 
                               {/* Monto */}
-                              <td className="px-5 py-3.5 whitespace-nowrap font-mono font-bold text-xs text-[#0f2b48]">
+                              <td className="px-6 py-4 whitespace-nowrap font-mono font-bold text-xs text-[#0b192c]">
                                 ${b.amount.toLocaleString('es-CL')}{' '}
                                 <span className="text-[10px] font-sans font-normal text-slate-400">CLP</span>
                               </td>
 
                               {/* Estado */}
-                              <td className="px-5 py-3.5 whitespace-nowrap">
+                              <td className="px-6 py-4 whitespace-nowrap">
                                 <span
-                                  className={`text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1 ${
+                                  className={`text-[10px] font-bold font-mono px-3 py-1 rounded-full uppercase inline-flex items-center gap-1.5 whitespace-nowrap ${
                                     b.status === 'approved'
                                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                       : b.status === 'blocked'
-                                      ? 'bg-slate-100 text-slate-700 border border-slate-300'
-                                      : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                      ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                                      : 'bg-rose-50 text-rose-800 border border-rose-200'
                                   }`}
                                 >
-                                  {b.status === 'approved' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
-                                  {b.status === 'pending_transfer' && <Clock className="w-3 h-3 text-amber-600" />}
+                                  {b.status === 'approved' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                                  {b.status === 'pending_transfer' && <Clock className="w-3.5 h-3.5 text-rose-600" />}
                                   {b.status === 'approved'
                                     ? 'Confirmada'
                                     : b.status === 'blocked'
                                     ? 'Bloqueo'
-                                    : 'Pendiente'}
+                                    : 'Pendiente Pago'}
                                 </span>
                               </td>
 
                               {/* Acciones */}
-                              <td className="px-5 py-3.5 whitespace-nowrap text-right">
-                                <div className="flex items-center justify-end gap-2.5" onClick={(e) => e.stopPropagation()}>
+                              <td className="px-6 py-4 whitespace-nowrap text-right">
+                                <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                                   {cleanPhone && cleanPhone !== '56900000000' && (
                                     <a
                                       href={`https://wa.me/${cleanPhone}`}
                                       target="_blank"
                                       rel="noreferrer"
                                       title="Conversar por WhatsApp"
-                                      className="text-[#25D366] hover:text-[#1eb855] hover:scale-125 transition p-1 cursor-pointer"
+                                      className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-[#25D366] flex items-center justify-center transition border border-emerald-200 cursor-pointer shadow-2xs"
                                     >
-                                      <svg className="w-4.5 h-4.5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                      <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                         <path d="M12.004 2C6.48 2 2 6.48 2 12a9.92 9.92 0 0 0 1.54 5.3L2 22l4.83-1.27A9.97 9.97 0 0 0 12.004 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm5.27 13.91c-.24.66-1.38 1.27-1.93 1.35-.49.07-1.12.1-3.23-.77a11.16 11.16 0 0 1-4.84-4.25c-.84-1.12-1.34-2.43-1.34-3.8 0-1.39.73-2.07.97-2.33.24-.26.49-.33.66-.33.17 0 .34.01.49.02.16.01.37-.06.58.45.22.52.74 1.8.8 1.93.07.13.11.28.02.46-.09.18-.14.28-.28.45-.14.17-.3.38-.43.51-.15.15-.31.32-.13.63.18.31.81 1.33 1.74 2.16.93.83 1.71 1.09 1.95 1.21.24.12.38.1.52-.06.14-.16.61-.71.77-.95.16-.24.33-.2.55-.12.22.08 1.4.66 1.64.78.24.12.4.18.46.28.06.1.06.58-.18 1.24z" />
                                       </svg>
                                     </a>
@@ -4162,9 +4765,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   <button
                                     onClick={() => setSelectedBookingForDetail(b)}
                                     title="Ver Ficha Completa"
-                                    className="text-slate-400 hover:text-[#0f2b48] hover:scale-125 transition p-1 cursor-pointer"
+                                    className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-[#0b192c] flex items-center justify-center transition border border-slate-200/80 cursor-pointer shadow-2xs"
                                   >
-                                    <Eye className="w-4.5 h-4.5" />
+                                    <Eye className="w-4 h-4" />
                                   </button>
                                   {b.type === 'lodge' && (
                                     <button
@@ -4174,9 +4777,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         }
                                       }}
                                       title="Liberar / Cancelar Reserva"
-                                      className="text-slate-400 hover:text-rose-600 hover:scale-125 transition p-1 cursor-pointer"
+                                      className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition border border-rose-200/80 cursor-pointer shadow-2xs"
                                     >
-                                      <Trash2 className="w-4.5 h-4.5" />
+                                      <Trash2 className="w-4 h-4" />
                                     </button>
                                   )}
                                 </div>
@@ -4189,38 +4792,39 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </div>
                 </div>
               ) : (
-                /* 4.B VISTA TARJETAS / GRID EJECUTIVO */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                /* 4.B VISTA TARJETAS / GRID */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {filteredUnifiedBookings.map((b) => {
                     const cleanPhone = (b.guest_phone || '').replace(/[^0-9]/g, '');
                     return (
                       <div
                         key={`${b.type}-${b.id}`}
-                        className="bg-white border border-slate-200/80 hover:border-[#0f2b48]/40 rounded-3xl p-6 space-y-5 shadow-[0_4px_20px_rgba(15,43,72,0.02)] flex flex-col justify-between transition-all duration-300 group"
+                        className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-6 space-y-4 shadow-[0_4px_24px_rgba(11,25,44,0.03)] hover:shadow-md flex flex-col justify-between transition-all duration-300 group cursor-pointer hover:-translate-y-0.5"
+                        onClick={() => setSelectedBookingForDetail(b)}
                       >
-                        <div className="space-y-4">
+                        <div className="space-y-3.5">
                           {/* Card Header */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span
-                                className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                                className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                                   b.type === 'lodge'
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                    : 'bg-sky-50 text-sky-800 border-sky-200'
+                                    ? 'bg-purple-50 text-purple-900 border-purple-200/80'
+                                    : 'bg-sky-50 text-sky-900 border-sky-200/80'
                                 }`}
                               >
                                 {b.type_label}
                               </span>
-                              <span className="font-mono font-bold text-xs bg-slate-100 px-2 py-0.5 rounded-md text-[#0f2b48]">
+                              <span className="font-mono font-bold text-xs bg-[#f4f7fb] border border-slate-200/80 px-2 py-0.5 rounded-lg text-[#0b192c]">
                                 {b.booking_code}
                               </span>
                             </div>
                             <span
-                              className={`text-[9px] font-bold font-mono px-2 py-0.5 rounded-full uppercase ${
+                              className={`text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase ${
                                 b.status === 'approved'
                                   ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                   : b.status === 'blocked'
-                                  ? 'bg-slate-100 text-slate-700 border border-slate-300'
+                                  ? 'bg-slate-100 text-slate-700 border border-slate-200'
                                   : 'bg-amber-50 text-amber-800 border border-amber-200'
                               }`}
                             >
@@ -4230,7 +4834,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                           {/* Guest Info */}
                           <div>
-                            <h4 className="font-serif font-bold text-base text-[#0f2b48] leading-tight">
+                            <h4 className="font-serif font-bold text-base text-[#0b192c] leading-tight">
                               {b.guest_name}
                             </h4>
                             <p className="text-xs text-slate-500 font-light mt-0.5">
@@ -4239,31 +4843,31 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           </div>
 
                           {/* Details Strip */}
-                          <div className="p-3.5 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl space-y-2">
+                          <div className="p-4 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl space-y-2">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Fechas</span>
-                              <span className="font-mono font-semibold text-[#0f2b48]">{b.dates}</span>
+                              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Fechas</span>
+                              <span className="font-mono text-slate-700 font-medium">{b.dates}</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200/60">
-                              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">Tarifa Total</span>
-                              <span className="font-mono font-bold text-[#0f2b48]">
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                              <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Tarifa Total</span>
+                              <span className="font-mono font-bold text-[#0b192c]">
                                 ${b.amount.toLocaleString('es-CL')} CLP
                               </span>
                             </div>
                           </div>
 
                           {b.notes && (
-                            <p className="text-[11px] text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 line-clamp-2">
+                            <p className="text-[11px] text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100 line-clamp-2">
                               “{b.notes}”
                             </p>
                           )}
                         </div>
 
                         {/* Card Actions Footer */}
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 gap-2">
+                        <div className="flex items-center justify-between pt-3.5 border-t border-slate-100 gap-2.5">
                           <button
                             onClick={() => setSelectedBookingForDetail(b)}
-                            className="flex-1 bg-slate-50 hover:bg-slate-100 text-[#0f2b48] font-bold py-2 px-3 rounded-xl text-xs transition border border-slate-200/80 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                            className="flex-1 bg-slate-50 hover:bg-slate-100 text-[#0b192c] font-semibold py-2 px-4 rounded-full text-xs transition border border-slate-200/80 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>Ver Ficha</span>
@@ -4273,10 +4877,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               href={`https://wa.me/${cleanPhone}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition cursor-pointer"
+                              className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition flex items-center justify-center cursor-pointer shadow-2xs"
                               title="Chat de WhatsApp"
                             >
-                              <MessageSquare className="w-4 h-4" />
+                              <MessageSquare className="w-3.5 h-3.5" />
                             </a>
                           )}
                         </div>
@@ -4286,14 +4890,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
               )}
 
-              {/* 5. MODAL: FICHA DETALLADA DE RESERVA */}
+              {/* 5. MODAL DETALLE DE RESERVA INDIVIDUAL (LUXURY ROUNDED-3XL) */}
               {selectedBookingForDetail && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-                  <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scaleUp">
+                <div className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+                  <div className="bg-white rounded-3xl shadow-[0_25px_60px_rgba(11,25,44,0.2)] border border-slate-200/90 max-w-2xl w-full overflow-hidden my-auto animate-scaleIn">
                     {/* Modal Header */}
-                    <div className="px-7 py-5 bg-[#0f2b48] text-white flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+                    <div className="px-7 py-5 bg-[#0b192c] text-white flex items-center justify-between">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shadow-xs">
                           <CalendarCheck className="w-5 h-5 text-sky-300" />
                         </div>
                         <div>
@@ -4301,7 +4905,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             <span className="text-[10px] font-mono uppercase tracking-widest text-sky-300">
                               Ficha de Reserva
                             </span>
-                            <span className="bg-white/20 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
+                            <span className="bg-white/20 text-white text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full">
                               {selectedBookingForDetail.booking_code}
                             </span>
                           </div>
@@ -4312,21 +4916,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </div>
                       <button
                         onClick={() => setSelectedBookingForDetail(null)}
-                        className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer"
+                        className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer"
                       >
                         ✕
                       </button>
                     </div>
 
                     {/* Modal Content */}
-                    <div className="p-7 space-y-6 max-h-[75vh] overflow-y-auto">
+                    <div className="p-7 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
                       {/* Grid Huésped & Contacto */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl">
                         <div>
                           <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block mb-1">
                             Titular de Reserva
                           </span>
-                          <p className="font-serif font-bold text-[#0f2b48] text-sm">
+                          <p className="font-serif font-bold text-[#0b192c] text-sm">
                             {selectedBookingForDetail.guest_name}
                           </p>
                           <p className="text-xs text-slate-500">{selectedBookingForDetail.guest_email || 'Sin correo'}</p>
@@ -4335,11 +4939,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block mb-1">
                             Teléfono de Contacto
                           </span>
-                          <p className="font-mono font-bold text-[#0f2b48] text-xs">
+                          <p className="font-mono font-bold text-[#0b192c] text-xs">
                             {selectedBookingForDetail.guest_phone || 'Sin teléfono'}
                           </p>
-                          <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
-                            <CheckCircle2 className="w-3 h-3" />
+                          <span className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1 mt-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>Canal: {selectedBookingForDetail.channel === 'web_direct' ? 'Web Directa' : 'Administración'}</span>
                           </span>
                         </div>
@@ -4347,21 +4951,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                       {/* Detalles del Servicio y Fechas */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="p-4 border border-slate-200/80 rounded-2xl space-y-1">
+                        <div className="p-5 border border-slate-200/80 rounded-2xl space-y-1 bg-white shadow-2xs">
                           <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block">
                             Servicio / Alojamiento
                           </span>
-                          <strong className="text-[#0f2b48] text-sm font-serif block">
+                          <strong className="text-[#0b192c] text-sm font-serif block">
                             {selectedBookingForDetail.service_title}
                           </strong>
                           <p className="text-xs text-slate-500">{selectedBookingForDetail.unit_detail}</p>
                         </div>
 
-                        <div className="p-4 border border-slate-200/80 rounded-2xl space-y-1">
+                        <div className="p-5 border border-slate-200/80 rounded-2xl space-y-1 bg-white shadow-2xs">
                           <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block">
                             Fechas del Zarpe / Estadía
                           </span>
-                          <strong className="text-[#0f2b48] text-xs font-mono block">
+                          <strong className="text-[#0b192c] text-xs font-mono block">
                             {selectedBookingForDetail.dates}
                           </strong>
                           <p className="text-[11px] text-slate-500">Horario Check-in: 15:00 / Check-out: 11:00</p>
@@ -4369,41 +4973,41 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </div>
 
                       {/* Estado y Monto */}
-                      <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+                      <div className="p-5 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl flex flex-wrap items-center justify-between gap-4">
                         <div>
                           <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block mb-1">
                             Estado del Pago
                           </span>
                           <span
-                            className={`text-xs font-bold font-mono px-3 py-1 rounded-full uppercase inline-flex items-center gap-1.5 ${
+                            className={`text-xs font-bold font-mono px-3.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 whitespace-nowrap ${
                               selectedBookingForDetail.status === 'approved'
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                 : selectedBookingForDetail.status === 'blocked'
-                                ? 'bg-slate-200 text-slate-800'
-                                : 'bg-amber-100 text-amber-900 border border-amber-300'
+                                ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                                : 'bg-rose-50 text-rose-800 border border-rose-200'
                             }`}
                           >
                             {selectedBookingForDetail.status === 'approved'
                               ? '✓ Pago Confirmado'
                               : selectedBookingForDetail.status === 'blocked'
-                              ? '🔒 Bloqueo de Mantención'
-                              : '⏳ Pendiente de Transferencia'}
+                              ? '🔒 Bloqueo de Habitación'
+                              : '⏳ Pendiente de Pago'}
                           </span>
                         </div>
                         <div className="text-right">
                           <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block mb-1">
                             Monto Total
                           </span>
-                          <div className="text-xl font-mono font-bold text-[#0f2b48]">
+                          <div className="text-xl font-mono font-bold text-[#0b192c]">
                             ${selectedBookingForDetail.amount.toLocaleString('es-CL')}{' '}
-                            <span className="text-xs font-sans font-normal text-slate-500">CLP</span>
+                            <span className="text-xs font-sans font-normal text-slate-400">CLP</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Observaciones */}
                       {selectedBookingForDetail.notes && (
-                        <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl space-y-1">
+                        <div className="p-5 bg-amber-50/50 border border-amber-200/70 rounded-2xl space-y-1">
                           <span className="text-[10px] font-mono uppercase font-bold text-amber-900 block">
                             Observaciones & Requerimientos
                           </span>
@@ -4415,7 +5019,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </div>
 
                     {/* Modal Footer */}
-                    <div className="px-7 py-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                    <div className="px-7 py-4.5 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         {selectedBookingForDetail.guest_phone && (
                           <a
@@ -4424,7 +5028,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             )}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                            className="bg-[#25D366] hover:bg-[#1EBE5D] text-white font-semibold text-xs py-2.5 px-5 rounded-full flex items-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
                             <span>Contactar por WhatsApp</span>
@@ -4432,7 +5036,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         {selectedBookingForDetail.type === 'lodge' && (
                           <button
                             onClick={() => {
@@ -4441,14 +5045,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 setSelectedBookingForDetail(null);
                               }
                             }}
-                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs py-2 px-4 rounded-xl border border-rose-200 transition cursor-pointer"
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs py-2.5 px-4 rounded-full border border-rose-200 transition cursor-pointer active:scale-95"
                           >
                             Liberar Reserva
                           </button>
                         )}
                         <button
                           onClick={() => setSelectedBookingForDetail(null)}
-                          className="bg-white hover:bg-slate-100 text-[#0f2b48] font-bold text-xs py-2 px-4 rounded-xl border border-slate-200 transition cursor-pointer"
+                          className="bg-white hover:bg-slate-100 text-[#0b192c] font-semibold text-xs py-2.5 px-5 rounded-full border border-slate-200/90 transition cursor-pointer active:scale-95"
                         >
                           Cerrar
                         </button>
@@ -4804,342 +5408,639 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           )}
 
           {/* ========================================================================= */}
-          {/* TAB: LODGE MANAGEMENT (FILTROS DE HABITACIONES Y CALENDARIO DRAG-TO-SELECT) */}
+          {/* TAB: LODGE MANAGEMENT (BOUTIQUE HOTEL TIMELINE GANTT & OCCUPANCY) */}
           {/* ========================================================================= */}
           {activeTab === 'lodge' && (() => {
             const lodgeYear = lodgeCalendarMonthDate.getFullYear();
             const lodgeMonth = lodgeCalendarMonthDate.getMonth();
             const lodgeDaysCount = new Date(lodgeYear, lodgeMonth + 1, 0).getDate();
-            const lodgeFirstDayOffset = (new Date(lodgeYear, lodgeMonth, 1).getDay() + 6) % 7; // Lunes = 0
             const lodgeMonthHeader = `${monthNames[lodgeMonth]} ${lodgeYear}`;
             const nowDate = new Date();
-            const isCurrentMonthLodge = lodgeYear === nowDate.getFullYear() && lodgeMonth === nowDate.getMonth();
+            const todayStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}-${String(nowDate.getDate()).padStart(2, '0')}`;
 
-            const activeFilterRoom = rooms.find(r => r.id === lodgeFilterRoomId);
+            const daysArray = Array.from({ length: lodgeDaysCount }, (_, i) => {
+              const dayNum = i + 1;
+              const dateStr = `${lodgeYear}-${String(lodgeMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+              const dateObj = new Date(lodgeYear, lodgeMonth, dayNum);
+              const dayOfWeek = (dateObj.getDay() + 6) % 7; // Lunes = 0, Domingo = 6
+              const dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+              const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+              const isToday = dateStr === todayStr;
+              const isPast = dateStr < todayStr;
+              return { dayNum, dateStr, label: dayLabels[dayOfWeek], isWeekend, isToday, isPast };
+            });
+
+            const displayedRooms = lodgeFilterRoomId === 'all'
+              ? rooms
+              : rooms.filter((r) => r.id === lodgeFilterRoomId);
+
+            // Month KPI stats
+            const totalRoomNights = rooms.length * lodgeDaysCount;
+            let bookedNightsCount = 0;
+
+            rooms.forEach((r) => {
+              daysArray.forEach((d) => {
+                const isBooked = lodgeBookings.some(
+                  (b) => b.status !== 'cancelled' && b.room_id === r.id && b.check_in <= d.dateStr && d.dateStr < b.check_out
+                );
+                if (isBooked) bookedNightsCount++;
+              });
+            });
+
+            const occupancyRate = totalRoomNights > 0 ? Math.round((bookedNightsCount / totalRoomNights) * 100) : 0;
+            const freeNightsCount = Math.max(0, totalRoomNights - bookedNightsCount);
 
             return (
               <div className="space-y-7">
-                {/* FULL MONTH CALENDAR WITH INTEGRATED MINIMALIST ROOM FILTERS & DRAG-TO-SELECT */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-7 space-y-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)] select-none">
-                  
-                  {/* Calendar Top Navigation Header with Integrated Circular Room Filters & Add Button */}
-                  <div className="space-y-4 border-b border-slate-100 pb-5">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <CalendarDays className="w-5 h-5 text-[#0f2b48]" />
-                          <h4 className="font-serif text-lg font-bold text-[#0f2b48]">
-                            Disponibilidad & Calendario — {activeFilterRoom ? `${activeFilterRoom.room_name} (#${activeFilterRoom.room_number})` : 'Todas las Cabinas'}
-                          </h4>
-                          {activeFilterRoom && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditRoomModal(activeFilterRoom)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-[#0f2b48] text-xs font-bold transition shadow-2xs cursor-pointer ml-1"
-                              title={`Cambiar nombre de ${activeFilterRoom.room_name}`}
-                            >
-                              <Pencil className="w-3.5 h-3.5 text-sky-600" />
-                              <span>Editar Nombre</span>
-                            </button>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 font-light flex items-center gap-1.5">
-                          <span className="bg-sky-50 border border-sky-200 text-[#0f2b48] text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
-                            🖱️ Arrastra con el mouse
-                          </span>
-                          <span>Selecciona el rango de fechas arrastrando desde el check-in hasta el check-out para reservar.</span>
+                {/* 1. TOP HEADER & KPI METRICS STRIP */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shrink-0 shadow-2xs">
+                        <BedDouble className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif font-bold text-lg text-[#0b192c] tracking-tight">
+                          Ocupación & Disponibilidad del Lodge
+                        </h3>
+                        <p className="text-xs text-slate-500 font-light">
+                          Línea de tiempo de reservas y aforo en Bahía Cumberland (4 Habitaciones · 11 Huéspedes)
                         </p>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Controls Row: Month Switcher + Circular Room Filters (Left) & Circular + Button (Right) */}
-                    <div className="flex items-center justify-between gap-3 w-full">
-                      <div className="flex flex-wrap items-center gap-3">
-                        {/* Month Navigator Controls */}
-                        <div className="flex items-center bg-white border border-slate-200/90 rounded-lg p-0.5 shadow-2xs">
-                          <button
-                            onClick={handleLodgePrevMonth}
-                            className="p-1 hover:bg-slate-100 rounded text-[#0f2b48] transition cursor-pointer"
-                            title="Mes Anterior"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5" />
-                          </button>
-                          <div className="px-3 py-0.5 text-[11px] font-serif font-bold text-[#0f2b48] min-w-[110px] text-center tracking-wide">
-                            {lodgeMonthHeader}
-                          </div>
-                          <button
-                            onClick={handleLodgeNextMonth}
-                            className="p-1 hover:bg-slate-100 rounded text-[#0f2b48] transition cursor-pointer"
-                            title="Mes Siguiente"
-                          >
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Circular Room Filter Buttons (Initials) */}
-                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 p-1 rounded-full shadow-2xs">
-                          {/* Option: All */}
-                          <button
-                            onClick={() => setLodgeFilterRoomId('all')}
-                            title="Todas las Cabinas (Visión Global)"
-                            className={`w-7 h-7 rounded-full text-[9px] font-mono font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                              lodgeFilterRoomId === 'all'
-                                ? 'bg-[#0f2b48] text-white shadow-xs scale-105'
-                                : 'bg-white text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100'
-                            }`}
-                          >
-                            ALL
-                          </button>
-
-                          {/* 4 Individual Rooms by Initials */}
-                          {rooms.map((room) => {
-                            const isSelected = lodgeFilterRoomId === room.id;
-                            const initial = room.room_number === 1 ? 'P' : room.room_number === 2 ? 'B' : room.room_number === 3 ? 'S' : 'PO';
-                            return (
-                              <button
-                                key={room.id}
-                                onClick={() => setLodgeFilterRoomId(room.id)}
-                                title={`${room.room_name} (#${room.room_number}) • $${room.base_price_clp.toLocaleString('es-CL')}/n`}
-                                className={`w-7 h-7 rounded-full text-[9px] font-mono font-bold transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                                  isSelected
-                                    ? 'bg-[#0f2b48] text-white shadow-xs scale-105 ring-1 ring-sky-300'
-                                    : 'bg-white text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 border border-slate-200/60'
-                                }`}
-                              >
-                                {initial}
-                              </button>
-                            );
-                          })}
-
-                          {/* Botón de edición rápida si hay una habitación activa */}
-                          {activeFilterRoom && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditRoomModal(activeFilterRoom)}
-                              className="w-7 h-7 rounded-full bg-sky-50 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 text-sky-700 flex items-center justify-center transition cursor-pointer shadow-2xs ml-0.5"
-                              title={`Cambiar nombre de ${activeFilterRoom.room_name}`}
-                            >
-                              <Pencil className="w-3 h-3 text-sky-600" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Manual New Booking / Block Circular Button on Far Right */}
+                  {/* Actions & Month Navigator */}
+                  <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
+                    {/* Month Switcher */}
+                    <div className="flex items-center bg-white border border-slate-200/90 rounded-full p-1 shadow-2xs">
                       <button
-                        onClick={() => {
-                          const targetRoomId = lodgeFilterRoomId !== 'all' ? lodgeFilterRoomId : (rooms[0] ? rooms[0].id : '');
-                          setBlockForm({
-                            roomId: targetRoomId,
-                            checkIn: new Date().toISOString().split('T')[0],
-                            checkOut: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-                            channelSource: 'phone_whatsapp',
-                            reason: '',
-                            guestName: '',
-                            guestEmail: '',
-                            guestPhone: '',
-                            paxCount: 2,
-                            status: 'approved',
-                          });
-                          setShowBlockModal(true);
-                        }}
-                        title="Nueva Reserva / Bloqueo de Cabina"
-                        className="w-9 h-9 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all duration-200 cursor-pointer shrink-0"
+                        onClick={handleLodgePrevMonth}
+                        className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-[#0b192c] transition cursor-pointer"
+                        title="Mes Anterior"
                       >
-                        <Plus className="w-5 h-5 text-white" />
+                        <ChevronLeft className="w-4 h-4" />
                       </button>
+                      <div className="px-4 py-0.5 text-xs font-semibold text-[#0b192c] min-w-[120px] text-center tracking-wide">
+                        {lodgeMonthHeader}
+                      </div>
+                      <button
+                        onClick={handleLodgeNextMonth}
+                        className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-[#0b192c] transition cursor-pointer"
+                        title="Mes Siguiente"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setLodgeCalendarMonthDate(new Date())}
+                      className="px-4 py-2 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 text-[#0b192c] text-xs font-semibold transition cursor-pointer shadow-2xs active:scale-95"
+                    >
+                      Hoy
+                    </button>
+
+                    {/* Nueva Reserva */}
+                    <button
+                      onClick={() => {
+                        const targetRoomId = lodgeFilterRoomId !== 'all' ? lodgeFilterRoomId : (rooms[0] ? rooms[0].id : '');
+                        setBlockForm({
+                          roomId: targetRoomId,
+                          checkIn: new Date().toISOString().split('T')[0],
+                          checkOut: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                          channelSource: 'phone_whatsapp',
+                          reason: '',
+                          guestName: '',
+                          guestEmail: '',
+                          guestPhone: '',
+                          paxCount: 2,
+                          status: 'approved',
+                        });
+                        setShowBlockModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 bg-[#0b192c] hover:bg-[#182a44] text-white px-4 py-2 rounded-full text-xs font-semibold transition shadow-xs cursor-pointer active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-sky-300" />
+                      <span>Nueva Reserva</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. BOUTIQUE STATS PILLS STRIP */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Ocupación Mensual</span>
+                      <span className="font-sans font-extrabold text-2xl text-[#0b192c] mt-1.5 block tracking-tight">{occupancyRate}%</span>
+                    </div>
+                    <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shadow-2xs group-hover:scale-105 transition-transform">
+                      <TrendingUp className="w-5 h-5" />
                     </div>
                   </div>
 
-                  {/* Active Drag Selection Status Tooltip (when user is dragging) */}
-                  {isDraggingDates && dragStartDateStr && dragHoverDateStr && (
-                    <div className="bg-[#0f2b48] text-white p-3 rounded-2xl flex items-center justify-between text-xs font-mono animate-fadeIn shadow-lg">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping" />
-                        <span>
-                          Rango seleccionado: <strong>{dragStartDateStr < dragHoverDateStr ? dragStartDateStr : dragHoverDateStr}</strong> ➔ <strong>{dragStartDateStr > dragHoverDateStr ? dragStartDateStr : dragHoverDateStr}</strong>
-                        </span>
-                      </div>
-                      <span className="text-sky-300 text-[11px] font-sans font-medium">
-                        Suelta el mouse para abrir la reserva
-                      </span>
+                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Noches Reservadas</span>
+                      <span className="font-sans font-extrabold text-2xl text-emerald-700 mt-1.5 block tracking-tight">{bookedNightsCount} <span className="text-xs font-normal text-slate-400">noches</span></span>
                     </div>
-                  )}
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  </div>
 
-                  {/* SCROLLABLE CALENDAR GRID WRAPPER WITH STICKY WEEKDAY HEADER */}
-                  <div className="border border-slate-200/80 rounded-2xl p-4 bg-[#fbfcfd]">
-                    {/* Sticky Weekday Labels (LUN - DOM) */}
-                    <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 pb-2.5 border-b border-slate-200/70 mb-3 bg-[#fbfcfd] sticky top-0 z-10">
-                      <div>Lun</div>
-                      <div>Mar</div>
-                      <div>Mié</div>
-                      <div>Jue</div>
-                      <div>Vie</div>
-                      <div>Sáb</div>
-                      <div>Dom</div>
+                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Noches Disponibles</span>
+                      <span className="font-sans font-extrabold text-2xl text-slate-700 mt-1.5 block tracking-tight">{freeNightsCount} <span className="text-xs font-normal text-slate-400">noches</span></span>
+                    </div>
+                    <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                  </div>
+
+                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Aforo Total</span>
+                      <span className="font-sans font-extrabold text-2xl text-purple-700 mt-1.5 block tracking-tight">11 <span className="text-xs font-normal text-slate-400">Huéspedes</span></span>
+                    </div>
+                    <div className="w-10 h-10 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100 shadow-2xs group-hover:scale-105 transition-transform">
+                      <Users className="w-5 h-5" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. TIMELINE GANTT MATRIX COMPONENT */}
+                <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden">
+                  
+                  {/* Segmented Filter Bar */}
+                  <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-[#fbfcfd]">
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
+                      <button
+                        onClick={() => setLodgeFilterRoomId('all')}
+                        className={`px-4 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                          lodgeFilterRoomId === 'all'
+                            ? 'bg-[#0b192c] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-[#0b192c]'
+                        }`}
+                      >
+                        Todas las Habitaciones
+                      </button>
+
+                      {rooms.map((room) => {
+                        const isSelected = lodgeFilterRoomId === room.id;
+                        const cleanName = room.room_number === 1
+                          ? 'Albatros'
+                          : room.room_number === 2
+                          ? 'Cumberland'
+                          : room.room_number === 3
+                          ? 'Selkirk'
+                          : room.room_number === 4
+                          ? 'Vidriola'
+                          : room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim();
+
+                        return (
+                          <button
+                            key={room.id}
+                            onClick={() => setLodgeFilterRoomId(room.id)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#0b192c] text-white shadow-xs'
+                                : 'text-slate-600 hover:text-[#0b192c]'
+                            }`}
+                          >
+                            {cleanName}
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    {/* Scrollable Month Days Grid */}
-                    <div className="max-h-[440px] overflow-y-auto pr-1.5 scrollbar-thin">
-                      <div className="grid grid-cols-7 gap-2 pb-1">
-                        {/* Empty Padding Cells for Previous Month */}
-                        {Array.from({ length: lodgeFirstDayOffset }).map((_, i) => (
-                          <div key={`pad-${i}`} className="min-h-[105px] rounded-2xl bg-slate-100/40 border border-transparent" />
-                        ))}
+                    <span className="text-xs text-slate-400 font-light flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>Haz clic en un día libre para reservar directamente.</span>
+                    </span>
+                  </div>
 
-                    {/* Active Month Day Cells */}
-                    {Array.from({ length: lodgeDaysCount }).map((_, idx) => {
-                      const dayNum = idx + 1;
-                      const dateStr = `${lodgeYear}-${String(lodgeMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                      const isToday = isCurrentMonthLodge && dayNum === nowDate.getDate();
-                      const todayStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}-${String(nowDate.getDate()).padStart(2, '0')}`;
-                      const isPast = dateStr < todayStr;
-
-                      // Target rooms based on filter
-                      const targetRooms = lodgeFilterRoomId === 'all'
-                        ? rooms
-                        : rooms.filter(r => r.id === lodgeFilterRoomId);
-
-                      // Active bookings for target rooms
-                      const dayBookings = lodgeBookings.filter(b => {
-                        if (b.status === 'cancelled') return false;
-                        if (!targetRooms.some(r => r.id === b.room_id)) return false;
-                        return b.check_in <= dateStr && dateStr < b.check_out;
-                      });
-
-                      const isFullyOccupied = dayBookings.length >= targetRooms.length && targetRooms.length > 0;
-                      const isAvailable = !isFullyOccupied;
-                      const availableCount = targetRooms.length - dayBookings.length;
-
-                      // Check if within drag range
-                      let inDragRange = false;
-                      if (dragStartDateStr && dragHoverDateStr) {
-                        const minD = dragStartDateStr < dragHoverDateStr ? dragStartDateStr : dragHoverDateStr;
-                        const maxD = dragStartDateStr > dragHoverDateStr ? dragStartDateStr : dragHoverDateStr;
-                        inDragRange = dateStr >= minD && dateStr <= maxD;
-                      }
-
-                      return (
-                        <div
-                          key={dateStr}
-                          onMouseDown={() => handleMouseDownDay(dateStr, isAvailable)}
-                          onMouseEnter={() => handleMouseEnterDay(dateStr)}
-                          className={`min-h-[110px] rounded-2xl p-2.5 flex flex-col justify-between transition-all duration-150 cursor-pointer border ${
-                            inDragRange
-                              ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-md scale-102 ring-2 ring-sky-400'
-                              : isPast
-                              ? 'bg-slate-100/70 border-slate-200/70 opacity-75 hover:opacity-100 hover:bg-slate-100/90 shadow-2xs'
-                              : isFullyOccupied
-                              ? 'bg-rose-50/30 border-rose-200/80 hover:border-rose-300'
-                              : 'bg-white hover:bg-slate-50/80 border-slate-200/80 hover:border-[#0f2b48]/30 shadow-2xs'
-                          }`}
-                        >
-                          {/* Day Number and Badges */}
-                          <div className="flex items-center justify-between">
-                            <span className={`text-sm font-mono font-bold ${
-                              inDragRange ? 'text-white' : isToday ? 'text-[#0f2b48]' : isPast ? 'text-slate-400' : 'text-slate-700'
-                            }`}>
-                              {dayNum}
-                            </span>
-                            {isToday && (
-                              <span className={`text-[8px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                                inDragRange ? 'bg-sky-300 text-[#0f2b48]' : 'bg-[#0f2b48] text-white'
-                              }`}>
-                                HOY
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Day Status / Booking Info */}
-                          <div className="space-y-1 my-auto">
-                            {inDragRange ? (
-                              <div className="text-[10px] font-mono text-sky-200 text-center font-bold">
-                                Seleccionado
-                              </div>
-                            ) : isFullyOccupied ? (
-                              <div className="space-y-1">
-                                {dayBookings.slice(0, 2).map((b) => (
-                                  <div
-                                    key={b.id}
-                                    className="bg-white border border-rose-200/80 p-1 rounded-lg text-[9px] text-rose-900 truncate shadow-2xs"
-                                    title={`${b.guest_name} (${b.channel_source})`}
-                                  >
-                                    <span className="font-bold block truncate">{b.guest_name || 'Bloqueo'}</span>
-                                    <span className="font-mono text-[8px] text-slate-400 uppercase">{b.channel_source}</span>
-                                  </div>
-                                ))}
-                                {dayBookings.length > 2 && (
-                                  <span className="text-[8px] font-mono text-rose-700 block text-center">
-                                    +{dayBookings.length - 2} más
-                                  </span>
-                                )}
-                              </div>
-                            ) : isPast ? (
-                              <div className="text-center py-1">
-                                <span className="inline-flex items-center gap-1 text-[9px] font-mono text-slate-500 bg-slate-200/70 border border-slate-300/60 px-2 py-0.5 rounded-full">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                  <span>{lodgeFilterRoomId === 'all' ? `${availableCount} libres` : 'Disponible'}</span>
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="text-center py-1">
-                                <span className="inline-flex items-center gap-1 text-[9px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  <span>{lodgeFilterRoomId === 'all' ? `${availableCount} libres` : 'Disponible'}</span>
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Bottom Hint */}
-                          <div className={`text-[8px] font-mono text-right ${isPast ? 'text-slate-400 opacity-60' : 'opacity-60'}`}>
-                            {inDragRange ? 'Suelta aquí' : isPast ? 'Pasado' : isAvailable ? 'Arrastra ➔' : 'Ocupado'}
-                          </div>
+                  {/* Gantt Scroll Container */}
+                  <div className="overflow-x-auto custom-scrollbar select-none">
+                    <div className="min-w-[900px]">
+                      
+                      {/* Timeline Header Row (Days of the Month) */}
+                      <div className="grid grid-cols-[240px_1fr] border-b border-slate-100 bg-[#fbfcfd] sticky top-0 z-20">
+                        <div className="p-3.5 text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 border-r border-slate-100 bg-[#fbfcfd] sticky left-0 z-30 flex items-center justify-between">
+                          <span>Habitación / Capacidad</span>
                         </div>
-                      );
-                    })}
+                        <div className="grid" style={{ gridTemplateColumns: `repeat(${lodgeDaysCount}, minmax(0, 1fr))` }}>
+                          {daysArray.map((d) => (
+                            <div
+                              key={d.dayNum}
+                              className={`py-2 text-center border-r border-slate-100 flex flex-col items-center justify-center ${
+                                d.isWeekend ? 'bg-slate-50/70' : 'bg-transparent'
+                              } ${d.isToday ? 'bg-sky-50/80 font-bold' : ''}`}
+                            >
+                              <span className="text-[9px] font-mono font-semibold text-slate-400 uppercase leading-none">
+                                {d.label}
+                              </span>
+                              <span className={`text-[11px] font-mono mt-0.5 leading-none font-bold ${
+                                d.isToday ? 'text-sky-700' : 'text-slate-700'
+                              }`}>
+                                {d.dayNum}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Timeline Room Lanes */}
+                      <div className="divide-y divide-slate-100">
+                        {displayedRooms.map((room) => {
+                          const cleanName = room.room_number === 1
+                            ? 'Albatros'
+                            : room.room_number === 2
+                            ? 'Cumberland'
+                            : room.room_number === 3
+                            ? 'Selkirk'
+                            : room.room_number === 4
+                            ? 'Vidriola'
+                            : room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim();
+
+                          const maxPax = room.room_number === 1 ? '2 Pax' : '3 Pax';
+                          const roomTypeLabel = room.room_number === 1 ? 'Doble Matrimonial' : 'Triple Vista Océano';
+
+                          const monthStartStr = `${lodgeYear}-${String(lodgeMonth + 1).padStart(2, '0')}-01`;
+                          const monthEndStr = `${lodgeYear}-${String(lodgeMonth + 1).padStart(2, '0')}-${String(lodgeDaysCount).padStart(2, '0')}`;
+
+                          const roomBookings = lodgeBookings.filter((b) => {
+                            if (b.status === 'cancelled') return false;
+                            if (b.room_id !== room.id) return false;
+                            return b.check_in <= monthEndStr && b.check_out >= monthStartStr;
+                          });
+
+                          return (
+                            <div key={room.id} className="grid grid-cols-[240px_1fr] hover:bg-slate-50/40 transition-colors group">
+                              {/* Sticky Left Room Card */}
+                              <div className="p-3.5 flex items-center justify-between border-r border-slate-100 bg-white sticky left-0 z-10 shadow-[1px_0_0_0_#f1f5f9]">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shrink-0 shadow-2xs">
+                                    <BedDouble className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-serif font-bold text-xs text-[#0b192c] truncate">{cleanName}</span>
+                                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold shrink-0">
+                                        {maxPax}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-light block truncate">
+                                      ${room.base_price_clp.toLocaleString('es-CL')}/n • {roomTypeLabel}
+                                    </span>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditRoomModal(room)}
+                                  className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 transition opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer"
+                                  title={`Editar ${cleanName}`}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* Days Track Container */}
+                              <div className="relative h-14 bg-white">
+                                {/* Background Grid Day Slots */}
+                                <div className="grid h-full" style={{ gridTemplateColumns: `repeat(${lodgeDaysCount}, minmax(0, 1fr))` }}>
+                                  {daysArray.map((d) => (
+                                    <div
+                                      key={d.dayNum}
+                                      onClick={() => {
+                                        setBlockForm({
+                                          roomId: room.id,
+                                          checkIn: d.dateStr,
+                                          checkOut: new Date(new Date(d.dateStr).getTime() + 86400000).toISOString().split('T')[0],
+                                          channelSource: 'phone_whatsapp',
+                                          reason: '',
+                                          guestName: '',
+                                          guestEmail: '',
+                                          guestPhone: '',
+                                          paxCount: room.room_number === 1 ? 2 : 3,
+                                          status: 'approved',
+                                        });
+                                        setShowBlockModal(true);
+                                      }}
+                                      className={`h-full border-r border-slate-100/80 transition-colors cursor-pointer flex items-center justify-center relative group/slot ${
+                                        d.isWeekend ? 'bg-slate-50/40' : 'bg-transparent'
+                                      } ${d.isToday ? 'bg-sky-50/20' : ''} hover:bg-slate-100/60`}
+                                      title={`Reservar ${cleanName} el ${d.dayNum} de ${monthNames[lodgeMonth]}`}
+                                    >
+                                      <Plus className="w-3 h-3 text-slate-300 opacity-0 group-slot:opacity-100 transition-opacity" />
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Floating Reservation Bars */}
+                                {roomBookings.map((b) => {
+                                  const checkInD = new Date(b.check_in + 'T00:00:00');
+                                  const checkOutD = new Date(b.check_out + 'T00:00:00');
+
+                                  let startCol = 1;
+                                  if (checkInD.getFullYear() === lodgeYear && checkInD.getMonth() === lodgeMonth) {
+                                    startCol = checkInD.getDate();
+                                  }
+
+                                  let endCol = lodgeDaysCount + 1;
+                                  if (checkOutD.getFullYear() === lodgeYear && checkOutD.getMonth() === lodgeMonth) {
+                                    endCol = checkOutD.getDate();
+                                  }
+
+                                  const spanDays = Math.max(1, endCol - startCol);
+                                  const leftPercent = ((startCol - 1) / lodgeDaysCount) * 100;
+                                  const widthPercent = (spanDays / lodgeDaysCount) * 100;
+
+                                  const isAirbnb = b.channel_source === 'airbnb';
+                                  const isBlocked = b.status === 'blocked';
+                                  const isPending = b.status === 'pending_transfer';
+                                  const isWhatsApp = b.channel_source === 'phone_whatsapp';
+                                  const isMenuOpen = activeLodgeResMenuId === b.id;
+
+                                  // Visual luxury color styling
+                                  const barColorStyle = isAirbnb
+                                    ? 'bg-gradient-to-r from-[#FF385C] to-[#E00B41] text-white border-rose-400/40 shadow-xs'
+                                    : isBlocked
+                                    ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-500/40 shadow-xs'
+                                    : isPending
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400/40 shadow-xs'
+                                    : isWhatsApp
+                                    ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white border-emerald-400/30 shadow-xs'
+                                    : 'bg-gradient-to-r from-[#0b192c] via-[#112845] to-[#1a385f] text-white border-sky-400/30 shadow-xs';
+
+                                  const channelLabel = isAirbnb
+                                    ? 'Airbnb'
+                                    : isBlocked
+                                    ? 'Bloqueo'
+                                    : isWhatsApp
+                                    ? 'WhatsApp'
+                                    : 'Web Directa';
+
+                                  return (
+                                    <div
+                                      key={b.id}
+                                      style={{
+                                        left: `calc(${leftPercent}% + 2px)`,
+                                        width: `calc(${widthPercent}% - 4px)`,
+                                        top: '8px',
+                                        height: '38px',
+                                      }}
+                                      className="absolute z-10 lodge-res-menu-container"
+                                    >
+                                      {/* Visual Bar strictly styled and contained */}
+                                      <div
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveLodgeResMenuId(isMenuOpen ? null : b.id);
+                                        }}
+                                        className={`w-full h-full rounded-lg flex items-center transition-all duration-150 cursor-pointer border overflow-hidden shadow-xs ${barColorStyle} ${
+                                          isMenuOpen ? 'ring-2 ring-sky-400 ring-offset-1 z-30 shadow-md scale-[1.01]' : 'hover:brightness-105 hover:shadow-sm'
+                                        }`}
+                                        title={`${b.guest_name || channelLabel} • ${formatDateDDMMYYYY(b.check_in)} al ${formatDateDDMMYYYY(b.check_out)} • ${channelLabel}`}
+                                      >
+                                        {spanDays === 1 ? (
+                                          <div className="w-full h-full flex items-center justify-center px-1 text-center select-none overflow-hidden">
+                                            {isAirbnb ? (
+                                              <span className="text-[10px] font-bold text-white tracking-tight leading-none drop-shadow-2xs">AB</span>
+                                            ) : isBlocked ? (
+                                              <Lock className="w-3.5 h-3.5 text-white/90" />
+                                            ) : (
+                                              <span className="text-[10px] font-bold text-white tracking-tight leading-none truncate drop-shadow-2xs">
+                                                {b.guest_name ? b.guest_name.split(' ')[0] : '1n'}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : spanDays === 2 ? (
+                                          <div className="w-full h-full flex items-center justify-between px-2 min-w-0 select-none overflow-hidden">
+                                            <div className="min-w-0 flex-1 truncate">
+                                              <span className="font-semibold text-xs text-white truncate block leading-tight drop-shadow-2xs">
+                                                {b.guest_name ? b.guest_name.split(' ')[0] : (isAirbnb ? 'Airbnb' : 'Bloqueo')}
+                                              </span>
+                                              <span className="text-[9px] text-white/80 font-mono block leading-none truncate mt-0.5">
+                                                {channelLabel} • 2n
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-between px-2.5 min-w-0 select-none overflow-hidden">
+                                            <div className="min-w-0 flex-1 truncate pr-1">
+                                              <div className="flex items-center gap-1.5 leading-tight truncate">
+                                                <span className="font-semibold text-xs text-white truncate drop-shadow-2xs">
+                                                  {b.guest_name || (isAirbnb ? 'Bloqueo Airbnb' : 'Bloqueo Operativo')}
+                                                </span>
+                                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-white/20 text-white shrink-0">
+                                                  {spanDays}n
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-1 text-[9px] text-white/80 font-mono mt-0.5 truncate">
+                                                <span>{channelLabel}</span>
+                                                <span>•</span>
+                                                <span>{b.booking_code}</span>
+                                              </div>
+                                            </div>
+
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveLodgeResMenuId(isMenuOpen ? null : b.id);
+                                              }}
+                                              className="w-5 h-5 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition shrink-0 cursor-pointer"
+                                              title="Ver Opciones"
+                                            >
+                                              <MoreHorizontal className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Floating 3-Dots Options Popover */}
+                                      {isMenuOpen && (
+                                        <div
+                                          onClick={(e) => e.stopPropagation()}
+                                          className={`absolute top-full mt-2 w-72 bg-white rounded-3xl shadow-[0_20px_50px_rgba(11,25,44,0.25)] border border-slate-200/90 p-5 text-slate-800 space-y-3.5 z-50 animate-fadeIn text-left ${
+                                            leftPercent > 65 ? 'right-0' : 'left-0'
+                                          }`}
+                                        >
+                                          {/* Popover Header */}
+                                          <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full uppercase ${
+                                                  isAirbnb
+                                                    ? 'bg-rose-100 text-[#FF385C]'
+                                                    : isPending
+                                                    ? 'bg-amber-100 text-amber-800'
+                                                    : isWhatsApp
+                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                    : 'bg-blue-100 text-blue-900'
+                                                }`}>
+                                                  {channelLabel}
+                                                </span>
+                                                <span className="text-[10px] font-mono text-slate-400 font-bold">
+                                                  {b.booking_code}
+                                                </span>
+                                              </div>
+                                              <h5 className="font-serif font-bold text-sm text-[#0b192c] mt-1.5 truncate">
+                                                {b.guest_name || 'Bloqueo de Habitación'}
+                                              </h5>
+                                              <p className="text-[11px] text-slate-500 font-light truncate">
+                                                {cleanName} ({room.room_number === 1 ? '2 Pax' : '3 Pax'})
+                                              </p>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => setActiveLodgeResMenuId(null)}
+                                              className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-600 flex items-center justify-center hover:bg-slate-100 transition cursor-pointer"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+
+                                          {/* Reservation Info Grid */}
+                                          <div className="grid grid-cols-2 gap-2 p-3 bg-[#fbfcfd] border border-slate-100 rounded-2xl text-[11px]">
+                                            <div>
+                                              <span className="text-[9px] font-mono font-bold uppercase text-slate-400 block">
+                                                Check-in / Out
+                                              </span>
+                                              <span className="font-semibold text-[#0b192c] block mt-0.5 font-mono text-[10px]">
+                                                {formatDateDDMMYYYY(b.check_in).slice(0, 5)} ➔ {formatDateDDMMYYYY(b.check_out).slice(0, 5)}
+                                              </span>
+                                              <span className="text-[10px] text-slate-500">
+                                                {spanDays} {spanDays === 1 ? 'noche' : 'noches'}
+                                              </span>
+                                            </div>
+                                            <div className="border-l border-slate-200/80 pl-2.5">
+                                              <span className="text-[9px] font-mono font-bold uppercase text-slate-400 block">
+                                                Aforo / Monto
+                                              </span>
+                                              <span className="font-semibold text-[#0b192c] block mt-0.5">
+                                                {b.pax_count || (room.room_number === 1 ? 2 : 3)} Huéspedes
+                                              </span>
+                                              <span className="text-[10px] font-mono text-emerald-700 font-bold">
+                                                ${(b.total_amount || 0).toLocaleString('es-CL')} CLP
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          {/* Contact & Actions list */}
+                                          <div className="space-y-2 pt-1">
+                                            {/* WhatsApp Button */}
+                                            {b.guest_phone && (
+                                              <a
+                                                href={`https://wa.me/${b.guest_phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                                  `Hola estimado/a ${b.guest_name}, le contactamos desde Yates Chile & Lodge Rincón de Navegantes respecto a su reserva ${b.booking_code} en habitación ${cleanName}.`
+                                                )}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs border border-emerald-200 transition cursor-pointer shadow-2xs"
+                                              >
+                                                <MessageSquare className="w-3.5 h-3.5" />
+                                                <span>Contactar por WhatsApp</span>
+                                              </a>
+                                            )}
+
+                                            {/* Ver Ficha 360 */}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setActiveLodgeResMenuId(null);
+                                                setSelectedBookingForDetail({
+                                                  id: b.id,
+                                                  type: 'lodge',
+                                                  booking_code: b.booking_code,
+                                                  guest_name: b.guest_name || (isAirbnb ? 'Bloqueo Airbnb' : 'Bloqueo Operativo'),
+                                                  guest_email: b.guest_email || '',
+                                                  guestPhone: b.guest_phone || '',
+                                                  channel: b.channel_source,
+                                                  service_title: `Lodge Rincón de Navegantes — ${cleanName}`,
+                                                  unit_detail: `${b.pax_count || (room.room_number === 1 ? 2 : 3)} Pasajeros`,
+                                                  dates: `${formatDateDDMMYYYY(b.check_in)} al ${formatDateDDMMYYYY(b.check_out)} (${spanDays} noches)`,
+                                                  status: b.status,
+                                                  amount: b.total_amount || 0,
+                                                  notes: b.notes || (isAirbnb ? 'Bloqueo sincronizado con calendario de Airbnb' : ''),
+                                                });
+                                              }}
+                                              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-full bg-slate-100 hover:bg-slate-200 text-[#0b192c] font-semibold text-xs transition cursor-pointer"
+                                            >
+                                              <Info className="w-3.5 h-3.5 text-slate-600" />
+                                              <span>Ver Detalle de Reserva</span>
+                                            </button>
+
+                                            {/* Eliminar / Desbloquear */}
+                                            <button
+                                              type="button"
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                setActiveLodgeResMenuId(null);
+                                                if (confirm(`¿Eliminar la reserva/bloqueo ${b.booking_code} de ${b.guest_name || 'Airbnb'}?`)) {
+                                                  await deleteBookingOrBlock(b.id);
+                                                  refreshLodge();
+                                                }
+                                              }}
+                                              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs border border-rose-200 transition cursor-pointer"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                              <span>Eliminar / Liberar Noche</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 3. TABLE OF BOOKINGS & BLOCKS (LEDGER) */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_20px_rgba(15,43,72,0.02)] overflow-hidden">
+                {/* 4. TABLE OF BOOKINGS & BLOCKS (LEDGER) */}
+                <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden">
                   <div className="px-7 py-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-[#fbfcfd]">
                     <div>
-                      <h4 className="font-serif text-base font-bold text-[#0f2b48] flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-[#0f2b48]" />
-                        <span>Historial & Registro de Reservas</span>
+                      <h4 className="font-serif font-bold text-base text-[#0b192c] flex items-center gap-2">
+                        <Calendar className="w-4.5 h-4.5 text-[#0b192c]" />
+                        <span>Historial & Registro de Huéspedes</span>
                       </h4>
-                      <p className="text-xs text-slate-500">Gestión de códigos, canales de venta y eliminación de bloqueos</p>
+                      <p className="text-xs text-slate-500 mt-0.5 font-light">Gestión de códigos, canales de venta y eliminación de bloqueos</p>
                     </div>
                     <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-3.5 top-3 text-slate-400" />
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         value={searchFilter}
                         onChange={(e) => setSearchFilter(e.target.value)}
                         placeholder="Buscar por código, huésped o canal..."
-                        className="bg-white border border-slate-200 text-xs pl-9 pr-4 py-2 rounded-xl text-[#0f2b48] focus:outline-none focus:border-[#0f2b48] w-64 shadow-xs"
+                        className="bg-white border border-slate-200/90 text-xs pl-9 pr-3.5 py-2 rounded-full text-[#0b192c] focus:outline-none focus:border-[#0b192c] w-64 shadow-2xs placeholder-slate-400"
                       />
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-[#fbfcfd] text-[#0f2b48]/70 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
+                      <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono font-bold tracking-wider border-b border-slate-100">
                         <tr>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Código</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Habitación</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Huésped / Detalle</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Check-in</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap">Check-out</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap text-center">Canal de Origen</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap text-center">Estado</th>
-                          <th className="px-5 py-3.5 whitespace-nowrap text-right">Acción</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Código</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Habitación</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Huésped / Detalle</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Check-in</th>
+                          <th className="px-6 py-4 whitespace-nowrap">Check-out</th>
+                          <th className="px-6 py-4 whitespace-nowrap text-center">Canal de Origen</th>
+                          <th className="px-6 py-4 whitespace-nowrap text-center">Estado</th>
+                          <th className="px-6 py-4 whitespace-nowrap text-right">Acción</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
                         {lodgeBookings
                           .filter(
                             (b) =>
@@ -5150,58 +6051,64 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           .map((booking) => {
                             const room = rooms.find((r) => r.id === booking.room_id);
                             return (
-                              <tr key={booking.id} className="hover:bg-slate-50/80 transition">
-                                <td className="px-5 py-3.5 font-mono font-bold text-[#0f2b48] whitespace-nowrap">
-                                  {booking.booking_code}
+                              <tr key={booking.id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="px-6 py-4 font-mono font-bold text-[#0b192c] whitespace-nowrap">
+                                  <span className="bg-[#f4f7fb] border border-slate-200/80 px-2.5 py-1 rounded-lg">
+                                    {booking.booking_code}
+                                  </span>
                                 </td>
-                                <td className="px-5 py-3.5 font-semibold text-[#0f2b48] whitespace-nowrap">
-                                  {room ? `#${room.room_number} - ${room.room_name}` : 'Habitación sin asignar'}
+                                <td className="px-6 py-4 font-medium text-slate-800 whitespace-nowrap">
+                                  {room ? room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim() : 'Habitación sin asignar'}
                                 </td>
-                                <td className="px-5 py-3.5 whitespace-nowrap">
+                                <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex items-center gap-1.5 max-w-[280px] truncate" title={`${booking.guest_name} ${booking.guest_phone || ''} ${booking.notes || ''}`}>
-                                    <span className="font-bold text-[#0f2b48] truncate">{booking.guest_name}</span>
+                                    <span className="font-semibold text-[#0b192c] truncate">{booking.guest_name}</span>
                                     {booking.notes && (
-                                      <span className="text-[10px] text-amber-800 italic truncate font-light">({booking.notes})</span>
+                                      <span className="text-[10px] text-slate-400 italic truncate font-light">({booking.notes})</span>
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-5 py-3.5 font-mono text-slate-800 font-semibold whitespace-nowrap">
+                                <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">
                                   {formatDateDDMMYYYY(booking.check_in)}
                                 </td>
-                                <td className="px-5 py-3.5 font-mono text-slate-800 font-semibold whitespace-nowrap">
+                                <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">
                                   {formatDateDDMMYYYY(booking.check_out)}
                                 </td>
-                                <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                                <td className="px-6 py-4 whitespace-nowrap text-center">
                                   <span
-                                    className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase whitespace-nowrap ${
+                                    className={`text-[10px] px-3 py-1 rounded-full font-semibold uppercase whitespace-nowrap ${
                                       booking.channel_source === 'airbnb'
-                                        ? 'bg-rose-50 text-[#FF385C] border border-[#FF385C]/30'
+                                        ? 'bg-rose-50 text-[#FF385C] border border-rose-200'
                                         : booking.channel_source === 'booking_com'
-                                        ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                         : booking.channel_source === 'phone_whatsapp'
-                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                         : booking.channel_source === 'maintenance'
-                                        ? 'bg-slate-100 text-slate-800 border border-slate-200'
-                                        : 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                                        ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                                        : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                                     }`}
                                   >
                                     {booking.channel_source}
                                   </span>
                                 </td>
-                                <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                                <td className="px-6 py-4 whitespace-nowrap text-center">
                                   <span
-                                    className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase whitespace-nowrap ${
+                                    className={`text-[10px] px-3 py-1 rounded-full font-bold font-mono uppercase whitespace-nowrap inline-flex items-center ${
                                       booking.status === 'approved'
-                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                         : booking.status === 'blocked'
-                                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                        : 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                                        ? 'bg-purple-50 text-purple-900 border border-purple-200'
+                                        : 'bg-rose-50 text-rose-800 border border-rose-200'
                                     }`}
                                   >
-                                    {booking.status}
+                                    {booking.status === 'approved'
+                                      ? 'Confirmada'
+                                      : booking.status === 'blocked'
+                                      ? 'Bloqueo'
+                                      : 'Pendiente Pago'}
                                   </span>
                                 </td>
-                                <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                                <td className="px-6 py-4 text-right whitespace-nowrap">
                                   <button
                                     onClick={async () => {
                                       if (confirm(`¿Desea eliminar la reserva/bloqueo ${booking.booking_code}?`)) {
@@ -5209,10 +6116,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         refreshLodge();
                                       }
                                     }}
-                                    className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition cursor-pointer"
+                                    className="w-8 h-8 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer border border-transparent hover:border-rose-200"
                                     title="Eliminar / Desbloquear"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </td>
                               </tr>
@@ -5230,89 +6137,100 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           {/* TAB 1.5: EXPEDICIONES NÁUTICAS (GESTIÓN DE FLOTA, SALIDAS Y PASAJEROS) */}
           {/* ========================================================================= */}
           {activeTab === 'expeditions' && (
-            <div className="space-y-8">
-              {/* 1. TOP METRICS & OPERATIONAL KPIS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* KPI 1: SALIDAS ACTIVAS */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_10px_rgba(15,43,72,0.02)] flex items-center justify-between hover:border-[#0f2b48]/30 transition-all">
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+            <div className="space-y-7">
+              {/* 1. 4 TOP EXPEDITION KPIS (BANKDASH STYLE) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {/* KPI 1: SALIDAS PROGRAMADAS */}
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Salidas Programadas
                     </span>
-                    <span className="text-2xl font-mono font-bold text-[#0f2b48] mt-1 block">
+                    <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform">
+                      <Ship className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight block">
                       {departures.length > 0 ? departures.length : upcomingExpeditions.length}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-medium mt-0.5 block truncate">
-                      {departures.filter((d) => d.status === 'guaranteed').length || 2} con zarpe garantizado
+                    <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
+                      <span>{departures.filter((d) => d.status === 'guaranteed').length || 2} con zarpe garantizado</span>
                     </span>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0f2b48] shrink-0 ml-3">
-                    <Ship className="w-5 h-5 text-[#0f2b48]" />
                   </div>
                 </div>
 
                 {/* KPI 2: PASAJEROS Y OCUPACIÓN */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_10px_rgba(15,43,72,0.02)] flex items-center justify-between hover:border-[#0f2b48]/30 transition-all">
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Pasajeros a Bordo
                     </span>
-                    <span className="text-2xl font-mono font-bold text-[#0f2b48] mt-1 block">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform">
+                      <Users className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-3xl font-extrabold font-sans text-emerald-700 tracking-tight block">
                       {expBookings.reduce((acc, b) => acc + (b.status !== 'cancelled' ? b.pax_count : 0), 0) || 12}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-medium mt-0.5 block truncate">
-                      Cupos confirmados en temporada
+                    <span className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span>Cupos confirmados en temporada</span>
                     </span>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 ml-3">
-                    <Users className="w-5 h-5 text-emerald-700" />
                   </div>
                 </div>
 
                 {/* KPI 3: INGRESOS EXPEDICIONES */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_10px_rgba(15,43,72,0.02)] flex items-center justify-between hover:border-[#0f2b48]/30 transition-all">
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Ingresos Expediciones
                     </span>
-                    <span className="text-xl font-mono font-bold text-[#0f2b48] mt-1 block truncate">
-                      ${(expBookings.reduce((acc, b) => acc + (b.status !== 'cancelled' ? Number(b.total_amount) : 0), 0) || 22200000).toLocaleString('es-CL')}{' '}
-                      <span className="text-[10px] text-slate-400 font-sans font-normal">CLP</span>
-                    </span>
-                    <span className="text-[10px] text-emerald-600 font-medium mt-0.5 block truncate font-mono">
-                      Total contratado
-                    </span>
+                    <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shadow-2xs group-hover:scale-105 transition-transform">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
                   </div>
-                  <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shrink-0 ml-3">
-                    <DollarSign className="w-5 h-5 text-amber-700" />
+                  <div>
+                    <span className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight block truncate">
+                      ${(expBookings.reduce((acc, b) => acc + (b.status !== 'cancelled' ? Number(b.total_amount) : 0), 0) || 22200000).toLocaleString('es-CL')}{' '}
+                      <span className="text-xs font-normal text-slate-400 font-sans">CLP</span>
+                    </span>
+                    <span className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span>Total contratado</span>
+                    </span>
                   </div>
                 </div>
 
                 {/* KPI 4: FLOTA EN OPERACIÓN */}
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-[0_2px_10px_rgba(15,43,72,0.02)] flex items-center justify-between hover:border-[#0f2b48]/30 transition-all">
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                       Embarcaciones Activas
                     </span>
-                    <span className="text-2xl font-mono font-bold text-[#0f2b48] mt-1 block">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shadow-2xs group-hover:scale-105 transition-transform">
+                      <Sailboat className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-3xl font-extrabold font-sans text-purple-700 tracking-tight block">
                       {vessels.length > 0 ? vessels.length : 2}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-medium mt-0.5 block truncate">
+                    <span className="text-[11px] text-slate-500 font-light mt-1 block truncate">
                       Vegvisir 45ft • Terranova 52ft
                     </span>
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shrink-0 ml-3">
-                    <Sailboat className="w-5 h-5 text-purple-700" />
                   </div>
                 </div>
               </div>
 
               {/* 2. PROGRAMACIÓN DE SALIDAS (DEPARTURES GRID) */}
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-7 space-y-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)]">
-                <div className="space-y-4 border-b border-slate-100 pb-5">
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 space-y-6 shadow-[0_4px_24px_rgba(11,25,44,0.03)]">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-5">
                   <div>
-                    <h4 className="font-serif text-lg font-bold text-[#0f2b48] flex items-center gap-2">
-                      <Ship className="w-5 h-5 text-[#0f2b48]" />
+                    <h4 className="font-serif font-bold text-base text-[#0b192c] flex items-center gap-2">
+                      <Ship className="w-4.5 h-4.5 text-[#0b192c]" />
                       <span>Salidas Programadas & Estado de Zarpe</span>
                     </h4>
                     <p className="text-xs text-slate-500 font-light mt-0.5">
@@ -5320,77 +6238,64 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-4 w-full">
-                    {/* View Mode Switcher: Cards (Grid) vs List (Table) */}
-                    <div className="flex items-center bg-slate-100/90 border border-slate-200/80 p-1 rounded-full shadow-2xs">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* View Mode Switcher */}
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
                       <button
                         type="button"
                         onClick={() => setExpeditionsViewMode('grid')}
-                        title="Vista de Tarjetas / Cards"
-                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold transition-all duration-150 cursor-pointer ${
-                          expeditionsViewMode === 'grid'
-                            ? 'bg-[#0f2b48] text-white shadow-xs'
-                            : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/60'
+                        title="Vista de Tarjetas"
+                        className={`p-1.5 rounded-full transition cursor-pointer ${
+                          expeditionsViewMode === 'grid' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
                         }`}
                       >
                         <LayoutGrid className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">Tarjetas</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setExpeditionsViewMode('list')}
-                        title="Vista de Lista / Tabla"
-                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold transition-all duration-150 cursor-pointer ${
-                          expeditionsViewMode === 'list'
-                            ? 'bg-[#0f2b48] text-white shadow-xs'
-                            : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/60'
+                        title="Vista de Lista"
+                        className={`p-1.5 rounded-full transition cursor-pointer ${
+                          expeditionsViewMode === 'list' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
                         }`}
                       >
                         <List className="w-3.5 h-3.5" />
-                        <span className="text-[11px]">Lista</span>
                       </button>
                     </div>
 
-                    {/* Asset Filters with Circular Icons: Vegvisir, Terranova, Lodge */}
-                    <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/90 border border-slate-200/80 rounded-full shadow-2xs">
+                    {/* Asset Filters */}
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
                       {[
-                        { id: 'all', label: 'Todas', icon: Compass },
-                        { id: 'vegvisir', label: 'Vegvisir', icon: Sailboat },
-                        { id: 'terranova', label: 'Terranova', icon: Ship },
-                        { id: 'lodge', label: 'Lodge Rincón', icon: BedDouble },
+                        { id: 'all', label: 'Todas' },
+                        { id: 'vegvisir', label: 'Velero Vegvisir' },
+                        { id: 'terranova', label: 'Yate Terranova' },
                       ].map((filter) => {
-                        const Icon = filter.icon;
                         const isActive = expeditionsAssetFilter === filter.id;
                         return (
                           <button
                             key={filter.id}
                             type="button"
                             onClick={() => setExpeditionsAssetFilter(filter.id as any)}
-                            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer ${
+                            className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
                               isActive
-                                ? 'bg-[#0f2b48] text-white shadow-sm scale-[1.02]'
-                                : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/80'
+                                ? 'bg-[#0b192c] text-white shadow-xs'
+                                : 'text-slate-600 hover:text-[#0b192c]'
                             }`}
                           >
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
-                              isActive ? 'bg-white/20 text-sky-300' : 'bg-slate-200 text-slate-600'
-                            }`}>
-                              <Icon className="w-3 h-3" />
-                            </div>
                             <span>{filter.label}</span>
                           </button>
                         );
                       })}
                     </div>
 
-                    {/* Botón Circular + en el extremo derecho */}
+                    {/* Botón Nueva Salida */}
                     <button
                       type="button"
                       onClick={() => setShowNewDepartureModal(true)}
-                      title="Registrar Nueva Salida Programada"
-                      className="w-9 h-9 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all duration-200 cursor-pointer shrink-0"
+                      className="inline-flex items-center gap-1.5 bg-[#0b192c] hover:bg-[#182a44] text-white px-4 py-2 rounded-full text-xs font-semibold transition shadow-xs cursor-pointer active:scale-95"
                     >
-                      <Plus className="w-4.5 h-4.5 text-white" />
+                      <Plus className="w-3.5 h-3.5 text-sky-300" />
+                      <span>Programar Salida</span>
                     </button>
                   </div>
                 </div>
@@ -5398,16 +6303,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 {/* Conditional View Rendering: Cards vs List */}
                 {expeditionsViewMode === 'grid' ? (
                   /* Grid of Scheduled Departures */
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 animate-fadeIn">
                     {filteredDepartures.length > 0 ? (
                       filteredDepartures.map((dep) => {
                         const route = expRoutes.find(r => r.id === dep.route_id);
                         const vessel = vessels.find(v => v.id === dep.vessel_id);
                         const bookedPax = (dep.total_slots || 10) - (dep.available_slots || 0);
                         const percent = Math.round((bookedPax / (dep.total_slots || 10)) * 100);
-                        const vesselName = vessel?.name || (dep.vessel_id === 'terranova' ? 'Yate Terranova' : dep.vessel_id === 'lodge' ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
-                        const routeTitle = dep.name || route?.title || 'Expedición Austral';
-                        const VesselIcon = dep.vessel_id === 'terranova' || vesselName.includes('Terranova') ? Ship : dep.vessel_id === 'lodge' || vesselName.includes('Lodge') ? BedDouble : Sailboat;
+                        const isTerranova = dep.vessel_id === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
+                        const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+                        let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
+                        if (routeTitle.startsWith('JF ')) {
+                          routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+                        }
+                        const VesselIcon = isTerranova ? Ship : Sailboat;
 
                         const isAgotado = (dep.available_slots || 0) <= 0 || bookedPax >= (dep.total_slots || 10);
                         const calcDaysUntil = (dateStr?: string) => {
@@ -5422,200 +6331,117 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         };
                         const daysUntil = calcDaysUntil(dep.departure_date);
 
-                        const cardTheme = isAgotado
-                          ? {
-                              container: 'bg-slate-100/70 border-slate-300/80 shadow-[0_4px_20px_rgba(100,116,139,0.06)]',
-                              icon: 'bg-white text-slate-500 border-slate-200 shadow-2xs',
-                              inner: 'bg-white/90 border-slate-200/80',
-                              bar: 'bg-slate-400',
-                              badge: 'bg-slate-200 text-slate-700 border-slate-300 font-bold',
-                              badgeText: 'Agotado',
-                            }
-                          : daysUntil <= 15 && daysUntil >= 0
-                          ? {
-                              container: 'bg-rose-50/80 border-rose-300 shadow-[0_4px_24px_rgba(244,63,94,0.1)] hover:border-rose-400',
-                              icon: 'bg-white text-rose-700 border-rose-200 shadow-2xs',
-                              inner: 'bg-white/95 border-rose-200/80',
-                              bar: 'bg-rose-600',
-                              badge: 'bg-rose-100 text-rose-800 border-rose-300 font-bold animate-pulse',
-                              badgeText: `¡Zarpe en ${daysUntil} días!`,
-                            }
-                          : daysUntil <= 30 && daysUntil >= 0
-                          ? {
-                              container: 'bg-amber-50/80 border-amber-300 shadow-[0_4px_24px_rgba(245,158,11,0.1)] hover:border-amber-400',
-                              icon: 'bg-white text-amber-700 border-amber-200 shadow-2xs',
-                              inner: 'bg-white/95 border-amber-200/80',
-                              bar: 'bg-amber-500',
-                              badge: 'bg-amber-100 text-amber-900 border-amber-300 font-bold',
-                              badgeText: `Zarpe en ${daysUntil} días`,
-                            }
-                          : {
-                              container: 'bg-emerald-50/50 border-emerald-200/90 hover:border-emerald-300 shadow-[0_4px_20px_rgba(16,185,129,0.04)]',
-                              icon: 'bg-white text-emerald-800 border-emerald-200/80 shadow-2xs',
-                              inner: 'bg-white/80 border-emerald-100',
-                              bar: 'bg-emerald-600',
-                              badge: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-bold',
-                              badgeText: dep.status === 'guaranteed' ? 'Zarpe Garantizado' : 'Programada',
-                            };
-
                         return (
                           <div
                             key={dep.id}
-                            className={`border rounded-3xl p-6 space-y-5 flex flex-col justify-between transition-all duration-300 ${cardTheme.container}`}
+                            className="bg-white border border-slate-200/80 rounded-3xl p-6 space-y-4 shadow-[0_4px_24px_rgba(11,25,44,0.03)] hover:shadow-md flex flex-col justify-between hover:border-slate-300 transition-all duration-300 group hover:-translate-y-0.5"
                           >
                             <div className="space-y-4">
-                              {/* Top Header: Circular Icon + Expedition Name & Vessel Subtitle + Top-Right Edit & Delete Actions */}
-                              <div className="flex items-start justify-between gap-3 min-w-0">
-                                <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                                  <div className={`w-12 h-12 rounded-full border flex items-center justify-center shrink-0 shadow-2xs ${cardTheme.icon}`}>
+                              {/* Top Header */}
+                              <div className="flex items-start justify-between gap-2.5">
+                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                  <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0 text-sky-700 shadow-2xs">
                                     <VesselIcon className="w-5 h-5" />
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <h4 className="font-bold text-base text-[#0f2b48] tracking-tight leading-snug truncate" title={routeTitle}>
+                                    <h4 className="font-serif font-bold text-sm text-[#0b192c] tracking-tight leading-snug truncate" title={routeTitle}>
                                       {routeTitle}
                                     </h4>
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-0.5 truncate">
-                                      <span className="text-[#0f2b48] font-semibold">{vesselName}</span>
+                                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 truncate">
+                                      <span className="font-semibold text-slate-700">{vesselName}</span>
                                       {route?.duration && (
                                         <>
                                           <span className="text-slate-300">•</span>
-                                          <span className="text-slate-500 font-light">{route.duration}</span>
+                                          <span className="font-light">{route.duration}</span>
                                         </>
                                       )}
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Top-Right 3-Dots Action Menu */}
-                                <div className="relative shrink-0">
+                                {/* Top-Right Edit & Delete */}
+                                <div className="flex items-center gap-1 shrink-0">
                                   <button
                                     type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenDepMenuId(openDepMenuId === dep.id ? null : dep.id);
-                                    }}
-                                    title="Opciones de la Expedición"
-                                    className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-[#0f2b48] hover:border-[#0f2b48]/30 hover:bg-slate-50 shadow-2xs hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                                    onClick={() => setEditingDeparture(dep)}
+                                    className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+                                    title="Editar Expedición"
                                   >
-                                    <MoreVertical className="w-4 h-4" />
+                                    <Pencil className="w-3.5 h-3.5" />
                                   </button>
-
-                                  {openDepMenuId === dep.id && (
-                                    <>
-                                      <div
-                                        className="fixed inset-0 z-40"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setOpenDepMenuId(null);
-                                        }}
-                                      />
-                                      <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-slate-200 rounded-2xl shadow-[0_12px_36px_rgba(15,43,72,0.18)] py-1.5 px-1 z-50 animate-scale-in text-xs">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setOpenDepMenuId(null);
-                                            setEditingDeparture(dep);
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:text-[#0f2b48] hover:bg-slate-50 rounded-xl font-semibold transition text-left cursor-pointer"
-                                        >
-                                          <Pencil className="w-3.5 h-3.5 text-sky-600" />
-                                          <span>Editar Expedición</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setOpenDepMenuId(null);
-                                            handleDeleteDeparture(dep.id);
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl font-semibold transition text-left cursor-pointer"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                          <span>Eliminar Expedición</span>
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteDeparture(dep.id)}
+                                    className="w-7 h-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
+                                    title="Eliminar Expedición"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               </div>
 
-                              <div className="space-y-3.5">
-                                {/* Details Strip (Full Width Stacked) */}
-                                <div className={`p-4 border rounded-2xl space-y-3 ${cardTheme.inner}`}>
-                                  {/* Fila 1: Zarpe & Fechas */}
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                                      Zarpe & Fechas
+                              {/* Details Strip */}
+                              <div className="p-4 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Zarpe & Retorno</span>
+                                  <span className="font-mono text-slate-700 font-bold text-xs">{formatDateDDMMYYYY(dep.departure_date)} ➔ {formatDateDDMMYYYY(dep.return_date)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Tarifa p/Pax</span>
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="font-mono font-bold text-[#0b192c] text-sm">
+                                      ${Number(dep.price_per_pax_clp).toLocaleString('es-CL')}
                                     </span>
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#0f2b48]">
-                                      <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                                      <span>{dep.departure_date} ➔ {dep.return_date}</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Divisor */}
-                                  <div className="border-t border-slate-200/60" />
-
-                                  {/* Fila 2: Tarifa / Pax */}
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                                      Tarifa / Pax
-                                    </span>
-                                    <div className="text-sm font-mono font-bold text-[#0f2b48]">
-                                      ${Number(dep.price_per_pax_clp).toLocaleString('es-CL')} <span className="text-[10px] text-slate-400 font-sans font-normal">CLP</span>
-                                    </div>
+                                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60">CLP</span>
                                   </div>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Capacity Progress Bar, Status Selector & Action */}
-                            <div className="space-y-3 pt-3 border-t border-slate-200/60">
+                            {/* Capacity Progress Bar & Status */}
+                            <div className="space-y-2.5 pt-3 border-t border-slate-100">
                               <div className="flex items-center justify-between text-xs font-mono">
                                 <span className="text-slate-600 font-medium">
-                                  Ocupación: <strong className="text-[#0f2b48] font-bold">{bookedPax}</strong> / {dep.total_slots}
+                                  Ocupación: <strong className="text-[#0b192c] font-bold">{bookedPax}</strong> / {dep.total_slots}
                                 </span>
-
-                                {(dep.available_slots || 0) > 0 ? (
-                                  <div className="relative group/addpax flex items-center">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveTab('bookings');
-                                        setShowBlockModal(true);
-                                      }}
-                                      className="w-7 h-7 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white flex items-center justify-center shadow-xs hover:scale-110 active:scale-95 transition-all cursor-pointer"
-                                    >
-                                      <Plus className="w-3.5 h-3.5 text-white" />
-                                    </button>
-                                    <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/addpax:opacity-100 group-hover/addpax:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                                      Registrar Pasajeros ({dep.available_slots} cupos disponibles)
-                                      <span className="absolute top-full right-2.5 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                {isAgotado ? (
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full uppercase">
                                     Agotado
+                                  </span>
+                                ) : daysUntil <= 15 && daysUntil >= 0 ? (
+                                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase">
+                                    Zarpe en {daysUntil}d
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase">
+                                    {dep.available_slots} libres
                                   </span>
                                 )}
                               </div>
 
-                              <div className="w-full bg-white/80 border border-slate-200/50 h-2 rounded-full overflow-hidden">
+                              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                                 <div
-                                  className={`${cardTheme.bar} h-full rounded-full transition-all duration-500`}
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isAgotado ? 'bg-slate-400' : 'bg-[#0b192c]'
+                                  }`}
                                   style={{ width: `${percent}%` }}
                                 />
                               </div>
 
-                              {/* Status Change Selector */}
-                              <div className="flex items-center justify-between pt-1">
-                                <span className="text-[10px] font-mono text-slate-500">Estado de Operación:</span>
+                              <div className="flex items-center justify-between pt-1 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: dep.available_slots || 0, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 hover:bg-[#0b192c] text-slate-700 hover:text-white rounded-full text-xs font-semibold transition cursor-pointer shadow-2xs group/mbtn"
+                                >
+                                  <Users className="w-3.5 h-3.5 text-slate-500 group-hover/mbtn:text-sky-300" />
+                                  <span>Pasajeros ({bookedPax})</span>
+                                </button>
+
                                 <select
                                   value={dep.status}
                                   onChange={(e) => handleUpdateDepartureStatus(dep.id, e.target.value as any)}
-                                  className="bg-white border border-slate-200 text-[10px] font-mono font-bold text-[#0f2b48] rounded-lg px-2.5 py-1 focus:outline-none focus:border-[#0f2b48] cursor-pointer shadow-2xs"
+                                  className="bg-white border border-slate-200 text-[11px] font-mono font-semibold text-[#0b192c] rounded-full px-3 py-1 focus:outline-none focus:border-[#0b192c] cursor-pointer shadow-2xs"
                                 >
                                   <option value="scheduled">Programada</option>
                                   <option value="guaranteed">Zarpe Garantizado</option>
@@ -5631,201 +6457,57 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       filteredUpcomingExpeditions.map((exp) => {
                         const percent = Math.round((exp.bookedPax / exp.maxPax) * 100);
                         const isAgotado = exp.availablePax <= 0 || exp.bookedPax >= exp.maxPax;
-                        const daysUntil = exp.daysUntilDeparture !== undefined ? exp.daysUntilDeparture : 999;
                         const VesselIcon = exp.vesselName.includes('Terranova') ? Ship : exp.vesselName.includes('Lodge') ? BedDouble : Sailboat;
-
-                        const cardTheme = isAgotado
-                          ? {
-                              container: 'bg-slate-100/70 border-slate-300/80 shadow-[0_4px_20px_rgba(100,116,139,0.06)]',
-                              icon: 'bg-white text-slate-500 border-slate-200 shadow-2xs',
-                              inner: 'bg-white/90 border-slate-200/80',
-                              bar: 'bg-slate-400',
-                              badge: 'bg-slate-200 text-slate-700 border-slate-300 font-bold',
-                              badgeText: 'Agotado',
-                            }
-                          : daysUntil <= 15 && daysUntil >= 0
-                          ? {
-                              container: 'bg-rose-50/80 border-rose-300 shadow-[0_4px_24px_rgba(244,63,94,0.1)] hover:border-rose-400',
-                              icon: 'bg-white text-rose-700 border-rose-200 shadow-2xs',
-                              inner: 'bg-white/95 border-rose-200/80',
-                              bar: 'bg-rose-600',
-                              badge: 'bg-rose-100 text-rose-800 border-rose-300 font-bold animate-pulse',
-                              badgeText: `¡Zarpe en ${daysUntil} días!`,
-                            }
-                          : daysUntil <= 30 && daysUntil >= 0
-                          ? {
-                              container: 'bg-amber-50/80 border-amber-300 shadow-[0_4px_24px_rgba(245,158,11,0.1)] hover:border-amber-400',
-                              icon: 'bg-white text-amber-700 border-amber-200 shadow-2xs',
-                              inner: 'bg-white/95 border-amber-200/80',
-                              bar: 'bg-amber-500',
-                              badge: 'bg-amber-100 text-amber-900 border-amber-300 font-bold',
-                              badgeText: `Zarpe en ${daysUntil} días`,
-                            }
-                          : {
-                              container: 'bg-emerald-50/50 border-emerald-200/90 hover:border-emerald-300 shadow-[0_4px_20px_rgba(16,185,129,0.04)]',
-                              icon: 'bg-white text-emerald-800 border-emerald-200/80 shadow-2xs',
-                              inner: 'bg-white/80 border-emerald-100',
-                              bar: 'bg-emerald-600',
-                              badge: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-bold',
-                              badgeText: exp.status,
-                            };
 
                         return (
                           <div
                             key={exp.id}
-                            className={`border rounded-3xl p-6 space-y-5 flex flex-col justify-between transition-all duration-300 ${cardTheme.container}`}
+                            className="bg-white border border-slate-200/80 rounded-3xl p-6 space-y-4 shadow-[0_4px_24px_rgba(11,25,44,0.03)] hover:shadow-md flex flex-col justify-between hover:border-slate-300 transition-all duration-300 group hover:-translate-y-0.5"
                           >
                             <div className="space-y-4">
-                              {/* Top Header: Circular Icon + Expedition Name & Vessel Subtitle + Top-Right Edit & Delete Actions */}
-                              <div className="flex items-start justify-between gap-3 min-w-0">
-                                <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                                  <div className={`w-12 h-12 rounded-full border flex items-center justify-center shrink-0 shadow-2xs ${cardTheme.icon}`}>
-                                    <VesselIcon className="w-5 h-5" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className="font-bold text-base text-[#0f2b48] tracking-tight leading-snug truncate" title={exp.routeTitle}>
-                                      {exp.routeTitle}
-                                    </h4>
-                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-0.5 truncate">
-                                      <span className="text-[#0f2b48] font-semibold">{exp.vesselName}</span>
-                                      <span className="text-slate-300">•</span>
-                                      <span className="text-slate-500 font-light">{exp.vesselType}</span>
-                                    </div>
-                                  </div>
+                              <div className="flex items-start gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0 text-sky-700 shadow-2xs">
+                                  <VesselIcon className="w-5 h-5" />
                                 </div>
-
-                                {/* Top-Right 3-Dots Action Menu */}
-                                <div className="relative shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenDepMenuId(openDepMenuId === exp.id ? null : exp.id);
-                                    }}
-                                    title="Opciones de la Expedición"
-                                    className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-[#0f2b48] hover:border-[#0f2b48]/30 hover:bg-slate-50 shadow-2xs hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </button>
-
-                                  {openDepMenuId === exp.id && (
-                                    <>
-                                      <div
-                                        className="fixed inset-0 z-40"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setOpenDepMenuId(null);
-                                        }}
-                                      />
-                                      <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-slate-200 rounded-2xl shadow-[0_12px_36px_rgba(15,43,72,0.18)] py-1.5 px-1 z-50 animate-scale-in text-xs">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setOpenDepMenuId(null);
-                                            const vId = exp.vesselName.toLowerCase().includes('terranova') ? 'terranova' : exp.vesselName.toLowerCase().includes('lodge') ? 'lodge' : 'vegvisir';
-                                            setEditingDeparture({
-                                              id: exp.id,
-                                              name: exp.routeTitle,
-                                              vessel_id: vId,
-                                              route_id: 'ruta-juan-fernandez',
-                                              departure_date: '2026-09-09',
-                                              return_date: '2026-09-24',
-                                              total_slots: exp.maxPax,
-                                              available_slots: exp.availablePax,
-                                              price_per_pax_clp: parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 1850000,
-                                              status: exp.status === 'Zarpe Garantizado' ? 'guaranteed' : 'scheduled',
-                                              created_at: new Date().toISOString(),
-                                            } as any);
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:text-[#0f2b48] hover:bg-slate-50 rounded-xl font-semibold transition text-left cursor-pointer"
-                                        >
-                                          <Pencil className="w-3.5 h-3.5 text-sky-600" />
-                                          <span>Editar Expedición</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setOpenDepMenuId(null);
-                                            handleDeleteDeparture(exp.id);
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl font-semibold transition text-left cursor-pointer"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                          <span>Eliminar Expedición</span>
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-serif font-bold text-sm text-[#0b192c] tracking-tight leading-snug truncate" title={exp.routeTitle}>
+                                    {exp.routeTitle}
+                                  </h4>
+                                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 truncate">
+                                    <span className="font-semibold text-slate-700">{exp.vesselName}</span>
+                                  </div>
                                 </div>
                               </div>
 
-                              <div className="space-y-3.5">
-                                {/* Details Strip (Full Width Stacked) */}
-                                <div className={`p-4 border rounded-2xl space-y-3 ${cardTheme.inner}`}>
-                                  {/* Fila 1: Zarpe & Fechas */}
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                                      Zarpe & Fechas
-                                    </span>
-                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#0f2b48]">
-                                      <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                                      <span>{exp.departureDates}</span>
-                                    </div>
-                                  </div>
-
-                                  {/* Divisor */}
-                                  <div className="border-t border-slate-200/60" />
-
-                                  {/* Fila 2: Tarifa / Pax */}
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                                      Tarifa / Pax
-                                    </span>
-                                    <div className="text-sm font-mono font-bold text-[#0f2b48]">
-                                      {exp.pricePerPax}
-                                    </div>
-                                  </div>
+                              <div className="p-4 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Fechas</span>
+                                  <span className="font-mono text-slate-700 font-medium">{exp.departureDates}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+                                  <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Tarifa p/Pax</span>
+                                  <span className="font-mono font-bold text-[#0b192c]">
+                                    {exp.pricePerPax}
+                                  </span>
                                 </div>
                               </div>
                             </div>
 
-                            {/* Capacity Progress Bar & Action */}
-                            <div className="space-y-2.5 pt-3 border-t border-slate-200/60">
+                            <div className="space-y-2.5 pt-3 border-t border-slate-100">
                               <div className="flex items-center justify-between text-xs font-mono">
                                 <span className="text-slate-600 font-medium">
-                                  Ocupación: <strong className="text-[#0f2b48] font-bold">{exp.bookedPax}</strong> / {exp.maxPax}
+                                  Ocupación: <strong className="text-[#0b192c] font-bold">{exp.bookedPax}</strong> / {exp.maxPax}
                                 </span>
-
-                                {exp.availablePax > 0 ? (
-                                  <div className="relative group/addpax flex items-center">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveTab('bookings');
-                                        setShowBlockModal(true);
-                                      }}
-                                      className="w-7 h-7 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white flex items-center justify-center shadow-xs hover:scale-110 active:scale-95 transition-all cursor-pointer"
-                                    >
-                                      <Plus className="w-3.5 h-3.5 text-white" />
-                                    </button>
-                                    <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1 bg-[#0f2b48] text-white text-[10px] font-sans font-medium rounded-lg shadow-xl opacity-0 translate-y-1 group-hover/addpax:opacity-100 group-hover/addpax:translate-y-0 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
-                                      Registrar / Sumar Pasajeros ({exp.availablePax} cupos disponibles)
-                                      <span className="absolute top-full right-2.5 -mt-1 border-4 border-transparent border-t-[#0f2b48]" />
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
-                                    Agotado
-                                  </span>
-                                )}
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase">
+                                  {exp.availablePax} libres
+                                </span>
                               </div>
 
-                              <div className="w-full bg-white/80 border border-slate-200/50 h-2 rounded-full overflow-hidden">
+                              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                                 <div
-                                  className={`${cardTheme.bar} h-full rounded-full transition-all duration-500`}
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isAgotado ? 'bg-slate-400' : 'bg-[#0b192c]'
+                                  }`}
                                   style={{ width: `${percent}%` }}
                                 />
                               </div>
@@ -5836,40 +6518,44 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     )}
                   </div>
                 ) : (
-                  /* List / Table View of Scheduled Departures */
-                  <div className="overflow-x-auto border border-slate-200/80 rounded-2xl animate-fadeIn">
+                  /* List / Table View */
+                  <div className="overflow-x-auto custom-scrollbar border border-slate-200/80 rounded-3xl shadow-2xs">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-[#fbfcfd] text-[#0f2b48]/70 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-200/70">
+                      <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                         <tr>
-                          <th className="px-6 py-3.5">Ruta & Expedición</th>
-                          <th className="px-6 py-3.5">Embarcación</th>
-                          <th className="px-6 py-3.5">Fechas de Salida</th>
-                          <th className="px-6 py-3.5">Ocupación / Cupos</th>
-                          <th className="px-6 py-3.5">Tarifa p/Pax</th>
-                          <th className="px-6 py-3.5">Estado de Zarpe</th>
-                          <th className="px-6 py-3.5 text-right">Acciones</th>
+                          <th className="px-6 py-4">Ruta & Expedición</th>
+                          <th className="px-6 py-4">Embarcación</th>
+                          <th className="px-6 py-4">Fechas de Salida</th>
+                          <th className="px-6 py-4">Ocupación / Cupos</th>
+                          <th className="px-6 py-4">Tarifa p/Pax</th>
+                          <th className="px-6 py-4">Estado de Zarpe</th>
+                          <th className="px-6 py-4 text-right">Acciones</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
+                      <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                         {filteredDepartures.length > 0 ? (
                           filteredDepartures.map((dep) => {
                             const route = expRoutes.find(r => r.id === dep.route_id);
                             const vessel = vessels.find(v => v.id === dep.vessel_id);
                             const bookedPax = (dep.total_slots || 10) - (dep.available_slots || 0);
                             const percent = Math.round((bookedPax / (dep.total_slots || 10)) * 100);
-                            const vesselName = vessel?.name || (dep.vessel_id === 'terranova' ? 'Yate Terranova' : dep.vessel_id === 'lodge' ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
-                            const routeTitle = dep.name || route?.title || 'Expedición Austral';
-                            const VesselIcon = dep.vessel_id === 'terranova' || vesselName.includes('Terranova') ? Ship : dep.vessel_id === 'lodge' || vesselName.includes('Lodge') ? BedDouble : Sailboat;
+                            const isTerranova = dep.vessel_id === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
+                            const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+                            let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
+                            if (routeTitle.startsWith('JF ')) {
+                              routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+                            }
+                            const VesselIcon = isTerranova ? Ship : Sailboat;
 
                             return (
-                              <tr key={dep.id} className="hover:bg-slate-50/80 transition">
+                              <tr key={dep.id} className="hover:bg-slate-50/80 transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[#0f2b48]">
+                                    <div className="w-8 h-8 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs">
                                       <VesselIcon className="w-4 h-4" />
                                     </div>
                                     <div>
-                                      <strong className="text-[#0f2b48] font-bold text-sm block">
+                                      <strong className="text-[#0b192c] font-semibold text-xs block">
                                         {routeTitle}
                                       </strong>
                                       <span className="text-[10px] text-slate-400 font-mono">
@@ -5880,42 +6566,39 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </td>
                                 <td className="px-6 py-4">
                                   <div>
-                                    <strong className="text-[#0f2b48] font-bold text-xs block">
+                                    <strong className="text-slate-800 font-medium text-xs block">
                                       {vesselName}
                                     </strong>
                                     <span className="text-[10px] text-slate-400 font-mono">
-                                      {vessel?.type || (dep.vessel_id === 'terranova' ? 'Hatteras 65ft LRC' : dep.vessel_id === 'lodge' ? 'Refugio Boutique' : 'Dufour 52.5 ft Francés')}
+                                      {vessel?.type || (dep.vessel_id === 'terranova' ? 'Hatteras 65ft' : dep.vessel_id === 'lodge' ? 'Refugio Boutique' : 'Dufour 52.5ft')}
                                     </span>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 font-mono text-[11px] text-slate-600">
-                                  <div className="space-y-0.5">
-                                    <div><span className="text-slate-400">Zarpe:</span> <strong className="text-[#0f2b48]">{dep.departure_date}</strong></div>
-                                    <div><span className="text-slate-400">Retorno:</span> <strong className="text-[#0f2b48]">{dep.return_date}</strong></div>
-                                  </div>
+                                <td className="px-6 py-4 font-mono text-xs text-slate-700 font-medium">
+                                  {formatDateDDMMYYYY(dep.departure_date)} ➔ {formatDateDDMMYYYY(dep.return_date)}
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="w-36 space-y-1">
+                                  <div className="w-36 space-y-1.5">
                                     <div className="flex justify-between text-[10px] font-mono text-slate-500">
                                       <span>{bookedPax} / {dep.total_slots} pax</span>
-                                      <strong className="text-[#0f2b48]">{dep.available_slots} libres</strong>
+                                      <strong className="text-[#0b192c]">{dep.available_slots} libres</strong>
                                     </div>
-                                    <div className="w-full bg-slate-200/70 h-1.5 rounded-full overflow-hidden">
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                       <div
-                                        className="bg-[#0f2b48] h-full rounded-full transition-all duration-500"
+                                        className="bg-[#0b192c] h-full rounded-full transition-all duration-500"
                                         style={{ width: `${percent}%` }}
                                       />
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 font-mono font-bold text-xs text-[#0f2b48]">
-                                  ${Number(dep.price_per_pax_clp).toLocaleString('es-CL')}
+                                <td className="px-6 py-4 font-mono font-bold text-xs text-[#0b192c]">
+                                  ${Number(dep.price_per_pax_clp).toLocaleString('es-CL')} <span className="text-[10px] text-slate-500 font-normal">CLP</span>
                                 </td>
                                 <td className="px-6 py-4">
                                   <select
                                     value={dep.status}
                                     onChange={(e) => handleUpdateDepartureStatus(dep.id, e.target.value as any)}
-                                    className="bg-white border border-slate-200 text-[10px] font-mono font-bold text-[#0f2b48] rounded-lg px-2 py-1 focus:outline-none focus:border-[#0f2b48] cursor-pointer shadow-2xs"
+                                    className="bg-white border border-slate-200 text-[10px] font-mono font-bold text-[#0b192c] rounded-full px-2.5 py-1 focus:outline-none focus:border-[#0b192c] cursor-pointer shadow-2xs"
                                   >
                                     <option value="scheduled">Programada</option>
                                     <option value="guaranteed">Zarpe Garantizado</option>
@@ -5926,16 +6609,24 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
                                     <button
+                                      type="button"
+                                      onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: dep.available_slots || 0, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                      className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+                                      title="Ver Manifiesto de Pasajeros"
+                                    >
+                                      <Users className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
                                       onClick={() => setEditingDeparture(dep)}
-                                      className="text-slate-500 hover:text-[#0f2b48] p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-                                      title="Editar Información de la Expedición"
+                                      className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+                                      title="Editar"
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => handleDeleteDeparture(dep.id)}
-                                      className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                                      title="Eliminar Expedición"
+                                      className="w-7 h-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
+                                      title="Eliminar"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -5949,14 +6640,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             const percent = Math.round((exp.bookedPax / exp.maxPax) * 100);
                             const VesselIcon = exp.vesselName.includes('Terranova') ? Ship : exp.vesselName.includes('Lodge') ? BedDouble : Sailboat;
                             return (
-                              <tr key={exp.id} className="hover:bg-slate-50/80 transition">
+                              <tr key={exp.id} className="hover:bg-slate-50/80 transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[#0f2b48]">
+                                    <div className="w-8 h-8 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs">
                                       <VesselIcon className="w-4 h-4" />
                                     </div>
                                     <div>
-                                      <strong className="text-[#0f2b48] font-bold text-sm block">
+                                      <strong className="text-[#0b192c] font-semibold text-xs block">
                                         {exp.routeTitle}
                                       </strong>
                                       <span className="text-[10px] text-slate-400 font-mono">
@@ -5967,7 +6658,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </td>
                                 <td className="px-6 py-4">
                                   <div>
-                                    <strong className="text-[#0f2b48] font-bold text-xs block">
+                                    <strong className="text-slate-800 font-medium text-xs block">
                                       {exp.vesselName}
                                     </strong>
                                     <span className="text-[10px] text-slate-400 font-mono">
@@ -5975,28 +6666,28 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     </span>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 font-mono text-[11px] text-slate-600">
+                                <td className="px-6 py-4 font-mono text-xs text-slate-600">
                                   {exp.departureDates}
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="w-36 space-y-1">
+                                  <div className="w-36 space-y-1.5">
                                     <div className="flex justify-between text-[10px] font-mono text-slate-500">
                                       <span>{exp.bookedPax} / {exp.maxPax} pax</span>
-                                      <strong className="text-[#0f2b48]">{exp.availablePax} libres</strong>
+                                      <strong className="text-[#0b192c]">{exp.availablePax} libres</strong>
                                     </div>
-                                    <div className="w-full bg-slate-200/70 h-1.5 rounded-full overflow-hidden">
+                                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                       <div
-                                        className="bg-[#0f2b48] h-full rounded-full transition-all duration-500"
+                                        className="bg-[#0b192c] h-full rounded-full transition-all duration-500"
                                         style={{ width: `${percent}%` }}
                                       />
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 font-mono font-bold text-xs text-[#0f2b48]">
+                                <td className="px-6 py-4 font-mono font-bold text-xs text-[#0b192c]">
                                   {exp.pricePerPax}
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${
                                     exp.statusColor === 'emerald' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-sky-50 text-sky-800 border border-sky-200'
                                   }`}>
                                     {exp.status}
@@ -6021,15 +6712,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                           created_at: new Date().toISOString(),
                                         } as any);
                                       }}
-                                      className="text-slate-500 hover:text-[#0f2b48] p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-                                      title="Editar Información de la Expedición"
+                                      className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+                                      title="Editar"
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       onClick={() => handleDeleteDeparture(exp.id)}
-                                      className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                                      title="Eliminar Expedición"
+                                      className="w-7 h-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
+                                      title="Eliminar"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -6046,44 +6737,44 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </div>
 
               {/* 3. MANIFIESTO & RESERVAS DE EXPEDICIÓN */}
-              <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_20px_rgba(15,43,72,0.02)] overflow-hidden">
+              <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden">
                 <div className="px-7 py-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-[#fbfcfd]">
                   <div>
-                    <h4 className="font-serif text-base font-bold text-[#0f2b48] flex items-center gap-2">
-                      <Users className="w-4 h-4 text-[#0f2b48]" />
+                    <h4 className="font-serif text-base font-bold text-[#0b192c] flex items-center gap-2">
+                      <Users className="w-4.5 h-4.5 text-[#0b192c]" />
                       <span>Manifiesto & Registro de Pasajeros de Expediciones</span>
                     </h4>
-                    <p className="text-xs text-slate-500">Control de pasajeros, datos de contacto y estado de pago de travesías</p>
+                    <p className="text-xs text-slate-500 font-light">Control de pasajeros, datos de contacto y estado de pago de travesías</p>
                   </div>
                   <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3.5 top-3 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       placeholder="Buscar por código o pasajero..."
                       value={searchFilter}
                       onChange={(e) => setSearchFilter(e.target.value)}
-                      className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48] w-64 shadow-2xs"
+                      className="pl-9 pr-4 py-2 bg-white border border-slate-200/90 rounded-full text-xs text-[#0b192c] focus:outline-none focus:border-[#0b192c] w-64 shadow-2xs placeholder-slate-400"
                     />
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto custom-scrollbar">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#fbfcfd] text-[#0f2b48]/70 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
+                    <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                       <tr>
-                        <th className="px-7 py-3.5">Código</th>
-                        <th className="px-7 py-3.5">Pasajero Titular</th>
-                        <th className="px-7 py-3.5">Modalidad</th>
-                        <th className="px-7 py-3.5">Cupos (Pax)</th>
-                        <th className="px-7 py-3.5">Monto Total</th>
-                        <th className="px-7 py-3.5">Estado</th>
-                        <th className="px-7 py-3.5 text-right">Acción</th>
+                        <th className="px-6 py-4">Código</th>
+                        <th className="px-6 py-4">Pasajero Titular</th>
+                        <th className="px-6 py-4">Modalidad</th>
+                        <th className="px-6 py-4">Cupos (Pax)</th>
+                        <th className="px-6 py-4">Monto Total</th>
+                        <th className="px-6 py-4">Estado</th>
+                        <th className="px-6 py-4 text-right">Acción</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {expBookings.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-7 py-8 text-center text-slate-400 italic">
+                          <td colSpan={7} className="px-6 py-8 text-center text-slate-400 italic">
                             No se han registrado reservas de expediciones aún.
                           </td>
                         </tr>
@@ -6096,47 +6787,72 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               b.guest_email.toLowerCase().includes(searchFilter.toLowerCase())
                           )
                           .map((booking) => (
-                            <tr key={booking.id} className="hover:bg-slate-50/80 transition">
-                              <td className="px-7 py-4 font-mono font-bold text-[#0f2b48]">
-                                {booking.booking_code}
+                            <tr key={booking.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="px-6 py-4 font-mono font-bold text-[#0b192c]">
+                                <span className="bg-[#f4f7fb] border border-slate-200/80 px-2.5 py-1 rounded-lg">
+                                  {booking.booking_code}
+                                </span>
                               </td>
-                              <td className="px-7 py-4">
-                                <div className="font-bold text-[#0f2b48]">{booking.guest_name}</div>
-                                <div className="text-[10px] text-slate-500 font-mono">{booking.guest_email} • {booking.guest_phone}</div>
+                              <td className="px-6 py-4">
+                                <div className="space-y-1">
+                                  <strong className="font-semibold text-[#0b192c] text-xs block">{booking.guest_name}</strong>
+                                  <div className="flex items-center gap-2">
+                                    {booking.guest_phone && booking.guest_phone !== 'Sin contacto' && !booking.guest_phone.includes('00000000') && (
+                                      <a
+                                        href={`https://wa.me/${booking.guest_phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                          `Hola estimado/a ${booking.guest_name}, le contactamos desde Yates Chile respecto a su reserva de expedición ${booking.booking_code}.`
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200 transition-all shadow-2xs group/wa cursor-pointer shrink-0"
+                                        title={`Abrir WhatsApp de ${booking.guest_name} (${booking.guest_phone})`}
+                                      >
+                                        <svg className="w-3 h-3 fill-current transition-colors shrink-0" viewBox="0 0 24 24">
+                                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                                        </svg>
+                                      </a>
+                                    )}
+                                    <span className="text-[10px] text-slate-400 font-mono">{booking.guest_email}</span>
+                                  </div>
+                                </div>
                               </td>
-                              <td className="px-7 py-4">
-                                <span className="bg-slate-100 text-[#0f2b48] text-[10px] px-2.5 py-1 rounded-full font-mono font-bold">
+                              <td className="px-6 py-4">
+                                <span className="bg-slate-100 text-[#0b192c] text-[10px] px-3 py-1 rounded-full font-mono font-bold">
                                   {booking.booking_type === 'full_charter' ? 'Chárter Privado' : 'Cupo Individual'}
                                 </span>
                               </td>
-                              <td className="px-7 py-4 font-mono font-bold text-[#0f2b48]">
+                              <td className="px-6 py-4 font-mono font-bold text-[#0b192c]">
                                 {booking.pax_count} Pax
                               </td>
-                              <td className="px-7 py-4 font-mono font-bold text-[#0f2b48]">
+                              <td className="px-6 py-4 font-mono font-bold text-[#0b192c]">
                                 ${Number(booking.total_amount).toLocaleString('es-CL')} CLP
                               </td>
-                              <td className="px-7 py-4">
-                                <span
-                                  className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase ${
+                              <td className="px-6 py-4">
+                                <select
+                                  value={booking.status}
+                                  onChange={(e) => handleUpdateExpBookingStatus(booking.id, e.target.value as any)}
+                                  className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase cursor-pointer border focus:outline-none transition ${
                                     booking.status === 'approved'
-                                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                       : booking.status === 'pending_transfer'
-                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      : 'bg-rose-50 text-rose-800 border-rose-200'
                                   }`}
                                 >
-                                  {booking.status === 'pending_transfer' ? 'Pendiente Pago' : booking.status}
-                                </span>
+                                  <option value="pending_transfer">Pendiente Pago</option>
+                                  <option value="approved">Confirmada (Pagada)</option>
+                                  <option value="completed">Completada</option>
+                                  <option value="cancelled">Cancelada</option>
+                                </select>
                               </td>
-                              <td className="px-7 py-4 text-right">
-                                {booking.status === 'pending_transfer' && (
-                                  <button
-                                    onClick={() => handleUpdateExpBookingStatus(booking.id, 'approved')}
-                                    className="text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg text-[10px] font-bold font-mono transition cursor-pointer"
-                                  >
-                                    Aprobar
-                                  </button>
-                                )}
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  onClick={() => triggerAlert(`Detalle de reserva: ${booking.booking_code} - ${booking.guest_name}`, 'info', 'Ficha de Reserva')}
+                                  className="text-xs font-semibold px-4 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-[#0b192c] transition shadow-2xs cursor-pointer active:scale-95"
+                                >
+                                  Ver Ficha
+                                </button>
                               </td>
                             </tr>
                           ))
@@ -6149,38 +6865,38 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           )}
 
           {/* ========================================================================= */}
-          {/* TAB: CRM DE CLIENTES & GESTIÓN DE LEADS */}
+          {/* TAB 2: CRM CONCIERGE & CLIENTES (GESTIÓN DE HUÉSPEDES, VIP & LEADS) */}
           {/* ========================================================================= */}
           {activeTab === 'payments' && (
-            <div className="space-y-6 animate-fadeIn">
+            <div className="space-y-7 animate-fadeIn">
               
-              {/* 0. SUB-NAVIGATION SWITCHER: CLIENTES VS LEADS (CENTERED MINIMALIST CAPSULE) */}
+              {/* 0. SUB-NAVIGATION SWITCHER: CLIENTES VS LEADS */}
               <div className="flex justify-center w-full">
-                <div className="inline-flex items-center p-1.5 bg-slate-100/90 border border-slate-200/80 rounded-full shadow-inner gap-1.5">
+                <div className="inline-flex items-center p-1 bg-slate-100 rounded-full border border-slate-200/60 shadow-2xs gap-1">
                   <button
                     type="button"
                     onClick={() => setCrmActiveSubTab('clients')}
-                    className={`flex items-center justify-center gap-2 px-6 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs transition cursor-pointer ${
                       crmActiveSubTab === 'clients'
-                        ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                        : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/80 font-medium'
+                        ? 'bg-[#0b192c] text-white shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-[#0b192c] font-medium'
                     }`}
                   >
                     <UserCheck className="w-3.5 h-3.5" />
-                    <span>Clientes</span>
+                    <span>Directorio de Clientes</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setCrmActiveSubTab('leads')}
-                    className={`flex items-center justify-center gap-2 px-6 py-2 rounded-full text-xs transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center justify-center gap-2 px-5 py-2 rounded-full text-xs transition cursor-pointer ${
                       crmActiveSubTab === 'leads'
-                        ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 font-bold'
-                        : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/80 font-medium'
+                        ? 'bg-[#0b192c] text-white shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-[#0b192c] font-medium'
                     }`}
                   >
                     <Users className="w-3.5 h-3.5" />
-                    <span>Leads</span>
+                    <span>Prospectos & Leads ({newLeadsCount} nuevos)</span>
                   </button>
                 </div>
               </div>
@@ -6191,103 +6907,116 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {crmActiveSubTab === 'clients' && (
                 <div className="space-y-7 animate-fadeIn">
                   
-                  {/* 1. KPI CARDS DEL CRM (MODERN & MINIMALIST DESIGN) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* 1. TOP CRM & REVENUE KPIS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {/* Total Clientes */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)] hover:shadow-[0_8px_30px_rgba(15,43,72,0.05)] hover:border-slate-300/80 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Total Clientes CRM
                         </span>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight leading-none">
+                        <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-[#0b192c] border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
+                          <Users className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight">
                           {crmClients.length}
                         </div>
-                        <span className="text-[11px] text-slate-500 font-light block truncate pt-1">
-                          Base unificada Lodge & Yates
+                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                          <span>Base unificada Lodge & Yates</span>
                         </span>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-[#0f2b48] shrink-0 shadow-2xs">
-                        <Users className="w-5 h-5" />
                       </div>
                     </div>
 
                     {/* Clientes VIP Gold */}
-                    <div className="bg-white border border-amber-200/70 rounded-3xl p-6 shadow-[0_4px_20px_rgba(245,158,11,0.03)] hover:shadow-[0_8px_30px_rgba(245,158,11,0.07)] hover:border-amber-300 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-amber-700 group-hover:text-amber-800 transition-colors">
                           Clientes VIP Gold
                         </span>
-                        <div className="text-3xl font-mono font-bold text-amber-900 tracking-tight leading-none">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shadow-2xs group-hover:scale-105 transition-transform">
+                          <Award className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-amber-700 tracking-tight">
                           {crmClients.filter((c) => c.category === 'vip').length}
                         </div>
-                        <span className="text-[11px] text-amber-700/80 font-light block truncate pt-1">
-                          Alta recurrencia & Chárter
+                        <span className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span>Alta recurrencia & Chárter</span>
                         </span>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-800 shrink-0 shadow-2xs">
-                        <Award className="w-5 h-5" />
                       </div>
                     </div>
 
                     {/* Valor Total Facturado (LTV) */}
-                    <div className="bg-white border border-emerald-200/70 rounded-3xl p-6 shadow-[0_4px_20px_rgba(16,185,129,0.03)] hover:shadow-[0_8px_30px_rgba(16,185,129,0.07)] hover:border-emerald-300 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           LTV Facturado CRM
                         </span>
-                        <div className="text-xl sm:text-2xl font-mono font-bold text-[#0f2b48] tracking-tight leading-tight truncate">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform">
+                          <DollarSign className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight truncate">
                           ${crmClients.reduce((acc, c) => acc + c.totalSpentClp, 0).toLocaleString('es-CL')}
                         </div>
-                        <span className="text-[11px] text-emerald-600 font-medium block truncate pt-1">
-                          CLP Facturado histórico
+                        <span className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          <span>CLP Facturado histórico</span>
                         </span>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0 shadow-2xs">
-                        <DollarSign className="w-5 h-5" />
                       </div>
                     </div>
 
                     {/* Conciliaciones / Transferencias Pendientes */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)] hover:shadow-[0_8px_30px_rgba(15,43,72,0.05)] hover:border-slate-300/80 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Transferencias Pendientes
                         </span>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight leading-none">
+                        <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform">
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-sky-800 tracking-tight">
                           {pendingApprovalsCount}
                         </div>
                         <button
                           type="button"
                           onClick={() => setIsTransfersAccordionOpen(!isTransfersAccordionOpen)}
-                          className="text-[11px] text-[#0f2b48] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer pt-1"
+                          className="text-xs text-sky-700 font-semibold hover:underline inline-flex items-center gap-1 cursor-pointer mt-2"
                         >
-                          <span>{isTransfersAccordionOpen ? 'Ocultar mesa de pagos' : 'Ver mesa de pagos'}</span>
-                          <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isTransfersAccordionOpen ? 'rotate-180' : ''}`} />
+                          <span>{isTransfersAccordionOpen ? 'Ocultar mesa' : 'Ver mesa de conciliación'}</span>
+                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isTransfersAccordionOpen ? 'rotate-180' : ''}`} />
                         </button>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-[#0f2b48] shrink-0 shadow-2xs">
-                        <CreditCard className="w-5 h-5" />
                       </div>
                     </div>
                   </div>
 
                   {/* 2. MESA DE CONCILIACIÓN DE TRANSFERENCIAS (ACORDEÓN DESPLEGABLE) */}
                   {isTransfersAccordionOpen && (
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)] space-y-4 animate-fadeIn">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-[#0f2b48]" />
-                          <h4 className="text-sm font-bold text-[#0f2b48]">
+                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_24px_rgba(11,25,44,0.03)] space-y-4 animate-fadeIn">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center text-sky-700">
+                            <CreditCard className="w-4 h-4" />
+                          </div>
+                          <h4 className="text-sm font-serif font-bold text-[#0b192c]">
                             Mesa de Conciliación de Transferencias Bancarias
                           </h4>
                         </div>
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          {installments.length} transacciones registradas
+                        <span className="text-xs text-slate-400 font-mono font-bold">
+                          {installments.length} transacciones
                         </span>
                       </div>
 
                       {installments.length === 0 ? (
-                        <div className="text-center py-6 text-slate-400 text-xs">
+                        <div className="text-center py-8 text-slate-400 text-xs font-light">
                           No hay transferencias pendientes de conciliación.
                         </div>
                       ) : (
@@ -6295,18 +7024,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           {installments.map((inst) => (
                             <div
                               key={inst.id}
-                              className="bg-[#fbfcfd] border border-slate-200/80 rounded-2xl p-5 space-y-3 hover:border-[#0f2b48]/30 transition"
+                              className="bg-[#fbfcfd] border border-slate-200/80 rounded-2xl p-5 space-y-3 hover:border-slate-300 transition-all shadow-2xs"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="bg-white text-[#0f2b48] border border-slate-200 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                                <span className="bg-white text-[#0b192c] border border-slate-200 text-[10px] px-2.5 py-1 rounded-full font-mono font-bold">
                                   {inst.booking_type === 'lodge' ? 'Lodge' : 'Expedición'}
                                 </span>
                                 <span
-                                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                  className={`text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase ${
                                     inst.status === 'approved'
                                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                       : inst.status === 'pending_approval'
-                                      ? 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse'
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
                                       : 'bg-slate-100 text-slate-600'
                                   }`}
                                 >
@@ -6315,8 +7044,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               </div>
 
                               <div>
-                                <h5 className="text-xs font-bold text-[#0f2b48]">{inst.concept}</h5>
-                                <div className="text-base font-mono font-bold text-[#0f2b48] mt-0.5">
+                                <h5 className="text-xs font-bold text-[#0b192c]">{inst.concept}</h5>
+                                <div className="text-sm font-mono font-bold text-[#0b192c] mt-1">
                                   ${inst.amount_expected.toLocaleString('es-CL')}{' '}
                                   <span className="text-[10px] text-slate-400 font-sans font-normal">CLP</span>
                                 </div>
@@ -6327,13 +7056,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   href={inst.receipt_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="w-full bg-slate-100 hover:bg-slate-200 text-[#0f2b48] text-[11px] py-1.5 rounded-lg transition inline-flex items-center justify-center gap-1.5 font-bold"
+                                  className="w-full bg-white hover:bg-slate-50 text-[#0b192c] border border-slate-200 text-[11px] py-2 rounded-full transition inline-flex items-center justify-center gap-1.5 font-semibold shadow-2xs"
                                 >
-                                  <Eye className="w-3.5 h-3.5 text-[#0f2b48]" />
+                                  <Eye className="w-3.5 h-3.5 text-slate-600" />
                                   <span>Ver Comprobante</span>
                                 </a>
                               ) : (
-                                <div className="text-[10px] text-slate-400 italic bg-slate-50 p-2 rounded-lg text-center">
+                                <div className="text-[10px] text-slate-400 italic bg-white p-2 rounded-xl text-center border border-slate-100">
                                   Pendiente de subida
                                 </div>
                               )}
@@ -6341,7 +7070,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               {inst.status !== 'approved' && (
                                 <button
                                   onClick={() => setSelectedInstallment(inst)}
-                                  className="w-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold py-2 rounded-xl text-[11px] transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                  className="w-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-2 rounded-full text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                                 >
                                   <ShieldCheck className="w-3.5 h-3.5 text-sky-300" />
                                   <span>Conciliar Pago</span>
@@ -6355,79 +7084,72 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   )}
 
                   {/* 3. DIRECTORIO & GESTIÓN DE CLIENTES */}
-                  <div className="bg-white border border-slate-200/80 rounded-3xl p-7 shadow-[0_4px_20px_rgba(15,43,72,0.02)] space-y-6">
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-[0_4px_24px_rgba(11,25,44,0.03)] space-y-5">
                     
-                    {/* Header del Directorio: Título, Switcher Tarjetas/Lista, Botón Registrar y Buscador Full-Width */}
+                    {/* Header del Directorio */}
                     <div className="space-y-4 border-b border-slate-100 pb-5">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                          <h3 className="font-bold text-lg text-[#0f2b48] flex items-center gap-2">
-                            <UserCheck className="w-5 h-5 text-[#0f2b48]" />
+                          <h3 className="font-serif font-bold text-base text-[#0b192c] flex items-center gap-2">
+                            <UserCheck className="w-4.5 h-4.5 text-[#0b192c]" />
                             <span>Directorio de Clientes & Fichas Individuales</span>
                           </h3>
                           <p className="text-xs text-slate-500 font-light mt-0.5">
-                            Selecciona cualquier cliente para ver su ficha completa, historial de reservas, preferencias y bitácora.
+                            Selecciona cualquier cliente para ver su ficha completa, historial de reservas y bitácora.
                           </p>
                         </div>
 
-                        {/* Switcher Tarjetas / Lista y Botón Circular + */}
-                        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
-                          {/* View Mode Switcher: Cards (Grid) vs List (Table) */}
-                          <div className="flex items-center bg-slate-100/90 border border-slate-200/80 p-1 rounded-full shadow-2xs">
+                        {/* Switcher Tarjetas / Lista y Botón Registrar */}
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
                             <button
                               type="button"
                               onClick={() => setCustomersViewMode('grid')}
-                              title="Vista de Tarjetas / Cards"
-                              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold transition-all duration-150 cursor-pointer ${
-                                customersViewMode === 'grid'
-                                  ? 'bg-[#0f2b48] text-white shadow-xs'
-                                  : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/60'
+                              title="Vista de Tarjetas"
+                              className={`p-1.5 rounded-full transition cursor-pointer ${
+                                customersViewMode === 'grid' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
                               }`}
                             >
                               <LayoutGrid className="w-3.5 h-3.5" />
-                              <span className="text-[11px]">Tarjetas</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setCustomersViewMode('list')}
-                              title="Vista de Lista / Tabla"
-                              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold transition-all duration-150 cursor-pointer ${
-                                customersViewMode === 'list'
-                                  ? 'bg-[#0f2b48] text-white shadow-xs'
-                                  : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/60'
+                              title="Vista de Lista"
+                              className={`p-1.5 rounded-full transition cursor-pointer ${
+                                customersViewMode === 'list' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
                               }`}
                             >
                               <List className="w-3.5 h-3.5" />
-                              <span className="text-[11px]">Lista</span>
                             </button>
                           </div>
 
                           <button
                             type="button"
                             onClick={() => setShowNewCustomerModal(true)}
-                            title="Registrar Nuevo Cliente"
-                            className="w-9 h-9 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all duration-200 cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1.5 bg-[#0b192c] hover:bg-[#182a44] text-white px-4 py-2 rounded-full text-xs font-semibold transition shadow-xs cursor-pointer active:scale-95"
                           >
-                            <Plus className="w-4.5 h-4.5 text-white" />
+                            <Plus className="w-3.5 h-3.5 text-sky-300" />
+                            <span>Nuevo Cliente</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* Barra de Búsqueda Full-Width abajo */}
-                      <div className="relative w-full">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                      {/* Barra de Búsqueda */}
+                      <div className="relative w-full max-w-md">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
-                          placeholder="Buscar por nombre, RUT, email, teléfono, ciudad o palabras clave..."
+                          placeholder="Buscar por nombre, RUT, email, teléfono..."
                           value={customerSearchQuery}
                           onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                          className="w-full bg-[#fbfcfd] border border-slate-200/90 rounded-full pl-11 pr-10 py-2.5 text-xs text-[#0f2b48] placeholder:text-slate-400 focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs font-medium"
+                          className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 focus:border-[#0b192c] rounded-full pl-9.5 pr-8 py-2 text-xs text-[#0b192c] placeholder:text-slate-400 focus:outline-none transition shadow-2xs"
                         />
                         {customerSearchQuery && (
                           <button
                             type="button"
                             onClick={() => setCustomerSearchQuery('')}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
                           >
                             ✕
                           </button>
@@ -6439,7 +7161,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     {filteredCustomers.length === 0 ? (
                       <div className="p-12 text-center text-slate-400 space-y-2">
                         <User className="w-8 h-8 mx-auto text-slate-300" />
-                        <p className="text-xs">No se encontraron clientes con los filtros seleccionados.</p>
+                        <p className="text-xs font-light">No se encontraron clientes con los filtros seleccionados.</p>
                       </div>
                     ) : customersViewMode === 'grid' ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 animate-fadeIn">
@@ -6451,15 +7173,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           return (
                             <div
                               key={cust.id}
-                              className="bg-white border border-slate-200/80 hover:border-[#0f2b48]/40 rounded-3xl p-6 hover:shadow-[0_8px_30px_rgba(15,43,72,0.06)] transition-all duration-300 flex flex-col justify-between space-y-5 group"
+                              className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-6 shadow-[0_4px_24px_rgba(11,25,44,0.03)] hover:shadow-md transition-all duration-300 flex flex-col justify-between space-y-4 group cursor-pointer hover:-translate-y-0.5"
+                              onClick={() => {
+                                setSelectedCustomer(cust);
+                                setCustomerDossierTab('profile');
+                              }}
                             >
-                              {/* Top: Monogram Avatar, Name, Location & 3 Dots Button */}
+                              {/* Top */}
                               <div className="space-y-4">
                                 <div className="flex items-start justify-between gap-3">
-                                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                                    <div
-                                      className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-sm tracking-wider shadow-2xs shrink-0 font-mono bg-slate-100 text-[#0f2b48] border border-slate-200`}
-                                    >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs shrink-0 font-mono bg-slate-100 text-[#0b192c] border border-slate-200 shadow-2xs">
                                       {cust.fullName
                                         .split(' ')
                                         .slice(0, 2)
@@ -6467,80 +7191,63 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         .join('')}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                      <h4
-                                        onClick={() => {
-                                          setSelectedCustomer(cust);
-                                          setCustomerDossierTab('profile');
-                                        }}
-                                        className="font-bold text-base text-[#0f2b48] leading-snug group-hover:text-sky-700 transition cursor-pointer"
-                                        title="Ver Ficha de Cliente"
-                                      >
+                                      <h4 className="font-serif font-bold text-sm text-[#0b192c] leading-snug truncate">
                                         {cust.fullName}
                                       </h4>
-                                      <div className="text-xs text-slate-500 font-light mt-0.5 truncate">
-                                        {cust.city} • <span className="font-mono text-slate-400 text-[11px]">{cust.rutOrPassport}</span>
+                                      <div className="text-[11px] text-slate-500 font-light mt-0.5 truncate">
+                                        {cust.city} • <span className="font-mono text-slate-400 text-[10px]">{cust.rutOrPassport}</span>
                                       </div>
                                     </div>
                                   </div>
 
-                                  {/* 3 Puntos Arriba para abrir Ficha de Cliente */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedCustomer(cust);
-                                      setCustomerDossierTab('profile');
-                                    }}
-                                    className="w-8 h-8 rounded-full bg-slate-50 hover:bg-[#0f2b48] text-slate-500 hover:text-white border border-slate-200/80 hover:border-[#0f2b48] flex items-center justify-center transition shadow-2xs hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-                                    title="Ver Ficha Completa del Cliente"
-                                  >
-                                    <MoreVertical className="w-4 h-4" />
-                                  </button>
+                                  <span className={`text-[9px] font-mono font-bold px-2.5 py-0.5 rounded-full uppercase ${
+                                    cust.category === 'vip' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-600'
+                                  }`}>
+                                    {cust.category === 'vip' ? 'VIP Gold' : 'Regular'}
+                                  </span>
                                 </div>
 
                                 {/* Metrics Strip */}
-                                <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50/80 border border-slate-200/80 rounded-2xl">
+                                <div className="grid grid-cols-2 gap-2 p-3.5 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl">
                                   <div>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block mb-1">
+                                    <span className="text-[10px] uppercase font-mono text-slate-400 font-bold block mb-0.5">
                                       Inversión LTV
                                     </span>
-                                    <div className="text-sm font-mono font-bold text-[#0f2b48]">
-                                      ${cust.totalSpentClp.toLocaleString('es-CL')}{' '}
-                                      <span className="text-[10px] text-slate-400 font-sans font-normal">CLP</span>
+                                    <div className="text-xs font-mono font-bold text-[#0b192c]">
+                                      ${cust.totalSpentClp.toLocaleString('es-CL')} <span className="text-[9px] text-slate-400 font-sans font-normal">CLP</span>
                                     </div>
                                   </div>
                                   <div className="border-l border-slate-200/80 pl-3 text-right">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block mb-1">
+                                    <span className="text-[10px] uppercase font-mono text-slate-400 font-bold block mb-0.5">
                                       Historial
                                     </span>
-                                    <div className="text-xs font-semibold text-[#0f2b48] mt-0.5">
+                                    <div className="text-xs font-semibold text-slate-800">
                                       {totalBookings} {totalBookings === 1 ? 'reserva' : 'reservas'}
                                     </div>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* Card Footer: WhatsApp Original Icon & Email Actions */}
-                              <div className="pt-2 border-t border-slate-100 flex items-center gap-2.5">
+                              {/* Card Footer */}
+                              <div className="pt-3 border-t border-slate-100 flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
                                 <a
                                   href={`https://wa.me/${cust.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
                                     `Hola estimado/a ${cust.fullName}, le contactamos desde Yates Chile & Lodge Rincón de Navegantes.`
                                   )}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex-1 py-2 px-3 rounded-xl bg-emerald-50 hover:bg-[#25D366] text-[#25D366] hover:text-white border border-emerald-200/80 hover:border-[#25D366] flex items-center justify-center gap-2 transition-all duration-200 shadow-2xs hover:shadow-xs cursor-pointer font-bold text-xs"
+                                  className="flex-1 py-2 px-3 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center gap-1.5 transition cursor-pointer font-semibold text-xs shadow-2xs"
                                   title="Contactar por WhatsApp"
                                 >
-                                  <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                    <path d="M12.004 2C6.48 2 2 6.48 2 12a9.92 9.92 0 0 0 1.54 5.3L2 22l4.83-1.27A9.97 9.97 0 0 0 12.004 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm5.27 13.91c-.24.66-1.38 1.27-1.93 1.35-.49.07-1.12.1-3.23-.77a11.16 11.16 0 0 1-4.84-4.25c-.84-1.12-1.34-2.43-1.34-3.8 0-1.39.73-2.07.97-2.33.24-.26.49-.33.66-.33.17 0 .34.01.49.02.16.01.37-.06.58.45.22.52.74 1.8.8 1.93.07.13.11.28.02.46-.09.18-.14.28-.28.45-.14.17-.3.38-.43.51-.15.15-.31.32-.13.63.18.31.81 1.33 1.74 2.16.93.83 1.71 1.09 1.95 1.21.24.12.38.1.52-.06.14-.16.61-.71.77-.95.16-.24.33-.2.55-.12.22.08 1.4.66 1.64.78.24.12.4.18.46.28.06.1.06.58-.18 1.24z" />
-                                  </svg>
+                                  <MessageSquare className="w-3.5 h-3.5" />
                                   <span>WhatsApp</span>
                                 </a>
                                 <a
                                   href={`mailto:${cust.email}?subject=${encodeURIComponent('Atención Concierge — Yates Chile')}`}
-                                  className="flex-1 py-2 px-3 rounded-xl bg-slate-50 hover:bg-[#0f2b48] text-slate-600 hover:text-white border border-slate-200 hover:border-[#0f2b48] flex items-center justify-center gap-2 transition-all duration-200 shadow-2xs hover:shadow-xs cursor-pointer font-bold text-xs"
+                                  className="flex-1 py-2 px-3 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center gap-1.5 transition cursor-pointer font-semibold text-xs shadow-2xs"
                                   title="Enviar Correo Electrónico"
                                 >
-                                  <Mail className="w-4 h-4" />
+                                  <Mail className="w-3.5 h-3.5" />
                                   <span>Email</span>
                                 </a>
                               </div>
@@ -6550,20 +7257,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </div>
                     ) : (
                       /* Table / List View of Customers */
-                      <div className="overflow-x-auto border border-slate-200/80 rounded-2xl animate-fadeIn">
+                      <div className="overflow-x-auto custom-scrollbar border border-slate-200/80 rounded-3xl shadow-2xs">
                         <table className="w-full text-left text-xs">
-                          <thead className="bg-[#fbfcfd] text-[#0f2b48]/70 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-200/70">
+                          <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                             <tr>
-                              <th className="px-6 py-3.5">Cliente</th>
-                              <th className="px-6 py-3.5">Categoría</th>
-                              <th className="px-6 py-3.5">Ubicación / Ciudad</th>
-                              <th className="px-6 py-3.5">Inversión LTV</th>
-                              <th className="px-6 py-3.5">Historial Reservas</th>
-                              <th className="px-6 py-3.5">Preferencias / Tags</th>
-                              <th className="px-6 py-3.5 text-right">Acciones</th>
+                              <th className="px-6 py-4">Cliente</th>
+                              <th className="px-6 py-4">Categoría</th>
+                              <th className="px-6 py-4">Ubicación / Ciudad</th>
+                              <th className="px-6 py-4">Inversión LTV</th>
+                              <th className="px-6 py-4">Historial Reservas</th>
+                              <th className="px-6 py-4">Preferencias / Tags</th>
+                              <th className="px-6 py-4 text-right">Acciones</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100 bg-white">
+                          <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                             {filteredCustomers.map((cust) => {
                               const custLodge = getCustomerLodgeBookings(cust);
                               const custExp = getCustomerExpBookings(cust);
@@ -6581,24 +7288,24 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     setSelectedCustomer(cust);
                                     setCustomerDossierTab('profile');
                                   }}
-                                  className="hover:bg-slate-50/80 transition cursor-pointer"
+                                  className="hover:bg-slate-50/80 transition-colors cursor-pointer"
                                 >
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                       <div
-                                        className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${
+                                        className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
                                           cust.category === 'vip'
-                                            ? 'bg-[#0f2b48] text-amber-300 border border-amber-400/30'
-                                            : 'bg-slate-100 text-[#0f2b48] border border-slate-200'
+                                            ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                            : 'bg-slate-100 text-slate-800 border border-slate-200'
                                         }`}
                                       >
                                         {monogram}
                                       </div>
                                       <div>
-                                        <strong className="text-[#0f2b48] font-bold text-sm block">
+                                        <strong className="text-[#0b192c] font-semibold text-xs block">
                                           {cust.fullName}
                                         </strong>
-                                        <span className="text-[11px] text-slate-400 font-mono">
+                                        <span className="text-[10px] text-slate-400 font-mono">
                                           {cust.rutOrPassport || cust.email}
                                         </span>
                                       </div>
@@ -6606,33 +7313,33 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   </td>
                                   <td className="px-6 py-4">
                                     {cust.category === 'vip' ? (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold font-mono tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-[#fef9ee] text-[#926c15] border border-[#f3e5b8]">
-                                        <Award className="w-3 h-3 text-amber-600" />
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold font-mono uppercase px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                                        <Award className="w-3.5 h-3.5 text-amber-600" />
                                         <span>VIP Gold</span>
                                       </span>
                                     ) : (
-                                      <span className="text-[10px] font-bold font-mono tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                      <span className="text-[10px] font-medium font-mono uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
                                         Regular
                                       </span>
                                     )}
                                   </td>
-                                  <td className="px-6 py-4 text-slate-600 font-medium">
-                                    <div className="flex items-center gap-1.5">
+                                  <td className="px-6 py-4 text-slate-600">
+                                    <div className="flex items-center gap-1">
                                       <MapPin className="w-3.5 h-3.5 text-slate-400" />
                                       <span>{cust.city || 'Chile'}</span>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 font-mono font-bold text-sm text-[#0f2b48]">
+                                  <td className="px-6 py-4 font-mono font-bold text-xs text-[#0b192c]">
                                     ${cust.totalSpentClp.toLocaleString('es-CL')}{' '}
                                     <span className="text-[10px] text-slate-400 font-sans font-normal">CLP</span>
                                   </td>
                                   <td className="px-6 py-4">
                                     <div className="space-y-0.5">
-                                      <strong className="text-[#0f2b48] font-bold text-xs block">
+                                      <strong className="text-slate-900 font-semibold text-xs block">
                                         {totalBookings} {totalBookings === 1 ? 'reserva' : 'reservas'}
                                       </strong>
                                       <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                                        {custExp.length > 0 && <span>{custExp.length} Expediciones</span>}
+                                        {custExp.length > 0 && <span>{custExp.length} Exp.</span>}
                                         {custExp.length > 0 && custLodge.length > 0 && <span>•</span>}
                                         {custLodge.length > 0 && <span>{custLodge.length} Lodge</span>}
                                       </div>
@@ -6643,16 +7350,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       {cust.tags?.slice(0, 2).map((tag, i) => (
                                         <span
                                           key={i}
-                                          className="text-[10px] px-2 py-0.5 bg-slate-50 border border-slate-200/60 text-slate-600 rounded-md font-medium"
+                                          className="text-[10px] px-2 py-0.5 bg-slate-50 border border-slate-200/80 text-slate-600 rounded-full font-medium"
                                         >
                                           {tag.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim()}
                                         </span>
                                       ))}
-                                      {cust.tags && cust.tags.length > 2 && (
-                                        <span className="text-[10px] text-slate-400 font-mono">
-                                          +{cust.tags.length - 2}
-                                        </span>
-                                      )}
                                     </div>
                                   </td>
                                   <td className="px-6 py-4 text-right">
@@ -6664,8 +7366,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                             e.stopPropagation();
                                             window.open(`https://wa.me/${cust.phone.replace(/[^0-9]/g, '')}`, '_blank');
                                           }}
-                                          title="Contactar por WhatsApp"
-                                          className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center transition cursor-pointer"
+                                          title="WhatsApp"
+                                          className="w-7 h-7 rounded-full text-emerald-700 hover:bg-emerald-50 flex items-center justify-center transition cursor-pointer"
                                         >
                                           <MessageSquare className="w-3.5 h-3.5" />
                                         </button>
@@ -6677,9 +7379,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                           setSelectedCustomer(cust);
                                           setCustomerDossierTab('profile');
                                         }}
-                                        className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-[#0f2b48] hover:text-white text-slate-700 text-xs font-bold transition cursor-pointer"
+                                        className="px-3 py-1 rounded-full bg-slate-100 hover:bg-[#0b192c] hover:text-white text-slate-700 text-xs font-semibold transition cursor-pointer"
                                       >
-                                        Ficha 360°
+                                        Ficha
                                       </button>
                                     </div>
                                   </td>
@@ -6698,214 +7400,215 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* SUB-VIEW B: GESTIÓN DE LEADS & PROSPECTOS (INTERESADOS) */}
               {/* ========================================================================= */}
               {crmActiveSubTab === 'leads' && (
-                <div className="space-y-6 animate-fadeIn">
+                <div className="space-y-7 animate-fadeIn">
                   
-                  {/* KPI Cards de Leads (Modern & Minimalist Design) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* KPI Cards de Leads */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {/* Total Leads */}
-                    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)] hover:shadow-[0_8px_30px_rgba(15,43,72,0.05)] hover:border-slate-300/80 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Total Leads Captados
                         </span>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight leading-none">
+                        <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-[#0b192c] border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
+                          <Users className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight">
                           {leads.length}
                         </div>
-                        <span className="text-[11px] text-slate-500 font-light block truncate pt-1">
-                          Brochure, Web & WhatsApp
+                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                          <span>Brochure, Web & WhatsApp</span>
                         </span>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-[#0f2b48] shrink-0 shadow-2xs">
-                        <Users className="w-5 h-5" />
                       </div>
                     </div>
 
                     {/* Nuevos por Atender */}
-                    <div className="bg-white border border-amber-200/70 rounded-3xl p-6 shadow-[0_4px_20px_rgba(245,158,11,0.03)] hover:shadow-[0_8px_30px_rgba(245,158,11,0.07)] hover:border-amber-300 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-amber-700 group-hover:text-amber-800 transition-colors">
                           Nuevos por Atender
                         </span>
-                        <div className="text-3xl font-mono font-bold text-amber-900 tracking-tight leading-none">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shadow-2xs group-hover:scale-105 transition-transform">
+                          <Flame className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-amber-700 tracking-tight">
                           {newLeadsCount}
                         </div>
-                        <span className="text-[11px] text-amber-700/80 font-light block truncate pt-1">
-                          Atención requerida
+                        <span className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span>Atención requerida</span>
                         </span>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-800 shrink-0 shadow-2xs">
-                        <Flame className="w-5 h-5" />
                       </div>
                     </div>
 
                     {/* En Cotización Activa */}
-                    <div className="bg-white border border-sky-200/70 rounded-3xl p-6 shadow-[0_4px_20px_rgba(14,165,233,0.03)] hover:shadow-[0_8px_30px_rgba(14,165,233,0.07)] hover:border-sky-300 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           En Cotización Activa
                         </span>
-                        <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight leading-none">
+                        <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform">
+                          <DollarSign className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-sky-800 tracking-tight">
                           {quotingLeadsCount}
                         </div>
-                        <span className="text-[11px] text-sky-600 font-medium block truncate pt-1">
-                          Propuestas enviadas
+                        <span className="text-xs text-sky-700 font-medium mt-2 flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
+                          <span>Propuestas enviadas</span>
                         </span>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-700 shrink-0 shadow-2xs">
-                        <DollarSign className="w-5 h-5" />
                       </div>
                     </div>
 
                     {/* Tasa de Conversión */}
-                    <div className="bg-white border border-emerald-200/70 rounded-3xl p-6 shadow-[0_4px_20px_rgba(16,185,129,0.03)] hover:shadow-[0_8px_30px_rgba(16,185,129,0.07)] hover:border-emerald-300 transition-all duration-300 flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
                           Tasa de Conversión
                         </span>
-                        <div className="text-3xl font-mono font-bold text-emerald-700 tracking-tight leading-none">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform">
+                          <TrendingUp className="w-5 h-5" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-extrabold font-sans text-emerald-700 tracking-tight">
                           {conversionRate}%
                         </div>
-                        <span className="text-[11px] text-emerald-600 font-medium block truncate pt-1">
-                          {convertedLeadsCount} convertidos a clientes
+                        <span className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          <span>{convertedLeadsCount} convertidos a clientes</span>
                         </span>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0 shadow-2xs">
-                        <TrendingUp className="w-5 h-5" />
                       </div>
                     </div>
                   </div>
 
                   {/* Directorio & Gestión de Leads */}
-                  <div className="bg-white border border-slate-200/80 rounded-3xl p-7 shadow-[0_4px_20px_rgba(15,43,72,0.02)] space-y-6">
+                  <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-[0_4px_24px_rgba(11,25,44,0.03)] space-y-5">
                     {/* Header: Título, Filtros, Buscador y Botón Registrar */}
                     <div className="space-y-4 border-b border-slate-100 pb-5">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                          <h3 className="font-bold text-lg text-[#0f2b48] flex items-center gap-2">
-                            <Users className="w-5 h-5 text-[#0f2b48]" />
+                          <h3 className="font-serif font-bold text-base text-[#0b192c] flex items-center gap-2">
+                            <Users className="w-4.5 h-4.5 text-[#0b192c]" />
                             <span>Directorio de Leads & Prospectos</span>
                           </h3>
                           <p className="text-xs text-slate-500 font-light mt-0.5">
-                            Gestiona el seguimiento, contacta por WhatsApp/correo y convierte prospectos en clientes contratados con un solo clic.
+                            Gestiona el seguimiento, contacta por WhatsApp/correo y convierte prospectos en clientes.
                           </p>
                         </div>
 
                         {/* Switcher Tarjetas / Lista y Botón Registrar */}
-                        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
-                          {/* View Mode Switcher: Cards (Grid) vs List (Table) */}
-                          <div className="flex items-center bg-slate-100/90 border border-slate-200/80 p-1 rounded-full shadow-2xs">
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
                             <button
                               type="button"
                               onClick={() => setLeadsViewMode('grid')}
-                              title="Vista de Tarjetas / Cards"
-                              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold transition-all duration-150 cursor-pointer ${
-                                leadsViewMode === 'grid'
-                                  ? 'bg-[#0f2b48] text-white shadow-xs'
-                                  : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/60'
+                              title="Vista de Tarjetas"
+                              className={`p-1.5 rounded-full transition cursor-pointer ${
+                                leadsViewMode === 'grid' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
                               }`}
                             >
                               <LayoutGrid className="w-3.5 h-3.5" />
-                              <span className="text-[11px]">Tarjetas</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setLeadsViewMode('list')}
-                              title="Vista de Lista / Tabla"
-                              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold transition-all duration-150 cursor-pointer ${
-                                leadsViewMode === 'list'
-                                  ? 'bg-[#0f2b48] text-white shadow-xs'
-                                  : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/60'
+                              title="Vista de Lista"
+                              className={`p-1.5 rounded-full transition cursor-pointer ${
+                                leadsViewMode === 'list' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
                               }`}
                             >
                               <List className="w-3.5 h-3.5" />
-                              <span className="text-[11px]">Lista</span>
                             </button>
                           </div>
 
                           <button
                             type="button"
                             onClick={() => setShowNewLeadModal(true)}
-                            className="bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-5 py-2.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-md hover:scale-105 cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1.5 bg-[#0b192c] hover:bg-[#182a44] text-white px-4 py-2 rounded-full text-xs font-semibold transition shadow-xs cursor-pointer active:scale-95"
                           >
-                            <Plus className="w-4 h-4 text-sky-300" />
-                            <span>+ Registrar Lead</span>
+                            <Plus className="w-3.5 h-3.5 text-sky-300" />
+                            <span>Nuevo Lead</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* Barra de Búsqueda Full-Width abajo */}
-                      <div className="relative w-full">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Buscar lead por nombre, email, teléfono, origen o palabras clave..."
-                          value={leadSearchQuery}
-                          onChange={(e) => setLeadSearchQuery(e.target.value)}
-                          className="w-full bg-[#fbfcfd] border border-slate-200/90 rounded-full pl-11 pr-10 py-2.5 text-xs text-[#0f2b48] placeholder:text-slate-400 focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs font-medium"
-                        />
-                        {leadSearchQuery && (
-                          <button
-                            type="button"
-                            onClick={() => setLeadSearchQuery('')}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Filter Pills (Estado y Origen) */}
-                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                        {/* Estado Pills */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono mr-1">
-                            Estado:
-                          </span>
-                          {[
-                            { id: 'all', label: 'Todos', count: leads.length },
-                            { id: 'nuevo', label: 'Nuevos', count: newLeadsCount },
-                            { id: 'contactado', label: 'Contactados', count: contactedLeadsCount },
-                            { id: 'cotizando', label: 'En Cotización', count: quotingLeadsCount },
-                            { id: 'convertido', label: 'Convertidos', count: convertedLeadsCount },
-                            { id: 'descartado', label: 'Descartados', count: discardedLeadsCount },
-                          ].map((tab) => (
+                      {/* Barra de Búsqueda y Filtros */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                        <div className="relative w-full max-w-md">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Buscar lead por nombre, email, teléfono..."
+                            value={leadSearchQuery}
+                            onChange={(e) => setLeadSearchQuery(e.target.value)}
+                            className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 focus:border-[#0b192c] rounded-full pl-9.5 pr-8 py-2 text-xs text-[#0b192c] placeholder:text-slate-400 focus:outline-none transition shadow-2xs"
+                          />
+                          {leadSearchQuery && (
                             <button
-                              key={tab.id}
-                              onClick={() => setLeadStatusFilter(tab.id as any)}
-                              className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                                leadStatusFilter === tab.id
-                                  ? 'bg-[#0f2b48] text-white shadow-xs font-bold'
-                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80'
-                              }`}
+                              type="button"
+                              onClick={() => setLeadSearchQuery('')}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
                             >
-                              <span>{tab.label}</span>
-                              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                                leadStatusFilter === tab.id ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
-                              }`}>
-                                {tab.count}
-                              </span>
+                              ✕
                             </button>
-                          ))}
+                          )}
                         </div>
 
                         {/* Origen Selector */}
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                          <span className="text-[10px] uppercase font-mono font-bold text-slate-400">
                             Origen:
                           </span>
                           <select
                             value={leadOriginFilter}
                             onChange={(e) => setLeadOriginFilter(e.target.value)}
-                            className="bg-[#fbfcfd] border border-slate-200 rounded-xl px-3 py-1 text-xs font-semibold text-[#0f2b48] focus:outline-none"
+                            className="bg-[#f4f7fb] border border-slate-200/90 rounded-full px-3 py-1.5 text-xs font-semibold text-[#0b192c] focus:outline-none focus:border-[#0b192c] cursor-pointer"
                           >
                             <option value="all">Todos los Canales</option>
-                            <option value="brochure">📥 Descarga Brochure PDF</option>
+                            <option value="brochure">📥 Brochure PDF</option>
                             <option value="contacto_web">🌐 Formulario Web</option>
-                            <option value="lodge_interest">🏡 Interés Lodge</option>
-                            <option value="whatsapp">💬 WhatsApp Directo</option>
-                            <option value="manual">✍️ Registro Manual</option>
+                            <option value="lodge_interest">🏡 Lodge</option>
+                            <option value="whatsapp">💬 WhatsApp</option>
+                            <option value="manual">✍️ Manual</option>
                           </select>
                         </div>
+                      </div>
+
+                      {/* Segmented Status Filters */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        {[
+                          { id: 'all', label: 'Todos', count: leads.length },
+                          { id: 'nuevo', label: 'Nuevos', count: newLeadsCount },
+                          { id: 'contactado', label: 'Contactados', count: contactedLeadsCount },
+                          { id: 'cotizando', label: 'En Cotización', count: quotingLeadsCount },
+                          { id: 'convertido', label: 'Convertidos', count: convertedLeadsCount },
+                          { id: 'descartado', label: 'Descartados', count: discardedLeadsCount },
+                        ].map((tab) => (
+                          <button
+                            key={tab.id}
+                            onClick={() => setLeadStatusFilter(tab.id as any)}
+                            className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer flex items-center gap-1.5 ${
+                              leadStatusFilter === tab.id
+                                ? 'bg-[#0b192c] text-white font-semibold shadow-xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                            }`}
+                          >
+                            <span>{tab.label}</span>
+                            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                              leadStatusFilter === tab.id ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
+                            }`}>
+                              {tab.count}
+                            </span>
+                          </button>
+                        ))}
                       </div>
                     </div>
 
@@ -6913,7 +7616,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     {filteredLeads.length === 0 ? (
                       <div className="p-12 text-center text-slate-400 space-y-2">
                         <Users className="w-8 h-8 mx-auto text-slate-300" />
-                        <p className="text-xs">No se encontraron prospectos con los filtros seleccionados.</p>
+                        <p className="text-xs font-light">No se encontraron prospectos con los filtros seleccionados.</p>
                       </div>
                     ) : leadsViewMode === 'grid' ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 animate-fadeIn">
@@ -6926,7 +7629,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               : lead.status === 'cotizando'
                               ? { bg: 'bg-indigo-50 text-indigo-800 border-indigo-200', label: 'En Cotización' }
                               : lead.status === 'convertido'
-                              ? { bg: 'bg-emerald-50 text-emerald-800 border-emerald-200', label: 'Convertido a Cliente' }
+                              ? { bg: 'bg-emerald-50 text-emerald-800 border-emerald-200', label: 'Convertido' }
                               : { bg: 'bg-slate-100 text-slate-600 border-slate-200', label: 'Descartado' };
 
                           const OriginIcon =
@@ -6939,65 +7642,63 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           return (
                             <div
                               key={lead.id}
-                              className={`bg-white border rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between space-y-5 shadow-[0_4px_20px_rgba(15,43,72,0.02)] ${
+                              className={`bg-white border rounded-3xl p-6 transition flex flex-col justify-between space-y-4 shadow-[0_4px_24px_rgba(11,25,44,0.03)] hover:shadow-md ${
                                 lead.status === 'convertido'
                                   ? 'border-emerald-200/80 bg-emerald-50/10'
-                                  : 'border-slate-200/80 hover:border-[#0f2b48]/40 hover:shadow-[0_8px_30px_rgba(15,43,72,0.06)]'
+                                  : 'border-slate-200/80 hover:border-slate-300'
                               }`}
                             >
-                              <div className="space-y-4">
+                              <div className="space-y-3.5">
                                 {/* Top: Monogram & Status */}
-                                <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start justify-between gap-2.5">
                                   <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-[#0f2b48] tracking-wider shrink-0">
+                                    <div className="w-9 h-9 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-[#0b192c] shrink-0 font-mono shadow-2xs">
                                       {lead.fullName.split(' ').slice(0, 2).map((n) => n[0]).join('')}
                                     </div>
                                     <div className="min-w-0">
-                                      <h4 className="font-bold text-sm text-[#0f2b48] leading-snug truncate">
+                                      <h4 className="font-serif font-bold text-sm text-[#0b192c] leading-snug truncate">
                                         {lead.fullName}
                                       </h4>
                                       <span className="text-[11px] text-slate-400 font-light block truncate">
-                                        {lead.city || 'Chile'} • <span className="font-mono">{lead.dateCreated}</span>
+                                        {lead.city || 'Chile'} • <span className="font-mono text-[10px]">{lead.dateCreated}</span>
                                       </span>
                                     </div>
                                   </div>
 
-                                  <div className="relative shrink-0">
-                                    <select
-                                      value={lead.status}
-                                      onChange={(e) => updateLeadStatus(lead.id, e.target.value as any)}
-                                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none ${statusTheme.bg}`}
-                                    >
-                                      <option value="nuevo">🟡 Nuevo</option>
-                                      <option value="contactado">🔵 Contactado</option>
-                                      <option value="cotizando">🟣 Cotizando</option>
-                                      <option value="convertido">🟢 Convertido</option>
-                                      <option value="descartado">⚪ Descartado</option>
-                                    </select>
-                                  </div>
+                                  <select
+                                    value={lead.status}
+                                    onChange={(e) => updateLeadStatus(lead.id, e.target.value as any)}
+                                    className={`text-[10px] font-mono font-bold px-3 py-1 rounded-full border cursor-pointer focus:outline-none ${statusTheme.bg}`}
+                                  >
+                                    <option value="nuevo">Nuevo</option>
+                                    <option value="contactado">Contactado</option>
+                                    <option value="cotizando">Cotizando</option>
+                                    <option value="convertido">Convertido</option>
+                                    <option value="descartado">Descartado</option>
+                                  </select>
                                 </div>
 
                                 {/* Origin Channel Badge */}
-                                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200/70 px-3 py-1.5 rounded-xl">
-                                  <OriginIcon className="w-3.5 h-3.5 text-sky-700 shrink-0" />
-                                  <span className="truncate font-medium">{lead.originDetails}</span>
+                                <div className="flex items-center gap-2 text-xs text-slate-600 bg-[#fbfcfd] border border-slate-200/80 px-3 py-1.5 rounded-full">
+                                  <OriginIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                  <span className="truncate font-semibold text-[11px]">{lead.originDetails}</span>
                                 </div>
 
                                 {/* Contact & Trip Details */}
                                 <div className="grid grid-cols-2 gap-2 p-3 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl text-[11px]">
                                   <div>
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                                    <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">
                                       Interés / Pax
                                     </span>
-                                    <span className="font-bold text-[#0f2b48] block mt-0.5 capitalize truncate">
+                                    <span className="font-semibold text-[#0b192c] block mt-0.5 capitalize truncate">
                                       {lead.interestType} • {lead.estimatedPax || 2} pax
                                     </span>
                                   </div>
-                                  <div className="border-l border-slate-200/80 pl-2">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                                  <div className="border-l border-slate-200/80 pl-2.5">
+                                    <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">
                                       Fecha / Presupuesto
                                     </span>
-                                    <span className="font-bold text-[#0f2b48] block mt-0.5 font-mono text-[10px] truncate">
+                                    <span className="font-semibold text-[#0b192c] block mt-0.5 font-mono text-[10px] truncate">
                                       {lead.tentativeDate || 'Flexible'} {lead.estimatedBudgetClp ? `• $${Number(lead.estimatedBudgetClp).toLocaleString('es-CL')}` : ''}
                                     </span>
                                   </div>
@@ -7005,79 +7706,74 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                                 {/* Notes Box */}
                                 {lead.notes && (
-                                  <div className="p-3 bg-white border border-slate-200/70 rounded-xl text-xs text-slate-600 font-light leading-relaxed">
+                                  <div className="p-3 bg-white border border-slate-200/80 rounded-xl text-[11px] text-slate-600 font-light leading-relaxed">
                                     <p className="line-clamp-2">{lead.notes}</p>
                                   </div>
                                 )}
                               </div>
 
-                              {/* Card Footer: Conversion & Direct Actions */}
+                              {/* Card Footer */}
                               <div className="space-y-2 pt-3 border-t border-slate-100">
                                 <div className="flex items-center gap-2">
-                                  {/* WhatsApp Direct */}
-                                  {lead.phone ? (
+                                  {lead.phone && (
                                     <a
                                       href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                                        `Hola ${lead.fullName}, te contacto desde Yates Chile respecto a tu consulta sobre ${lead.interestType === 'lodge' ? 'Lodge Rincón de Navegantes' : 'nuestras expediciones náuticas'}. ¿Cómo podemos ayudarte?`
+                                        `Hola ${lead.fullName}, te contacto desde Yates Chile respecto a tu consulta sobre ${lead.interestType === 'lodge' ? 'Lodge Rincón de Navegantes' : 'nuestras expediciones náuticas'}.`
                                       )}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition shadow-2xs shrink-0 cursor-pointer"
-                                      title="Contactar por WhatsApp"
+                                      className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center transition cursor-pointer border border-emerald-200"
+                                      title="WhatsApp"
                                     >
-                                      <MessageSquare className="w-4 h-4" />
+                                      <MessageSquare className="w-3.5 h-3.5" />
                                     </a>
-                                  ) : null}
+                                  )}
 
-                                  {/* Mail Direct */}
-                                  {lead.email ? (
+                                  {lead.email && (
                                     <a
-                                      href={`mailto:${lead.email}?subject=${encodeURIComponent('Información & Propuesta de Travesía — Yates Chile')}`}
-                                      className="w-9 h-9 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 flex items-center justify-center transition shadow-2xs shrink-0 cursor-pointer"
-                                      title="Enviar Correo"
+                                      href={`mailto:${lead.email}?subject=${encodeURIComponent('Información & Propuesta — Yates Chile')}`}
+                                      className="w-8 h-8 rounded-full bg-sky-50 text-sky-700 hover:bg-sky-100 flex items-center justify-center transition cursor-pointer border border-sky-200"
+                                      title="Correo"
                                     >
-                                      <Mail className="w-4 h-4" />
+                                      <Mail className="w-3.5 h-3.5" />
                                     </a>
-                                  ) : null}
+                                  )}
 
-                                  {/* Edit Notes Button */}
                                   <button
                                     onClick={() => {
                                       setEditingLeadNotes(lead);
                                       setLeadNotesText(lead.notes || '');
                                     }}
-                                    className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center transition shadow-2xs shrink-0 cursor-pointer"
-                                    title="Editar Notas de Seguimiento"
+                                    className="w-8 h-8 rounded-full bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer border border-slate-200/80"
+                                    title="Notas"
                                   >
-                                    <FileText className="w-4 h-4" />
+                                    <FileText className="w-3.5 h-3.5" />
                                   </button>
 
-                                  {/* Main Action: Convert to Customer */}
                                   {lead.status !== 'convertido' ? (
                                     <button
                                       onClick={() => handleConvertLeadToClient(lead)}
-                                      className="flex-1 bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold py-2 px-3 rounded-xl text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02]"
+                                      className="flex-1 bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-2 px-3 rounded-full text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                                     >
                                       <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                                      <span>Convertir a Cliente</span>
+                                      <span>Convertir</span>
                                     </button>
                                   ) : (
-                                    <div className="flex-1 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold py-2 px-3 rounded-xl text-xs text-center">
+                                    <div className="flex-1 bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold py-1.5 px-3 rounded-full text-[11px] text-center">
                                       ✓ Cliente Activo
                                     </div>
                                   )}
 
-                                  {/* Delete button */}
                                   <button
                                     onClick={() => {
                                       if (confirm(`¿Eliminar al prospecto ${lead.fullName}?`)) {
                                         deleteLead(lead.id);
                                       }
                                     }}
-                                    className="text-slate-300 hover:text-rose-600 p-1.5 transition cursor-pointer"
-                                    title="Eliminar Lead"
+                                    className="w-8 h-8 rounded-full text-slate-300 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
+                                    title="Eliminar"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               </div>
@@ -7087,29 +7783,29 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </div>
                     ) : (
                       /* Table / List View of Leads */
-                      <div className="overflow-x-auto border border-slate-200/80 rounded-2xl animate-fadeIn">
+                      <div className="overflow-x-auto custom-scrollbar border border-slate-200/80 rounded-3xl shadow-2xs">
                         <table className="w-full text-left text-xs">
-                          <thead className="bg-[#fbfcfd] text-[#0f2b48]/70 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-200/70">
+                          <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                             <tr>
-                              <th className="px-6 py-3.5">Prospecto</th>
-                              <th className="px-6 py-3.5">Canal de Origen</th>
-                              <th className="px-6 py-3.5">Estado de Gestión</th>
-                              <th className="px-6 py-3.5">Interés & Pax</th>
-                              <th className="px-6 py-3.5">Fecha / Presupuesto</th>
-                              <th className="px-6 py-3.5 text-right">Acciones</th>
+                              <th className="px-6 py-4">Prospecto</th>
+                              <th className="px-6 py-4">Canal de Origen</th>
+                              <th className="px-6 py-4">Estado</th>
+                              <th className="px-6 py-4">Interés & Pax</th>
+                              <th className="px-6 py-4">Fecha / Presupuesto</th>
+                              <th className="px-6 py-4 text-right">Acciones</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-100 bg-white">
+                          <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                             {filteredLeads.map((lead) => {
                               const statusTheme =
                                 lead.status === 'nuevo'
-                                  ? { bg: 'bg-amber-50 text-amber-800 border-amber-200', label: 'Nuevo Lead' }
+                                  ? { bg: 'bg-amber-50 text-amber-800 border-amber-200', label: 'Nuevo' }
                                   : lead.status === 'contactado'
                                   ? { bg: 'bg-sky-50 text-sky-800 border-sky-200', label: 'Contactado' }
                                   : lead.status === 'cotizando'
-                                  ? { bg: 'bg-indigo-50 text-indigo-800 border-indigo-200', label: 'En Cotización' }
+                                  ? { bg: 'bg-indigo-50 text-indigo-800 border-indigo-200', label: 'Cotizando' }
                                   : lead.status === 'convertido'
-                                  ? { bg: 'bg-emerald-50 text-emerald-800 border-emerald-200', label: 'Convertido a Cliente' }
+                                  ? { bg: 'bg-emerald-50 text-emerald-800 border-emerald-200', label: 'Convertido' }
                                   : { bg: 'bg-slate-100 text-slate-600 border-slate-200', label: 'Descartado' };
 
                               const OriginIcon =
@@ -7126,53 +7822,53 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 .join('');
 
                               return (
-                                <tr key={lead.id} className="hover:bg-slate-50/80 transition">
+                                <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors">
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                      <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-[#0f2b48] tracking-wider shrink-0">
+                                      <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-[#0b192c] shrink-0 font-mono shadow-2xs">
                                         {monogram}
                                       </div>
                                       <div>
-                                        <strong className="text-[#0f2b48] font-bold text-sm block">
+                                        <strong className="text-[#0b192c] font-semibold text-xs block">
                                           {lead.fullName}
                                         </strong>
-                                        <span className="text-[11px] text-slate-400 font-light">
+                                        <span className="text-[10px] text-slate-400 font-light">
                                           {lead.city || 'Chile'} • <span className="font-mono">{lead.dateCreated}</span>
                                         </span>
                                       </div>
                                     </div>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <div className="inline-flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200/70 px-2.5 py-1 rounded-full">
-                                      <OriginIcon className="w-3.5 h-3.5 text-sky-700 shrink-0" />
-                                      <span className="font-medium">{lead.originDetails}</span>
+                                    <div className="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-full">
+                                      <OriginIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                      <span className="text-[11px] font-medium">{lead.originDetails}</span>
                                     </div>
                                   </td>
                                   <td className="px-6 py-4">
                                     <select
                                       value={lead.status}
                                       onChange={(e) => updateLeadStatus(lead.id, e.target.value as any)}
-                                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none shadow-2xs ${statusTheme.bg}`}
+                                      className={`text-[10px] font-mono font-bold px-3 py-1 rounded-full border cursor-pointer focus:outline-none ${statusTheme.bg}`}
                                     >
-                                      <option value="nuevo">🟡 Nuevo</option>
-                                      <option value="contactado">🔵 Contactado</option>
-                                      <option value="cotizando">🟣 Cotizando</option>
-                                      <option value="convertido">🟢 Convertido</option>
-                                      <option value="descartado">⚪ Descartado</option>
+                                      <option value="nuevo">Nuevo</option>
+                                      <option value="contactado">Contactado</option>
+                                      <option value="cotizando">Cotizando</option>
+                                      <option value="convertido">Convertido</option>
+                                      <option value="descartado">Descartado</option>
                                     </select>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <strong className="text-[#0f2b48] font-bold text-xs block capitalize">
+                                    <strong className="text-slate-900 font-semibold text-xs block capitalize">
                                       {lead.interestType}
                                     </strong>
                                     <span className="text-[10px] text-slate-400 font-mono">
-                                      {lead.estimatedPax || 2} pasajeros
+                                      {lead.estimatedPax || 2} pax
                                     </span>
                                   </td>
                                   <td className="px-6 py-4 font-mono text-[11px] text-slate-600">
                                     <div>{lead.tentativeDate || 'Flexible'}</div>
                                     {lead.estimatedBudgetClp && (
-                                      <strong className="text-[#0f2b48] text-xs font-bold">
+                                      <strong className="text-[#0b192c] text-xs font-bold">
                                         ${Number(lead.estimatedBudgetClp).toLocaleString('es-CL')} CLP
                                       </strong>
                                     )}
@@ -7182,42 +7878,22 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       {lead.phone && (
                                         <a
                                           href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                                            `Hola ${lead.fullName}, te contacto desde Yates Chile respecto a tu consulta sobre ${lead.interestType === 'lodge' ? 'Lodge Rincón de Navegantes' : 'nuestras expediciones náuticas'}.`
+                                            `Hola ${lead.fullName}, te contacto desde Yates Chile.`
                                           )}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center justify-center transition cursor-pointer"
+                                          className="w-7 h-7 rounded-full text-emerald-700 hover:bg-emerald-50 flex items-center justify-center transition cursor-pointer"
                                           title="WhatsApp"
                                         >
                                           <MessageSquare className="w-3.5 h-3.5" />
                                         </a>
                                       )}
-                                      {lead.email && (
-                                        <a
-                                          href={`mailto:${lead.email}?subject=${encodeURIComponent('Información & Propuesta — Yates Chile')}`}
-                                          className="w-8 h-8 rounded-full bg-sky-50 text-sky-700 hover:bg-sky-100 flex items-center justify-center transition cursor-pointer"
-                                          title="Correo"
-                                        >
-                                          <Mail className="w-3.5 h-3.5" />
-                                        </a>
-                                      )}
-                                      <button
-                                        onClick={() => {
-                                          setEditingLeadNotes(lead);
-                                          setLeadNotesText(lead.notes || '');
-                                        }}
-                                        className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer"
-                                        title="Notas"
-                                      >
-                                        <FileText className="w-3.5 h-3.5" />
-                                      </button>
                                       {lead.status !== 'convertido' && (
                                         <button
                                           onClick={() => handleConvertLeadToClient(lead)}
-                                          className="px-3 py-1.5 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                                          className="px-3 py-1 bg-[#0b192c] hover:bg-[#182a44] text-white text-xs font-semibold rounded-full transition cursor-pointer"
                                         >
-                                          <Sparkles className="w-3 h-3 text-amber-300" />
-                                          <span>Convertir</span>
+                                          Convertir
                                         </button>
                                       )}
                                       <button
@@ -7226,7 +7902,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                             deleteLead(lead.id);
                                           }
                                         }}
-                                        className="w-8 h-8 rounded-full text-slate-300 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
+                                        className="w-7 h-7 rounded-full text-slate-300 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
                                         title="Eliminar"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -7250,39 +7926,39 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           {/* TAB 3: SERVICES & ACTIVITIES CATALOG */}
           {/* ========================================================================= */}
           {activeTab === 'services' && (
-            <div className="space-y-6">
+            <div className="space-y-7">
               {/* Header Bar with Title and Action Button */}
-              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_20px_rgba(15,43,72,0.02)] flex flex-wrap items-center justify-between gap-4">
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-[0_4px_24px_rgba(11,25,44,0.03)] flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h3 className="font-serif text-lg font-bold text-[#0f2b48] flex items-center gap-2">
-                    <Tag className="w-5 h-5 text-[#0f2b48]" />
+                  <h3 className="text-base font-serif font-bold text-[#0b192c] flex items-center gap-2">
+                    <Tag className="w-4.5 h-4.5 text-[#0b192c]" />
                     <span>Catálogo de Experiencias & Actividades</span>
                   </h3>
                   <p className="text-xs text-slate-500 font-light mt-0.5">
-                    Controla las excursiones guiadas, actividades de buceo, cabalgatas y trekkings del catálogo.
+                    Controla las excursiones guiadas, actividades náuticas, buceo y expediciones del catálogo.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowNewServiceModal(true)}
-                  className="bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-xs flex items-center gap-2 cursor-pointer"
+                  className="bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold px-5 py-2 rounded-full text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  <Plus className="w-4 h-4 text-sky-300" />
-                  <span>+ Agregar Experiencia</span>
+                  <Plus className="w-3.5 h-3.5 text-sky-300" />
+                  <span>Nueva Experiencia</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {services.map((svc) => (
                   <div
                     key={svc.id}
-                    className={`bg-white border rounded-3xl overflow-hidden flex flex-col justify-between transition-all duration-300 shadow-[0_4px_20px_rgba(15,43,72,0.02)] ${
-                      svc.is_active ? 'border-slate-200/80 hover:border-[#0f2b48]/40' : 'border-slate-200 opacity-60'
+                    className={`bg-white border rounded-3xl overflow-hidden flex flex-col justify-between transition-all duration-300 shadow-[0_4px_24px_rgba(11,25,44,0.03)] hover:shadow-md hover:-translate-y-0.5 ${
+                      svc.is_active ? 'border-slate-200/80 hover:border-slate-300' : 'border-slate-200 opacity-60'
                     }`}
                   >
                     {svc.image_url && (
-                      <div className="h-44 w-full relative">
-                        <img src={svc.image_url} alt={svc.name} className="w-full h-full object-cover" />
-                        <span className="absolute top-3.5 left-3.5 bg-[#0f2b48]/90 backdrop-blur-md text-white text-[10px] font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                      <div className="h-44 w-full relative bg-slate-100 overflow-hidden">
+                        <img src={svc.image_url} alt={svc.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <span className="absolute top-3 left-3 bg-[#0b192c]/85 backdrop-blur-md text-white text-[9px] font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-xs">
                           {svc.category}
                         </span>
                       </div>
@@ -7290,32 +7966,32 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                     <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
                       <div>
-                        <h4 className="font-serif text-base font-bold text-[#0f2b48] leading-tight">
+                        <h4 className="text-sm font-serif font-bold text-[#0b192c] leading-snug">
                           {svc.name}
                         </h4>
-                        <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed font-light">
                           {svc.description}
                         </p>
                       </div>
 
                       <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                         <div>
-                          <span className="text-[10px] text-slate-400 block font-medium font-mono">
+                          <span className="text-[10px] text-slate-400 block font-mono font-medium">
                             {svc.duration_label || 'Duración flexible'}
                           </span>
-                          <span className="text-base font-mono font-bold text-[#0f2b48]">
+                          <span className="text-sm font-mono font-bold text-[#0b192c]">
                             ${svc.price_clp.toLocaleString('es-CL')}{' '}
-                            <span className="text-[10px] font-sans font-normal text-slate-500">CLP</span>
+                            <span className="text-[10px] font-sans font-normal text-slate-400">CLP</span>
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button
                             onClick={async () => {
                               await toggleServiceActive(svc.id, !svc.is_active);
                               refreshServices();
                             }}
-                            className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                            className={`text-xs font-semibold px-3.5 py-1.5 rounded-full transition cursor-pointer active:scale-95 shadow-2xs ${
                               svc.is_active
                                 ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                 : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
@@ -7330,9 +8006,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 refreshServices();
                               }
                             }}
-                            className="text-slate-400 hover:text-rose-600 p-1.5 transition cursor-pointer"
+                            className="text-slate-300 hover:text-rose-600 w-7 h-7 rounded-full flex items-center justify-center hover:bg-rose-50 transition cursor-pointer"
+                            title="Eliminar"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -7362,11 +8039,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       </div>
 
       {/* ========================================================================= */}
-      {/* MODAL CONFIRMACIÓN: BLOQUEO AIRBNB DIRECTO */}
+      {/* MODAL: CONFIRMAR BLOQUEO AIRBNB */}
       {/* ========================================================================= */}
       {airbnbConfirmModal?.isOpen && airbnbConfirmModal.room && (
-        <div className="fixed inset-0 z-50 bg-[#0a1e34]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(15,43,72,0.25)] space-y-6 animate-scale-in">
+        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.2)] space-y-6 animate-scale-in">
             {/* Header with Airbnb brand identity */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3.5">
@@ -7377,7 +8054,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   <span className="text-[10px] uppercase font-mono tracking-wider text-[#FF385C] font-bold block">
                     Sincronización Airbnb
                   </span>
-                  <h3 className="font-serif text-xl font-bold text-[#0f2b48]">
+                  <h3 className="font-serif text-xl font-bold text-[#0b192c]">
                     Confirmar Bloqueo
                   </h3>
                 </div>
@@ -7393,16 +8070,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             </div>
 
             {/* Room & Date details card */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+            <div className="bg-[#f4f7fb] border border-slate-200/80 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
                 <span className="text-xs text-slate-500 font-medium">Habitación:</span>
-                <span className="text-xs font-bold text-[#0f2b48] font-serif">
-                  #{airbnbConfirmModal.room.room_number} {airbnbConfirmModal.room.room_name}
+                <span className="text-xs font-bold text-[#0b192c] font-serif">
+                  {airbnbConfirmModal.room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim()}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-500 font-medium">Fecha de Estadía:</span>
-                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-800">
+                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#0b192c]">
                   <Calendar className="w-3.5 h-3.5 text-[#FF385C]" />
                   <span>
                     {(() => {
@@ -7419,7 +8096,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             </div>
 
             {/* Information alert */}
-            <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5 flex items-start gap-2.5 text-amber-900 text-xs">
+            <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-3.5 flex items-start gap-2.5 text-amber-900 text-xs">
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <p className="leading-relaxed text-[11px]">
                 Al confirmar, esta habitación pasará automáticamente a estado <strong>OCUPADA</strong> en esa fecha y el bloqueo quedará registrado de forma permanente en la base de datos.
@@ -7432,7 +8109,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 type="button"
                 disabled={isSavingAirbnbBlock}
                 onClick={() => setAirbnbConfirmModal(null)}
-                className="w-1/2 py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-xs transition cursor-pointer text-center"
+                className="w-1/2 py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold text-xs transition cursor-pointer text-center"
               >
                 Rechazar
               </button>
@@ -7440,7 +8117,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 type="button"
                 disabled={isSavingAirbnbBlock}
                 onClick={handleConfirmAirbnbBlock}
-                className="w-1/2 py-3 px-4 rounded-2xl bg-[#FF385C] hover:bg-[#E00B41] active:bg-[#D70466] text-white font-bold text-xs transition shadow-md shadow-[#FF385C]/25 hover:shadow-lg hover:shadow-[#FF385C]/35 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-1/2 py-2.5 px-4 rounded-full bg-[#FF385C] hover:bg-[#E00B41] active:bg-[#D70466] text-white font-semibold text-xs transition shadow-md shadow-[#FF385C]/25 hover:shadow-lg hover:shadow-[#FF385C]/35 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
               >
                 {isSavingAirbnbBlock ? (
                   <>
@@ -7463,20 +8140,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: RESERVAR HOSPEDAJE (4-STEP HOTEL RESERVATION WIZARD) */}
       {/* ========================================================================= */}
       {showBlockModal && (
-        <div className="fixed inset-0 z-50 bg-[#0a1e34]/55 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-xl w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_60px_rgba(15,43,72,0.22)] space-y-5 animate-scale-in my-8">
+        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="max-w-xl w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_60px_rgba(11,25,44,0.22)] space-y-5 animate-scale-in my-8">
             
             {/* Header with Title & Close */}
-            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-200 text-[#0f2b48] flex items-center justify-center shadow-xs shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-200 text-[#0b192c] flex items-center justify-center shadow-xs shrink-0">
                   <BedDouble className="w-5 h-5 text-sky-700" />
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-mono tracking-widest text-[#0f2b48]/70 font-bold block">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
                     Lodge Rincón de Navegantes
                   </span>
-                  <h4 className="font-serif text-xl font-bold text-[#0f2b48]">Reservar Hospedaje</h4>
+                  <h4 className="font-serif text-xl font-bold text-[#0b192c]">Reservar Hospedaje</h4>
                 </div>
               </div>
               <button
@@ -7484,10 +8161,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   setShowBlockModal(false);
                   setReservationWizardStep(1);
                 }}
-                className="text-slate-400 hover:text-[#0f2b48] transition cursor-pointer p-1"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
                 title="Cerrar modal"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
@@ -7505,10 +8182,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   <div
                     key={s.step}
                     onClick={() => {
-                      // Allow jumping back to earlier steps
                       if (isPassed) setReservationWizardStep(s.step as any);
                     }}
-                    className={`rounded-xl py-2 px-1 text-center transition ${
+                    className={`rounded-2xl py-2 px-1 text-center transition ${
                       isPassed ? 'cursor-pointer' : ''
                     }`}
                   >
@@ -7516,7 +8192,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <div
                         className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-mono transition ${
                           isActive
-                            ? 'bg-[#0f2b48] text-white shadow-xs'
+                            ? 'bg-[#0b192c] text-white shadow-xs'
                             : isPassed
                             ? 'bg-emerald-500 text-white'
                             : 'bg-slate-100 text-slate-400'
@@ -7528,7 +8204,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <span
                       className={`text-[10px] font-bold block truncate ${
                         isActive
-                          ? 'text-[#0f2b48]'
+                          ? 'text-[#0b192c]'
                           : isPassed
                           ? 'text-emerald-700'
                           : 'text-slate-400'
@@ -7573,7 +8249,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   {/* ======================================================== */}
                   {reservationWizardStep === 1 && (
                     <div className="space-y-4 animate-fade-in">
-                      <div className="bg-sky-50/70 border border-sky-100 rounded-2xl p-3.5 flex items-center gap-2.5 text-[#0f2b48]">
+                      <div className="bg-[#f4f7fb] border border-slate-200/90 rounded-2xl p-3.5 flex items-center gap-2.5 text-[#0b192c]">
                         <Calendar className="w-4 h-4 text-sky-700 shrink-0" />
                         <span className="text-xs font-semibold">
                           Paso 1: Selecciona las fechas de llegada y salida del Lodge.
@@ -7582,7 +8258,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-[#0f2b48] block">
+                          <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block">
                             Fecha Check-in (Llegada) *
                           </label>
                           <input
@@ -7601,13 +8277,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 return { ...prev, checkIn: newIn, checkOut: newOut };
                               });
                             }}
-                            className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none font-mono text-xs font-semibold"
+                            className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none font-mono text-xs font-semibold transition shadow-2xs"
                             required
                           />
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-[10px] uppercase font-bold text-[#0f2b48] block">
+                          <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block">
                             Fecha Check-out (Salida) *
                           </label>
                           <input
@@ -7615,7 +8291,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             value={blockForm.checkOut}
                             min={blockForm.checkIn || undefined}
                             onChange={(e) => setBlockForm({ ...blockForm, checkOut: e.target.value })}
-                            className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none font-mono text-xs font-semibold"
+                            className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none font-mono text-xs font-semibold transition shadow-2xs"
                             required
                           />
                         </div>
@@ -7630,7 +8306,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               Estadía de <strong className="font-bold">{calculatedNights} {calculatedNights === 1 ? 'noche' : 'noches'}</strong>
                             </span>
                           </div>
-                          <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100/80 px-2.5 py-1 rounded-lg">
+                          <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100/80 px-3 py-1 rounded-full">
                             {formatDateDDMMYYYY(blockForm.checkIn)} ➔ {formatDateDDMMYYYY(blockForm.checkOut)}
                           </span>
                         </div>
@@ -7648,7 +8324,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         <button
                           type="button"
                           onClick={() => setShowBlockModal(false)}
-                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition cursor-pointer text-xs"
+                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer text-xs"
                         >
                           Cancelar
                         </button>
@@ -7656,10 +8332,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           type="button"
                           disabled={!isDatesValid}
                           onClick={() => setReservationWizardStep(2)}
-                          className={`w-2/3 py-3 rounded-xl font-bold transition shadow-md flex items-center justify-center gap-2 text-xs ${
+                          className={`w-2/3 py-2.5 rounded-full font-semibold transition shadow-xs flex items-center justify-center gap-2 text-xs active:scale-95 ${
                             !isDatesValid
                               ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                              : 'bg-[#0f2b48] hover:bg-[#0a1e34] text-white shadow-[#0f2b48]/20 cursor-pointer'
+                              : 'bg-[#0b192c] hover:bg-[#182a44] text-white cursor-pointer'
                           }`}
                         >
                           <span>Siguiente: Cantidad de Pasajeros</span>
@@ -7675,18 +8351,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   {reservationWizardStep === 2 && (
                     <div className="space-y-4 animate-fade-in">
                       {/* Dates chip */}
-                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-[#0f2b48]" />
+                      <div className="bg-[#f4f7fb] border border-slate-200/80 rounded-2xl px-4 py-2.5 flex items-center justify-between text-xs">
+                        <span className="text-slate-500 flex items-center gap-1.5 font-medium">
+                          <Calendar className="w-3.5 h-3.5 text-[#0b192c]" />
                           <span>Fechas seleccionadas:</span>
                         </span>
-                        <span className="font-mono font-bold text-[#0f2b48]">
+                        <span className="font-mono font-bold text-[#0b192c]">
                           {formatDateDDMMYYYY(blockForm.checkIn)} al {formatDateDDMMYYYY(blockForm.checkOut)} ({calculatedNights} {calculatedNights === 1 ? 'noche' : 'noches'})
                         </span>
                       </div>
 
                       <div>
-                        <label className="text-[11px] uppercase font-bold text-[#0f2b48] block mb-2">
+                        <label className="text-[11px] uppercase font-mono font-bold text-[#0b192c] block mb-2">
                           ¿Para cuántos pasajeros / huéspedes es la estadía?
                         </label>
                         <div className="grid grid-cols-2 gap-3">
@@ -7704,22 +8380,22 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 onClick={() => {
                                   setBlockForm({ ...blockForm, paxCount: opt.count });
                                 }}
-                                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                className={`p-4 rounded-3xl border transition-all cursor-pointer flex flex-col justify-between ${
                                   isSelected
-                                    ? 'bg-[#0f2b48] border-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 ring-2 ring-[#0f2b48]/20'
-                                    : 'bg-[#fbfcfd] hover:bg-slate-50 border-slate-200 text-slate-700'
+                                    ? 'bg-[#0b192c] border-[#0b192c] text-white shadow-md ring-2 ring-[#0b192c]/20'
+                                    : 'bg-[#f4f7fb] hover:bg-slate-100 border-slate-200/80 text-slate-700'
                                 }`}
                               >
                                 <div className="flex items-center justify-between mb-2">
-                                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-[#0f2b48]'
+                                  <div className={`w-8 h-8 rounded-2xl flex items-center justify-center ${
+                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-[#0b192c]'
                                   }`}>
                                     <IconComponent className="w-4 h-4" />
                                   </div>
-                                  {isSelected && <span className="text-[10px] font-bold bg-white/25 px-2 py-0.5 rounded-full">Seleccionado</span>}
+                                  {isSelected && <span className="text-[10px] font-bold bg-white/25 px-2.5 py-0.5 rounded-full">Seleccionado</span>}
                                 </div>
                                 <div>
-                                  <h5 className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-[#0f2b48]'}`}>
+                                  <h5 className={`font-bold text-xs ${isSelected ? 'text-white' : 'text-[#0b192c]'}`}>
                                     {opt.title}
                                   </h5>
                                   <p className={`text-[10px] mt-0.5 ${isSelected ? 'text-sky-200' : 'text-slate-400'}`}>
@@ -7737,10 +8413,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         <button
                           type="button"
                           onClick={() => setReservationWizardStep(1)}
-                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
+                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
                         >
                           <ChevronLeft className="w-4 h-4" />
-                          <span>Volver a Fechas</span>
+                          <span>Volver</span>
                         </button>
                         <button
                           type="button"
@@ -7754,7 +8430,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             }
                             setReservationWizardStep(3);
                           }}
-                          className="w-2/3 py-3 rounded-xl font-bold transition shadow-md bg-[#0f2b48] hover:bg-[#0a1e34] text-white shadow-[#0f2b48]/20 cursor-pointer flex items-center justify-center gap-2 text-xs"
+                          className="w-2/3 py-2.5 rounded-full font-semibold transition shadow-xs bg-[#0b192c] hover:bg-[#182a44] text-white cursor-pointer flex items-center justify-center gap-2 text-xs active:scale-95"
                         >
                           <span>Siguiente: Elegir Habitación</span>
                           <ChevronRight className="w-4 h-4" />
@@ -7769,21 +8445,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   {reservationWizardStep === 3 && (
                     <div className="space-y-4 animate-fade-in">
                       {/* Filter criteria recap */}
-                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs">
+                      <div className="bg-[#f4f7fb] border border-slate-200/80 rounded-2xl px-4 py-2.5 flex items-center justify-between text-xs font-medium">
                         <span className="text-slate-500">
                           📅 {formatDateDDMMYYYY(blockForm.checkIn)} al {formatDateDDMMYYYY(blockForm.checkOut)} ({calculatedNights} n)
                         </span>
-                        <span className="font-mono font-bold text-[#0f2b48]">
+                        <span className="font-mono font-bold text-[#0b192c]">
                           👥 {blockForm.paxCount} {blockForm.paxCount === 1 ? 'Huésped' : 'Huéspedes'}
                         </span>
                       </div>
 
                       <div>
-                        <label className="text-[11px] uppercase font-bold text-[#0f2b48] block mb-2">
+                        <label className="text-[11px] uppercase font-mono font-bold text-[#0b192c] block mb-2">
                           Habitaciones Disponibles para estas Fechas y Capacidad:
                         </label>
 
-                        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
                           {rooms.map((r) => {
                             const isOccupied = isRoomBookedForRange(r.id, blockForm.checkIn, blockForm.checkOut);
                             const hasCapacity = r.max_pax >= blockForm.paxCount;
@@ -7798,34 +8474,34 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   if (!isAvailable) return;
                                   setBlockForm({ ...blockForm, roomId: r.id });
                                 }}
-                                className={`p-3.5 rounded-2xl border transition-all ${
+                                className={`p-4 rounded-3xl border transition-all ${
                                   !isAvailable
                                     ? 'bg-slate-50 border-slate-200/70 opacity-60 cursor-not-allowed'
                                     : isSelected
-                                    ? 'bg-[#0f2b48] border-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/20 ring-2 ring-[#0f2b48]/20 cursor-pointer'
-                                    : 'bg-[#fbfcfd] hover:bg-slate-50 border-slate-200 text-slate-700 cursor-pointer'
+                                    ? 'bg-[#0b192c] border-[#0b192c] text-white shadow-md ring-2 ring-[#0b192c]/20 cursor-pointer'
+                                    : 'bg-[#f4f7fb] hover:bg-slate-100 border-slate-200/80 text-slate-700 cursor-pointer'
                                 }`}
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div
-                                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                      className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
                                         !isAvailable
                                           ? 'bg-slate-200 text-slate-400'
                                           : isSelected
                                           ? 'bg-white/20 text-white'
-                                          : 'bg-slate-100 text-[#0f2b48]'
+                                          : 'bg-slate-200/80 text-[#0b192c]'
                                       }`}
                                     >
                                       {isOccupied ? <Lock className="w-4 h-4 text-rose-500" /> : <BedDouble className="w-4 h-4" />}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-2">
-                                        <h5 className={`font-bold text-xs truncate ${isSelected ? 'text-white' : 'text-[#0f2b48]'}`}>
+                                        <h5 className={`font-serif font-bold text-xs truncate ${isSelected ? 'text-white' : 'text-[#0b192c]'}`}>
                                           Habitación #{r.room_number} - {r.room_name}
                                         </h5>
                                       </div>
-                                      <span className={`text-[10px] block ${isSelected ? 'text-sky-200' : 'text-slate-500'}`}>
+                                      <span className={`text-[10px] block font-light ${isSelected ? 'text-sky-200' : 'text-slate-500'}`}>
                                         Capacidad: hasta {r.max_pax} huéspedes • ${r.base_price_clp.toLocaleString('es-CL')}/noche
                                       </span>
                                     </div>
@@ -7834,23 +8510,23 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   {/* Status badge & Total Price */}
                                   <div className="text-right shrink-0">
                                     {isOccupied ? (
-                                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 uppercase block">
+                                      <span className="text-[9px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 uppercase block">
                                         Ocupada
                                       </span>
                                     ) : !hasCapacity ? (
-                                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 uppercase block">
+                                      <span className="text-[9px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 uppercase block">
                                         Máx {r.max_pax} PAX
                                       </span>
                                     ) : (
                                       <div>
-                                        <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full uppercase inline-block mb-0.5 ${
+                                        <span className={`text-[9px] font-mono font-bold px-2.5 py-0.5 rounded-full uppercase inline-block mb-0.5 ${
                                           isSelected
                                             ? 'bg-emerald-400/30 text-emerald-200 border border-emerald-300/30'
                                             : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                         }`}>
                                           Disponible
                                         </span>
-                                        <div className={`text-[11px] font-mono font-bold ${isSelected ? 'text-white' : 'text-[#0f2b48]'}`}>
+                                        <div className={`text-[11px] font-mono font-bold ${isSelected ? 'text-white' : 'text-[#0b192c]'}`}>
                                           ${roomStayPrice.toLocaleString('es-CL')} CLP
                                         </div>
                                       </div>
@@ -7868,7 +8544,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         <button
                           type="button"
                           onClick={() => setReservationWizardStep(2)}
-                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
+                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
                         >
                           <ChevronLeft className="w-4 h-4" />
                           <span>Volver</span>
@@ -7877,10 +8553,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           type="button"
                           disabled={!isSelectedRoomEligible}
                           onClick={() => setReservationWizardStep(4)}
-                          className={`w-2/3 py-3 rounded-xl font-bold transition shadow-md flex items-center justify-center gap-2 text-xs ${
+                          className={`w-2/3 py-2.5 rounded-full font-semibold transition shadow-xs flex items-center justify-center gap-2 text-xs active:scale-95 ${
                             !isSelectedRoomEligible
                               ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                              : 'bg-[#0f2b48] hover:bg-[#0a1e34] text-white shadow-[#0f2b48]/20 cursor-pointer'
+                              : 'bg-[#0b192c] hover:bg-[#182a44] text-white cursor-pointer'
                           }`}
                         >
                           <span>Siguiente: Datos de Pasajeros</span>
@@ -7897,35 +8573,35 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <div className="space-y-4 animate-fade-in">
                       
                       {/* Summary Banner of Chosen Booking */}
-                      <div className="bg-[#0f2b48] text-white rounded-2xl p-3.5 shadow-sm space-y-1">
+                      <div className="bg-[#0b192c] text-white rounded-3xl p-4 shadow-sm space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-xs text-sky-200">
+                          <span className="font-serif font-bold text-xs text-sky-200">
                             Habitación #{selectedRoom?.room_number} - {selectedRoom?.room_name}
                           </span>
                           <span className="font-mono font-bold text-sm text-white">
                             ${totalStayPrice.toLocaleString('es-CL')} CLP
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-300 flex items-center justify-between pt-0.5 border-t border-white/10">
+                        <div className="text-[10px] text-slate-300 flex items-center justify-between pt-1 border-t border-white/10 font-mono">
                           <span>📅 {formatDateDDMMYYYY(blockForm.checkIn)} al {formatDateDDMMYYYY(blockForm.checkOut)} ({calculatedNights} {calculatedNights === 1 ? 'noche' : 'noches'})</span>
                           <span>👥 {blockForm.paxCount} {blockForm.paxCount === 1 ? 'Huésped' : 'Huéspedes'}</span>
                         </div>
                       </div>
 
                       {/* Passenger 1 (Main Guest) */}
-                      <div className="space-y-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                      <div className="space-y-3 p-4 bg-[#f4f7fb] border border-slate-200/90 rounded-3xl">
                         <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-full bg-[#0f2b48] text-white flex items-center justify-center text-[10px] font-bold">
+                          <div className="w-5 h-5 rounded-full bg-[#0b192c] text-white flex items-center justify-center text-[10px] font-bold">
                             1
                           </div>
-                          <h5 className="font-bold text-xs text-[#0f2b48]">
+                          <h5 className="font-serif font-bold text-xs text-[#0b192c]">
                             Pasajero 1 (Titular de la Reserva) *
                           </h5>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                            <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                               Nombre Completo *
                             </label>
                             <input
@@ -7940,11 +8616,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 updated[0] = { ...updated[0], name: val };
                                 setGuestList(updated);
                               }}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs font-semibold"
+                              className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs font-medium"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                            <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                               Teléfono / WhatsApp *
                             </label>
                             <input
@@ -7953,20 +8629,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               placeholder="Ej: +56 9 8131 2920"
                               value={guestList[0]?.phone || blockForm.guestPhone}
                               onChange={(e) => {
-                                const val = e.target.value;
+                                const val = formatPhone(e.target.value);
                                 setBlockForm({ ...blockForm, guestPhone: val });
                                 const updated = [...guestList];
                                 updated[0] = { ...updated[0], phone: val };
                                 setGuestList(updated);
                               }}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs font-mono"
+                              className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs font-mono"
                             />
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                            <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                               Email de Contacto
                             </label>
                             <input
@@ -7980,11 +8656,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 updated[0] = { ...updated[0], email: val };
                                 setGuestList(updated);
                               }}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs"
+                              className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                            <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                               RUT / Pasaporte
                             </label>
                             <input
@@ -7992,12 +8668,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               placeholder="Ej: 12.345.678-9 / Pasaporte"
                               value={guestList[0]?.rut || ''}
                               onChange={(e) => {
-                                const val = e.target.value;
+                                const val = formatRut(e.target.value);
                                 const updated = [...guestList];
                                 updated[0] = { ...updated[0], rut: val };
                                 setGuestList(updated);
                               }}
-                              className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs font-mono"
+                              className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs font-mono"
                             />
                           </div>
                         </div>
@@ -8005,7 +8681,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                       {/* Additional Passengers (2, 3, 4) */}
                       {blockForm.paxCount > 1 && (
-                        <div className="space-y-2.5">
+                        <div className="space-y-3">
                           {Array.from({ length: blockForm.paxCount - 1 }).map((_, idx) => {
                             const pIndex = idx + 1;
                             const guest = guestList[pIndex] || { name: '', rut: '' };
@@ -8013,20 +8689,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             return (
                               <div
                                 key={pIndex}
-                                className="p-3.5 bg-slate-50/70 border border-slate-200 rounded-2xl space-y-2"
+                                className="p-4 bg-[#f4f7fb] border border-slate-200/90 rounded-3xl space-y-2.5"
                               >
                                 <div className="flex items-center gap-2">
                                   <div className="w-5 h-5 rounded-full bg-slate-300 text-slate-700 flex items-center justify-center text-[10px] font-bold">
                                     {pIndex + 1}
                                   </div>
-                                  <h5 className="font-bold text-xs text-[#0f2b48]">
+                                  <h5 className="font-serif font-bold text-xs text-[#0b192c]">
                                     Pasajero {pIndex + 1} (Acompañante)
                                   </h5>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   <div>
-                                    <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                                    <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                                       Nombre Completo
                                     </label>
                                     <input
@@ -8038,11 +8714,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         updated[pIndex] = { ...updated[pIndex], name: e.target.value };
                                         setGuestList(updated);
                                       }}
-                                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs"
+                                      className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs font-medium"
                                     />
                                   </div>
                                   <div>
-                                    <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                                    <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                                       RUT / Pasaporte / Documento
                                     </label>
                                     <input
@@ -8051,10 +8727,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       value={guest.rut}
                                       onChange={(e) => {
                                         const updated = [...guestList];
-                                        updated[pIndex] = { ...updated[pIndex], rut: e.target.value };
+                                        updated[pIndex] = { ...updated[pIndex], rut: formatRut(e.target.value) };
                                         setGuestList(updated);
                                       }}
-                                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs font-mono"
+                                      className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs font-mono"
                                     />
                                   </div>
                                 </div>
@@ -8067,13 +8743,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       {/* Canal & Estado de Pago */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                             Canal de Reserva
                           </label>
                           <select
                             value={blockForm.channelSource}
                             onChange={(e) => setBlockForm({ ...blockForm, channelSource: e.target.value as any })}
-                            className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs font-medium cursor-pointer"
+                            className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs font-medium cursor-pointer"
                           >
                             <option value="phone_whatsapp">Teléfono / WhatsApp</option>
                             <option value="web_direct">Web Directa Yates Chile</option>
@@ -8083,13 +8759,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           </select>
                         </div>
                         <div>
-                          <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                          <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                             Estado de Pago
                           </label>
                           <select
                             value={blockForm.status}
                             onChange={(e) => setBlockForm({ ...blockForm, status: e.target.value as any })}
-                            className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs font-semibold cursor-pointer"
+                            className="w-full bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs font-semibold cursor-pointer"
                           >
                             <option value="approved">Confirmada (Pagada)</option>
                             <option value="pending_transfer">Pendiente de Transferencia</option>
@@ -8100,7 +8776,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                       {/* Notes / Special Requests */}
                       <div>
-                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                           Notas / Requerimientos Especiales
                         </label>
                         <input
@@ -8108,7 +8784,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           placeholder="Ej: Traslado desde aeródromo Robinson Crusoe, late check-out..."
                           value={blockForm.reason}
                           onChange={(e) => setBlockForm({ ...blockForm, reason: e.target.value })}
-                          className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none text-xs"
+                          className="w-full bg-white border border-slate-200/90 rounded-2xl px-4 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none text-xs"
                         />
                       </div>
 
@@ -8117,16 +8793,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         <button
                           type="button"
                           onClick={() => setReservationWizardStep(3)}
-                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
+                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
                         >
                           <ChevronLeft className="w-4 h-4" />
                           <span>Volver</span>
                         </button>
                         <button
                           type="submit"
-                          className="w-2/3 py-3 rounded-xl font-bold transition shadow-md bg-[#0f2b48] hover:bg-[#0a1e34] text-white shadow-[#0f2b48]/20 cursor-pointer flex items-center justify-center gap-2 text-xs"
+                          className="w-2/3 py-2.5 rounded-full font-semibold transition shadow-xs bg-[#0b192c] hover:bg-[#182a44] text-white cursor-pointer flex items-center justify-center gap-2 text-xs active:scale-95"
                         >
-                          <Check className="w-4 h-4" />
+                          <Check className="w-4 h-4 text-sky-300" />
                           <span>Confirmar Reserva de Hospedaje</span>
                         </button>
                       </div>
@@ -8143,19 +8819,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: EDITAR INFORMACIÓN / NOMBRE DE HABITACIÓN */}
       {/* ========================================================================= */}
       {editRoomModal.isOpen && editRoomModal.room && (
-        <div className="fixed inset-0 z-50 bg-[#0a1e34]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(15,43,72,0.25)] space-y-6 animate-scale-in">
+        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.25)] space-y-6 animate-scale-in">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200/90 text-[#0f2b48] flex items-center justify-center shadow-xs shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200/90 text-[#0b192c] flex items-center justify-center shadow-xs shrink-0">
                   <BedDouble className="w-6 h-6 text-sky-700" />
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
                     Habitación #{editRoomModal.room.room_number}
                   </span>
-                  <h4 className="font-serif text-xl font-bold text-[#0f2b48]">
+                  <h4 className="font-serif text-xl font-bold text-[#0b192c]">
                     Editar Habitación
                   </h4>
                 </div>
@@ -8163,16 +8839,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <button
                 type="button"
                 onClick={() => setEditRoomModal((prev) => ({ ...prev, isOpen: false }))}
-                className="text-slate-400 hover:text-[#0f2b48] transition cursor-pointer p-1"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveRoomName} className="space-y-4">
               {/* Room Name Input */}
               <div>
-                <label className="text-[10px] uppercase font-mono font-bold text-[#0f2b48] block mb-1.5">
+                <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1.5">
                   Nombre de la Cabina / Habitación
                 </label>
                 <input
@@ -8182,18 +8858,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   onChange={(e) =>
                     setEditRoomModal((prev) => ({ ...prev, roomName: e.target.value }))
                   }
-                  placeholder="Ej: Cabina Popa (Doble Matrimonial Vista Océano)"
-                  className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-bold focus:outline-none focus:border-sky-500 focus:bg-white transition"
+                  placeholder="Ej: Albatros (Doble Matrimonial Vista Océano)"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-bold focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">
+                <p className="text-[10px] text-slate-400 mt-1 font-light">
                   Este nombre se reflejará en el calendario, reservas, cotizaciones y catálogo.
                 </p>
               </div>
 
               {/* Price & Max Pax Grid */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="text-[10px] uppercase font-mono font-bold text-[#0f2b48] block mb-1.5">
+                  <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1.5">
                     Tarifa Base ($ CLP / Noche)
                   </label>
                   <input
@@ -8208,12 +8884,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         basePrice: Number(e.target.value),
                       }))
                     }
-                    className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-mono font-bold focus:outline-none focus:border-sky-500 focus:bg-white transition"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-xs text-[#0b192c] font-mono font-bold focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] uppercase font-mono font-bold text-[#0f2b48] block mb-1.5">
+                  <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1.5">
                     Capacidad (Huéspedes)
                   </label>
                   <input
@@ -8228,7 +8904,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         maxPax: Number(e.target.value),
                       }))
                     }
-                    className="w-full bg-slate-50/70 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-mono font-bold focus:outline-none focus:border-sky-500 focus:bg-white transition"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-xs text-[#0b192c] font-mono font-bold focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
                   />
                 </div>
               </div>
@@ -8238,14 +8914,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <button
                   type="button"
                   onClick={() => setEditRoomModal((prev) => ({ ...prev, isOpen: false }))}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold transition text-xs cursor-pointer"
+                  className="px-5 py-2 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold transition text-xs cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingRoom || !editRoomModal.roomName.trim()}
-                  className="px-5 py-2.5 rounded-xl bg-[#0f2b48] hover:bg-[#0a1e34] active:scale-98 text-white font-bold transition text-xs shadow-md shadow-[#0f2b48]/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-6 py-2 rounded-full bg-[#0b192c] hover:bg-[#182a44] active:scale-95 text-white font-semibold transition text-xs shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {isSavingRoom ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -8264,31 +8940,31 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: CONCILIAR TRANSFERENCIA (LUXURY LIGHT/NAVY THEME) */}
       {/* ========================================================================= */}
       {selectedInstallment && (
-        <div className="fixed inset-0 z-50 bg-[#0a1e34]/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-[0_20px_50px_rgba(15,43,72,0.15)] space-y-5 animate-scale-in">
-            <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-[0_20px_50px_rgba(11,25,44,0.15)] space-y-5 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[10px] uppercase font-mono tracking-widest text-[#0f2b48]/70 font-bold block">
+                <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
                   Conciliación de Pagos
                 </span>
-                <h4 className="font-serif text-xl font-bold text-[#0f2b48]">Revisar Transferencia</h4>
+                <h4 className="font-serif text-xl font-bold text-[#0b192c]">Revisar Transferencia</h4>
               </div>
               <button
                 onClick={() => setSelectedInstallment(null)}
-                className="text-slate-400 hover:text-[#0f2b48]"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
-            <div className="bg-[#fbfcfd] p-5 rounded-2xl space-y-2 text-xs border border-slate-200">
+            <div className="bg-[#f4f7fb] p-5 rounded-3xl space-y-2 text-xs border border-slate-200/80">
               <div className="flex justify-between">
-                <span className="text-slate-500">Concepto:</span>
-                <span className="font-bold text-[#0f2b48]">{selectedInstallment.concept}</span>
+                <span className="text-slate-500 font-medium">Concepto:</span>
+                <span className="font-bold text-[#0b192c]">{selectedInstallment.concept}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Monto Esperado:</span>
-                <span className="font-mono font-bold text-[#0f2b48] text-sm">
+                <span className="text-slate-500 font-medium">Monto Esperado:</span>
+                <span className="font-mono font-bold text-[#0b192c] text-sm">
                   ${selectedInstallment.amount_expected.toLocaleString('es-CL')} CLP
                 </span>
               </div>
@@ -8299,7 +8975,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     href={selectedInstallment.receipt_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="block rounded-xl overflow-hidden border border-slate-200 max-h-48 shadow-xs"
+                    className="block rounded-2xl overflow-hidden border border-slate-200 max-h-48 shadow-2xs"
                   >
                     <img
                       src={selectedInstallment.receipt_url}
@@ -8313,7 +8989,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
             <div className="space-y-3 pt-2">
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                   Descuento Especial (Opcional - Monto en CLP)
                 </label>
                 <input
@@ -8321,13 +8997,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   placeholder="0"
                   value={discountAmount || ''}
                   onChange={(e) => setDiscountAmount(Number(e.target.value))}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none font-mono"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-mono font-bold focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                 />
               </div>
 
               {discountAmount > 0 && (
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
+                  <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block mb-1">
                     Motivo del Descuento
                   </label>
                   <input
@@ -8335,7 +9011,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     placeholder="Ej: Descuento grupo familiar / Convenio"
                     value={discountReason}
                     onChange={(e) => setDiscountReason(e.target.value)}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
               )}
@@ -8345,14 +9021,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <button
                 type="button"
                 onClick={() => setSelectedInstallment(null)}
-                className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl text-xs font-bold"
+                className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full text-xs font-semibold transition cursor-pointer"
               >
                 Cerrar
               </button>
               <button
                 type="button"
                 onClick={() => handleApprovePayment(selectedInstallment)}
-                className="w-2/3 bg-[#0f2b48] hover:bg-[#0a1e34] text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-[#0f2b48]/20"
+                className="w-2/3 bg-[#0b192c] hover:bg-[#182a44] text-white py-2.5 rounded-full text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer active:scale-95"
               >
                 <CheckCircle2 className="w-4 h-4 text-sky-300" />
                 <span>Aprobar y Confirmar</span>
@@ -8366,41 +9042,41 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: NUEVA EXPERIENCIA / SERVICIO (LUXURY LIGHT/NAVY THEME) */}
       {/* ========================================================================= */}
       {showNewServiceModal && (
-        <div className="fixed inset-0 z-50 bg-[#0a1e34]/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-[0_20px_50px_rgba(15,43,72,0.15)] space-y-4 animate-scale-in">
-            <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-8 shadow-[0_20px_50px_rgba(11,25,44,0.15)] space-y-5 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[10px] uppercase font-mono tracking-widest text-[#0f2b48]/70 font-bold block">
-                  Catálogo
+                <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
+                  Catálogo de Experiencias
                 </span>
-                <h4 className="font-serif text-xl font-bold text-[#0f2b48]">Nueva Experiencia</h4>
+                <h4 className="font-serif text-xl font-bold text-[#0b192c]">Nueva Experiencia</h4>
               </div>
               <button
                 onClick={() => setShowNewServiceModal(false)}
-                className="text-slate-400 hover:text-[#0f2b48]"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateService} className="space-y-3.5 text-xs">
+            <form onSubmit={handleCreateService} className="space-y-4 text-xs">
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
-                  Nombre del Servicio
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">
+                  Nombre del Servicio *
                 </label>
                 <input
                   type="text"
                   placeholder="Ej: Cabalgata Mirador Selkirk"
                   value={newServiceForm.name}
                   onChange={(e) => setNewServiceForm({ ...newServiceForm, name: e.target.value })}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-medium focus:border-[#0f2b48] focus:outline-none"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-medium focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Categoría</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">Categoría</label>
                   <select
                     value={newServiceForm.category}
                     onChange={(e) =>
@@ -8409,7 +9085,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         category: e.target.value as 'cabalgatas' | 'buceo' | 'trekking' | 'gastronomia' | 'nautica' | 'bienestar',
                       })
                     }
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none cursor-pointer"
                   >
                     <option value="cabalgatas">Cabalgatas</option>
                     <option value="buceo">Buceo / Snorkel</option>
@@ -8421,47 +9097,47 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Precio (CLP)</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">Precio (CLP) *</label>
                   <input
                     type="number"
                     value={newServiceForm.price_clp}
                     onChange={(e) => setNewServiceForm({ ...newServiceForm, price_clp: Number(e.target.value) })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-[#0b192c] font-mono font-bold focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Duración (Etiqueta)</label>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">Duración (Etiqueta)</label>
                 <input
                   type="text"
                   placeholder="Ej: Medio Día (4 hrs)"
                   value={newServiceForm.duration_label}
                   onChange={(e) => setNewServiceForm({ ...newServiceForm, duration_label: e.target.value })}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Descripción</label>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">Descripción</label>
                 <textarea
                   rows={2}
                   placeholder="Detalle de la actividad..."
                   value={newServiceForm.description}
                   onChange={(e) => setNewServiceForm({ ...newServiceForm, description: e.target.value })}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs leading-relaxed"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">URL Foto (Opcional)</label>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">URL Foto (Opcional)</label>
                 <input
                   type="url"
                   placeholder="https://images.unsplash.com/..."
                   value={newServiceForm.image_url}
                   onChange={(e) => setNewServiceForm({ ...newServiceForm, image_url: e.target.value })}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs font-mono text-[11px]"
                 />
               </div>
 
@@ -8469,13 +9145,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <button
                   type="button"
                   onClick={() => setShowNewServiceModal(false)}
-                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition"
+                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 bg-[#0f2b48] hover:bg-[#0a1e34] text-white py-3 rounded-xl font-bold transition shadow-md shadow-[#0f2b48]/20"
+                  className="w-1/2 bg-[#0b192c] hover:bg-[#182a44] text-white py-2.5 rounded-full font-semibold transition shadow-xs cursor-pointer active:scale-95"
                 >
                   Guardar Servicio
                 </button>
@@ -8484,6 +9160,1246 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: MANIFIESTO DE PASAJEROS & CONTROL DE ZARPE / PAGOS */}
+      {/* ========================================================================= */}
+      {selectedExpeditionForManifest && (() => {
+        const exp = selectedExpeditionForManifest;
+        const allExpPassengers = getPassengersForExpedition(exp, expBookings);
+        
+        // Filter by search query and payment status
+        const filteredPassengers = allExpPassengers.filter((pax) => {
+          const matchesSearch = 
+            pax.fullName.toLowerCase().includes(manifestSearchQuery.toLowerCase()) ||
+            pax.rutPassport.toLowerCase().includes(manifestSearchQuery.toLowerCase()) ||
+            pax.email.toLowerCase().includes(manifestSearchQuery.toLowerCase()) ||
+            pax.phone.toLowerCase().includes(manifestSearchQuery.toLowerCase()) ||
+            pax.code.toLowerCase().includes(manifestSearchQuery.toLowerCase());
+
+          const matchesPayment = 
+            manifestPaymentFilter === 'all' ? true :
+            manifestPaymentFilter === 'paid' ? pax.paymentStatus === 'paid' :
+            manifestPaymentFilter === 'partial' ? pax.paymentStatus === 'partial' :
+            pax.paymentStatus === 'pending';
+
+          return matchesSearch && matchesPayment;
+        });
+
+        const totalPaxCount = allExpPassengers.reduce((sum, p) => sum + p.paxCount, 0);
+        const totalMaxPax = exp.maxPax || (exp.totalSlots ? exp.totalSlots : 6);
+        const totalAmountClp = allExpPassengers.reduce((sum, p) => sum + p.totalAmount, 0);
+        const totalPaidClp = allExpPassengers.reduce((sum, p) => sum + p.amountPaid, 0);
+        const totalPendingClp = Math.max(0, totalAmountClp - totalPaidClp);
+        const paidPaxCount = allExpPassengers.filter(p => p.paymentStatus === 'paid').length;
+        const partialPaxCount = allExpPassengers.filter(p => p.paymentStatus === 'partial').length;
+        const pendingPaxCount = allExpPassengers.filter(p => p.paymentStatus === 'pending').length;
+
+        const isFull = totalPaxCount >= totalMaxPax;
+        const percentOccupied = Math.min(100, Math.round((totalPaxCount / totalMaxPax) * 100));
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#0b192c]/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+            <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-[0_25px_60px_rgba(11,25,44,0.25)] border border-slate-200/90 overflow-hidden my-auto animate-scaleIn">
+              
+              {/* Modal Header */}
+              <div className="px-6 py-5 bg-[#0b192c] text-white flex items-start justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shadow-xs shrink-0">
+                    <Users className="w-5 h-5 text-sky-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-sky-300 font-bold">
+                        Manifiesto Oficial de Zarpe
+                      </span>
+                      <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${
+                        isFull 
+                          ? 'bg-slate-700 text-slate-200 border border-slate-600'
+                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                      }`}>
+                        {totalPaxCount} de {totalMaxPax} Cupos ({isFull ? 'Agotado' : `${totalMaxPax - totalPaxCount} disponibles`})
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-lg sm:text-xl font-bold text-white tracking-tight mt-0.5 truncate">
+                      {exp.routeTitle || exp.name || 'Expedición Robinson Crusoe'}
+                    </h3>
+                    <p className="text-xs text-sky-100/80 font-light truncate mt-0.5">
+                      {exp.vesselName} {exp.vesselType ? `• ${exp.vesselType}` : ''} • Fechas: {exp.departureDates || `${exp.departureDate} al ${exp.returnDate}`}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedExpeditionForManifest(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0"
+                  title="Cerrar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Executive Metrics Bar (4 Mini KPI Cards) */}
+              <div className="p-6 bg-[#f4f7fb] border-b border-slate-200/80 grid grid-cols-2 lg:grid-cols-4 gap-3.5 shrink-0">
+                {/* Ocupación */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Ocupación / Cupos</span>
+                  <div className="flex items-baseline gap-1.5 mt-1">
+                    <span className="font-serif font-bold text-lg text-[#0b192c]">{totalPaxCount}</span>
+                    <span className="text-xs text-slate-500 font-mono">/ {totalMaxPax} pax</span>
+                    <span className="text-[10px] font-mono font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded ml-auto">
+                      {percentOccupied}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                    <div className="bg-[#0b192c] h-full rounded-full" style={{ width: `${percentOccupied}%` }} />
+                  </div>
+                </div>
+
+                {/* Total Recaudado */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Total Recaudado</span>
+                  <div className="mt-1">
+                    <span className="font-mono font-extrabold text-base text-emerald-700 block">
+                      ${totalPaidClp.toLocaleString('es-CL')} <span className="text-[10px] font-normal text-slate-400">CLP</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                      {paidPaxCount} 100% Pagados • {partialPaxCount} Abonos
+                    </span>
+                  </div>
+                </div>
+
+                {/* Saldo Por Cobrar */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Saldo Por Cobrar</span>
+                  <div className="mt-1">
+                    <span className={`font-mono font-extrabold text-base block ${totalPendingClp > 0 ? 'text-amber-700' : 'text-slate-600'}`}>
+                      ${totalPendingClp.toLocaleString('es-CL')} <span className="text-[10px] font-normal text-slate-400">CLP</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono block mt-0.5">
+                      {pendingPaxCount > 0 ? `${pendingPaxCount} con saldo pendiente` : 'Todos los pagos al día'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tarifa Individual */}
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Tarifa Oficial p/Pax</span>
+                  <div className="mt-1">
+                    <span className="font-mono font-extrabold text-base text-[#0b192c] block">
+                      ${(exp.pricePerPaxClp || 2200000).toLocaleString('es-CL')} <span className="text-[10px] font-normal text-slate-400">CLP</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-mono font-semibold block mt-0.5">
+                      ✓ Todo incluido a bordo
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search & Filter Toolbar */}
+              <div className="px-6 py-3.5 bg-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2 flex-1 min-w-[220px] max-w-md">
+                  <div className="relative w-full">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={manifestSearchQuery}
+                      onChange={(e) => setManifestSearchQuery(e.target.value)}
+                      placeholder="Buscar pasajero por nombre, RUT, email..."
+                      className="w-full pl-9 pr-3 py-1.5 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/80 rounded-xl text-xs text-[#0b192c] placeholder:text-slate-400 focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Filter Pills */}
+                  <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-2xs text-xs font-mono">
+                    {[
+                      { id: 'all', label: `Todos (${allExpPassengers.length})` },
+                      { id: 'paid', label: `Pagados (${paidPaxCount})` },
+                      { id: 'partial', label: `Abono 50% (${partialPaxCount})` },
+                      { id: 'pending', label: `Pendientes (${pendingPaxCount})` },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setManifestPaymentFilter(f.id as any)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                          manifestPaymentFilter === f.id
+                            ? 'bg-[#0b192c] text-white shadow-xs'
+                            : 'text-slate-600 hover:text-[#0b192c]'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Add Passenger Button */}
+                  {(exp.availablePax > 0 || (totalMaxPax - totalPaxCount > 0)) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedExpeditionForManifest(null);
+                        handleOpenAddPassengerModal(exp);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0b192c] hover:bg-[#182a44] text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-sky-300" />
+                      <span>Sumar Pasajero</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Scrollable Table Area */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                {filteredPassengers.length > 0 ? (
+                  <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
+                        <tr>
+                          <th className="py-3.5 px-4">#</th>
+                          <th className="py-3.5 px-4">Pasajero & RUT / ID</th>
+                          <th className="py-3.5 px-4">Contacto</th>
+                          <th className="py-3.5 px-4">Tarifa & Total</th>
+                          <th className="py-3.5 px-4">Monto Pagado / Estado</th>
+                          <th className="py-3.5 px-4">Ficha Médica & Emergencia</th>
+                          <th className="py-3.5 px-4 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
+                        {filteredPassengers.map((pax, idx) => {
+                          const isFullyPaid = pax.paymentStatus === 'paid';
+                          const isPartial = pax.paymentStatus === 'partial';
+
+                          return (
+                            <tr key={pax.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px] font-bold">
+                                {String(idx + 1).padStart(2, '0')}
+                              </td>
+                              
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-[#0b192c] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                    {pax.fullName.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                                  </div>
+                                  <div>
+                                    <strong className="text-[#0b192c] font-semibold text-xs block">
+                                      {pax.fullName}
+                                    </strong>
+                                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                                      <span>RUT: {pax.rutPassport}</span>
+                                      <span>•</span>
+                                      <span className="text-sky-700">{pax.code}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                <div className="space-y-0.5 text-[11px]">
+                                  <a href={`mailto:${pax.email}`} className="text-slate-600 hover:text-[#0b192c] hover:underline flex items-center gap-1">
+                                    <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>{pax.email}</span>
+                                  </a>
+                                  <a href={`tel:${pax.phone.replace(/[^0-9+]/g, '')}`} className="text-slate-600 hover:text-sky-700 font-mono flex items-center gap-1">
+                                    <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>{pax.phone}</span>
+                                  </a>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 font-mono">
+                                <div>
+                                  <strong className="text-[#0b192c] text-xs font-bold block">
+                                    ${pax.totalAmount.toLocaleString('es-CL')} CLP
+                                  </strong>
+                                  <span className="text-[10px] text-slate-400">
+                                    {pax.paxCount} {pax.paxCount === 1 ? 'cupo individual' : 'cupos'}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono font-bold text-xs text-[#0b192c]">
+                                      ${pax.amountPaid.toLocaleString('es-CL')} CLP
+                                    </span>
+                                  </div>
+
+                                  <div className="inline-flex items-center">
+                                    {isFullyPaid ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        <span>Pagado 100%</span>
+                                      </span>
+                                    ) : isPartial ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                                        <Clock className="w-3 h-3 text-sky-600" />
+                                        <span>Abono 50%</span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                        <AlertCircle className="w-3 h-3 text-amber-600" />
+                                        <span>Pendiente</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 max-w-xs">
+                                <div className="space-y-1">
+                                  <div className="text-[11px] text-slate-600 leading-tight">
+                                    {pax.dietaryNotes}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 font-mono">
+                                    <span className="font-semibold text-slate-500">Emergencia:</span> {pax.emergencyContact}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextStatus = isFullyPaid ? 'partial' : isPartial ? 'pending' : 'paid';
+                                    handleUpdatePassengerPaymentStatus(pax.id, nextStatus);
+                                  }}
+                                  className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#0b192c] text-slate-600 hover:text-white transition shadow-2xs cursor-pointer whitespace-nowrap"
+                                  title="Cambiar estado de pago"
+                                >
+                                  {isFullyPaid ? 'Marcar Abono' : isPartial ? 'Marcar Pend.' : 'Marcar Pagado'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                    <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-semibold text-slate-600">No se encontraron pasajeros registrados con este filtro</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Prueba con otro término de búsqueda o suma un pasajero a esta expedición.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Manifiesto oficial para Capitanía de Puerto y Armada de Chile</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 text-[#0b192c] border border-slate-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Imprimir Manifiesto</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedExpeditionForManifest(null)}
+                    className="px-5 py-2 bg-[#0b192c] hover:bg-[#182a44] text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========================================================================= */}
+      {/* MODAL: REGISTRAR / SUMAR PASAJERO A TRAVESÍA (MULTI-PASO & SPLIT PREVIEW) */}
+      {/* ========================================================================= */}
+      {selectedExpeditionForPassenger && (() => {
+        const exp = selectedExpeditionForPassenger;
+        const totalCapacity = Math.max(1, Number(exp.maxPax || exp.totalSlots || 6));
+        const rawAvailable = typeof exp.availablePax === 'number'
+          ? exp.availablePax
+          : typeof exp.spotsLeft === 'number'
+          ? exp.spotsLeft
+          : (totalCapacity - (Number(exp.bookedPax) || 0));
+        const availableSlots = Math.max(0, Number(rawAvailable) || 0);
+        const bookedSpots = Math.max(0, totalCapacity - availableSlots);
+        const refPriceClp = Number(exp.pricePerPaxClp) || (typeof exp.pricePerPax === 'string' ? parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 1950000 : 1950000);
+        const currentCustomPrice = Number(expPassengerForm.customPricePerPax) || refPriceClp;
+        const priceDifference = currentCustomPrice - refPriceClp;
+        const totalToCharge = expPassengerForm.bookingType === 'full_charter'
+          ? (Number(exp.priceCharterFullClp) || currentCustomPrice * totalCapacity)
+          : currentCustomPrice * Math.max(1, expPassengerForm.paxCount || 1);
+
+        const expImage =
+          exp.image ||
+          exp.heroImage ||
+          exp.publicCoverImage ||
+          exp.cover_image ||
+          'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80';
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
+            <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[94vh] flex flex-col lg:flex-row shadow-[0_25px_70px_rgba(11,25,44,0.35)] border border-slate-200/90 overflow-hidden my-auto animate-scaleIn">
+              
+              {/* ================================================================= */}
+              {/* COLUMNA IZQUIERDA: IMAGEN DE FONDO COMPLETA & RESUMEN EN TIEMPO REAL */}
+              {/* ================================================================= */}
+              <div className="w-full lg:w-[360px] shrink-0 text-white p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-700/50">
+                {/* Imagen fotográfica de fondo de toda la columna */}
+                <img
+                  src={expImage}
+                  alt={exp.routeTitle || exp.name}
+                  className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none scale-105"
+                />
+                
+                {/* Capa de degradado luxury y oscurecimiento para legibilidad perfecta */}
+                <div className="absolute inset-0 bg-gradient-to-b from-[#081322]/90 via-[#0b192c]/85 to-[#050b14]/95 backdrop-blur-[2px]" />
+
+                {/* Glow decorativo sutil */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Contenido superior sobre la foto de fondo */}
+                <div className="relative z-10 space-y-4">
+                  {/* Badges superiores */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="bg-sky-500/25 backdrop-blur-md text-sky-200 border border-sky-300/30 text-[9px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      Expedición Náutica
+                    </span>
+                    <span className="bg-white/20 backdrop-blur-md text-white border border-white/20 text-[10px] font-mono font-medium px-2.5 py-0.5 rounded-full">
+                      {exp.vesselName || 'Velero Vegvisir'}
+                    </span>
+                    <span className="bg-emerald-500/80 backdrop-blur-md text-white font-bold text-[10px] font-mono px-2 py-0.5 rounded-full">
+                      {availableSlots} {availableSlots === 1 ? 'libre' : 'libres'}
+                    </span>
+                  </div>
+
+                  {/* Título de la Expedición y Fechas */}
+                  <div className="space-y-2">
+                    <h3 className="font-serif text-xl sm:text-2xl font-bold text-white leading-tight drop-shadow-sm">
+                      {exp.routeTitle || exp.name}
+                    </h3>
+                    <p className="text-xs text-sky-100 flex items-center gap-1.5 font-medium bg-white/10 backdrop-blur-md border border-white/15 px-3 py-1.5 rounded-xl w-fit">
+                      <Calendar className="w-3.5 h-3.5 text-sky-300 shrink-0" />
+                      <span>{exp.departureDates || `${formatDateDDMMYYYY(exp.rawDepartureDate || exp.departureDate)} ➔ ${formatDateDDMMYYYY(exp.rawReturnDate || exp.returnDate)}`}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Total a Facturar Minimalista (Glassmorphic) */}
+                <div className="relative z-10 pt-4">
+                  <div className="bg-black/40 backdrop-blur-md border border-white/15 rounded-2xl p-4 shadow-2xl">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-300 block mb-0.5">
+                      Total a Facturar
+                    </span>
+                    <span className="text-xl font-bold font-mono text-white tracking-tight">
+                      ${totalToCharge.toLocaleString('es-CL')}{' '}
+                      <span className="text-xs text-sky-300 font-normal">CLP</span>
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ================================================================= */}
+              {/* COLUMNA DERECHA: ASISTENTE MULTI-PASO (WIZARD) */}
+              {/* ================================================================= */}
+              <div className="flex-1 flex flex-col justify-between bg-[#fbfcfd] overflow-hidden">
+                
+                {/* Header con Stepper Navigation */}
+                <div className="px-6 sm:px-8 py-5 bg-white border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                        Paso {expPassengerStep} de 4
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                      <span className="text-[10px] font-mono font-bold text-[#0b192c]">
+                        {expPassengerStep === 1 && '1. Cantidad de Pasajeros & Cupos'}
+                        {expPassengerStep === 2 && '2. Datos Personales & Fecha de Nacimiento'}
+                        {expPassengerStep === 3 && '3. Tarifa por Pasajero & Pago (CLP)'}
+                        {expPassengerStep === 4 && '4. Resumen & Confirmación Final'}
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-lg font-bold text-[#0b192c]">
+                      Registrar Pasajero en Travesía
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedExpeditionForPassenger(null)}
+                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-[#0b192c] flex items-center justify-center transition cursor-pointer shrink-0"
+                    title="Cerrar modal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Stepper Progress Bar con Círculos Elegantes */}
+                <div className="px-6 sm:px-8 py-3.5 bg-white border-b border-slate-200/80">
+                  <div className="flex items-center justify-between max-w-md mx-auto relative">
+                    {/* Línea conectora de fondo */}
+                    <div className="absolute top-4 left-4 right-4 h-0.5 bg-slate-200 -z-0" />
+                    <div
+                      className="absolute top-4 left-4 h-0.5 bg-[#0b192c] transition-all duration-300 -z-0"
+                      style={{
+                        width: `${((expPassengerStep - 1) / 3) * 100}%`,
+                        maxWidth: 'calc(100% - 32px)',
+                      }}
+                    />
+
+                    {[
+                      { num: 1, label: 'Cupos' },
+                      { num: 2, label: 'Pasajeros' },
+                      { num: 3, label: 'Tarifa' },
+                      { num: 4, label: 'Confirmar' },
+                    ].map((st) => {
+                      const isCompleted = expPassengerStep > st.num;
+                      const isCurrent = expPassengerStep === st.num;
+                      const isClickable = isCompleted || (st.num === 2 && expPassengerStep >= 1) || (st.num === 3 && isExpStep2Valid());
+
+                      return (
+                        <button
+                          key={st.num}
+                          type="button"
+                          disabled={!isClickable && !isCurrent}
+                          onClick={() => {
+                            if (st.num > 2 && expPassengerStep <= 2) {
+                              if (!validateExpStep2()) return;
+                            }
+                            setExpPassengerStep(st.num);
+                          }}
+                          className={`flex flex-col items-center gap-1 relative z-10 group ${
+                            isClickable ? 'cursor-pointer' : 'cursor-default'
+                          }`}
+                        >
+                          {/* Círculo del Paso */}
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-bold transition-all shadow-2xs ${
+                              isCurrent
+                                ? 'bg-[#0b192c] text-white ring-4 ring-sky-100 shadow-md scale-105'
+                                : isCompleted
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-white text-slate-400 border-2 border-slate-300 group-hover:border-slate-400'
+                            }`}
+                          >
+                            {isCompleted ? (
+                              <Check className="w-4 h-4 text-white stroke-[2.5]" />
+                            ) : (
+                              <span>{st.num}</span>
+                            )}
+                          </div>
+
+                          {/* Etiqueta del Paso */}
+                          <span
+                            className={`text-[11px] font-sans font-medium tracking-tight transition-colors ${
+                              isCurrent
+                                ? 'text-[#0b192c] font-bold'
+                                : isCompleted
+                                ? 'text-emerald-700 font-semibold'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            {st.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Body del Formulario con scroll independiente */}
+                <div className="p-6 sm:p-8 flex-1 overflow-y-auto custom-scrollbar">
+                  
+                  {/* ------------------------------------------------------------- */}
+                  {/* PASO 1: CANTIDAD DE PASAJEROS & MODALIDAD                     */}
+                  {/* ------------------------------------------------------------- */}
+                  {expPassengerStep === 1 && (
+                    <div className="space-y-6 animate-fadeIn">
+
+                      <div className="space-y-3">
+                        <label className="block text-xs font-mono uppercase font-bold text-slate-700">
+                          ¿Cuántos pasajeros registrarás en esta reserva? <span className="text-rose-500">*</span>
+                        </label>
+                        
+                        {/* Selector con botones interactivos de cupos */}
+                        <div className="flex flex-wrap items-center gap-3">
+                          {availableSlots > 0 ? (
+                            Array.from({ length: Math.min(6, availableSlots) }, (_, i) => i + 1).map((n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                onClick={() => handleExpPaxCountChange(n)}
+                                className={`flex-1 min-w-[70px] py-3.5 px-4 rounded-2xl font-mono text-sm font-bold transition-all border cursor-pointer ${
+                                  expPassengerForm.paxCount === n
+                                    ? 'bg-[#0b192c] text-white border-[#0b192c] shadow-md scale-102'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                                }`}
+                              >
+                                <span className="block text-base">{n}</span>
+                                <span className="text-[10px] font-normal text-slate-400 block font-sans">
+                                  {n === 1 ? 'Pasajero' : 'Pasajeros'}
+                                </span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="w-full p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                              Esta expedición se encuentra sin cupos disponibles actualmente.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Modalidad de Reserva */}
+                      <div className="space-y-3 pt-4 border-t border-slate-200/70">
+                        <label className="block text-xs font-mono uppercase font-bold text-slate-700">
+                          Modalidad de Travesía
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Cupo Individual */}
+                          <button
+                            type="button"
+                            onClick={() => setExpPassengerForm({ ...expPassengerForm, bookingType: 'per_pax' })}
+                            className={`p-4 rounded-2xl border text-left transition cursor-pointer ${
+                              expPassengerForm.bookingType === 'per_pax'
+                                ? 'bg-sky-50/50 border-[#0b192c] text-[#0b192c] ring-1 ring-[#0b192c]'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-bold text-xs">Cupo Individual (Plazas)</span>
+                              <Ship className="w-4 h-4 text-sky-700" />
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              Reserva por plaza individual en camarote compartido o privado según cupos.
+                            </p>
+                          </button>
+
+                          {/* Chárter Privado (Inteligente: Solo habilitado si la nave está 100% libre) */}
+                          {bookedSpots === 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpPassengerForm({ ...expPassengerForm, bookingType: 'full_charter' })}
+                              className={`p-4 rounded-2xl border text-left transition cursor-pointer ${
+                                expPassengerForm.bookingType === 'full_charter'
+                                  ? 'bg-sky-50/50 border-[#0b192c] text-[#0b192c] ring-1 ring-[#0b192c]'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-xs">Chárter Privado (Exclusivo)</span>
+                                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                              </div>
+                              <p className="text-[11px] text-slate-500">
+                                Reserva la nave completa para grupo privado con patrón y marinero exclusivo.
+                              </p>
+                            </button>
+                          ) : (
+                            <div
+                              className="p-4 rounded-2xl border border-slate-200 bg-slate-50/80 text-slate-400 cursor-not-allowed select-none space-y-1.5"
+                              title="No disponible: Ya existen pasajeros registrados en esta travesía"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-500">Chárter Privado (Exclusivo)</span>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
+                                  <Lock className="w-3 h-3 text-amber-600" />
+                                  <span>Bloqueado</span>
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 leading-snug">
+                                No disponible: Ya hay {bookedSpots} {bookedSpots === 1 ? 'pasajero registrado' : 'pasajeros registrados'} a bordo. La nave completa requiere 100% de aforo libre.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ------------------------------------------------------------- */}
+                  {/* PASO 2: DATOS PERSONALES & FECHA DE NACIMIENTO                */}
+                  {/* ------------------------------------------------------------- */}
+                  {expPassengerStep === 2 && (
+                    <div className="space-y-4 animate-fadeIn">
+                      {/* Banner Informativo / Validación Personalizado con diseño del sitio */}
+                      {expPassengerValidationError && (
+                        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 flex items-start gap-3.5 shadow-2xs animate-fadeIn">
+                          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                            <AlertTriangle className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1 text-xs text-amber-950">
+                            <strong className="font-semibold block mb-0.5 text-amber-900">Información Incompleta</strong>
+                            <p className="text-amber-800 leading-relaxed font-normal">{expPassengerValidationError}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setExpPassengerValidationError(null)}
+                            className="w-6 h-6 rounded-lg text-amber-500 hover:text-amber-800 hover:bg-amber-100 flex items-center justify-center transition cursor-pointer"
+                            title="Descartar"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Tabs de Pasajeros si hay más de 1 */}
+                      {expPassengerForm.paxCount > 1 && (
+                        <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
+                          {expPassengerForm.passengers.map((pax, idx) => {
+                            const isComplete = pax.fullName.trim() && pax.rutPassport.trim() && pax.birthDate.trim();
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  setExpPassengerActiveTab(idx);
+                                  setExpPassengerValidationError(null);
+                                }}
+                                className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-2 border ${
+                                  expPassengerActiveTab === idx
+                                    ? 'bg-[#0b192c] text-white border-[#0b192c] shadow-xs'
+                                    : isComplete
+                                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                {isComplete && <Check className="w-3 h-3 text-emerald-600" />}
+                                <span>Pasajero {idx + 1} {idx === 0 ? '(Titular)' : ''}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Formulario del Pasajero Seleccionado */}
+                      {(() => {
+                        const idx = expPassengerActiveTab;
+                        const pax = expPassengerForm.passengers[idx] || {
+                          fullName: '',
+                          rutPassport: '',
+                          birthDate: '',
+                          email: '',
+                          phone: '',
+                          dietaryNotes: '',
+                          emergencyContact: '',
+                          emergencyPhone: '',
+                        };
+
+                        return (
+                          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xs">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                              <h4 className="font-serif text-sm font-bold text-[#0b192c] flex items-center gap-2">
+                                <UserCheck className="w-4 h-4 text-sky-700" />
+                                <span>Información de Pasajero {idx + 1} {idx === 0 ? '— Titular de la Reserva' : ''}</span>
+                              </h4>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {idx + 1} de {expPassengerForm.paxCount}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {/* Nombre Completo */}
+                              <div>
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  Nombre Completo <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Ej: Carolina Morales Silva"
+                                  value={pax.fullName}
+                                  onChange={(e) => handleUpdateExpPassengerField(idx, 'fullName', e.target.value)}
+                                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0b192c] font-medium focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                                />
+                              </div>
+
+                              {/* RUT o Pasaporte */}
+                              <div>
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  RUT o Pasaporte <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="Ej: 18.345.678-9 / P123456"
+                                  value={pax.rutPassport}
+                                  onChange={(e) => handleUpdateExpPassengerField(idx, 'rutPassport', e.target.value)}
+                                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                                />
+                              </div>
+
+                              {/* Fecha de Nacimiento (Requerida por el usuario) */}
+                              <div>
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  Fecha de Nacimiento <span className="text-rose-500">*</span>
+                                </label>
+                                <LuxuryDatePicker
+                                  required
+                                  value={pax.birthDate}
+                                  onChange={(val) => handleUpdateExpPassengerField(idx, 'birthDate', val)}
+                                  placeholder="dd/mm/aaaa"
+                                />
+                              </div>
+
+                              {/* Teléfono / WhatsApp */}
+                              <div>
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  Teléfono / WhatsApp {idx === 0 ? <span className="text-rose-500">*</span> : '(Opcional)'}
+                                </label>
+                                <CountryPhoneInput
+                                  required={idx === 0}
+                                  value={pax.phone}
+                                  onChange={(val) => handleUpdateExpPassengerField(idx, 'phone', val)}
+                                  placeholder="9 8765 4321"
+                                />
+                              </div>
+
+                              {/* Correo Electrónico */}
+                              <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  Correo Electrónico {idx === 0 ? <span className="text-rose-500">*</span> : '(Opcional)'}
+                                </label>
+                                <input
+                                  type="email"
+                                  required={idx === 0}
+                                  placeholder="pasajero@correo.com"
+                                  value={pax.email}
+                                  onChange={(e) => handleUpdateExpPassengerField(idx, 'email', e.target.value)}
+                                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                                />
+                              </div>
+
+                              {/* Nombre y Apellido Contacto de Emergencia */}
+                              <div>
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  Nombre y Apellido Contacto de Emergencia (Opcional)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Ej: Carmen Gloria Silva"
+                                  value={pax.emergencyContact}
+                                  onChange={(e) => handleUpdateExpPassengerField(idx, 'emergencyContact', e.target.value)}
+                                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                                />
+                              </div>
+
+                              {/* Teléfono Contacto de Emergencia con selector de país */}
+                              <div>
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  Teléfono Contacto de Emergencia (Opcional)
+                                </label>
+                                <CountryPhoneInput
+                                  value={pax.emergencyPhone || ''}
+                                  onChange={(val) => handleUpdateExpPassengerField(idx, 'emergencyPhone', val)}
+                                  placeholder="9 1234 5678"
+                                />
+                              </div>
+
+                              {/* Restricciones Dietéticas / Alergias */}
+                              <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                                  Restricciones Dietéticas / Médicas (Opcional)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Vegetariano, celíaco, alergia a mariscos..."
+                                  value={pax.dietaryNotes}
+                                  onChange={(e) => handleUpdateExpPassengerField(idx, 'dietaryNotes', e.target.value)}
+                                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* ------------------------------------------------------------- */}
+                  {/* PASO 3: TARIFA POR PASAJERO & DESCUENTOS (CLP)                */}
+                  {/* ------------------------------------------------------------- */}
+                  {expPassengerStep === 3 && (
+                    <div className="space-y-6 animate-fadeIn">
+                      
+                      {/* Tarifa Oficial vs Modificada */}
+                      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 space-y-4 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <h4 className="font-serif text-sm font-bold text-[#0b192c] flex items-center gap-2">
+                            <Tag className="w-4 h-4 text-emerald-700" />
+                            <span>Tarifa a Cobrar por Pasajero (en Pesos Chilenos)</span>
+                          </h4>
+                          <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">
+                            Moneda: CLP
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                          {/* Tarifa de Referencia Oficial */}
+                          <div className="bg-[#f4f7fb] border border-slate-200 rounded-2xl p-4 space-y-1">
+                            <span className="text-[10px] font-mono uppercase font-bold text-slate-500 block">
+                              Tarifa de Lista Oficial (Referencia)
+                            </span>
+                            <div className="text-base font-bold font-mono text-slate-700">
+                              ${refPriceClp.toLocaleString('es-CL')} CLP
+                            </div>
+                            <p className="text-[10px] text-slate-400">
+                              Precio de catálogo establecido para esta travesía.
+                            </p>
+                          </div>
+
+                          {/* Tarifa Personalizada / Con Descuento */}
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-mono uppercase font-bold text-[#0b192c]">
+                              Valor Acordado por Pasajero <span className="text-rose-500">*</span>
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-slate-400">
+                                $
+                              </span>
+                              <input
+                                type="number"
+                                step={10000}
+                                min={0}
+                                value={expPassengerForm.customPricePerPax}
+                                onChange={(e) =>
+                                  setExpPassengerForm({
+                                    ...expPassengerForm,
+                                    customPricePerPax: parseInt(e.target.value) || 0,
+                                  })
+                                }
+                                className="w-full bg-white hover:bg-slate-50 focus:bg-white border-2 border-[#0b192c] rounded-2xl pl-8 pr-14 py-3 text-base font-mono font-bold text-[#0b192c] focus:outline-none transition shadow-xs"
+                              />
+                              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-bold text-slate-400">
+                                CLP
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Indicador de Descuento / Modificación en Vivo */}
+                        {priceDifference !== 0 ? (
+                          <div
+                            className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs ${
+                              priceDifference < 0
+                                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                                : 'bg-amber-50/80 border-amber-200 text-amber-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Sparkles className={`w-4 h-4 ${priceDifference < 0 ? 'text-emerald-600' : 'text-amber-600'}`} />
+                              <span>
+                                {priceDifference < 0
+                                  ? `Descuento especial aplicado: -$${Math.abs(priceDifference).toLocaleString('es-CL')} CLP por cupo`
+                                  : `Tarifa con recargo adicional: +$${priceDifference.toLocaleString('es-CL')} CLP`}
+                              </span>
+                            </div>
+                            <span className="font-mono font-bold text-[11px]">
+                              {priceDifference < 0
+                                ? `-${((Math.abs(priceDifference) / refPriceClp) * 100).toFixed(1)}%`
+                                : `+${((priceDifference / refPriceClp) * 100).toFixed(1)}%`}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 text-xs flex items-center gap-2">
+                            <Check className="w-4 h-4 text-slate-400" />
+                            <span>Tarifa estándar de catálogo (sin modificaciones ni descuentos aplicados).</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Configuración de Estado de Pago con Tarjetas Seleccionables */}
+                      <div className="bg-white border border-slate-200/90 rounded-3xl p-5 sm:p-6 space-y-3.5 shadow-2xs">
+                        <label className="block text-[10px] font-mono uppercase font-bold text-slate-600">
+                          Modalidad Inicial del Pago <span className="text-rose-500">*</span>
+                        </label>
+
+                        {/* Opciones Interactivas de Selección (Cards) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Opción 1: 100% Pagado */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpPassengerForm({
+                                ...expPassengerForm,
+                                status: '100_paid',
+                              })
+                            }
+                            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 relative ${
+                              expPassengerForm.status === '100_paid'
+                                ? 'bg-[#0b192c] text-white border-[#0b192c] shadow-md ring-2 ring-sky-300/30'
+                                : 'bg-[#f8fafc] text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border transition-all ${
+                                expPassengerForm.status === '100_paid'
+                                  ? 'bg-emerald-500 border-emerald-400 text-white'
+                                  : 'border-slate-300 bg-white text-transparent'
+                              }`}
+                            >
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-serif text-sm font-bold block leading-tight">
+                                  100% Pagado
+                                </span>
+                                <span
+                                  className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                    expPassengerForm.status === '100_paid'
+                                      ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/40'
+                                      : 'bg-emerald-100 text-emerald-800'
+                                  }`}
+                                >
+                                  Total
+                                </span>
+                              </div>
+                              <p
+                                className={`text-[11px] leading-relaxed ${
+                                  expPassengerForm.status === '100_paid'
+                                    ? 'text-slate-300'
+                                    : 'text-slate-500'
+                                }`}
+                              >
+                                Liquidación completa del total de la travesía.
+                              </p>
+                            </div>
+                          </button>
+
+                          {/* Opción 2: 50% Reservado */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpPassengerForm({
+                                ...expPassengerForm,
+                                status: '50_reserved',
+                              })
+                            }
+                            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 relative ${
+                              expPassengerForm.status === '50_reserved'
+                                ? 'bg-[#0b192c] text-white border-[#0b192c] shadow-md ring-2 ring-sky-300/30'
+                                : 'bg-[#f8fafc] text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border transition-all ${
+                                expPassengerForm.status === '50_reserved'
+                                  ? 'bg-amber-500 border-amber-400 text-white'
+                                  : 'border-slate-300 bg-white text-transparent'
+                              }`}
+                            >
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-serif text-sm font-bold block leading-tight">
+                                  50% Reservado
+                                </span>
+                                <span
+                                  className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                    expPassengerForm.status === '50_reserved'
+                                      ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  Abono
+                                </span>
+                              </div>
+                              <p
+                                className={`text-[11px] leading-relaxed ${
+                                  expPassengerForm.status === '50_reserved'
+                                    ? 'text-slate-300'
+                                    : 'text-slate-500'
+                                }`}
+                              >
+                                Abono inicial para asegurar plazas (saldo previo al zarpe).
+                              </p>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ------------------------------------------------------------- */}
+                  {/* PASO 4: RESUMEN & CONFIRMACIÓN FINAL                          */}
+                  {/* ------------------------------------------------------------- */}
+                  {expPassengerStep === 4 && (
+                    <div className="space-y-5 animate-fadeIn">
+                      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 space-y-5 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                          <h4 className="font-serif text-sm font-bold text-[#0b192c] flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                            <span>Confirmación de Registro en Travesía</span>
+                          </h4>
+                          <span className="text-[10px] font-mono bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full font-bold">
+                            Listo para Emitir
+                          </span>
+                        </div>
+
+                        {/* Listado de Pasajeros a Inscribir */}
+                        <div className="space-y-3">
+                          <span className="text-[10px] font-mono font-bold uppercase text-slate-400 block">
+                            Pasajeros Registrados ({expPassengerForm.passengers.length})
+                          </span>
+
+                          <div className="space-y-2">
+                            {expPassengerForm.passengers.map((pax, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-[#f8fafc] border border-slate-200/80 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="space-y-0.5">
+                                  <strong className="text-[#0b192c] font-bold block text-xs">
+                                    {pax.fullName || 'Pasajero'}
+                                  </strong>
+                                  <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
+                                    <span>RUT: {pax.rutPassport || 'No informado'}</span>
+                                    <span>•</span>
+                                    <span>F. Nacimiento: {pax.birthDate || 'No informada'}</span>
+                                  </div>
+                                </div>
+
+                                <div className="text-right space-y-0.5">
+                                  <span className="text-[11px] text-slate-600 block">
+                                    {pax.phone || 'Sin teléfono'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    {idx === 0 ? 'Pasajero Titular' : `Acompañante ${idx}`}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Desglose de Montos */}
+                        <div className="bg-[#0b192c] text-white rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono uppercase text-sky-300 font-bold block">
+                                Total Expedición
+                              </span>
+                              <span
+                                className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                                  expPassengerForm.status === '50_reserved'
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-400/30'
+                                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
+                                }`}
+                              >
+                                {expPassengerForm.status === '50_reserved' ? '50% RESERVADO' : '100% PAGADO'}
+                              </span>
+                            </div>
+                            <span className="text-xs text-slate-300 block">
+                              {expPassengerForm.paxCount} {expPassengerForm.paxCount === 1 ? 'cupo' : 'cupos'} x ${currentCustomPrice.toLocaleString('es-CL')} CLP
+                            </span>
+                            {expPassengerForm.status === '50_reserved' && (
+                              <div className="text-[11px] text-amber-200 font-mono pt-1 space-y-0.5">
+                                <div>Abono inicial 50%: <strong>${Math.round(totalToCharge * 0.5).toLocaleString('es-CL')} CLP</strong></div>
+                                <div className="text-slate-400">Saldo pendiente 50%: <strong>${Math.round(totalToCharge * 0.5).toLocaleString('es-CL')} CLP</strong> (antes del zarpe)</div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="text-left sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/10">
+                            <div className="text-xl font-bold font-mono text-emerald-400">
+                              ${totalToCharge.toLocaleString('es-CL')} <span className="text-xs font-normal text-sky-300">CLP</span>
+                            </div>
+                            {expPassengerForm.status === '50_reserved' && (
+                              <span className="text-[11px] font-mono text-amber-300 block">
+                                A pagar hoy: ${Math.round(totalToCharge * 0.5).toLocaleString('es-CL')} CLP
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+                {/* Footer de Navegación de Pasos */}
+                <div className="px-6 sm:px-8 py-4 bg-white border-t border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
+                  {expPassengerStep > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setExpPassengerStep((prev) => Math.max(1, prev - 1))}
+                      className="px-5 py-2.5 rounded-full text-xs font-semibold text-slate-600 hover:text-[#0b192c] hover:bg-slate-100 transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Atrás</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExpeditionForPassenger(null)}
+                      className="px-5 py-2.5 rounded-full text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+
+                  {expPassengerStep < 4 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (expPassengerStep === 2) {
+                          if (!validateExpStep2()) return;
+                        }
+                        setExpPassengerStep((prev) => Math.min(4, prev + 1));
+                      }}
+                      className="bg-[#0b192c] hover:bg-[#182a44] active:bg-[#061424] text-white px-7 py-2.5 rounded-full text-xs font-semibold transition shadow-xs hover:shadow-md cursor-pointer flex items-center gap-2 active:scale-95"
+                    >
+                      <span>Continuar</span>
+                      <ChevronRight className="w-4 h-4 text-sky-300" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isSubmittingExpPassenger}
+                      onClick={() => handleSubmitExpPassenger()}
+                      className="bg-gradient-to-r from-[#0b192c] via-[#10243d] to-[#0b192c] hover:from-[#122b49] hover:to-[#122b49] text-white px-7 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-2.5 active:scale-98 disabled:opacity-50 border border-white/15 group"
+                    >
+                      {isSubmittingExpPassenger ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-400" />
+                          <span>Registrando en Travesía...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-4.5 h-4.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                          <span>Confirmar y Registrar Pasajeros</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
       {/* MODAL: CREADOR INTELIGENTE DE EXPEDICIONES EN 6 PASOS */}
       <ExpeditionWizardModal
         isOpen={showNewDepartureModal}
@@ -8496,13 +10412,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: EDITAR INFORMACIÓN DE EXPEDICIÓN */}
       {/* ========================================================================= */}
       {editingDeparture && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
             {/* Modal Header */}
-            <div className="px-6 py-5 bg-[#0f2b48] text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                  <Pencil className="w-4 h-4 text-sky-300" />
+            <div className="px-7 py-5 bg-[#0b192c] text-white flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
+                  <Pencil className="w-4.5 h-4.5 text-sky-300" />
                 </div>
                 <div>
                   <h3 className="font-serif text-lg font-bold text-white">Editar Expedición</h3>
@@ -8519,10 +10435,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             </div>
 
             {/* Form Body */}
-            <form onSubmit={handleSaveEditedDeparture} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+            <form onSubmit={handleSaveEditedDeparture} className="p-7 space-y-4.5 overflow-y-auto flex-1 text-xs">
               {/* Nombre de la Expedición */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                   Nombre de la Expedición
                 </label>
                 <input
@@ -8531,35 +10447,34 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   value={editingDeparture.name || ''}
                   onChange={(e) => setEditingDeparture({ ...editingDeparture, name: e.target.value })}
                   placeholder="Ej: Expedición Robinson Crusoe"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-[#0f2b48] text-sm focus:bg-white focus:outline-none focus:border-[#0f2b48]"
+                  className="w-full px-4 py-2.5 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl font-bold text-[#0b192c] text-sm focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
                 />
               </div>
 
               {/* Embarcación / Activo */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
-                    Embarcación / Activo
+                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                    Embarcación de Expedición
                   </label>
                   <select
                     value={editingDeparture.vessel_id}
                     onChange={(e) => setEditingDeparture({ ...editingDeparture, vessel_id: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48] cursor-pointer"
+                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-semibold text-[#0b192c] focus:outline-none focus:border-[#0b192c] cursor-pointer"
                   >
-                    <option value="vegvisir">Velero Vegvisir (45ft Dufour)</option>
-                    <option value="terranova">Yate Terranova (52ft Hatteras)</option>
-                    <option value="lodge">Lodge Rincón de Navegantes</option>
+                    <option value="vegvisir">Velero Vegvisir (Dufour 52.5 ft)</option>
+                    <option value="terranova">Yate Terranova (Hatteras 65ft LRC)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Estado de Zarpe
                   </label>
                   <select
                     value={editingDeparture.status}
                     onChange={(e) => setEditingDeparture({ ...editingDeparture, status: e.target.value as any })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48] cursor-pointer"
+                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-semibold text-[#0b192c] focus:outline-none focus:border-[#0b192c] cursor-pointer"
                   >
                     <option value="scheduled">Programada</option>
                     <option value="guaranteed">Zarpe Garantizado</option>
@@ -8572,7 +10487,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* Fechas: Zarpe & Retorno */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Fecha de Zarpe / Salida
                   </label>
                   <input
@@ -8580,11 +10495,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     required
                     value={editingDeparture.departure_date}
                     onChange={(e) => setEditingDeparture({ ...editingDeparture, departure_date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48]"
+                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Fecha de Retorno
                   </label>
                   <input
@@ -8592,7 +10507,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     required
                     value={editingDeparture.return_date}
                     onChange={(e) => setEditingDeparture({ ...editingDeparture, return_date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48]"
+                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                   />
                 </div>
               </div>
@@ -8600,7 +10515,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* Cupos & Tarifas */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Cupos Totales
                   </label>
                   <input
@@ -8610,11 +10525,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     required
                     value={editingDeparture.total_slots}
                     onChange={(e) => setEditingDeparture({ ...editingDeparture, total_slots: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48]"
+                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Cupos Disponibles
                   </label>
                   <input
@@ -8624,11 +10539,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     required
                     value={editingDeparture.available_slots}
                     onChange={(e) => setEditingDeparture({ ...editingDeparture, available_slots: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48]"
+                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Tarifa p/Pax (CLP)
                   </label>
                   <input
@@ -8638,14 +10553,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     required
                     value={editingDeparture.price_per_pax_clp}
                     onChange={(e) => setEditingDeparture({ ...editingDeparture, price_per_pax_clp: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48]"
+                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                   />
                 </div>
               </div>
 
               {/* Ubicación / Región */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 font-mono">
+                <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                   Destino / Ubicación
                 </label>
                 <input
@@ -8653,7 +10568,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   value={editingDeparture.location || ''}
                   onChange={(e) => setEditingDeparture({ ...editingDeparture, location: e.target.value })}
                   placeholder="Ej: Archipiélago Juan Fernández / Bahía Cumberland"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-[#0f2b48] focus:bg-white focus:outline-none focus:border-[#0f2b48]"
+                  className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-medium text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                 />
               </div>
 
@@ -8662,13 +10577,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <button
                   type="button"
                   onClick={() => setEditingDeparture(null)}
-                  className="px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold transition cursor-pointer"
+                  className="px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold transition shadow-md shadow-[#0f2b48]/20 cursor-pointer"
+                  className="px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold transition shadow-xs cursor-pointer active:scale-95"
                 >
                   Guardar Cambios
                 </button>
@@ -8682,16 +10597,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: FICHA DE CLIENTE 360° (CRM DOSSIER) */}
       {/* ========================================================================= */}
       {selectedCustomer && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
             
             {/* Header del Dossier */}
-            <div className="px-8 py-6 bg-gradient-to-r from-[#0f2b48] to-[#163e66] text-white flex flex-wrap items-start justify-between gap-4">
+            <div className="px-8 py-6 bg-[#0b192c] text-white flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div
                   className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-xl uppercase shadow-lg ${
                     selectedCustomer.category === 'vip'
-                      ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-[#0f2b48]'
+                      ? 'bg-amber-400 text-[#0b192c]'
                       : 'bg-white/10 text-white border border-white/20'
                   }`}
                 >
@@ -8707,17 +10622,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       {selectedCustomer.fullName}
                     </h3>
                     {selectedCustomer.category === 'vip' ? (
-                      <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Award className="w-3 h-3 text-amber-300" />
+                      <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] px-3 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Award className="w-3.5 h-3.5 text-amber-300" />
                         <span>Socio VIP Gold</span>
                       </span>
                     ) : (
-                      <span className="bg-white/10 text-slate-200 border border-white/20 text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      <span className="bg-white/10 text-slate-200 border border-white/20 text-[10px] px-3 py-0.5 rounded-full font-bold uppercase tracking-wider">
                         Cliente Registrado
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-sky-200/80 font-mono">
+                  <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-sky-200/80 font-mono">
                     <span>{selectedCustomer.rutOrPassport}</span>
                     <span>•</span>
                     <span>{selectedCustomer.city}</span>
@@ -8731,7 +10646,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleCopyCustomerDossier(selectedCustomer)}
-                  className="bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-bold cursor-pointer"
+                  className="bg-white/10 hover:bg-white/20 text-white text-xs px-4 py-2 rounded-full transition flex items-center gap-1.5 font-semibold cursor-pointer"
                   title="Copiar resumen de ficha"
                 >
                   {crmCopiedNotification ? (
@@ -8748,30 +10663,30 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </button>
                 <button
                   onClick={() => setSelectedCustomer(null)}
-                  className="text-white/70 hover:text-white p-2 rounded-xl hover:bg-white/10 transition cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
                 >
-                  <XCircle className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Quick Contact & Key Metrics Strip */}
             <div className="bg-[#f8fafc] border-b border-slate-200 px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-4 text-xs">
+              <div className="flex flex-wrap items-center gap-3 text-xs">
                 <a
                   href={`https://wa.me/${selectedCustomer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
                     `Hola estimado/a ${selectedCustomer.fullName}, le contactamos desde Yates Chile & Lodge Rincón de Navegantes.`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow-xs"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-1.5 rounded-full flex items-center gap-1.5 transition shadow-2xs"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                   <span>WhatsApp: {selectedCustomer.phone}</span>
                 </a>
                 <a
                   href={`mailto:${selectedCustomer.email}?subject=${encodeURIComponent('Atención Concierge Yates Chile')}`}
-                  className="bg-white hover:bg-slate-100 text-[#0f2b48] border border-slate-200 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
+                  className="bg-white hover:bg-slate-100 text-[#0b192c] border border-slate-200 font-semibold px-4 py-1.5 rounded-full flex items-center gap-1.5 transition shadow-2xs"
                 >
                   <Mail className="w-3.5 h-3.5 text-slate-500" />
                   <span>{selectedCustomer.email}</span>
@@ -8780,14 +10695,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               <div className="flex items-center gap-6 font-mono text-xs">
                 <div>
-                  <span className="text-[10px] text-slate-400 block uppercase">Inversión (LTV)</span>
-                  <span className="font-bold text-[#0f2b48]">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Inversión (LTV)</span>
+                  <span className="font-bold text-[#0b192c]">
                     ${selectedCustomer.totalSpentClp.toLocaleString('es-CL')} CLP
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block uppercase">Reservas</span>
-                  <span className="font-bold text-[#0f2b48]">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Reservas</span>
+                  <span className="font-bold text-[#0b192c]">
                     {selectedCustomer.bookingsCount || (getCustomerLodgeBookings(selectedCustomer).length + getCustomerExpBookings(selectedCustomer).length)}
                   </span>
                 </div>
@@ -8795,12 +10710,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             </div>
 
             {/* Dossier Navigation Tabs */}
-            <div className="flex items-center gap-1 px-8 pt-3 border-b border-slate-200 bg-white">
+            <div className="flex items-center gap-2 px-8 pt-3 border-b border-slate-200 bg-white">
               <button
                 onClick={() => setCustomerDossierTab('profile')}
-                className={`pb-3 px-4 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                className={`pb-3 px-4 text-xs font-semibold transition-all border-b-2 cursor-pointer ${
                   customerDossierTab === 'profile'
-                    ? 'border-[#0f2b48] text-[#0f2b48]'
+                    ? 'border-[#0b192c] text-[#0b192c]'
                     : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -8808,9 +10723,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </button>
               <button
                 onClick={() => setCustomerDossierTab('bookings')}
-                className={`pb-3 px-4 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                className={`pb-3 px-4 text-xs font-semibold transition-all border-b-2 cursor-pointer ${
                   customerDossierTab === 'bookings'
-                    ? 'border-[#0f2b48] text-[#0f2b48]'
+                    ? 'border-[#0b192c] text-[#0b192c]'
                     : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -8818,9 +10733,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </button>
               <button
                 onClick={() => setCustomerDossierTab('payments')}
-                className={`pb-3 px-4 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                className={`pb-3 px-4 text-xs font-semibold transition-all border-b-2 cursor-pointer ${
                   customerDossierTab === 'payments'
-                    ? 'border-[#0f2b48] text-[#0f2b48]'
+                    ? 'border-[#0b192c] text-[#0b192c]'
                     : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -8828,9 +10743,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </button>
               <button
                 onClick={() => setCustomerDossierTab('timeline')}
-                className={`pb-3 px-4 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                className={`pb-3 px-4 text-xs font-semibold transition-all border-b-2 cursor-pointer ${
                   customerDossierTab === 'timeline'
-                    ? 'border-[#0f2b48] text-[#0f2b48]'
+                    ? 'border-[#0b192c] text-[#0b192c]'
                     : 'border-transparent text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -8839,41 +10754,41 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             </div>
 
             {/* Dossier Content Body (Scrollable) */}
-            <div className="p-8 overflow-y-auto max-h-[60vh] space-y-6">
+            <div className="p-8 overflow-y-auto max-h-[60vh] space-y-6 custom-scrollbar">
               
               {/* TAB 1: PERFIL & PREFERENCIAS */}
               {customerDossierTab === 'profile' && (
                 <div className="space-y-6">
                   {/* Datos de Contacto y Emergencia */}
-                  <div className="bg-[#fbfcfd] border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                    <h4 className="font-serif text-sm font-bold text-[#0f2b48] flex items-center gap-2">
-                      <User className="w-4 h-4 text-[#0f2b48]" />
+                  <div className="bg-[#fbfcfd] border border-slate-200/80 rounded-3xl p-6 space-y-4">
+                    <h4 className="font-serif text-sm font-bold text-[#0b192c] flex items-center gap-2">
+                      <User className="w-4 h-4 text-[#0b192c]" />
                       <span>Datos Generales & Contacto</span>
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">RUT / Pasaporte</span>
-                        <span className="font-bold text-[#0f2b48] font-mono">{selectedCustomer.rutOrPassport}</span>
+                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.rutOrPassport}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Nacionalidad</span>
-                        <span className="font-bold text-[#0f2b48]">{selectedCustomer.nationality}</span>
+                        <span className="font-bold text-[#0b192c]">{selectedCustomer.nationality}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Ciudad de Residencia</span>
-                        <span className="font-bold text-[#0f2b48]">{selectedCustomer.city}</span>
+                        <span className="font-bold text-[#0b192c]">{selectedCustomer.city}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Teléfono Móvil</span>
-                        <span className="font-bold text-[#0f2b48] font-mono">{selectedCustomer.phone}</span>
+                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.phone}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Correo Electrónico</span>
-                        <span className="font-bold text-[#0f2b48]">{selectedCustomer.email}</span>
+                        <span className="font-bold text-[#0b192c]">{selectedCustomer.email}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Contacto de Emergencia</span>
-                        <span className="font-bold text-[#0f2b48]">
+                        <span className="font-bold text-[#0b192c]">
                           {selectedCustomer.emergencyContact || 'No especificado'}
                         </span>
                       </div>
@@ -8881,33 +10796,33 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </div>
 
                   {/* Preferencias de Hospitalidad & Náutica */}
-                  <div className="bg-[#fbfcfd] border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                    <h4 className="font-serif text-sm font-bold text-[#0f2b48] flex items-center gap-2">
+                  <div className="bg-[#fbfcfd] border border-slate-200/80 rounded-3xl p-6 space-y-4">
+                    <h4 className="font-serif text-sm font-bold text-[#0b192c] flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-amber-600" />
                       <span>Perfil de Hospitalidad & Preferencias Concierge</span>
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80">
+                      <div className="bg-white p-4 rounded-2xl border border-slate-200/80">
                         <span className="text-[10px] font-bold uppercase text-slate-400 font-mono block mb-1">
                           🥗 Dieta & Alergias
                         </span>
-                        <p className="text-[#0f2b48] font-medium leading-relaxed">
+                        <p className="text-[#0b192c] font-medium leading-relaxed">
                           {selectedCustomer.dietaryPreferences || 'Sin restricciones conocidas.'}
                         </p>
                       </div>
-                      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80">
+                      <div className="bg-white p-4 rounded-2xl border border-slate-200/80">
                         <span className="text-[10px] font-bold uppercase text-slate-400 font-mono block mb-1">
                           🍷 Vinos & Bebidas
                         </span>
-                        <p className="text-[#0f2b48] font-medium leading-relaxed">
+                        <p className="text-[#0b192c] font-medium leading-relaxed">
                           {selectedCustomer.beveragePreference || 'No especificado.'}
                         </p>
                       </div>
-                      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80">
+                      <div className="bg-white p-4 rounded-2xl border border-slate-200/80">
                         <span className="text-[10px] font-bold uppercase text-slate-400 font-mono block mb-1">
                           🤿 Náutica & Buceo
                         </span>
-                        <p className="text-[#0f2b48] font-medium leading-relaxed">
+                        <p className="text-[#0b192c] font-medium leading-relaxed">
                           {selectedCustomer.divingLevel || 'No especificado.'}
                         </p>
                       </div>
@@ -8915,10 +10830,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </div>
 
                   {/* Notas Internas Editables del Concierge */}
-                  <div className="bg-[#fbfcfd] border border-slate-200/80 rounded-2xl p-5 space-y-3">
+                  <div className="bg-[#fbfcfd] border border-slate-200/80 rounded-3xl p-6 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-serif text-sm font-bold text-[#0f2b48] flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-[#0f2b48]" />
+                      <h4 className="font-serif text-sm font-bold text-[#0b192c] flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-[#0b192c]" />
                         <span>Notas Internas del Concierge & Administración</span>
                       </h4>
                       <span className="text-[10px] text-slate-400 font-mono">Privado para el equipo</span>
@@ -8928,7 +10843,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       value={selectedCustomer.notes}
                       onChange={(e) => handleUpdateCustomerNotes(e.target.value)}
                       placeholder="Agrega notas clave sobre este cliente (preferencias familiares, solicitudes especiales, acuerdos comerciales)..."
-                      className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-xs text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none leading-relaxed"
+                      className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-xs text-[#0b192c] focus:border-[#0b192c] focus:outline-none leading-relaxed shadow-2xs"
                     />
                     <div className="flex justify-end">
                       <span className="text-[10px] text-emerald-600 font-mono">
@@ -8943,7 +10858,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {customerDossierTab === 'bookings' && (
                 <div className="space-y-4">
                   {getCustomerLodgeBookings(selectedCustomer).length === 0 && getCustomerExpBookings(selectedCustomer).length === 0 ? (
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-xs">
+                    <div className="bg-slate-50 border border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs font-light">
                       No hay reservas registradas actualmente para este cliente.
                     </div>
                   ) : (
@@ -8954,18 +10869,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         return (
                           <div
                             key={b.id}
-                            className="bg-[#fbfcfd] border border-slate-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4"
+                            className="bg-[#fbfcfd] border border-slate-200/80 rounded-3xl p-5 flex flex-wrap items-center justify-between gap-4"
                           >
                             <div className="flex items-center gap-3.5">
-                              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700">
+                              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs">
                                 <BedDouble className="w-5 h-5" />
                               </div>
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-serif font-bold text-sm text-[#0f2b48]">
+                                  <span className="font-serif font-bold text-sm text-[#0b192c]">
                                     {room ? room.room_name : 'Lodge Rincón de Navegantes'}
                                   </span>
-                                  <span className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600">
+                                  <span className="text-[10px] font-mono font-bold bg-white px-2.5 py-0.5 rounded-full border border-slate-200 text-slate-600">
                                     {b.booking_code}
                                   </span>
                                 </div>
@@ -8979,7 +10894,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               </div>
                             </div>
                             <div className="text-right font-mono">
-                              <span className="text-xs font-bold text-[#0f2b48] block">
+                              <span className="text-xs font-bold text-[#0b192c] block">
                                 ${(b.total_amount || 240000).toLocaleString('es-CL')} CLP
                               </span>
                               <span className="text-[10px] text-emerald-600 font-sans font-semibold">
@@ -8994,18 +10909,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       {getCustomerExpBookings(selectedCustomer).map((b) => (
                         <div
                           key={b.id}
-                          className="bg-[#fbfcfd] border border-slate-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4"
+                          className="bg-[#fbfcfd] border border-slate-200/80 rounded-3xl p-5 flex flex-wrap items-center justify-between gap-4"
                         >
                           <div className="flex items-center gap-3.5">
-                            <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700">
+                            <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs">
                               <Ship className="w-5 h-5" />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-serif font-bold text-sm text-[#0f2b48]">
+                                <span className="font-serif font-bold text-sm text-[#0b192c]">
                                   Expedición Náutica ({b.booking_type === 'full_charter' ? 'Chárter Exclusivo' : 'Por Cupos'})
                                 </span>
-                                <span className="text-[10px] font-mono font-bold bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600">
+                                <span className="text-[10px] font-mono font-bold bg-white px-2.5 py-0.5 rounded-full border border-slate-200 text-slate-600">
                                   {b.booking_code}
                                 </span>
                               </div>
@@ -9017,7 +10932,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             </div>
                           </div>
                           <div className="text-right font-mono">
-                            <span className="text-xs font-bold text-[#0f2b48] block">
+                            <span className="text-xs font-bold text-[#0b192c] block">
                               ${(b.total_amount || 1850000).toLocaleString('es-CL')} CLP
                             </span>
                             <span className="text-[10px] text-sky-600 font-sans font-semibold">
@@ -9035,7 +10950,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {customerDossierTab === 'payments' && (
                 <div className="space-y-4">
                   {getCustomerInstallments(selectedCustomer).length === 0 ? (
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center text-slate-400 text-xs">
+                    <div className="bg-slate-50 border border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs font-light">
                       No hay cuotas o transferencias pendientes registradas para este cliente.
                     </div>
                   ) : (
@@ -9043,12 +10958,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       {getCustomerInstallments(selectedCustomer).map((inst) => (
                         <div
                           key={inst.id}
-                          className="bg-[#fbfcfd] border border-slate-200 rounded-2xl p-5 space-y-3"
+                          className="bg-[#fbfcfd] border border-slate-200/80 rounded-3xl p-5 space-y-3"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-[#0f2b48]">{inst.concept}</span>
+                            <span className="text-xs font-bold text-[#0b192c]">{inst.concept}</span>
                             <span
-                              className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                              className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
                                 inst.status === 'approved'
                                   ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                   : 'bg-amber-50 text-amber-800 border border-amber-200'
@@ -9057,7 +10972,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               {inst.status}
                             </span>
                           </div>
-                          <div className="text-lg font-mono font-bold text-[#0f2b48]">
+                          <div className="text-lg font-mono font-bold text-[#0b192c]">
                             ${inst.amount_expected.toLocaleString('es-CL')} CLP
                           </div>
                           {inst.receipt_url && (
@@ -9065,16 +10980,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               href={inst.receipt_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="w-full bg-slate-100 hover:bg-slate-200 text-[#0f2b48] text-xs py-1.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition"
+                              className="w-full bg-slate-100 hover:bg-slate-200 text-[#0b192c] text-xs py-2 rounded-full font-semibold flex items-center justify-center gap-1.5 transition shadow-2xs"
                             >
-                              <Eye className="w-3.5 h-3.5 text-[#0f2b48]" />
+                              <Eye className="w-3.5 h-3.5 text-[#0b192c]" />
                               <span>Ver Voucher Bancario</span>
                             </a>
                           )}
                           {inst.status !== 'approved' && (
                             <button
                               onClick={() => setSelectedInstallment(inst)}
-                              className="w-full bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold py-2 rounded-xl text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                              className="w-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-2 rounded-full text-xs transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
                             >
                               <ShieldCheck className="w-3.5 h-3.5 text-sky-300" />
                               <span>Conciliar Pago</span>
@@ -9091,8 +11006,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {customerDossierTab === 'timeline' && (
                 <div className="space-y-6">
                   {/* Formulario para registrar nota/hito en timeline */}
-                  <form onSubmit={handleAddTimelineNote} className="bg-[#fbfcfd] border border-slate-200 rounded-2xl p-5 space-y-3">
-                    <h5 className="font-serif text-xs font-bold text-[#0f2b48] flex items-center gap-1.5">
+                  <form onSubmit={handleAddTimelineNote} className="bg-[#fbfcfd] border border-slate-200/80 rounded-3xl p-5 space-y-3">
+                    <h5 className="font-serif text-xs font-bold text-[#0b192c] flex items-center gap-1.5">
                       <Plus className="w-3.5 h-3.5 text-sky-600" />
                       <span>Registrar Interacción o Seguimiento</span>
                     </h5>
@@ -9100,7 +11015,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <select
                         value={newTimelineType}
                         onChange={(e) => setNewTimelineType(e.target.value as any)}
-                        className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-[#0f2b48] focus:outline-none"
+                        className="bg-white border border-slate-200 rounded-full px-3 py-1.5 text-xs font-semibold text-[#0b192c] focus:outline-none"
                       >
                         <option value="note">📝 Nota Interna</option>
                         <option value="call">📞 Llamada / WhatsApp</option>
@@ -9111,11 +11026,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         placeholder="Escribe el detalle de la interacción realizada con el cliente..."
                         value={newTimelineNote}
                         onChange={(e) => setNewTimelineNote(e.target.value)}
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                        className="flex-1 bg-white border border-slate-200 rounded-full px-4 py-1.5 text-xs text-[#0b192c] focus:border-[#0b192c] focus:outline-none"
                       />
                       <button
                         type="submit"
-                        className="bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold px-4 py-2 rounded-xl text-xs transition cursor-pointer"
+                        className="bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold px-5 py-1.5 rounded-full text-xs transition cursor-pointer active:scale-95 shadow-xs"
                       >
                         Añadir
                       </button>
@@ -9126,12 +11041,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   <div className="space-y-4 pl-3 border-l-2 border-slate-200">
                     {selectedCustomer.timeline?.map((item) => (
                       <div key={item.id} className="relative pl-6 space-y-1">
-                        <div className="w-3 h-3 rounded-full bg-[#0f2b48] absolute -left-[19px] top-1 border-2 border-white ring-2 ring-slate-200" />
+                        <div className="w-3 h-3 rounded-full bg-[#0b192c] absolute -left-[19px] top-1 border-2 border-white ring-2 ring-slate-200" />
                         <div className="flex items-center gap-2 text-xs">
-                          <span className="font-bold text-[#0f2b48]">{item.title}</span>
+                          <span className="font-bold text-[#0b192c]">{item.title}</span>
                           <span className="text-[10px] text-slate-400 font-mono">{item.date}</span>
                         </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">{item.description}</p>
+                        <p className="text-xs text-slate-600 leading-relaxed font-light">{item.description}</p>
                       </div>
                     ))}
                   </div>
@@ -9146,7 +11061,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </span>
               <button
                 onClick={() => setSelectedCustomer(null)}
-                className="bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold px-5 py-2 rounded-xl text-xs transition cursor-pointer"
+                className="bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold px-6 py-2 rounded-full text-xs transition cursor-pointer active:scale-95 shadow-xs"
               >
                 Cerrar Ficha
               </button>
@@ -9159,76 +11074,76 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: REGISTRAR NUEVO CLIENTE (CRM) */}
       {/* ========================================================================= */}
       {showNewCustomerModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0f2b48]">
-                  <UserPlus className="w-5 h-5 text-[#0f2b48]" />
+                <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0b192c]">
+                  <UserPlus className="w-5 h-5 text-[#0b192c]" />
                 </div>
                 <div>
-                  <h4 className="font-serif text-lg font-bold text-[#0f2b48]">Registrar Nuevo Cliente</h4>
+                  <h4 className="font-serif text-lg font-bold text-[#0b192c]">Registrar Nuevo Cliente</h4>
                   <span className="text-[10px] text-slate-400 font-mono">CRM Yates Chile & Lodge</span>
                 </div>
               </div>
               <button
                 onClick={() => setShowNewCustomerModal(false)}
-                className="text-slate-400 hover:text-[#0f2b48] p-1 transition cursor-pointer"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateCustomer} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3.5">
                 <div className="col-span-2">
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Nombre Completo *</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Nombre Completo *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej: Sebastián Edwards Claro"
                     value={newCustomerForm.fullName}
                     onChange={(e) => setNewCustomerForm({ ...newCustomerForm, fullName: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs font-medium"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Email *</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Email *</label>
                   <input
                     type="email"
                     required
                     placeholder="cliente@dominio.cl"
                     value={newCustomerForm.email}
                     onChange={(e) => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Teléfono Móvil</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Teléfono Móvil</label>
                   <input
                     type="tel"
                     placeholder="+56 9 1234 5678"
                     value={newCustomerForm.phone}
                     onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">RUT / Pasaporte</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">RUT / Pasaporte</label>
                   <input
                     type="text"
                     placeholder="12.345.678-9"
                     value={newCustomerForm.rutOrPassport}
                     onChange={(e) => setNewCustomerForm({ ...newCustomerForm, rutOrPassport: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Categoría</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Categoría</label>
                   <select
                     value={newCustomerForm.category}
                     onChange={(e) => setNewCustomerForm({ ...newCustomerForm, category: e.target.value as any })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-bold focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-bold focus:border-[#0b192c] focus:outline-none"
                   >
                     <option value="regular">Cliente Estándar</option>
                     <option value="vip">👑 Socio VIP Gold</option>
@@ -9238,24 +11153,24 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Dieta o Alergias</label>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Dieta o Alergias</label>
                 <input
                   type="text"
                   placeholder="Ej: Celíaco / Pescatariano / Sin mariscos"
                   value={newCustomerForm.dietary}
                   onChange={(e) => setNewCustomerForm({ ...newCustomerForm, dietary: e.target.value })}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Notas Iniciales</label>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Notas Iniciales</label>
                 <textarea
                   rows={2}
                   placeholder="Notas de concierge o antecedentes del cliente..."
                   value={newCustomerForm.notes}
                   onChange={(e) => setNewCustomerForm({ ...newCustomerForm, notes: e.target.value })}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs leading-relaxed"
                 />
               </div>
 
@@ -9263,13 +11178,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <button
                   type="button"
                   onClick={() => setShowNewCustomerModal(false)}
-                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition cursor-pointer"
+                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 bg-[#0f2b48] hover:bg-[#0a1e34] text-white py-3 rounded-xl font-bold transition shadow-md shadow-[#0f2b48]/20 cursor-pointer"
+                  className="w-1/2 bg-[#0b192c] hover:bg-[#182a44] text-white py-2.5 rounded-full font-semibold transition shadow-xs cursor-pointer active:scale-95"
                 >
                   Guardar Ficha
                 </button>
@@ -9283,7 +11198,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: REGISTRAR NUEVO LEAD / PROSPECTO */}
       {/* ========================================================================= */}
       {showNewLeadModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
@@ -9291,58 +11206,58 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-lg text-[#0f2b48]">Registrar Nuevo Lead / Prospecto</h4>
+                  <h4 className="font-serif font-bold text-lg text-[#0b192c]">Registrar Nuevo Lead / Prospecto</h4>
                   <span className="text-[10px] text-slate-400 font-mono">Seguimiento Comercial Yates Chile</span>
                 </div>
               </div>
               <button
                 onClick={() => setShowNewLeadModal(false)}
-                className="text-slate-400 hover:text-[#0f2b48] p-1 transition cursor-pointer"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateLeadSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3.5">
                 <div className="col-span-2">
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Nombre Completo *</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Nombre Completo *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej: Marcelo Ríos Salas"
                     value={newLeadForm.fullName}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, fullName: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs font-medium"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Email *</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Email *</label>
                   <input
                     type="email"
                     required
                     placeholder="prospecto@empresa.cl"
                     value={newLeadForm.email}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, email: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Teléfono Móvil (WhatsApp)</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Teléfono Móvil (WhatsApp)</label>
                   <input
                     type="tel"
                     placeholder="+56 9 8765 4321"
                     value={newLeadForm.phone}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Canal de Origen</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Canal de Origen</label>
                   <select
                     value={newLeadForm.origin}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, origin: e.target.value as any })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-bold focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-semibold focus:border-[#0b192c] focus:outline-none"
                   >
                     <option value="contacto_web">🌐 Formulario Web Contacto</option>
                     <option value="brochure">📥 Descarga Brochure PDF</option>
@@ -9352,11 +11267,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Tipo de Interés</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Tipo de Interés</label>
                   <select
                     value={newLeadForm.interestType}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, interestType: e.target.value as any })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-bold focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-semibold focus:border-[#0b192c] focus:outline-none"
                   >
                     <option value="expediciones">⛵ Expediciones Náuticas</option>
                     <option value="lodge">🏡 Lodge Rincón de Navegantes</option>
@@ -9365,46 +11280,46 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Pax Estimados</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Pax Estimados</label>
                   <input
                     type="number"
                     min="1"
                     max="30"
                     value={newLeadForm.estimatedPax}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, estimatedPax: Number(e.target.value) })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Fecha Tentativa</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Fecha Tentativa</label>
                   <input
                     type="text"
                     placeholder="Ej: Noviembre 2026"
                     value={newLeadForm.tentativeDate}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, tentativeDate: e.target.value })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Presupuesto Estimado (CLP)</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Presupuesto Estimado (CLP)</label>
                   <input
                     type="number"
                     placeholder="3700000"
                     value={newLeadForm.estimatedBudgetClp}
                     onChange={(e) => setNewLeadForm({ ...newLeadForm, estimatedBudgetClp: Number(e.target.value) })}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:outline-none"
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-mono font-bold focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">Notas / Consulta Inicial</label>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Notas / Consulta Inicial</label>
                 <textarea
                   rows={3}
                   placeholder="Detalles sobre lo que busca el prospecto..."
                   value={newLeadForm.notes}
                   onChange={(e) => setNewLeadForm({ ...newLeadForm, notes: e.target.value })}
-                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs leading-relaxed"
                 />
               </div>
 
@@ -9412,13 +11327,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <button
                   type="button"
                   onClick={() => setShowNewLeadModal(false)}
-                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition cursor-pointer"
+                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 bg-[#0f2b48] hover:bg-[#0a1e34] text-white py-3 rounded-xl font-bold transition shadow-md shadow-[#0f2b48]/20 cursor-pointer"
+                  className="w-1/2 bg-[#0b192c] hover:bg-[#182a44] text-white py-2.5 rounded-full font-semibold transition shadow-xs cursor-pointer active:scale-95"
                 >
                   Registrar Lead
                 </button>
@@ -9432,18 +11347,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: EDITAR NOTAS DEL LEAD */}
       {/* ========================================================================= */}
       {editingLeadNotes && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white rounded-3xl p-7 max-w-md w-full shadow-2xl border border-slate-200 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h4 className="font-bold text-base text-[#0f2b48]">Bitácora de Notas</h4>
+                <h4 className="font-serif font-bold text-base text-[#0b192c]">Bitácora de Notas</h4>
                 <span className="text-[11px] text-slate-500 font-light">Lead: {editingLeadNotes.fullName}</span>
               </div>
               <button
                 onClick={() => setEditingLeadNotes(null)}
-                className="text-slate-400 hover:text-[#0f2b48] p-1 transition cursor-pointer"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
               >
-                <XCircle className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
@@ -9453,21 +11368,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 value={leadNotesText}
                 onChange={(e) => setLeadNotesText(e.target.value)}
                 placeholder="Registra acuerdos, fechas acordadas, resumen de llamadas o notas comerciales..."
-                className="w-full bg-[#fbfcfd] border border-slate-200 rounded-2xl p-3.5 text-xs text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none leading-relaxed"
+                className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl p-4 text-xs text-[#0b192c] focus:border-[#0b192c] focus:outline-none leading-relaxed transition shadow-2xs"
                 autoFocus
               />
 
-              <div className="flex gap-2">
+              <div className="flex gap-2.5">
                 <button
                   type="button"
                   onClick={() => setEditingLeadNotes(null)}
-                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full text-xs font-semibold transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 bg-[#0f2b48] hover:bg-[#0a1e34] text-white py-2.5 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                  className="w-1/2 bg-[#0b192c] hover:bg-[#182a44] text-white py-2.5 rounded-full text-xs font-semibold transition shadow-xs cursor-pointer active:scale-95"
                 >
                   Guardar Notas
                 </button>
@@ -9490,17 +11405,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* 9. MODAL: MODIFICAR PERFIL & RESETEAR CONTRASEÑA */}
       {/* ========================================================================= */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-50 bg-[#0a1e34]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(15,43,72,0.25)] space-y-6 animate-scale-in my-8">
+        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(11,25,44,0.25)] space-y-6 animate-scale-in my-8">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#0f2b48] text-white flex items-center justify-center font-mono font-bold text-sm shadow-sm shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-[#0b192c] text-white flex items-center justify-center font-mono font-bold text-sm shadow-sm shrink-0">
                   {`${(adminProfile.firstName?.[0] || 'A')}${(adminProfile.lastName?.[0] || 'D')}`.toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-serif text-xl font-bold text-[#0f2b48]">
+                  <h3 className="font-serif text-xl font-bold text-[#0b192c]">
                     Mi Perfil & Seguridad
                   </h3>
                   <p className="text-xs text-slate-500 font-light">
@@ -9511,10 +11426,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <button
                 type="button"
                 onClick={() => setShowProfileModal(false)}
-                className="text-slate-400 hover:text-[#0f2b48] p-1.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
                 title="Cerrar modal"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
@@ -9540,8 +11455,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* SECCIÓN 1: DATOS PERSONALES */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#0f2b48]" />
-                  <h4 className="font-serif text-sm font-bold text-[#0f2b48] uppercase tracking-wider text-[11px]">
+                  <User className="w-4 h-4 text-[#0b192c]" />
+                  <h4 className="font-serif text-sm font-bold text-[#0b192c] uppercase tracking-wider text-[11px]">
                     Información Personal
                   </h4>
                 </div>
@@ -9557,7 +11472,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       value={profileForm.firstName}
                       onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
                       placeholder="Nombre"
-                      className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-medium focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs"
+                      className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-medium focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                     />
                   </div>
 
@@ -9571,7 +11486,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       value={profileForm.lastName}
                       onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
                       placeholder="Apellido"
-                      className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-medium focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs"
+                      className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-medium focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                     />
                   </div>
                 </div>
@@ -9587,7 +11502,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       value={profileForm.phone}
                       onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
                       placeholder="+56 9 1234 5678"
-                      className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-medium focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs"
+                      className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-medium focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                     />
                   </div>
 
@@ -9607,10 +11522,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         disabled
                         readOnly
                         value={profileForm.email}
-                        className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-500 font-mono font-medium cursor-not-allowed select-none opacity-80"
+                        className="w-full bg-slate-100 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs text-slate-500 font-mono font-medium cursor-not-allowed select-none opacity-80"
                         title="El correo principal corporativo no puede ser modificado"
                       />
-                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                      <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
                     </div>
                   </div>
                 </div>
@@ -9620,8 +11535,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <KeyRound className="w-4 h-4 text-[#0f2b48]" />
-                    <h4 className="font-serif text-sm font-bold text-[#0f2b48] uppercase tracking-wider text-[11px]">
+                    <KeyRound className="w-4 h-4 text-[#0b192c]" />
+                    <h4 className="font-serif text-sm font-bold text-[#0b192c] uppercase tracking-wider text-[11px]">
                       Seguridad & Contraseña
                     </h4>
                   </div>
@@ -9644,12 +11559,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         value={passwordForm.currentPassword}
                         onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                         placeholder="Ingresa tu contraseña actual"
-                        className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs pr-10"
+                        className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs pr-10"
                       />
                       <button
                         type="button"
                         onClick={() => setShowCurrentPass(!showCurrentPass)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0f2b48] p-1 cursor-pointer transition"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0b192c] p-1 cursor-pointer transition"
                       >
                         {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -9668,12 +11583,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           value={passwordForm.newPassword}
                           onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                           placeholder="Mínimo 6 caracteres"
-                          className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs pr-10"
+                          className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs pr-10"
                         />
                         <button
                           type="button"
                           onClick={() => setShowNewPass(!showNewPass)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0f2b48] p-1 cursor-pointer transition"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0b192c] p-1 cursor-pointer transition"
                         >
                           {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -9690,12 +11605,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           value={passwordForm.confirmPassword}
                           onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                           placeholder="Repite la nueva contraseña"
-                          className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-mono focus:border-[#0f2b48] focus:bg-white focus:outline-none transition shadow-2xs pr-10"
+                          className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs pr-10"
                         />
                         <button
                           type="button"
                           onClick={() => setShowConfirmPass(!showConfirmPass)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0f2b48] p-1 cursor-pointer transition"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0b192c] p-1 cursor-pointer transition"
                         >
                           {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -9710,19 +11625,80 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(false)}
-                  className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-[#0f2b48] hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                  className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:text-[#0b192c] hover:bg-slate-100 rounded-full transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="bg-[#0f2b48] hover:bg-[#0a1e34] active:bg-[#061424] text-white px-6 py-2.5 rounded-xl text-xs font-bold transition shadow-sm hover:shadow-md cursor-pointer flex items-center gap-2"
+                  className="bg-[#0b192c] hover:bg-[#182a44] active:bg-[#061424] text-white px-6 py-2.5 rounded-full text-xs font-semibold transition shadow-xs hover:shadow-md cursor-pointer flex items-center gap-2 active:scale-95"
                 >
                   <Check className="w-4 h-4 text-sky-300" />
                   <span>Guardar Cambios</span>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CUADRO INFORMATIVO / ALERT MODAL PERSONALIZADO (LUXURY YATES CHILE) */}
+      {/* ========================================================================= */}
+      {customAlert?.isOpen && (
+        <div className="fixed inset-0 z-[100] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative">
+            <button
+              type="button"
+              onClick={() => setCustomAlert(null)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-[#0b192c] flex items-center justify-center transition cursor-pointer"
+              title="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-start gap-4">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+                  customAlert.type === 'error'
+                    ? 'bg-rose-50 border-rose-200 text-rose-600'
+                    : customAlert.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                    : customAlert.type === 'info'
+                    ? 'bg-sky-50 border-sky-200 text-sky-600'
+                    : 'bg-amber-50 border-amber-200 text-amber-600'
+                }`}
+              >
+                {customAlert.type === 'error' && <AlertCircle className="w-6 h-6" />}
+                {customAlert.type === 'success' && <CheckCircle2 className="w-6 h-6" />}
+                {customAlert.type === 'info' && <Info className="w-6 h-6" />}
+                {(customAlert.type === 'warning' || !customAlert.type) && <AlertTriangle className="w-6 h-6" />}
+              </div>
+
+              <div className="space-y-1 pr-6">
+                <h4 className="font-serif font-bold text-lg text-[#0b192c] tracking-tight">
+                  {customAlert.title}
+                </h4>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+                  {customAlert.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (customAlert.onConfirm) {
+                    customAlert.onConfirm();
+                  }
+                  setCustomAlert(null);
+                }}
+                className="w-full py-3 px-5 rounded-2xl bg-[#0b192c] hover:bg-[#182a44] active:bg-[#061424] text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-md hover:shadow-lg cursor-pointer active:scale-98 text-center"
+              >
+                Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}

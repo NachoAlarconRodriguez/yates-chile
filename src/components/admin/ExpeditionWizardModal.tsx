@@ -1350,10 +1350,10 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                 type="button"
                 onClick={handleFinalSubmit}
                 disabled={isSubmitting || dateRangeConflict?.hasConflict}
-                className={`px-6 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-md flex items-center gap-2 cursor-pointer ${
+                className={`px-6 py-2.5 rounded-full text-white text-xs font-semibold transition shadow-md flex items-center gap-2 cursor-pointer active:scale-95 ${
                   dateRangeConflict?.hasConflict
                     ? 'bg-slate-400 cursor-not-allowed'
-                    : 'bg-[#0f2b48] hover:bg-[#0a1e34] shadow-[#0f2b48]/25 hover:scale-[1.02]'
+                    : 'bg-[#0b192c] hover:bg-[#182a44] shadow-[#0b192c]/25'
                 }`}
               >
                 <Check className="w-4 h-4 text-emerald-400" />
@@ -1363,7 +1363,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-5 py-2.5 rounded-xl bg-[#0f2b48] hover:bg-[#0a1e34] text-white text-xs font-bold transition shadow-md shadow-[#0f2b48]/20 flex items-center gap-1.5 cursor-pointer hover:scale-[1.02]"
+                className="px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white text-xs font-semibold transition shadow-md shadow-[#0b192c]/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <span>Siguiente Paso</span>
                 <ChevronRight className="w-4 h-4" />

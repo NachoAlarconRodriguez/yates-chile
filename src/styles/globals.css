@@ -35,12 +35,12 @@
   --color-glass-surface: rgba(255, 255, 255, 0.85);
 
   /* ------------------------------------------------------------------------
-     2. TYPOGRAPHY (Inter — Official Project Typography)
+     2. TYPOGRAPHY (Plus Jakarta Sans & Inter)
      ------------------------------------------------------------------------ */
-  --font-serif: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
 
-  /* Base Body Size Minimum 18px for 55+ Audience */
+  /* Base Body Size */
   --text-base: 1.125rem; /* 18px */
   --text-base--line-height: 1.75rem;
 
@@ -62,11 +62,15 @@
   /* ------------------------------------------------------------------------
      3. RADII, SHADOWS & SPACING
      ------------------------------------------------------------------------ */
-  --radius-luxury: 1rem;       /* 16px rounded corners */
-  --radius-luxury-lg: 1.5rem;  /* 24px for large modals */
+  --radius-luxury: 1rem;       /* 16px */
+  --radius-luxury-lg: 1.5rem;  /* 24px for bento cards & modals */
+  --radius-luxury-xl: 2rem;    /* 32px */
 
   --shadow-gold-glow: 0 4px 20px -2px rgba(212, 175, 55, 0.25);
   --shadow-luxury-soft: 0 15px 35px -10px rgba(15, 23, 42, 0.08);
+  --shadow-bento: 0 4px 24px -2px rgba(11, 25, 44, 0.04), 0 2px 6px -1px rgba(11, 25, 44, 0.02);
+  --shadow-bento-hover: 0 14px 35px -4px rgba(11, 25, 44, 0.08), 0 4px 12px -2px rgba(11, 25, 44, 0.03);
+  --shadow-navy-card: 0 20px 40px -10px rgba(11, 25, 44, 0.28), 0 8px 16px -4px rgba(2, 132, 199, 0.16);
 }
 
 /* ==========================================================================
@@ -75,14 +79,14 @@
 
 @layer base {
   * {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   html {
     background-color: var(--color-fjord-light);
     color: var(--color-navy-dark);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 112.5%; /* Sets default rem to 18px */
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 112.5%;
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
   }
@@ -90,20 +94,14 @@
   body {
     background-color: var(--color-fjord-light);
     color: var(--color-navy-body);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow-x: hidden;
   }
 
-  /* Headings Setup using Inter Heavy Weights */
+  /* Headings Setup using Plus Jakarta Sans Heavy Weights */
   h1, h2, h3, h4, h5, h6, .font-serif, .font-serif-heading {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     letter-spacing: -0.025em;
-  }
-
-  /* Accessibility & Touch Target Minimum (48px) */
-  button, a, input, select {
-    min-height: 3rem; /* 48px */
-    min-width: 3rem;
   }
 }
 
@@ -124,4 +122,28 @@
 /* White/Monochrome Text Utility */
 .text-gold-gradient {
   color: #FFFFFF;
+}
+
+/* Custom Scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.12);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.25);
 }

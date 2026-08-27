@@ -90,8 +90,8 @@ export const EXPEDITIONS: Expedition[] = INITIAL_EXPEDITIONS;
 
 export const ExpeditionCalendar: React.FC = () => {
   const { expeditions } = useExpeditions();
-  const [selectedMonth, setSelectedMonth] = useState<number>(9); // Start in September
-  const [activeExpeditionId, setActiveExpeditionId] = useState<string | null>('exp-rob-1');
+  const [selectedMonth, setSelectedMonth] = useState<number>(11); // Iniciar en temporada alta (Noviembre)
+  const [activeExpeditionId, setActiveExpeditionId] = useState<string | null>('exp-cabo-nov-26');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // Filter expeditions available in selected month

@@ -241,51 +241,51 @@ const CATALOG_PROGRAMS = [
   // LODGE SOLO
   {
     id: 'prog-lodge-1',
-    title: 'Habitación Proa #1 (Triple Vista Océano) — Lodge Rincón',
-    category: 'lodge',
-    categoryLabel: 'Lodge Rincón',
-    includedAssets: ['lodge'],
-    duration: 'Por noche',
-    priceClp: 240000,
-    unitType: 'night' as const,
-    description: 'Vista panorámica a Bahía Cumberland con terraza privada y desayuno isleño.',
-    paxLimit: 3,
-  },
-  {
-    id: 'prog-lodge-2',
-    title: 'Habitación Barlovento #2 (Triple Vista Océano) — Lodge Rincón',
-    category: 'lodge',
-    categoryLabel: 'Lodge Rincón',
-    includedAssets: ['lodge'],
-    duration: 'Por noche',
-    priceClp: 240000,
-    unitType: 'night' as const,
-    description: 'Cabina superior con chimenea a leña y ventanales al mar.',
-    paxLimit: 3,
-  },
-  {
-    id: 'prog-lodge-3',
-    title: 'Habitación Sotavento #3 (Triple Vista Océano) — Lodge Rincón',
-    category: 'lodge',
-    categoryLabel: 'Lodge Rincón',
-    includedAssets: ['lodge'],
-    duration: 'Por noche',
-    priceClp: 240000,
-    unitType: 'night' as const,
-    description: 'Silenciosa cabina equipada para familias o expedicionarios.',
-    paxLimit: 3,
-  },
-  {
-    id: 'prog-lodge-4',
-    title: 'Habitación Popa #4 (Doble Matrimonial) — Lodge Rincón',
+    title: 'Habitación Albatros #1 (Doble Matrimonial, Máx 2 Pax) — Lodge Rincón',
     category: 'lodge',
     categoryLabel: 'Lodge Rincón',
     includedAssets: ['lodge'],
     duration: 'Por noche',
     priceClp: 210000,
     unitType: 'night' as const,
-    description: 'Suite íntima frente al mar ideal para parejas.',
+    description: 'Suite íntima con cama matrimonial frente al mar en Bahía Cumberland, baño privado y terraza.',
     paxLimit: 2,
+  },
+  {
+    id: 'prog-lodge-2',
+    title: 'Habitación Cumberland #2 (Triple Vista Océano, Máx 3 Pax) — Lodge Rincón',
+    category: 'lodge',
+    categoryLabel: 'Lodge Rincón',
+    includedAssets: ['lodge'],
+    duration: 'Por noche',
+    priceClp: 240000,
+    unitType: 'night' as const,
+    description: 'Habitación panorámica con vista al mar, baño privado y chimenea a leña.',
+    paxLimit: 3,
+  },
+  {
+    id: 'prog-lodge-3',
+    title: 'Habitación Selkirk #3 (Triple Vista Océano, Máx 3 Pax) — Lodge Rincón',
+    category: 'lodge',
+    categoryLabel: 'Lodge Rincón',
+    includedAssets: ['lodge'],
+    duration: 'Por noche',
+    priceClp: 240000,
+    unitType: 'night' as const,
+    description: 'Espaciosa habitación con baño privado y vistas a los farellones y al mar.',
+    paxLimit: 3,
+  },
+  {
+    id: 'prog-lodge-4',
+    title: 'Habitación Vidriola #4 (Triple Vista Océano, Máx 3 Pax) — Lodge Rincón',
+    category: 'lodge',
+    categoryLabel: 'Lodge Rincón',
+    includedAssets: ['lodge'],
+    duration: 'Por noche',
+    priceClp: 240000,
+    unitType: 'night' as const,
+    description: 'Cómoda habitación triple con baño en suite y vista privilegiada al horizonte.',
+    paxLimit: 3,
   },
 
   // SERVICIOS SOLO
@@ -758,32 +758,32 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0a1e34]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
-      <div className="max-w-4xl w-full bg-white border border-slate-200/90 rounded-3xl shadow-[0_25px_60px_rgba(15,43,72,0.2)] overflow-hidden flex flex-col my-auto max-h-[92vh]">
+    <div className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+      <div className="max-w-4xl w-full bg-white border border-slate-200/90 rounded-3xl shadow-[0_25px_60px_rgba(11,25,44,0.2)] overflow-hidden flex flex-col my-auto max-h-[92vh]">
         
         {/* HEADER MODAL */}
-        <div className="px-6 py-4 bg-[#fbfcfd] border-b border-slate-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#0f2b48] text-white flex items-center justify-center shadow-md">
+        <div className="px-7 py-4.5 bg-[#fbfcfd] border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-[#0b192c] text-white flex items-center justify-center shadow-md shadow-[#0b192c]/15">
               <Sparkles className="w-5 h-5 text-sky-300" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] uppercase font-mono font-bold tracking-widest text-[#0f2b48]/70 block">
+                <span className="text-[9px] uppercase font-mono font-bold tracking-widest text-slate-400 block">
                   Asistente de Reservas Yates Chile
                 </span>
-                <span className="text-[9px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.2 rounded-full font-mono">
+                <span className="text-[9px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full font-mono">
                   Paso {currentStep} de 6
                 </span>
               </div>
-              <h3 className="font-serif text-lg font-bold text-[#0f2b48] leading-tight">
+              <h3 className="font-serif text-lg font-bold text-[#0b192c] leading-tight">
                 Registrar Nueva Reserva Oficial
               </h3>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-[#0f2b48] p-1.5 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+            className="text-slate-400 hover:text-[#0b192c] p-2 rounded-full hover:bg-slate-100 transition cursor-pointer"
           >
             <XCircle className="w-5 h-5" />
           </button>
@@ -1799,7 +1799,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-bold transition cursor-pointer text-xs"
+                className="px-5 py-2.5 rounded-full border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-semibold transition cursor-pointer text-xs"
               >
                 Cancelar
               </button>
@@ -1811,7 +1811,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 rounded-xl bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold transition shadow-md shadow-[#0f2b48]/20 flex items-center gap-2 cursor-pointer text-xs"
+                className="px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold transition shadow-md shadow-[#0b192c]/20 flex items-center gap-2 cursor-pointer text-xs active:scale-95"
               >
                 <span>Siguiente Paso</span>
                 <ChevronRight className="w-4 h-4 text-sky-300" />
@@ -1820,7 +1820,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
               <button
                 type="button"
                 onClick={handleFinalSubmit}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold transition shadow-md shadow-emerald-600/25 flex items-center gap-2 cursor-pointer text-xs"
+                className="px-7 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold transition shadow-md shadow-emerald-600/25 flex items-center gap-2 cursor-pointer text-xs"
               >
                 <ShieldCheck className="w-4.5 h-4.5" />
                 <span>Confirmar y Registrar Reserva Oficial</span>

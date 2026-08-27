@@ -8,10 +8,10 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
   {
     id: 'room-1',
     room_number: 1,
-    room_name: 'Cabina Proa (Triple)',
-    room_type: 'triple',
-    max_pax: 3,
-    base_price_clp: 240000,
+    room_name: 'Albatros',
+    room_type: 'doble',
+    max_pax: 2,
+    base_price_clp: 210000,
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -19,7 +19,7 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
   {
     id: 'room-2',
     room_number: 2,
-    room_name: 'Cabina Barlovento (Triple)',
+    room_name: 'Cumberland',
     room_type: 'triple',
     max_pax: 3,
     base_price_clp: 240000,
@@ -30,7 +30,7 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
   {
     id: 'room-3',
     room_number: 3,
-    room_name: 'Cabina Sotavento (Triple)',
+    room_name: 'Selkirk',
     room_type: 'triple',
     max_pax: 3,
     base_price_clp: 240000,
@@ -41,23 +41,42 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
   {
     id: 'room-4',
     room_number: 4,
-    room_name: 'Cabina Popa (Doble Matrimonial)',
-    room_type: 'doble',
-    max_pax: 2,
-    base_price_clp: 210000,
+    room_name: 'Vidriola',
+    room_type: 'triple',
+    max_pax: 3,
+    base_price_clp: 240000,
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
   },
 ];
 
-const LOCAL_STORAGE_BOOKINGS_KEY = 'yates_lodge_bookings_cache';
-const LOCAL_STORAGE_ROOMS_KEY = 'yates_lodge_rooms_cache';
+export const LODGE_TOTAL_MAX_PAX = 11; // 2 (Albatros) + 3 (Cumberland) + 3 (Selkirk) + 3 (Vidriola)
+
+export const isRoomSuitableForPax = (room: LodgeRoom, pax: number): boolean => {
+  return (room.max_pax ?? 3) >= pax;
+};
+
+const LOCAL_STORAGE_BOOKINGS_KEY = 'yates_lodge_bookings_v3';
+const LOCAL_STORAGE_ROOMS_KEY = 'yates_lodge_rooms_v3';
 
 const getCachedRooms = (): LodgeRoom[] => {
   try {
+    // Clean all legacy keys
+    localStorage.removeItem('yates_lodge_rooms_cache');
+    localStorage.removeItem('yates_lodge_rooms_v2');
     const raw = localStorage.getItem(LOCAL_STORAGE_ROOMS_KEY);
-    return raw ? JSON.parse(raw) : FALLBACK_ROOMS;
+    if (!raw) {
+      localStorage.setItem(LOCAL_STORAGE_ROOMS_KEY, JSON.stringify(FALLBACK_ROOMS));
+      return FALLBACK_ROOMS;
+    }
+    const parsed: LodgeRoom[] = JSON.parse(raw);
+    // If any old names or parentheses remain, force reset to official pure names
+    if (parsed.some(r => r.room_name.includes('Cabina') || r.room_name.includes('Proa') || r.room_name.includes('Popa') || r.room_name.includes('Barlovento') || r.room_name.includes('('))) {
+      localStorage.setItem(LOCAL_STORAGE_ROOMS_KEY, JSON.stringify(FALLBACK_ROOMS));
+      return FALLBACK_ROOMS;
+    }
+    return parsed;
   } catch {
     return FALLBACK_ROOMS;
   }
@@ -96,8 +115,30 @@ export const lodgeService = {
       if (error || !data || data.length === 0) {
         return local;
       }
-      saveCachedRooms(data);
-      return data;
+
+      const officialMap: Record<number, { name: string; maxPax: number; price: number }> = {
+        1: { name: 'Albatros', maxPax: 2, price: 210000 },
+        2: { name: 'Cumberland', maxPax: 3, price: 240000 },
+        3: { name: 'Selkirk', maxPax: 3, price: 240000 },
+        4: { name: 'Vidriola', maxPax: 3, price: 240000 },
+      };
+
+      const normalized: LodgeRoom[] = data.map((room) => {
+        const official = officialMap[room.room_number];
+        if (official && (room.room_name.includes('Cabina') || room.room_name.includes('Proa') || room.room_name.includes('Popa') || room.room_name.includes('Barlovento') || room.room_name.includes('Sotavento') || room.room_name.includes('('))) {
+          // Asynchronously persist official names in remote DB
+          supabase
+            .from('lodge_rooms')
+            .update({ room_name: official.name, max_pax: official.maxPax, base_price_clp: official.price })
+            .eq('id', room.id)
+            .then();
+          return { ...room, room_name: official.name, max_pax: official.maxPax, base_price_clp: official.price };
+        }
+        return room;
+      });
+
+      saveCachedRooms(normalized);
+      return normalized;
     } catch {
       return local;
     }

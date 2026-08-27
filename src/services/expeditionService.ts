@@ -42,246 +42,229 @@ export interface PublicExpedition {
 }
 
 export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
+  // --- CABO DE HORNOS (Velero Vegvisir) ---
   {
-    id: 'exp-rob-1',
-    name: 'Expedición Robinson',
-    startDate: '09 sept 2026',
-    endDate: '24 sept 2026',
-    departureDate: '2026-09-09',
-    returnDate: '2026-09-24',
-    monthsActive: [9],
-    year: 2026,
-    spotsLeft: 'completo',
-    totalSlots: 6,
-    availableSlots: 0,
-    pricePerPaxClp: 2200000,
-    priceCharterFullClp: 13200000,
-    vessel: 'Lodge Rincón de Navegantes',
-    vesselId: 'lodge',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Estadía de exploración botánica e inmersión histórica en el archipiélago de Juan Fernández, hospedándose en nuestro santuario privado de Cumberland.',
-    location: 'Isla Robinson Crusoe',
-    image: '/rincon-de-navegantes.jpg',
-    bestViewTime: 'Primavera austral',
-    tempEstimate: '13°C - 16°C',
-    status: 'guaranteed'
-  },
-  {
-    id: 'exp-rob-2',
-    name: 'Travesía Robinson',
-    startDate: '30 sept 2026',
-    endDate: '14 oct 2026',
-    departureDate: '2026-09-30',
-    returnDate: '2026-10-14',
-    monthsActive: [9, 10],
-    year: 2026,
-    spotsLeft: 4,
-    totalSlots: 6,
-    availableSlots: 4,
-    pricePerPaxClp: 1850000,
-    priceCharterFullClp: 11100000,
-    vessel: 'Velero Vegvisir',
-    vesselId: 'vegvisir',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Aventura oceánica de ida y vuelta navegando a vela hacia Juan Fernández. Ideal para navegantes apasionados que buscan el reto del mar abierto.',
-    location: 'Océano Pacífico Sur',
-    image: '/travesia-robinson.jpg',
-    bestViewTime: 'Zarpe de primavera',
-    tempEstimate: '12°C - 15°C',
-    status: 'guaranteed'
-  },
-  {
-    id: 'exp-jf-nov',
-    name: 'JF 1 de Noviembre',
-    startDate: '31 oct 2026',
-    endDate: '11 nov 2026',
-    departureDate: '2026-10-31',
-    returnDate: '2026-11-11',
-    monthsActive: [10, 11],
-    year: 2026,
-    spotsLeft: 4,
-    totalSlots: 6,
-    availableSlots: 4,
-    pricePerPaxClp: 1950000,
-    priceCharterFullClp: 11700000,
-    vessel: 'Lodge Rincón de Navegantes',
-    vesselId: 'lodge',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Travesía de descanso en primavera tardía. Recorra senderos rodeados de helechos gigantes y disfrute de la primera pesca de langosta de la temporada.',
-    location: 'Bahía Cumberland',
-    image: '/jf-noviembre.jpg',
-    bestViewTime: 'Mañana templada',
-    tempEstimate: '14°C - 18°C',
-    status: 'scheduled'
-  },
-  {
-    id: 'exp-zar-dic',
-    name: 'Zarpe Archipiélago',
-    startDate: '01 dic 2026',
-    endDate: '15 dic 2026',
-    departureDate: '2026-12-01',
-    returnDate: '2026-12-15',
-    monthsActive: [12],
-    year: 2026,
-    spotsLeft: 2,
-    totalSlots: 8,
-    availableSlots: 2,
-    pricePerPaxClp: 2450000,
-    priceCharterFullClp: 19600000,
-    vessel: 'Yate Terranova',
-    vesselId: 'terranova',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Travesía rápida y confortable a motor a bordo de nuestro yate de alta velocidad. Explora caletas solitarias con la comodidad y el lujo que ofrece el Terranova.',
-    location: 'Juan Fernández',
-    image: '/zarpe-archipielago.jpg',
-    bestViewTime: 'Atardecer en flybridge',
-    tempEstimate: '16°C - 20°C',
-    status: 'guaranteed'
-  },
-  {
-    id: 'exp-sel-dic',
-    name: 'Juan Fernández-Selkirk',
-    startDate: '05 dic 2026',
-    endDate: '12 dic 2026',
-    departureDate: '2026-12-05',
-    returnDate: '2026-12-12',
-    monthsActive: [12],
+    id: 'exp-cabo-nov-26',
+    name: 'Expedición Cabo de Hornos',
+    startDate: '10 nov 2026',
+    endDate: '19 nov 2026',
+    departureDate: '2026-11-10',
+    returnDate: '2026-11-19',
+    monthsActive: [11],
     year: 2026,
     spotsLeft: 3,
     totalSlots: 6,
     availableSlots: 3,
-    pricePerPaxClp: 2100000,
-    priceCharterFullClp: 12600000,
-    vessel: 'Lodge & Velero',
-    vesselId: 'vegvisir',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Expedición combinada marítimo-terrestre en busca de los vestigios del histórico navegante Alejandro Selkirk. Incluye navegación en velero e itinerarios de trekking exigentes.',
-    location: 'Santuario Selkirk',
-    image: '/juan-fernandez-selkirk.jpg',
-    bestViewTime: 'Jornada de día completo',
-    tempEstimate: '15°C - 19°C',
-    status: 'scheduled'
-  },
-  {
-    id: 'exp-jf-ene',
-    name: 'Archipiélago Juan Fernández',
-    startDate: '01 ene 2027',
-    endDate: '16 ene 2027',
-    departureDate: '2027-01-01',
-    returnDate: '2027-01-16',
-    monthsActive: [1],
-    year: 2027,
-    spotsLeft: 'completo',
-    totalSlots: 6,
-    availableSlots: 0,
-    pricePerPaxClp: 2400000,
-    priceCharterFullClp: 14400000,
-    vessel: 'Lodge Rincón de Navegantes',
-    vesselId: 'lodge',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Expedición en temporada alta de verano. Senderismo de montaña, buceo con lobos marinos de dos pelos y degustación gastronómica en nuestro refugio Cumberland.',
-    location: 'Robinson Crusoe',
-    image: '/rincon-de-navegantes.jpg',
-    bestViewTime: 'Verano austral',
-    tempEstimate: '18°C - 22°C',
-    status: 'guaranteed'
-  },
-  {
-    id: 'exp-sel-ene',
-    name: 'Selkirk Colombia',
-    startDate: '20 ene 2027',
-    endDate: '28 ene 2027',
-    departureDate: '2027-01-20',
-    returnDate: '2027-01-28',
-    monthsActive: [1],
-    year: 2027,
-    spotsLeft: 5,
-    totalSlots: 6,
-    availableSlots: 5,
-    pricePerPaxClp: 1850000,
-    priceCharterFullClp: 11100000,
+    pricePerPaxClp: 2850000,
+    priceCharterFullClp: 17100000,
     vessel: 'Velero Vegvisir',
     vesselId: 'vegvisir',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Navegación deportiva, pesca de altura y avistamiento de cetáceos en el Pacífico Sur profundo. Una ruta desafiante con el sello de Yates Chile.',
-    location: 'Isla Alejandro Selkirk',
-    image: '/travesia-robinson.jpg',
-    bestViewTime: 'Navegación matutina',
-    tempEstimate: '17°C - 21°C',
-    status: 'scheduled'
-  },
-  {
-    id: 'exp-pes-ene',
-    name: 'Grupo Pesca Selkirk (España)',
-    startDate: '28 ene 2027',
-    endDate: '04 feb 2027',
-    departureDate: '2027-01-28',
-    returnDate: '2027-02-04',
-    monthsActive: [1, 2],
-    year: 2027,
-    spotsLeft: 'completo',
-    totalSlots: 8,
-    availableSlots: 0,
-    pricePerPaxClp: 2600000,
-    priceCharterFullClp: 20800000,
-    vessel: 'Yate Terranova',
-    vesselId: 'terranova',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Chárter de pesca deportiva exclusivo reservado para delegación internacional. Rutas de trolling de alta gama y servicios de lujo de chef a bordo.',
-    location: 'Archipiélago Juan Fernández',
-    image: '/zarpe-archipielago.jpg',
-    bestViewTime: 'Pesca de amanecer',
-    tempEstimate: '18°C - 22°C',
+    routeId: 'ruta-cabo-hornos',
+    description: 'La máxima aventura náutica mundial: circunvalar el mítico Cabo de Hornos a vela con patrón de ultramar y máxima seguridad.',
+    location: 'Canal Beagle & Cabo de Hornos',
+    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+    bestViewTime: 'Primavera austral',
+    tempEstimate: '8°C - 12°C',
     status: 'guaranteed'
   },
   {
-    id: 'exp-col-mar',
-    name: 'Colombia Selkirk',
-    startDate: '08 mar 2027',
-    endDate: '17 mar 2027',
-    departureDate: '2027-03-08',
-    returnDate: '2027-03-17',
-    monthsActive: [3],
-    year: 2027,
-    spotsLeft: 'bloqueado',
+    id: 'exp-cabo-dic-26',
+    name: 'Expedición Cabo de Hornos',
+    startDate: '05 dic 2026',
+    endDate: '14 dic 2026',
+    departureDate: '2026-12-05',
+    returnDate: '2026-12-14',
+    monthsActive: [12],
+    year: 2026,
+    spotsLeft: 2,
     totalSlots: 6,
-    availableSlots: 0,
-    pricePerPaxClp: 2200000,
-    priceCharterFullClp: 13200000,
-    vessel: 'Lodge Rincón de Navegantes',
-    vesselId: 'lodge',
-    routeId: 'ruta-juan-fernandez',
-    description: 'Reserva exclusiva bloqueada para misión de investigación científica, filmación de documentales y monitoreo de aves terrestres en peligro de extinción.',
-    location: 'Bahía Cumberland',
-    image: '/jf-noviembre.jpg',
-    bestViewTime: 'Reserva científica',
-    tempEstimate: '16°C - 20°C',
-    status: 'scheduled'
+    availableSlots: 2,
+    pricePerPaxClp: 2950000,
+    priceCharterFullClp: 17700000,
+    vessel: 'Velero Vegvisir',
+    vesselId: 'vegvisir',
+    routeId: 'ruta-cabo-hornos',
+    description: 'Navegación oceánica de altura hacia los confines del planeta en los días más largos del año en latitudes australes.',
+    location: 'Isla de Hornos',
+    image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
+    bestViewTime: 'Solsticio de verano',
+    tempEstimate: '9°C - 13°C',
+    status: 'guaranteed'
   },
   {
-    id: 'exp-zar-mar',
-    name: 'Zarpe Especial del Archipiélago',
-    startDate: '14 mar 2027',
-    endDate: '29 mar 2027',
-    departureDate: '2027-03-14',
-    returnDate: '2027-03-29',
-    monthsActive: [3],
+    id: 'exp-cabo-ene-27',
+    name: 'Expedición Cabo de Hornos',
+    startDate: '12 ene 2027',
+    endDate: '21 ene 2027',
+    departureDate: '2027-01-12',
+    returnDate: '2027-01-21',
+    monthsActive: [1],
     year: 2027,
-    spotsLeft: 6,
+    spotsLeft: 4,
     totalSlots: 6,
-    availableSlots: 6,
+    availableSlots: 4,
+    pricePerPaxClp: 2950000,
+    priceCharterFullClp: 17700000,
+    vessel: 'Velero Vegvisir',
+    vesselId: 'vegvisir',
+    routeId: 'ruta-cabo-hornos',
+    description: 'Travesía de verano en las aguas míticas de Magallanes con desembarco en el monumento al Albatros en Isla de Hornos.',
+    location: 'Cabo de Hornos',
+    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+    bestViewTime: 'Verano austral',
+    tempEstimate: '10°C - 14°C',
+    status: 'scheduled'
+  },
+
+  // --- ROBINSON CRUSOE (Velero Vegvisir & Yate Terranova) ---
+  {
+    id: 'exp-rob-oct-26',
+    name: 'Travesía Robinson Crusoe',
+    startDate: '15 oct 2026',
+    endDate: '22 oct 2026',
+    departureDate: '2026-10-15',
+    returnDate: '2026-10-22',
+    monthsActive: [10],
+    year: 2026,
+    spotsLeft: 4,
+    totalSlots: 6,
+    availableSlots: 4,
     pricePerPaxClp: 1950000,
     priceCharterFullClp: 11700000,
     vessel: 'Velero Vegvisir',
     vesselId: 'vegvisir',
     routeId: 'ruta-juan-fernandez',
-    description: 'Expedición marítima de fin de verano recorriendo las caletas más inaccesibles y bahías protegidas del archipiélago con excelentes vientos de retorno.',
-    location: 'Juan Fernández',
-    image: '/juan-fernandez-selkirk.jpg',
-    bestViewTime: 'Navegación al atardecer',
+    description: 'Aventura oceánica a vela hacia Juan Fernández con descanso en cabinas privadas en Bahía Cumberland.',
+    location: 'Isla Robinson Crusoe',
+    image: '/travesia-robinson.jpg',
+    bestViewTime: 'Primavera austral',
+    tempEstimate: '14°C - 18°C',
+    status: 'guaranteed'
+  },
+  {
+    id: 'exp-rob-nov-26',
+    name: 'Expedición Robinson Crusoe',
+    startDate: '08 nov 2026',
+    endDate: '15 nov 2026',
+    departureDate: '2026-11-08',
+    returnDate: '2026-11-15',
+    monthsActive: [11],
+    year: 2026,
+    spotsLeft: 3,
+    totalSlots: 8,
+    availableSlots: 3,
+    pricePerPaxClp: 2350000,
+    priceCharterFullClp: 18800000,
+    vessel: 'Yate Terranova',
+    vesselId: 'terranova',
+    routeId: 'ruta-juan-fernandez',
+    description: 'Navegación rápida de alto confort en Yate Terranova de 3 cubiertas por el Archipiélago Juan Fernández.',
+    location: 'Bahía Cumberland',
+    image: '/zarpe-archipielago.jpg',
+    bestViewTime: 'Floración primaveral',
     tempEstimate: '15°C - 19°C',
+    status: 'guaranteed'
+  },
+  {
+    id: 'exp-rob-ene-27',
+    name: 'Travesía Robinson Crusoe',
+    startDate: '05 ene 2027',
+    endDate: '12 ene 2027',
+    departureDate: '2027-01-05',
+    returnDate: '2027-01-12',
+    monthsActive: [1],
+    year: 2027,
+    spotsLeft: 2,
+    totalSlots: 6,
+    availableSlots: 2,
+    pricePerPaxClp: 2150000,
+    priceCharterFullClp: 12900000,
+    vessel: 'Velero Vegvisir',
+    vesselId: 'vegvisir',
+    routeId: 'ruta-juan-fernandez',
+    description: 'Temporada alta de verano: navegación a vela, buceo en aguas cristalinas y senderismo por bosques de helechos gigantes.',
+    location: 'Archipiélago Juan Fernández',
+    image: '/rincon-de-navegantes.jpg',
+    bestViewTime: 'Verano calmo',
+    tempEstimate: '18°C - 22°C',
+    status: 'guaranteed'
+  },
+
+  // --- ALEJANDRO SELKIRK (Vegvisir / Terranova) ---
+  {
+    id: 'exp-sel-dic-26',
+    name: 'Desafío Alejandro Selkirk',
+    startDate: '01 dic 2026',
+    endDate: '10 dic 2026',
+    departureDate: '2026-12-01',
+    returnDate: '2026-12-10',
+    monthsActive: [12],
+    year: 2026,
+    spotsLeft: 4,
+    totalSlots: 8,
+    availableSlots: 4,
+    pricePerPaxClp: 2650000,
+    priceCharterFullClp: 21200000,
+    vessel: 'Yate Terranova',
+    vesselId: 'terranova',
+    routeId: 'ruta-selkirk',
+    description: 'Expedición hacia la isla más remota e indómita del Pacífico Sur chileno, con avistamiento de fauna y pesca deportiva de altura.',
+    location: 'Isla Alejandro Selkirk (Más Afuera)',
+    image: '/juan-fernandez-selkirk.jpg',
+    bestViewTime: 'Pesca y trekking',
+    tempEstimate: '16°C - 20°C',
     status: 'scheduled'
-  }
+  },
+  {
+    id: 'exp-sel-feb-27',
+    name: 'Desafío Alejandro Selkirk',
+    startDate: '08 feb 2027',
+    endDate: '17 feb 2027',
+    departureDate: '2027-02-08',
+    returnDate: '2027-02-17',
+    monthsActive: [2],
+    year: 2027,
+    spotsLeft: 5,
+    totalSlots: 6,
+    availableSlots: 5,
+    pricePerPaxClp: 2450000,
+    priceCharterFullClp: 14700000,
+    vessel: 'Velero Vegvisir',
+    vesselId: 'vegvisir',
+    routeId: 'ruta-selkirk',
+    description: 'Travesía a vela hacia la mítica Isla Más Afuera con fondeos en caletas vírgenes y exploración de cumbres escarpadas.',
+    location: 'Océano Pacífico Profundo',
+    image: '/travesia-robinson.jpg',
+    bestViewTime: 'Viento favorable',
+    tempEstimate: '17°C - 21°C',
+    status: 'scheduled'
+  },
+
+  // --- FIORDOS & GLACIARES (Yate Terranova) ---
+  {
+    id: 'exp-fio-mar-27',
+    name: 'Fiordos Secretos & Glaciares',
+    startDate: '02 mar 2027',
+    endDate: '09 mar 2027',
+    departureDate: '2027-03-02',
+    returnDate: '2027-03-09',
+    monthsActive: [3],
+    year: 2027,
+    spotsLeft: 6,
+    totalSlots: 8,
+    availableSlots: 6,
+    pricePerPaxClp: 2200000,
+    priceCharterFullClp: 17600000,
+    vessel: 'Yate Terranova',
+    vesselId: 'terranova',
+    routeId: 'ruta-fiordos-glaciares',
+    description: 'Navegación protegida entre canales patagónicos, aguas termales y paredones de hielo milenario en la Patagonia Norte.',
+    location: 'Canales Australes & Ventisqueros',
+    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
+    bestViewTime: 'Otoño patagónico',
+    tempEstimate: '12°C - 16°C',
+    status: 'scheduled'
+  },
 ];
 
 const LOCAL_STORAGE_KEY = 'yates_departures_store';
@@ -310,24 +293,42 @@ const getMonthsFromDates = (startStr: string, endStr: string): number[] => {
   return Array.from(months);
 };
 
+const sanitizePublicExpedition = (e: PublicExpedition): PublicExpedition => {
+  const vLower = (e.vessel || e.vesselId || '').toLowerCase();
+  const isTerranova = vLower.includes('terranova');
+  const vessel = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+  const vesselId = isTerranova ? 'terranova' : 'vegvisir';
+  let name = e.name;
+  if (name.startsWith('JF ')) {
+    name = name.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+  }
+  return {
+    ...e,
+    name,
+    vessel,
+    vesselId,
+  };
+};
+
 const getStoredDepartures = (): PublicExpedition[] => {
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map(sanitizePublicExpedition);
       }
     }
   } catch {}
-  return INITIAL_EXPEDITIONS;
+  return INITIAL_EXPEDITIONS.map(sanitizePublicExpedition);
 };
 
 const saveStoredDepartures = (items: PublicExpedition[]) => {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+    const sanitized = items.map(sanitizePublicExpedition);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sanitized));
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('yates_expeditions_updated', { detail: items }));
+      window.dispatchEvent(new CustomEvent('yates_expeditions_updated', { detail: sanitized }));
     }
   } catch {}
 };
@@ -373,42 +374,69 @@ export const expeditionService = {
         .order('departure_date', { ascending: true });
 
       if (!error && data && data.length > 0) {
-        return data as DepartureRow[];
+        return (data as any[]).map((d) => {
+          const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
+          const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+          const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
+          let routeName = d.name || d.route?.title || 'Expedición Robinson Crusoe';
+          if (routeName.startsWith('JF ')) {
+            routeName = routeName.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+          }
+          return {
+            ...d,
+            name: routeName,
+            vessel_id: isTerranova ? 'terranova' : 'vegvisir',
+            vessel: {
+              id: isTerranova ? 'terranova' : 'vegvisir',
+              name: vesselName,
+              type: vesselType,
+            },
+          };
+        }) as DepartureRow[];
       }
     } catch {}
 
     // Convert local public expeditions into DepartureRow format
     const local = getStoredDepartures();
-    return local.map((e) => ({
-      id: e.id,
-      route_id: e.routeId,
-      vessel_id: e.vesselId,
-      departure_date: e.departureDate,
-      return_date: e.returnDate,
-      total_slots: e.totalSlots,
-      available_slots: e.availableSlots,
-      price_per_pax_clp: e.pricePerPaxClp,
-      price_charter_full_clp: e.priceCharterFullClp,
-      status: e.status,
-      created_at: new Date().toISOString(),
-      name: e.name,
-      location: e.location,
-      image: e.image,
-      description: e.description,
-      tempEstimate: e.tempEstimate,
-      bestViewTime: e.bestViewTime,
-      route: EXPEDITION_ROUTES.find((r) => r.id === e.routeId) || {
-        id: e.routeId,
-        title: e.name,
-        subtitle: e.location,
-        duration: `${e.startDate} - ${e.endDate}`,
-      },
-      vessel: FLEET_DATA.find((v) => v.id === e.vesselId) || {
-        id: e.vesselId,
-        name: e.vessel,
-        type: e.vessel.includes('Velero') ? 'Velero de Expedición' : 'Yate de Expedición',
-      },
-    })) as DepartureRow[];
+    return local.map((e) => {
+      const isTerranova = e.vessel.toLowerCase().includes('terranova') || e.vesselId === 'terranova';
+      const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+      const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
+      let name = e.name;
+      if (name.startsWith('JF ')) {
+        name = name.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+      }
+      return {
+        id: e.id,
+        route_id: e.routeId,
+        vessel_id: isTerranova ? 'terranova' : 'vegvisir',
+        departure_date: e.departureDate,
+        return_date: e.returnDate,
+        total_slots: e.totalSlots,
+        available_slots: e.availableSlots,
+        price_per_pax_clp: e.pricePerPaxClp,
+        price_charter_full_clp: e.priceCharterFullClp,
+        status: e.status,
+        created_at: new Date().toISOString(),
+        name: name,
+        location: e.location,
+        image: e.image,
+        description: e.description,
+        tempEstimate: e.tempEstimate,
+        bestViewTime: e.bestViewTime,
+        route: EXPEDITION_ROUTES.find((r) => r.id === e.routeId) || {
+          id: e.routeId,
+          title: name,
+          subtitle: e.location,
+          duration: `${e.startDate} - ${e.endDate}`,
+        },
+        vessel: {
+          id: isTerranova ? 'terranova' : 'vegvisir',
+          name: vesselName,
+          type: vesselType,
+        },
+      };
+    }) as DepartureRow[];
   },
 
   async getPublicExpeditions(): Promise<PublicExpedition[]> {
@@ -423,15 +451,20 @@ export const expeditionService = {
         const local = getStoredDepartures();
         const mapped: PublicExpedition[] = data.map((d: any) => {
           const matchedLocal = local.find((l) => l.id === d.id);
-          const vesselName = d.vessel?.name || (d.vessel_id === 'terranova' ? 'Yate Terranova' : d.vessel_id === 'lodge' ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
-          const routeTitle = d.route?.title || matchedLocal?.name || 'Expedición Austral';
+          const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
+          const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+          const vesselId = isTerranova ? 'terranova' : 'vegvisir';
+          let routeTitle = d.name || d.route?.title || matchedLocal?.name || 'Expedición Austral';
+          if (routeTitle.startsWith('JF ')) {
+            routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+          }
           const depYear = parseInt(d.departure_date?.split('-')[0] || '2026', 10);
           const months = getMonthsFromDates(d.departure_date, d.return_date);
           const spots = d.available_slots === 0 ? 'completo' : d.status === 'cancelled' ? 'bloqueado' : d.available_slots;
 
           return {
             id: d.id,
-            name: matchedLocal?.name || routeTitle,
+            name: routeTitle,
             startDate: formatDateSpan(d.departure_date),
             endDate: formatDateSpan(d.return_date),
             departureDate: d.departure_date,
@@ -439,16 +472,16 @@ export const expeditionService = {
             monthsActive: months.length > 0 ? months : [10],
             year: isNaN(depYear) ? 2026 : depYear,
             spotsLeft: spots,
-            totalSlots: d.total_slots || 8,
-            availableSlots: d.available_slots ?? 8,
-            pricePerPaxClp: Number(d.price_per_pax_clp) || 1850000,
-            priceCharterFullClp: Number(d.price_charter_full_clp) || 14800000,
+            totalSlots: d.total_slots || (isTerranova ? 8 : 6),
+            availableSlots: d.available_slots ?? (isTerranova ? 8 : 6),
+            pricePerPaxClp: Number(d.price_per_pax_clp) || (isTerranova ? 2350000 : 1950000),
+            priceCharterFullClp: Number(d.price_charter_full_clp) || (isTerranova ? 18800000 : 11700000),
             vessel: vesselName,
-            vesselId: d.vessel_id || 'vegvisir',
+            vesselId: vesselId,
             routeId: d.route_id || 'ruta-juan-fernandez',
-            description: matchedLocal?.description || d.route?.description || 'Expedición exclusiva por las aguas prístinas y fiordos del archipiélago.',
+            description: matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
             location: matchedLocal?.location || 'Archipiélago Juan Fernández',
-            image: matchedLocal?.image || (d.vessel_id === 'terranova' ? '/yate-terranova.jpg' : '/travesia-robinson.jpg'),
+            image: matchedLocal?.image || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
             tempEstimate: matchedLocal?.tempEstimate || '14°C - 18°C',
             status: d.status || 'scheduled',
