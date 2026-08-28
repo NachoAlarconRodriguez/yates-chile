@@ -356,73 +356,6 @@ const CATALOG_PROGRAMS = [
   },
 ];
 
-export interface ProgramDeparture {
-  id: string;
-  startDate: string;
-  endDate: string;
-  label: string;
-  durationLabel: string;
-  status: 'confirmada' | 'abierta' | 'ultimos_cupos';
-  availableSlots: number;
-}
-
-const DEFAULT_PROGRAM_DEPARTURES: ProgramDeparture[] = [
-  {
-    id: 'dep-oct-1',
-    startDate: '2026-10-15',
-    endDate: '2026-10-22',
-    label: '15 Octubre — 22 Octubre 2026',
-    durationLabel: '8 Días / 7 Noches',
-    status: 'confirmada',
-    availableSlots: 4,
-  },
-  {
-    id: 'dep-nov-1',
-    startDate: '2026-11-05',
-    endDate: '2026-11-12',
-    label: '05 Noviembre — 12 Noviembre 2026',
-    durationLabel: '8 Días / 7 Noches',
-    status: 'confirmada',
-    availableSlots: 6,
-  },
-  {
-    id: 'dep-nov-2',
-    startDate: '2026-11-20',
-    endDate: '2026-11-27',
-    label: '20 Noviembre — 27 Noviembre 2026',
-    durationLabel: '8 Días / 7 Noches',
-    status: 'ultimos_cupos',
-    availableSlots: 2,
-  },
-  {
-    id: 'dep-dic-1',
-    startDate: '2026-12-10',
-    endDate: '2026-12-17',
-    label: '10 Diciembre — 17 Diciembre 2026',
-    durationLabel: '8 Días / 7 Noches',
-    status: 'abierta',
-    availableSlots: 8,
-  },
-  {
-    id: 'dep-ene-1',
-    startDate: '2027-01-08',
-    endDate: '2027-01-15',
-    label: '08 Enero — 15 Enero 2027',
-    durationLabel: '8 Días / 7 Noches',
-    status: 'abierta',
-    availableSlots: 6,
-  },
-  {
-    id: 'dep-feb-1',
-    startDate: '2027-02-05',
-    endDate: '2027-02-12',
-    label: '05 Febrero — 12 Febrero 2027',
-    durationLabel: '8 Días / 7 Noches',
-    status: 'abierta',
-    availableSlots: 6,
-  },
-];
-
 // Helper to guarantee Chilean Date format DD/MM/YYYY
 export const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '';
@@ -461,8 +394,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   // Step 2: Selected Program IDs
   const [selectedProgramIds, setSelectedProgramIds] = useState<string[]>([]);
 
-  // Step 3: Dates & Selected Departure ID
-  const [selectedDepartureId, setSelectedDepartureId] = useState<string>('');
+  // Step 3: Dates
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
@@ -519,7 +451,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       setCurrentStep(1);
       setSelectedCategories([]);
       setSelectedProgramIds([]);
-      setSelectedDepartureId('');
       setStartDate('');
       setEndDate('');
       setPassengersCount(1);
@@ -555,7 +486,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   // Helper booleans for dynamic wizard mode
   const isOnlyLodge = mainModality === 'lodge' || (selectedCategories.length === 1 && selectedCategories[0] === 'lodge');
-  const isExpedition = mainModality === 'expedition';
   const { isRoomBookedForRange } = useLodge();
 
   const getRoomIdFromProgId = (progId: string): string => {
@@ -732,7 +662,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     });
   }, [mainModality, expeditionMonthFilter, availablePrograms]);
 
-  // Single selection of program in Step 2 (Radio behavior: only 1 package at a time)
+  // Single selection of program (Radio behavior: only 1 package at a time)
   const selectProgram = (progId: string, autoAdvance = true) => {
     const found = availablePrograms.find((p) => p.id === progId);
     if (found && (found as any).isSoldOut) {
@@ -742,15 +672,23 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       );
       return;
     }
+    if (mainModality === 'expedition' && found && typeof (found as any).availablePax === 'number' && (found as any).availablePax < passengersCount) {
+      showNotification(
+        `La expedición "${found.title}" solo cuenta con ${(found as any).availablePax} cupos disponibles y has configurado ${passengersCount} pasajeros. Selecciona otra expedición con cupos suficientes.`,
+        'Cupos Insuficientes'
+      );
+      return;
+    }
     setSelectedProgramIds([progId]);
     if (found && (found as any).departureDate && (found as any).returnDate) {
       setStartDate((found as any).departureDate);
       setEndDate((found as any).returnDate);
-      setSelectedDepartureId(found.id);
     }
     if (autoAdvance) {
       setTimeout(() => {
         if (mainModality === 'lodge') {
+          setCurrentStep(3);
+        } else if (mainModality === 'expedition') {
           setCurrentStep(4);
         } else {
           setCurrentStep(3);
@@ -788,7 +726,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           if (first && first.departureDate && first.returnDate) {
             setStartDate(first.departureDate);
             setEndDate(first.returnDate);
-            setSelectedDepartureId(first.id);
           }
         }
       }
@@ -809,16 +746,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       setEndDate(endStr);
     }
   }, [isOnlyLodge, currentStep, startDate]);
-
-  // Select departure handler in Step 3
-  const handleSelectDeparture = (dep: ProgramDeparture) => {
-    setSelectedDepartureId(dep.id);
-    setStartDate(dep.startDate);
-    setEndDate(dep.endDate);
-    setTimeout(() => {
-      setCurrentStep(4);
-    }, 150);
-  };
 
   // Sync passengers list length with passengersCount
   const handlePaxCountChange = (newCount: number) => {
@@ -891,29 +818,64 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     if (currentStep === 1) {
       return Boolean(mainModality);
     }
-    if (currentStep === 2) {
-      if (mainModality === 'custom') {
-        return selectedCategories.length > 0;
+
+    // EXPEDICIÓN NÁUTICA
+    if (mainModality === 'expedition') {
+      if (currentStep === 2) {
+        // Step 2: Passenger form (lead passenger required)
+        const lead = passengers[0];
+        return Boolean(lead && lead.fullName.trim() && (lead.email.trim() || lead.phone.trim()));
       }
-      if (mainModality === 'lodge') {
+      if (currentStep === 3) {
+        // Step 3: Expedition selection (must have available spots >= passengersCount)
+        if (selectedProgramIds.length === 0) return false;
+        const target = availablePrograms.find((p: any) => p.id === selectedProgramIds[0]) as any;
+        if (!target || target.isSoldOut) return false;
+        if (typeof target.availablePax === 'number' && target.availablePax < passengersCount) return false;
+        return Boolean(startDate && endDate);
+      }
+      if (currentStep === 4) return true; // Payment
+      if (currentStep === 5) return true; // Summary
+      return true;
+    }
+
+    // LODGE RINCÓN
+    if (mainModality === 'lodge') {
+      if (currentStep === 2) {
+        // Step 2: Dates + Available Room
         if (!startDate || !endDate || startDate >= endDate) return false;
         if (selectedProgramIds.length === 0) return false;
         if (isSelectedLodgeRoomBooked) return false;
         if (passengersCount > (activeSelectedProgram?.paxLimit || 3)) return false;
         return true;
       }
-      return selectedProgramIds.length > 0;
+      if (currentStep === 3) {
+        // Step 3: Guest form (lead guest required)
+        const lead = passengers[0];
+        return Boolean(lead && lead.fullName.trim() && (lead.email.trim() || lead.phone.trim()));
+      }
+      if (currentStep === 4) return true; // Payment
+      if (currentStep === 5) return true; // Summary
+      return true;
     }
-    if (currentStep === 3) {
-      if (isOnlyLodge && isSelectedLodgeRoomBooked) return false;
-      return Boolean(startDate && endDate && startDate <= endDate);
+
+    // PERSONALIZADO
+    if (mainModality === 'custom') {
+      if (currentStep === 2) {
+        return selectedCategories.length > 0;
+      }
+      if (currentStep === 3) {
+        return Boolean(startDate && endDate && startDate <= endDate);
+      }
+      if (currentStep === 4) {
+        const lead = passengers[0];
+        return Boolean(lead && lead.fullName.trim() && (lead.email.trim() || lead.phone.trim()));
+      }
+      if (currentStep === 5) return true; // Payment
+      if (currentStep === 6) return true; // Summary
+      return true;
     }
-    if (currentStep === 4) {
-      // Must at least have Passenger 1 (Lead passenger) filled
-      const lead = passengers[0];
-      return Boolean(lead && lead.fullName.trim() && (lead.email.trim() || lead.phone.trim()));
-    }
-    if (currentStep === 5) return true;
+
     return true;
   };
 
@@ -921,10 +883,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     if (!canProceed()) {
       if (currentStep === 1) {
         showNotification('Por favor selecciona una modalidad de reserva (Expedición Náutica, Lodge o Personalizado).', 'Selección Requerida');
-      } else if (currentStep === 2) {
-        if (mainModality === 'custom') {
-          showNotification('Por favor activa al menos uno de los servicios (Velero, Yate, Lodge, Buceo, Vuelos) para continuar con esta expedición personalizada.', 'Servicios Requeridos');
-        } else if (mainModality === 'lodge') {
+      } else if (mainModality === 'expedition') {
+        if (currentStep === 2) {
+          showNotification('Por favor completa al menos el nombre y teléfono/correo del pasajero titular para continuar a la selección de expedición.', 'Datos de Pasajero Requeridos');
+        } else if (currentStep === 3) {
+          const target = availablePrograms.find((p: any) => p.id === selectedProgramIds[0]) as any;
+          if (target && typeof target.availablePax === 'number' && target.availablePax < passengersCount) {
+            showNotification(`La expedición seleccionada solo tiene ${target.availablePax} cupos disponibles y has configurado ${passengersCount} pasajeros. Elige una expedición con cupos suficientes.`, 'Cupos Insuficientes');
+          } else {
+            showNotification('Por favor selecciona una expedición con cupos disponibles para continuar.', 'Selección Requerida');
+          }
+        }
+      } else if (mainModality === 'lodge') {
+        if (currentStep === 2) {
           if (!startDate || !endDate || startDate >= endDate) {
             showNotification('Por favor selecciona una fecha de Check-in y Check-out válida (mínimo 1 noche) para consultar disponibilidad.', 'Fechas Requeridas');
           } else if (selectedProgramIds.length === 0) {
@@ -934,40 +905,28 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           } else if (passengersCount > (activeSelectedProgram?.paxLimit || 3)) {
             showNotification(`La habitación seleccionada tiene capacidad máxima para ${activeSelectedProgram?.paxLimit} huéspedes (solicitados: ${passengersCount}). Elige una habitación con mayor capacidad.`, 'Capacidad Excedida');
           }
-        } else if (mainModality === 'expedition') {
-          showNotification('Debe seleccionar una expedición programada para continuar.', 'Selección Requerida');
-        } else {
-          showNotification('Debe seleccionar un programa o paquete para continuar.', 'Selección Requerida');
+        } else if (currentStep === 3) {
+          showNotification('Por favor completa los datos del huésped principal.', 'Datos Requeridos');
         }
-      } else if (currentStep === 3) {
-        if (isOnlyLodge) {
-          if (isSelectedLodgeRoomBooked) {
-            showNotification(`La cabina "${activeSelectedProgram?.title}" no está disponible en las fechas seleccionadas (${formatDateDDMMYYYY(startDate)} al ${formatDateDDMMYYYY(endDate)}) porque ya cuenta con una reserva u ocupación confirmada. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación.`, 'Habitación no disponible');
-          } else {
-            showNotification('Por favor seleccione una fecha de check-in y check-out válida (mínimo 1 noche).', 'Fechas de Estadía Requeridas');
-          }
-        } else {
-          showNotification('Por favor seleccione una fecha de salida programada para continuar.', 'Fecha Requerida');
+      } else if (mainModality === 'custom') {
+        if (currentStep === 2) {
+          showNotification('Por favor activa al menos uno de los servicios para continuar con esta expedición personalizada.', 'Servicios Requeridos');
+        } else if (currentStep === 3) {
+          showNotification('Por favor define las fechas de inicio y término.', 'Fechas Requeridas');
+        } else if (currentStep === 4) {
+          showNotification('Por favor completa los datos del pasajero principal.', 'Datos Requeridos');
         }
-      } else if (currentStep === 4) {
-        showNotification('Por favor complete al menos el nombre y teléfono/correo del pasajero principal (Titular de Reserva).', 'Datos Requeridos');
       } else {
         showNotification('Por favor complete los campos requeridos para continuar.', 'Atención');
       }
       return;
     }
-    if (currentStep === 2 && mainModality === 'lodge') {
-      setCurrentStep(4);
-      return;
-    }
-    setCurrentStep((prev) => Math.min(6, prev + 1));
+
+    const maxStep = mainModality === 'custom' ? 6 : 5;
+    setCurrentStep((prev) => Math.min(maxStep, prev + 1));
   };
 
   const handleBack = () => {
-    if (currentStep === 4 && mainModality === 'lodge') {
-      setCurrentStep(2);
-      return;
-    }
     setCurrentStep((prev) => Math.max(1, prev - 1));
   };
 
@@ -1045,7 +1004,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   Asistente de Reservas Yates Chile
                 </span>
                 <span className="text-[9px] font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2 py-0.5 rounded-full font-mono">
-                  Paso {currentStep} de 6
+                  Paso {currentStep} de {mainModality === 'custom' ? 6 : 5}
                 </span>
               </div>
               <h3 className="font-serif text-lg font-bold text-[#0b192c] leading-tight">
@@ -1063,18 +1022,26 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
         {/* STEP PROGRESS BAR */}
         <div className="px-6 py-3 bg-slate-50/70 border-b border-slate-100 shrink-0">
-          <div className={`grid gap-2 ${mainModality === 'lodge' ? 'grid-cols-5' : 'grid-cols-6'}`}>
-            {(mainModality === 'lodge'
+          <div className={`grid gap-2 ${mainModality === 'custom' ? 'grid-cols-6' : 'grid-cols-5'}`}>
+            {(mainModality === 'expedition'
+              ? [
+                  { step: 1, label: '1. Modalidad' },
+                  { step: 2, label: '2. Pasajeros' },
+                  { step: 3, label: '3. Zarpes' },
+                  { step: 4, label: '4. Pago' },
+                  { step: 5, label: '5. Resumen' },
+                ]
+              : mainModality === 'lodge'
               ? [
                   { step: 1, label: '1. Modalidad' },
                   { step: 2, label: '2. Estadía & Cabina' },
-                  { step: 4, label: '3. Pasajeros' },
-                  { step: 5, label: '4. Pago' },
-                  { step: 6, label: '5. Resumen' },
+                  { step: 3, label: '3. Huéspedes' },
+                  { step: 4, label: '4. Pago' },
+                  { step: 5, label: '5. Resumen' },
                 ]
               : [
                   { step: 1, label: '1. Modalidad' },
-                  { step: 2, label: mainModality === 'expedition' ? '2. Zarpes' : '2. Servicios' },
+                  { step: 2, label: '2. Servicios' },
                   { step: 3, label: '3. Fechas' },
                   { step: 4, label: '4. Pasajeros' },
                   { step: 5, label: '5. Pago' },
@@ -1549,22 +1516,22 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 2: EXPEDICIÓN NÁUTICA — ZARPES PROGRAMADOS CON FILTRO POR MES        */}
+          {/* PASO 3: EXPEDICIÓN NÁUTICA — ZARPES PROGRAMADOS CON CUPOS PARA X PASAJEROS */}
           {/* ========================================================================= */}
-          {currentStep === 2 && mainModality === 'expedition' && (
+          {currentStep === 3 && mainModality === 'expedition' && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border bg-sky-50 text-sky-800 border-sky-200">
-                      Expediciones Náuticas Creadas
+                    <span className="text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
+                      Zarpes para {passengersCount} {passengersCount === 1 ? 'Pasajero' : 'Pasajeros'}
                     </span>
                   </div>
                   <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                    Paso 2: Selecciona la expedición náutica programada
+                    Paso 3: Selecciona la expedición náutica programada
                   </h4>
                   <p className="text-slate-500 text-xs font-light">
-                    Selecciona una de las expediciones con zarpes configurados para asignar los pasajeros.
+                    Se muestran los zarpes configurados. Las travesías con cupos disponibles para {passengersCount} {passengersCount === 1 ? 'pasajero' : 'pasajeros'} están listas para selección con 1 clic.
                   </p>
                 </div>
 
@@ -1715,22 +1682,30 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     const isSoldOut = Boolean(prog.isSoldOut || (typeof prog.availablePax === 'number' && prog.availablePax <= 0));
                     const availableSpots = typeof prog.availablePax === 'number' ? prog.availablePax : 6;
                     const maxSpots = prog.paxLimit || 6;
+                    const hasCapacity = !isSoldOut && availableSpots >= passengersCount;
 
                     return (
                       <div
                         key={prog.id}
                         onClick={() => {
-                          if (isSoldOut) {
-                            showNotification(
-                              `La expedición "${prog.title}" (${prog.duration}) ya tiene todos sus cupos reservados (Agotada). Selecciona otra expedición con cupos disponibles.`,
-                              'Expedición Agotada'
-                            );
+                          if (!hasCapacity) {
+                            if (isSoldOut || availableSpots <= 0) {
+                              showNotification(
+                                `La expedición "${prog.title}" (${prog.duration}) ya tiene todos sus cupos reservados (Agotada). Selecciona otra expedición con cupos disponibles.`,
+                                'Expedición Agotada'
+                              );
+                            } else {
+                              showNotification(
+                                `La expedición "${prog.title}" solo cuenta con ${availableSpots} ${availableSpots === 1 ? 'cupo libre' : 'cupos libres'} y has solicitado ${passengersCount} pasajeros. Por favor elige una expedición con al menos ${passengersCount} cupos o regresa al Paso 2 para ajustar la cantidad de pasajeros.`,
+                                'Cupos Insuficientes'
+                              );
+                            }
                             return;
                           }
                           selectProgram(prog.id);
                         }}
                         className={`p-4 rounded-2xl border transition-all duration-200 flex flex-wrap items-center justify-between gap-3 select-none ${
-                          isSoldOut
+                          !hasCapacity
                             ? 'bg-slate-50/80 border-slate-200 opacity-60 cursor-not-allowed text-slate-400'
                             : isSelected
                             ? 'bg-sky-50/50 border-sky-400 ring-2 ring-sky-300/40 shadow-xs cursor-pointer'
@@ -1740,36 +1715,40 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                         <div className="flex items-center gap-3.5 min-w-0 flex-1">
                           <div
                             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
-                              isSoldOut
+                              !hasCapacity
                                 ? 'bg-slate-200 border-slate-300 text-slate-400'
                                 : isSelected
                                 ? 'bg-[#0f2b48] border-[#0f2b48] text-white'
                                 : 'bg-white border-slate-300'
                             }`}
                           >
-                            {isSelected && !isSoldOut && <div className="w-2 h-2 bg-white rounded-full" />}
-                            {isSoldOut && <span className="text-[10px] leading-none font-bold text-slate-500">✕</span>}
+                            {isSelected && hasCapacity && <div className="w-2 h-2 bg-white rounded-full" />}
+                            {!hasCapacity && <span className="text-[10px] leading-none font-bold text-slate-500">✕</span>}
                           </div>
 
                           <div className="min-w-0 space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h5 className={`font-serif font-bold text-sm truncate ${isSoldOut ? 'text-slate-500' : 'text-[#0f2b48]'}`}>
+                              <h5 className={`font-serif font-bold text-sm truncate ${!hasCapacity ? 'text-slate-500' : 'text-[#0f2b48]'}`}>
                                 {prog.title}
                               </h5>
                               <span className="text-[10px] text-slate-400 font-mono shrink-0">
                                 • {prog.duration}
                               </span>
-                              {isSoldOut ? (
+                              {isSoldOut || availableSpots <= 0 ? (
                                 <span className="text-[9px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full">
                                   ✕ Agotada (0 cupos)
                                 </span>
+                              ) : availableSpots < passengersCount ? (
+                                <span className="text-[9px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full">
+                                  ⚠ Cupos insuficientes ({availableSpots} {availableSpots === 1 ? 'libre' : 'libres'} vs {passengersCount} PAX)
+                                </span>
                               ) : (
                                 <span className="text-[9px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                  ✓ {availableSpots} de {maxSpots} PAX disponibles
+                                  ✓ Disponible ({availableSpots} de {maxSpots} PAX libres)
                                 </span>
                               )}
                             </div>
-                            <p className={`text-[11px] font-light line-clamp-1 ${isSoldOut ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <p className={`text-[11px] font-light line-clamp-1 ${!hasCapacity ? 'text-slate-400' : 'text-slate-500'}`}>
                               {prog.description}
                             </p>
                           </div>
@@ -1779,7 +1758,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
                             Tarifa
                           </span>
-                          <div className={`text-sm font-mono font-bold ${isSoldOut ? 'text-slate-400' : 'text-[#0f2b48]'}`}>
+                          <div className={`text-sm font-mono font-bold ${!hasCapacity ? 'text-slate-400' : 'text-[#0f2b48]'}`}>
                             ${prog.priceClp.toLocaleString('es-CL')}{' '}
                             <span className="text-[10px] font-normal text-slate-500 font-sans">
                               {prog.unitType === 'pax' ? 'CLP / pax' : prog.unitType === 'night' ? 'CLP / noche' : 'CLP total'}
@@ -2078,159 +2057,106 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             </div>
           )}
 
-          {currentStep === 3 && !isOnlyLodge && (
+          {/* ========================================================================= */}
+          {/* PASO 3: FECHAS DE LA TRAVESÍA (SOLO PERSONALIZADO)                       */}
+          {/* ========================================================================= */}
+          {currentStep === 3 && mainModality === 'custom' && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] uppercase font-mono font-bold text-sky-800 bg-sky-100/70 border border-sky-200 px-2 py-0.5 rounded-md">
-                    {activeSelectedProgram?.title || 'Paquete Seleccionado'}
+                  <span className="text-[9px] uppercase font-mono font-bold text-amber-800 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded-md">
+                    Expedición a Medida
                   </span>
                 </div>
                 <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  {isExpedition
-                    ? 'Paso 3: Fechas de Zarpe y Desembarque de la Expedición'
-                    : 'Paso 3: Selecciona la Fecha de Salida Programada'}
+                  Paso 3: Define las fechas de la travesía personalizada
                 </h4>
                 <p className="text-slate-500 text-xs font-light">
-                  {isExpedition
-                    ? 'Revisa el itinerario y fechas programadas para esta travesía náutica.'
-                    : 'Este paquete opera en fechas fijas de zarpe y expedición. Selecciona la salida que prefieras:'}
+                  Selecciona la fecha de inicio (zarpe o check-in) y fecha de término para la expedición a medida:
                 </p>
               </div>
 
-              {isExpedition ? (
-                <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4 p-4.5 bg-[#fbfcfd] border border-slate-200/80 rounded-2xl">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-700 shrink-0">
-                        <Sailboat className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h5 className="font-serif font-bold text-sm text-[#0f2b48]">
-                          {activeSelectedProgram?.title}
-                        </h5>
-                        <p className="text-xs text-slate-500 font-mono mt-0.5">
-                          {activeSelectedProgram?.categoryLabel} • Tarifa: ${activeSelectedProgram?.priceClp.toLocaleString('es-CL')} CLP / PAX
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl shrink-0">
-                      Itinerario Programado
-                    </span>
+              <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Fecha Inicio */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
+                      Fecha de Inicio / Zarpe *
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-50 border border-slate-200/70 rounded-2xl space-y-1">
-                      <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block">
-                        Fecha de Zarpe (Inicio)
-                      </span>
-                      <span className="text-sm font-mono font-bold text-[#0f2b48] block">
-                        {formatDateDDMMYYYY(startDate) || '31/10/2026'}
-                      </span>
-                    </div>
-                    <div className="p-4 bg-slate-50 border border-slate-200/70 rounded-2xl space-y-1">
-                      <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block">
-                        Fecha de Desembarque (Fin)
-                      </span>
-                      <span className="text-sm font-mono font-bold text-[#0f2b48] block">
-                        {formatDateDDMMYYYY(endDate) || '11/11/2026'}
-                      </span>
-                    </div>
+                  {/* Fecha Fin */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
+                      Fecha de Término / Desembarque *
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={startDate || undefined}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                    />
                   </div>
                 </div>
-              ) : (
-                /* LIST OF SCHEDULED FIXED DEPARTURES */
-                <div className="space-y-2.5 pt-1">
-                  {DEFAULT_PROGRAM_DEPARTURES.map((dep) => {
-                    const isSelected = selectedDepartureId === dep.id;
-                    return (
-                      <div
-                        key={dep.id}
-                        onClick={() => handleSelectDeparture(dep)}
-                        className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-wrap items-center justify-between gap-3 select-none ${
-                          isSelected
-                            ? 'bg-sky-50/40 border-[#0f2b48] ring-2 ring-[#0f2b48]/20 shadow-xs'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                          <div
-                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
-                              isSelected
-                                ? 'bg-[#0f2b48] border-[#0f2b48] text-white'
-                                : 'bg-white border-slate-300'
-                            }`}
-                          >
-                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                          </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
-                              <strong className="text-sm font-mono font-bold text-[#0f2b48]">
-                                {formatDateDDMMYYYY(dep.startDate)} al {formatDateDDMMYYYY(dep.endDate)}
-                              </strong>
-                            </div>
-                            <span className="text-[11px] text-slate-500 font-mono mt-0.5 block">
-                              Duración: {dep.durationLabel}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <span className="font-mono text-xs font-bold text-[#0f2b48] bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-xl shadow-2xs">
-                            {dep.availableSlots} cupos disponibles
-                          </span>
-
-                          <span
-                            className={`text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase ${
-                              dep.status === 'confirmada'
-                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                : dep.status === 'ultimos_cupos'
-                                ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                                : 'bg-sky-50 text-sky-800 border border-sky-200'
-                            }`}
-                          >
-                            {dep.status === 'confirmada' ? 'Confirmada para zarpe' : dep.status === 'ultimos_cupos' ? 'Últimos cupos' : 'Salida abierta'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl flex items-center justify-between mt-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#0f2b48] shadow-2xs">
-                    <Clock className="w-4 h-4" />
+                <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#0f2b48] shadow-2xs">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-xs text-[#0f2b48] block">Duración Estimada</span>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        {startDate && endDate && startDate <= endDate
+                          ? `${calculatedNights} ${calculatedNights === 1 ? 'Día / Noche' : 'Días / Noches'} (${formatDateDDMMYYYY(startDate)} ➔ ${formatDateDDMMYYYY(endDate)})`
+                          : 'Selecciona fecha de inicio y término'}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-bold text-xs text-[#0f2b48] block">Fecha de Salida Seleccionada</span>
-                    <span className="text-[11px] text-slate-500 font-mono">
-                      {formatDateDDMMYYYY(startDate)} ➔ {formatDateDDMMYYYY(endDate)}
-                    </span>
-                  </div>
+                  <span className="text-xs font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200 px-3 py-1 rounded-xl">
+                    Travesía a Medida
+                  </span>
                 </div>
-                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
-                  Salida Programada Activa
-                </span>
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 4: PASAJEROS & DATOS PERSONALES */}
+          {/* PASO DE PASAJEROS: Step 2 para expedición, Step 3 para lodge, Step 4 para custom */}
           {/* ========================================================================= */}
-          {currentStep === 4 && (
+          {((mainModality === 'expedition' && currentStep === 2) ||
+            (mainModality === 'lodge' && currentStep === 3) ||
+            (mainModality === 'custom' && currentStep === 4)) && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border bg-sky-50 text-sky-800 border-sky-200">
+                      {mainModality === 'expedition'
+                        ? 'Manifiesto de Expedición'
+                        : mainModality === 'lodge'
+                        ? 'Huéspedes Lodge'
+                        : 'Manifiesto Personalizado'}
+                    </span>
+                  </div>
                   <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                    Paso 4: Cantidad de Pasajeros y Fichas de Clientes
+                    {mainModality === 'expedition'
+                      ? 'Paso 2: Cantidad de Pasajeros y Datos Personales'
+                      : mainModality === 'lodge'
+                      ? 'Paso 3: Fichas y Datos de los Huéspedes'
+                      : 'Paso 4: Cantidad de Pasajeros y Fichas de Clientes'}
                   </h4>
                   <p className="text-slate-500 text-xs font-light">
-                    Cada pasajero será creado automáticamente en la base de datos de Clientes CRM.
+                    {mainModality === 'expedition'
+                      ? 'Indica cuántos pasajeros viajarán y completa sus datos para consultar las expediciones con cupos disponibles.'
+                      : 'Cada pasajero será creado automáticamente en la base de datos de Clientes CRM.'}
                   </p>
                 </div>
 
@@ -2386,13 +2312,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 5: FORMA DE PAGO, DESCUENTOS & CUOTAS */}
+          {/* PASO DE PAGO: Step 4 para expedición/lodge, Step 5 para custom            */}
           {/* ========================================================================= */}
-          {currentStep === 5 && (
+          {((mainModality !== 'custom' && currentStep === 4) ||
+            (mainModality === 'custom' && currentStep === 5)) && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
                 <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  Paso 5: Plan de Cuotas y Descuentos
+                  {mainModality === 'custom' ? 'Paso 5: Plan de Cuotas y Descuentos' : 'Paso 4: Plan de Cuotas y Descuentos'}
                 </h4>
                 <p className="text-slate-500 text-xs font-light">
                   Configura la cantidad de cuotas flexibles y condiciones financieras de la reserva.
@@ -2651,13 +2578,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 6: RESUMEN EJECUTIVO & CONFIRMACIÓN */}
+          {/* PASO DE RESUMEN: Step 5 para expedición/lodge, Step 6 para custom         */}
           {/* ========================================================================= */}
-          {currentStep === 6 && (
+          {((mainModality !== 'custom' && currentStep === 5) ||
+            (mainModality === 'custom' && currentStep === 6)) && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
                 <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  Paso 6: Resumen Ejecutivo y Creación de Reserva
+                  {mainModality === 'custom' ? 'Paso 6: Resumen Ejecutivo y Creación de Reserva' : 'Paso 5: Resumen Ejecutivo y Creación de Reserva'}
                 </h4>
                 <p className="text-slate-500 text-xs font-light">
                   Revisa los datos consolidados antes de registrar la reserva y generar las fichas de cliente.
@@ -2789,13 +2717,17 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           </div>
 
           <div>
-            {currentStep < 6 ? (
+            {(mainModality === 'custom' ? currentStep < 6 : currentStep < 5) ? (
               <button
                 type="button"
                 onClick={handleNext}
                 className="px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold transition shadow-md shadow-[#0b192c]/20 flex items-center gap-2 cursor-pointer text-xs active:scale-95"
               >
-                <span>Siguiente Paso</span>
+                <span>
+                  {mainModality === 'expedition' && currentStep === 2
+                    ? 'Continuar a Selección de Zarpe'
+                    : 'Siguiente Paso'}
+                </span>
                 <ChevronRight className="w-4 h-4 text-sky-300" />
               </button>
             ) : (
