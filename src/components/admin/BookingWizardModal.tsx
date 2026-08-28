@@ -683,7 +683,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     }
     if (autoAdvance) {
       setTimeout(() => {
-        setCurrentStep(3);
+        if (mainModality === 'lodge') {
+          setCurrentStep(4);
+        } else {
+          setCurrentStep(3);
+        }
       }, 150);
     }
   };
@@ -819,7 +823,16 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       if (mainModality === 'custom') return selectedCategories.length > 0;
       return true;
     }
-    if (currentStep === 2) return selectedProgramIds.length > 0;
+    if (currentStep === 2) {
+      if (mainModality === 'lodge') {
+        if (!startDate || !endDate || startDate >= endDate) return false;
+        if (selectedProgramIds.length === 0) return false;
+        if (isSelectedLodgeRoomBooked) return false;
+        if (passengersCount > (activeSelectedProgram?.paxLimit || 3)) return false;
+        return true;
+      }
+      return selectedProgramIds.length > 0;
+    }
     if (currentStep === 3) {
       if (isOnlyLodge && isSelectedLodgeRoomBooked) return false;
       return Boolean(startDate && endDate && startDate <= endDate);
@@ -842,18 +855,25 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           showNotification('Por favor activa al menos uno de los íconos circulares para componer la reserva personalizada.', 'Servicios Requeridos');
         }
       } else if (currentStep === 2) {
-        showNotification(
-          mainModality === 'lodge'
-            ? 'Debe seleccionar una habitación del Lodge para continuar.'
-            : mainModality === 'expedition'
-            ? 'Debe seleccionar una expedición programada para continuar.'
-            : 'Debe seleccionar un programa o paquete para continuar.',
-          'Selección Requerida'
-        );
+        if (mainModality === 'lodge') {
+          if (!startDate || !endDate || startDate >= endDate) {
+            showNotification('Por favor selecciona una fecha de Check-in y Check-out válida (mínimo 1 noche) para consultar disponibilidad.', 'Fechas Requeridas');
+          } else if (selectedProgramIds.length === 0) {
+            showNotification('Por favor selecciona una de las habitaciones disponibles para continuar.', 'Habitación Requerida');
+          } else if (isSelectedLodgeRoomBooked) {
+            showNotification(`La cabina seleccionada no está disponible en las fechas (${formatDateDDMMYYYY(startDate)} al ${formatDateDDMMYYYY(endDate)}). Elige otra habitación disponible.`, 'Habitación no disponible');
+          } else if (passengersCount > (activeSelectedProgram?.paxLimit || 3)) {
+            showNotification(`La habitación seleccionada tiene capacidad máxima para ${activeSelectedProgram?.paxLimit} huéspedes (solicitados: ${passengersCount}). Elige una habitación con mayor capacidad.`, 'Capacidad Excedida');
+          }
+        } else if (mainModality === 'expedition') {
+          showNotification('Debe seleccionar una expedición programada para continuar.', 'Selección Requerida');
+        } else {
+          showNotification('Debe seleccionar un programa o paquete para continuar.', 'Selección Requerida');
+        }
       } else if (currentStep === 3) {
         if (isOnlyLodge) {
           if (isSelectedLodgeRoomBooked) {
-            showNotification(`La cabina "${activeSelectedProgram?.title}" no está disponible en las fechas seleccionadas (${startDate} al ${endDate}) porque ya cuenta con una reserva u ocupación confirmada. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación.`, 'Habitación no disponible');
+            showNotification(`La cabina "${activeSelectedProgram?.title}" no está disponible en las fechas seleccionadas (${formatDateDDMMYYYY(startDate)} al ${formatDateDDMMYYYY(endDate)}) porque ya cuenta con una reserva u ocupación confirmada. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación.`, 'Habitación no disponible');
           } else {
             showNotification('Por favor seleccione una fecha de check-in y check-out válida (mínimo 1 noche).', 'Fechas de Estadía Requeridas');
           }
@@ -867,10 +887,18 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       }
       return;
     }
+    if (currentStep === 2 && mainModality === 'lodge') {
+      setCurrentStep(4);
+      return;
+    }
     setCurrentStep((prev) => Math.min(6, prev + 1));
   };
 
   const handleBack = () => {
+    if (currentStep === 4 && mainModality === 'lodge') {
+      setCurrentStep(2);
+      return;
+    }
     setCurrentStep((prev) => Math.max(1, prev - 1));
   };
 
@@ -966,15 +994,24 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
         {/* STEP PROGRESS BAR */}
         <div className="px-6 py-3 bg-slate-50/70 border-b border-slate-100 shrink-0">
-          <div className="grid grid-cols-6 gap-2">
-            {[
-              { step: 1, label: '1. Modalidad' },
-              { step: 2, label: mainModality === 'lodge' ? '2. Cabina' : mainModality === 'expedition' ? '2. Zarpes' : '2. Programas' },
-              { step: 3, label: mainModality === 'lodge' ? '3. Estadía' : '3. Fechas' },
-              { step: 4, label: '4. Pasajeros' },
-              { step: 5, label: '5. Pago' },
-              { step: 6, label: '6. Resumen' },
-            ].map((s) => {
+          <div className={`grid gap-2 ${mainModality === 'lodge' ? 'grid-cols-5' : 'grid-cols-6'}`}>
+            {(mainModality === 'lodge'
+              ? [
+                  { step: 1, label: '1. Modalidad' },
+                  { step: 2, label: '2. Estadía & Cabina' },
+                  { step: 4, label: '3. Pasajeros' },
+                  { step: 5, label: '4. Pago' },
+                  { step: 6, label: '5. Resumen' },
+                ]
+              : [
+                  { step: 1, label: '1. Modalidad' },
+                  { step: 2, label: mainModality === 'expedition' ? '2. Zarpes' : '2. Programas' },
+                  { step: 3, label: '3. Fechas' },
+                  { step: 4, label: '4. Pasajeros' },
+                  { step: 5, label: '5. Pago' },
+                  { step: 6, label: '6. Resumen' },
+                ]
+            ).map((s) => {
               const isDone = currentStep > s.step;
               const isCurrent = currentStep === s.step;
               return (
@@ -1095,6 +1132,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   onClick={() => {
                     setMainModality('lodge');
                     setSelectedCategories(['lodge']);
+                    if (!startDate) {
+                      const d1 = new Date();
+                      d1.setDate(d1.getDate() + 14);
+                      const d2 = new Date(d1);
+                      d2.setDate(d2.getDate() + 3);
+                      setStartDate(d1.toISOString().split('T')[0]);
+                      setEndDate(d2.toISOString().split('T')[0]);
+                    }
                     setTimeout(() => {
                       setCurrentStep(2);
                     }, 120);
@@ -1292,38 +1337,240 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 2: PROGRAMAS O CABINAS DEL LODGE (DINÁMICO SEGÚN PASO 1) */}
+          {/* PASO 2: LODGE RINCÓN — DISPONIBILIDAD REAL, FECHAS & CANTIDAD DE HUÉSPEDES */}
           {/* ========================================================================= */}
-          {currentStep === 2 && (
+          {currentStep === 2 && mainModality === 'lodge' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
+                    Lodge Rincón de Navegantes
+                  </span>
+                </div>
+                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                  Paso 2: Parámetros de Estadía & Disponibilidad en Tiempo Real
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Selecciona la cantidad de huéspedes y las fechas de check-in / check-out para consultar las cabinas con disponibilidad real y capacidad adecuada.
+                </p>
+              </div>
+
+              {/* CARD DE CONTROL: HUÉSPEDES Y FECHAS DE ESTADÍA */}
+              <div className="bg-[#fbfcfd] border border-slate-200/90 rounded-3xl p-5 shadow-xs space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  {/* Cantidad de Huéspedes */}
+                  <div className="md:col-span-4 space-y-1.5">
+                    <label className="block text-[11px] font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
+                      Cantidad de Pasajeros *
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[1, 2, 3, 4].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => handlePaxCountChange(num)}
+                          className={`py-2 rounded-xl text-xs font-mono font-bold transition cursor-pointer border ${
+                            passengersCount === num
+                              ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-xs'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {num} {num === 1 ? 'PAX' : 'PAX'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fecha Check-In */}
+                  <div className="md:col-span-4 space-y-1.5">
+                    <label className="block text-[11px] font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
+                      Fecha Check-in (Entrada) *
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        setStartDate(newStart);
+                        if (!endDate || endDate <= newStart) {
+                          const d = new Date(newStart);
+                          d.setDate(d.getDate() + 2);
+                          setEndDate(d.toISOString().split('T')[0]);
+                        }
+                      }}
+                      className="w-full bg-white border border-slate-300 focus:border-[#0f2b48] rounded-xl py-2 px-3 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                    />
+                  </div>
+
+                  {/* Fecha Check-Out */}
+                  <div className="md:col-span-4 space-y-1.5">
+                    <label className="block text-[11px] font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
+                      Fecha Check-out (Salida) *
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={startDate || undefined}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full bg-white border border-slate-300 focus:border-[#0f2b48] rounded-xl py-2 px-3 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Resumen dinámico de Noches */}
+                {startDate && endDate && startDate < endDate ? (
+                  <div className="bg-sky-50/70 border border-sky-200/80 px-4 py-2.5 rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs text-sky-950">
+                    <div className="flex items-center gap-2 font-medium">
+                      <Clock className="w-4 h-4 text-sky-600 shrink-0" />
+                      <span>
+                        <strong>{calculatedNights} {calculatedNights === 1 ? 'Noche de Estadía' : 'Noches de Estadía'}</strong>: del {formatDateDDMMYYYY(startDate)} al {formatDateDDMMYYYY(endDate)}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-sky-800 bg-sky-100/90 border border-sky-200 px-2.5 py-0.5 rounded-full">
+                      Filtro activo: {passengersCount} {passengersCount === 1 ? 'Huésped' : 'Huéspedes'}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50/80 border border-amber-200 px-4 py-2 rounded-2xl text-xs text-amber-900 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Selecciona las fechas de Check-in y Check-out para verificar disponibilidad.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* LISTADO DE CABINAS CON DISPONIBILIDAD REAL */}
+              <div className="space-y-2.5 pt-1">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] uppercase font-mono font-bold text-slate-400">
+                    Habitaciones Configuradas ({availablePrograms.length})
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-500">
+                    Selecciona una cabina disponible para avanzar
+                  </span>
+                </div>
+
+                {availablePrograms.map((room) => {
+                  const roomId = getRoomIdFromProgId(room.id);
+                  const isOccupied = startDate && endDate ? isRoomBookedForRange(roomId, startDate, endDate) : false;
+                  const isCapacityExceeded = passengersCount > (room.paxLimit || 3);
+                  const isRoomAvailable = !isOccupied && !isCapacityExceeded && Boolean(startDate && endDate && startDate < endDate);
+                  const isSelected = selectedProgramIds.includes(room.id);
+                  const totalRoomStay = (room.priceClp || 240000) * (calculatedNights || 1);
+
+                  return (
+                    <div
+                      key={room.id}
+                      onClick={() => {
+                        if (!isRoomAvailable) {
+                          if (isOccupied) {
+                            showNotification(
+                              `La cabina "${room.title}" no está disponible entre el ${formatDateDDMMYYYY(startDate)} y el ${formatDateDDMMYYYY(endDate)} porque ya tiene una reserva u ocupación confirmada.`,
+                              'Habitación Ocupada'
+                            );
+                          } else if (isCapacityExceeded) {
+                            showNotification(
+                              `La cabina "${room.title}" tiene capacidad máxima de ${room.paxLimit} huéspedes y has configurado ${passengersCount} pasajeros.`,
+                              'Capacidad Insuficiente'
+                            );
+                          } else {
+                            showNotification('Ingresa fechas de entrada y salida válidas para reservar.', 'Fechas Requeridas');
+                          }
+                          return;
+                        }
+                        selectProgram(room.id, true);
+                      }}
+                      className={`p-4.5 rounded-2xl border transition-all duration-200 flex flex-wrap items-center justify-between gap-3 select-none ${
+                        !isRoomAvailable
+                          ? 'bg-slate-50/70 border-slate-200 opacity-60 cursor-not-allowed'
+                          : isSelected
+                          ? 'bg-emerald-50/60 border-emerald-500 ring-2 ring-emerald-300/40 shadow-xs cursor-pointer'
+                          : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-slate-50/60 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
+                            isSelected && isRoomAvailable
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'bg-white border-slate-300'
+                          }`}
+                        >
+                          {isSelected && isRoomAvailable && <div className="w-2 h-2 bg-white rounded-full" />}
+                        </div>
+
+                        <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-700 shrink-0 shadow-2xs">
+                          <BedDouble className="w-5 h-5" />
+                        </div>
+
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h5 className="font-serif font-bold text-sm text-[#0f2b48] truncate">
+                              {room.title}
+                            </h5>
+                            {isRoomAvailable ? (
+                              <span className="text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">
+                                ✓ Disponible para {passengersCount} PAX
+                              </span>
+                            ) : isOccupied ? (
+                              <span className="text-[9px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full">
+                                ✕ Ocupada en estas fechas
+                              </span>
+                            ) : isCapacityExceeded ? (
+                              <span className="text-[9px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full">
+                                ⚠ Capacidad máx: {room.paxLimit} PAX
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-light line-clamp-1">
+                            {room.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                          {calculatedNights > 0 ? `Total ${calculatedNights} ${calculatedNights === 1 ? 'Noche' : 'Noches'}` : 'Tarifa por Noche'}
+                        </span>
+                        <div className="text-sm font-mono font-bold text-[#0f2b48]">
+                          ${totalRoomStay.toLocaleString('es-CL')}{' '}
+                          <span className="text-[10px] font-normal text-slate-500 font-sans">CLP</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                          ${(room.priceClp || 240000).toLocaleString('es-CL')} / noche
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* PASO 2: PROGRAMAS O EXPEDICIONES (EXPEDICIÓN O PERSONALIZADO) */}
+          {/* ========================================================================= */}
+          {currentStep === 2 && mainModality !== 'lodge' && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className={`text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border ${
-                      mainModality === 'lodge'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : mainModality === 'expedition'
+                      mainModality === 'expedition'
                         ? 'bg-sky-50 text-sky-800 border-sky-200'
                         : 'bg-amber-50 text-amber-800 border-amber-200'
                     }`}>
-                      {mainModality === 'lodge'
-                        ? 'Lodge Rincón de Navegantes'
-                        : mainModality === 'expedition'
+                      {mainModality === 'expedition'
                         ? 'Expediciones Náuticas Creadas'
                         : 'Catálogo Personalizado'}
                     </span>
                   </div>
                   <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                    {mainModality === 'lodge'
-                      ? 'Paso 2: Selecciona la cabina o habitación del Lodge'
-                      : mainModality === 'expedition'
+                    {mainModality === 'expedition'
                       ? 'Paso 2: Selecciona la expedición náutica programada'
                       : 'Paso 2: Selecciona los programas o servicios a incluir'}
                   </h4>
                   <p className="text-slate-500 text-xs font-light">
-                    {mainModality === 'lodge'
-                      ? 'Selecciona una de las 4 cabinas privadas frente a Bahía Cumberland para esta estadía.'
-                      : mainModality === 'expedition'
+                    {mainModality === 'expedition'
                       ? 'Selecciona una de las expediciones con zarpes configurados para asignar los pasajeros.'
                       : 'Se muestran los programas y servicios disponibles según las opciones seleccionadas.'}
                   </p>
@@ -1374,13 +1621,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           >
                             {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
                           </div>
-
-                          {/* Icon badge if Lodge or Vessel */}
-                          {isOnlyLodge && (
-                            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-700 shrink-0 shadow-2xs">
-                              <BedDouble className="w-5 h-5" />
-                            </div>
-                          )}
 
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
