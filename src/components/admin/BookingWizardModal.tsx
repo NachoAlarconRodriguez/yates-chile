@@ -51,6 +51,7 @@ export interface BookingWizardData {
     notes?: string;
   }[];
   paymentMethod: 'transfer' | 'credit_card' | 'cash' | 'airbnb' | 'invoice';
+  paymentScheme: '100' | '50' | '0';
   discountType: 'none' | 'percent' | 'amount';
   discountValue: number;
   installmentsCount: number;
@@ -427,10 +428,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   // Step 5: Payment & Installments
   const paymentMethod: 'transfer' | 'credit_card' | 'cash' | 'airbnb' | 'invoice' = 'transfer';
+  const [paymentScheme, setPaymentScheme] = useState<'100' | '50' | '0'>('50');
   const [discountType, setDiscountType] = useState<'none' | 'percent' | 'amount'>('none');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
-  const [installmentsCount, setInstallmentsCount] = useState<number>(2);
   const [specialNotes, setSpecialNotes] = useState<string>('');
 
   // Custom In-App Notification State
@@ -455,6 +456,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       setStartDate('');
       setEndDate('');
       setPassengersCount(1);
+      setPaymentScheme('50');
       setPassengers([
         {
           fullName: '',
@@ -470,7 +472,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       setDiscountType('none');
       setDiscountPercent(0);
       setDiscountAmount(0);
-      setInstallmentsCount(2);
       setSpecialNotes('');
       setNotification(null);
     }
@@ -809,7 +810,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   }, [subtotalClp, discountType, discountPercent, discountAmount]);
 
   const totalFinalClp = Math.max(0, subtotalClp - calculatedDiscountClp);
-  const installmentAmountClp = Math.round(totalFinalClp / installmentsCount);
 
   // Validation before advancing
   const canProceed = () => {
@@ -946,9 +946,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       passengersCount,
       passengers: passengers.slice(0, passengersCount),
       paymentMethod,
+      paymentScheme,
       discountType,
       discountValue: discountType === 'percent' ? discountPercent : discountAmount,
-      installmentsCount,
+      installmentsCount: paymentScheme === '100' ? 1 : paymentScheme === '50' ? 2 : 0,
       specialNotes,
       totalAmountClp: totalFinalClp,
     };
@@ -2170,82 +2171,166 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 </div>
               </div>
 
-              {/* CONFIGURADOR MODERNO Y FLEXIBLE DE CUOTAS */}
+              {/* MODALIDAD DE PAGO Y RESERVA OFICIAL */}
               <div className="bg-[#fbfcfd] border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div>
                     <label className="text-[10px] uppercase font-bold text-[#0f2b48] flex items-center gap-1.5 font-mono">
                       <DollarSign className="w-4 h-4 text-sky-600" />
-                      <span>Plan de Cuotificación Flexible</span>
+                      <span>Modalidad de Pago y Reserva</span>
                     </label>
                     <p className="text-xs text-slate-500 font-light mt-0.5">
-                      Selecciona o ajusta libremente la cantidad de cuotas para el cliente.
+                      Selecciona el esquema comercial oficial para la reserva:
                     </p>
                   </div>
 
-                  {/* Modern Stepper Counter */}
-                  <div className="flex items-center gap-3 bg-white border border-slate-200 p-1.5 rounded-full shadow-2xs">
-                    <span className="text-[11px] uppercase font-mono font-bold text-slate-500 pl-3">
-                      N° de Cuotas:
-                    </span>
-                    <div className="flex items-center gap-1.5 pr-1">
-                      <button
-                        type="button"
-                        onClick={() => setInstallmentsCount((prev) => Math.max(1, prev - 1))}
-                        disabled={installmentsCount <= 1}
-                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-[#0f2b48] flex items-center justify-center transition cursor-pointer"
-                        title="Disminuir cuotas"
-                      >
-                        <Minus className="w-3 h-3 stroke-[2.5]" />
-                      </button>
-                      <span className="w-8 text-center font-mono font-bold text-sm text-[#0f2b48]">
-                        {installmentsCount}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setInstallmentsCount((prev) => Math.min(12, prev + 1))}
-                        disabled={installmentsCount >= 12}
-                        className="w-7 h-7 rounded-full bg-[#0f2b48] text-white hover:bg-[#182a44] disabled:opacity-40 flex items-center justify-center transition cursor-pointer shadow-2xs"
-                        title="Aumentar cuotas"
-                      >
-                        <Plus className="w-3 h-3 stroke-[2.5]" />
-                      </button>
-                    </div>
-                  </div>
+                  <span className={`text-[10px] font-mono font-bold uppercase px-3 py-1 rounded-full border ${
+                    paymentScheme === '100'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : paymentScheme === '50'
+                      ? 'bg-sky-50 text-sky-800 border-sky-200'
+                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                  }`}>
+                    {paymentScheme === '100'
+                      ? '✓ Reserva 100% Confirmada'
+                      : paymentScheme === '50'
+                      ? '⚓ Reserva de Cupo (50/50)'
+                      : '⚡ Registro Lead (Sin Cupo)'}
+                  </span>
                 </div>
 
-                {/* Quick Selection Pills */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-mono font-bold text-slate-400 block">
-                    Opciones Rápidas:
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {[
-                      { count: 1, label: '100% Contado' },
-                      { count: 2, label: '2 Cuotas (50/50)' },
-                      { count: 3, label: '3 Cuotas' },
-                      { count: 4, label: '4 Cuotas' },
-                      { count: 6, label: '6 Cuotas' },
-                      { count: 8, label: '8 Cuotas' },
-                      { count: 10, label: '10 Cuotas' },
-                      { count: 12, label: '12 Cuotas' },
-                    ].map((pill) => {
-                      const isActive = installmentsCount === pill.count;
-                      return (
-                        <button
-                          key={pill.count}
-                          type="button"
-                          onClick={() => setInstallmentsCount(pill.count)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-mono transition cursor-pointer ${
-                            isActive
-                              ? 'bg-[#0f2b48] text-white shadow-xs'
-                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          {pill.label}
-                        </button>
-                      );
-                    })}
+                {/* 3 OPCIONES OFICIALES */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {/* Opción 1: 100% Reserva Confirmada */}
+                  <div
+                    onClick={() => setPaymentScheme('100')}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between select-none ${
+                      paymentScheme === '100'
+                        ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-md scale-[1.01]'
+                        : 'bg-white text-[#0f2b48] border-slate-200 hover:border-slate-300 hover:bg-slate-50/70'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                          paymentScheme === '100'
+                            ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
+                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        }`}>
+                          100% Contado
+                        </span>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                          paymentScheme === '100' ? 'bg-white text-[#0f2b48] border-white' : 'border-slate-300'
+                        }`}>
+                          {paymentScheme === '100' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <h5 className="font-serif font-bold text-sm mb-1">
+                        Reserva Confirmada
+                      </h5>
+                      <p className={`text-xs leading-relaxed font-light ${
+                        paymentScheme === '100' ? 'text-slate-200' : 'text-slate-500'
+                      }`}>
+                        Pago del 100% al momento de reservar. Garantiza y confirma los cupos de manera inmediata y definitiva.
+                      </p>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-slate-100/20 flex items-baseline justify-between">
+                      <span className={`text-[10px] font-mono uppercase ${paymentScheme === '100' ? 'text-slate-300' : 'text-slate-400'}`}>
+                        Monto Total:
+                      </span>
+                      <span className="font-mono font-bold text-sm">
+                        ${totalFinalClp.toLocaleString('es-CL')} CLP
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Opción 2: 50% Reserva de Cupo */}
+                  <div
+                    onClick={() => setPaymentScheme('50')}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between select-none ${
+                      paymentScheme === '50'
+                        ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-md scale-[1.01]'
+                        : 'bg-white text-[#0f2b48] border-slate-200 hover:border-slate-300 hover:bg-slate-50/70'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                          paymentScheme === '50'
+                            ? 'bg-sky-400/20 text-sky-300 border border-sky-400/30'
+                            : 'bg-sky-50 text-sky-800 border border-sky-200'
+                        }`}>
+                          50% Abono Inicial
+                        </span>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                          paymentScheme === '50' ? 'bg-white text-[#0f2b48] border-white' : 'border-slate-300'
+                        }`}>
+                          {paymentScheme === '50' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <h5 className="font-serif font-bold text-sm mb-1">
+                        Reserva de Puesto (50/50)
+                      </h5>
+                      <p className={`text-xs leading-relaxed font-light ${
+                        paymentScheme === '50' ? 'text-slate-200' : 'text-slate-500'
+                      }`}>
+                        Abona el 50% para asegurar el puesto oficial. El otro 50% restante lo debe pagar 60 días antes de la fecha de zarpe.
+                      </p>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-slate-100/20 flex items-baseline justify-between">
+                      <span className={`text-[10px] font-mono uppercase ${paymentScheme === '50' ? 'text-slate-300' : 'text-slate-400'}`}>
+                        Pie Inicial (50%):
+                      </span>
+                      <span className="font-mono font-bold text-sm">
+                        ${Math.round(totalFinalClp * 0.5).toLocaleString('es-CL')} CLP
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Opción 3: 0% Lead / Cotización */}
+                  <div
+                    onClick={() => setPaymentScheme('0')}
+                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between select-none ${
+                      paymentScheme === '0'
+                        ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-md scale-[1.01]'
+                        : 'bg-white text-[#0f2b48] border-slate-200 hover:border-slate-300 hover:bg-slate-50/70'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                          paymentScheme === '0'
+                            ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                            : 'bg-amber-50 text-amber-800 border border-amber-200'
+                        }`}>
+                          0% Sin Abono (Lead)
+                        </span>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                          paymentScheme === '0' ? 'bg-white text-[#0f2b48] border-white' : 'border-slate-300'
+                        }`}>
+                          {paymentScheme === '0' && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <h5 className="font-serif font-bold text-sm mb-1">
+                        Posible Lead / Cotización
+                      </h5>
+                      <p className={`text-xs leading-relaxed font-light ${
+                        paymentScheme === '0' ? 'text-slate-200' : 'text-slate-500'
+                      }`}>
+                        Llena el formulario y registra ficha comercial. No ocupa cupo hasta que pague al menos el 50%.
+                      </p>
+                    </div>
+
+                    <div className="pt-3 mt-3 border-t border-slate-100/20 flex items-baseline justify-between">
+                      <span className={`text-[10px] font-mono uppercase ${paymentScheme === '0' ? 'text-slate-300' : 'text-slate-400'}`}>
+                        Abono Inmediato:
+                      </span>
+                      <span className="font-mono font-bold text-sm">
+                        $0 CLP <span className="text-[10px] font-normal opacity-75">(Sin Cupo)</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -2253,54 +2338,76 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
                     <span className="text-xs font-bold text-[#0f2b48]">
-                      Desglose de Pago Programado:
+                      Desglose del Esquema Seleccionado:
                     </span>
                     <span className="text-xs font-mono font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
-                      {installmentsCount === 1
-                        ? '1 Pago de $' + totalFinalClp.toLocaleString('es-CL') + ' CLP'
-                        : `${installmentsCount} cuotas de $${installmentAmountClp.toLocaleString('es-CL')} CLP cada una`}
+                      {paymentScheme === '100'
+                        ? '1 Pago Total de $' + totalFinalClp.toLocaleString('es-CL') + ' CLP'
+                        : paymentScheme === '50'
+                        ? '2 Cuotas (50/50): Pie $' + Math.round(totalFinalClp * 0.5).toLocaleString('es-CL') + ' + Saldo $' + (totalFinalClp - Math.round(totalFinalClp * 0.5)).toLocaleString('es-CL') + ' CLP'
+                        : 'Registro de Lead: $0 CLP Inmediato (Saldo $' + totalFinalClp.toLocaleString('es-CL') + ' CLP pendiente)'}
                     </span>
                   </div>
 
-                  {/* Installment cards grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
-                    {Array.from({ length: installmentsCount }).map((_, idx) => {
-                      const isFirst = idx === 0;
-                      const isLast = idx === installmentsCount - 1;
-                      const amount =
-                        idx === installmentsCount - 1
-                          ? totalFinalClp - installmentAmountClp * (installmentsCount - 1)
-                          : installmentAmountClp;
+                  {paymentScheme === '100' && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                      <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-emerald-800 mb-1">
+                        <span>Pago Único (100%)</span>
+                        <span>Reserva Confirmada Inmediata</span>
+                      </div>
+                      <div className="text-base font-mono font-bold text-[#0f2b48]">
+                        ${totalFinalClp.toLocaleString('es-CL')} <span className="text-xs font-normal text-slate-500">CLP</span>
+                      </div>
+                      <span className="text-[11px] text-slate-600 font-light block mt-1">
+                        Al momento de confirmar la reserva • Garantiza y bloquea el cupo de forma definitiva.
+                      </span>
+                    </div>
+                  )}
 
-                      return (
-                        <div
-                          key={idx}
-                          className={`p-3 rounded-xl border transition ${
-                            isFirst
-                              ? 'bg-sky-50/70 border-sky-200 shadow-2xs'
-                              : 'bg-slate-50 border-slate-200/80'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-slate-500 mb-1">
-                            <span>Cuota #{idx + 1}</span>
-                            <span className={isFirst ? 'text-sky-700' : 'text-slate-400'}>
-                              {isFirst ? 'Pie / Reserva' : isLast ? 'Saldo Final' : 'Cuota Intermedia'}
-                            </span>
-                          </div>
-                          <div className="text-sm font-mono font-bold text-[#0f2b48]">
-                            ${amount.toLocaleString('es-CL')} <span className="text-[10px] font-normal text-slate-500">CLP</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 font-light block mt-0.5">
-                            {isFirst
-                              ? 'Al momento de confirmar reserva'
-                              : isLast
-                              ? 'Previo al zarpe / check-in'
-                              : `Programado correlativo (#${idx + 1})`}
-                          </span>
+                  {paymentScheme === '50' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3.5 rounded-xl bg-sky-50/70 border border-sky-200 shadow-2xs">
+                        <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-sky-800 mb-1">
+                          <span>Cuota #1 (50%)</span>
+                          <span>Pie / Reserva de Puesto</span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <div className="text-base font-mono font-bold text-[#0f2b48]">
+                          ${Math.round(totalFinalClp * 0.5).toLocaleString('es-CL')} <span className="text-xs font-normal text-slate-500">CLP</span>
+                        </div>
+                        <span className="text-[11px] text-slate-600 font-light block mt-1">
+                          Al momento de confirmar reserva • Bloquea y asegura el cupo oficial en la expedición.
+                        </span>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                        <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
+                          <span>Cuota #2 (50%)</span>
+                          <span>Saldo Final</span>
+                        </div>
+                        <div className="text-base font-mono font-bold text-[#0f2b48]">
+                          ${(totalFinalClp - Math.round(totalFinalClp * 0.5)).toLocaleString('es-CL')} <span className="text-xs font-normal text-slate-500">CLP</span>
+                        </div>
+                        <span className="text-[11px] text-slate-600 font-light block mt-1">
+                          A pagar a más tardar <strong>60 días antes</strong> de la fecha de zarpe / check-in.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentScheme === '0' && (
+                    <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-amber-800">
+                        <span>Registro de Solicitud (0%)</span>
+                        <span>Lead / Cotización</span>
+                      </div>
+                      <div className="text-base font-mono font-bold text-[#0f2b48]">
+                        $0 <span className="text-xs font-normal text-slate-500">CLP a cobrar hoy</span>
+                      </div>
+                      <p className="text-[11px] text-amber-900 leading-relaxed font-light">
+                        ⚠️ <strong>Importante:</strong> Esta modalidad registra al cliente como un Lead comercial y crea su cotización. <strong>No ocupa ni descuenta cupos en el zarpe</strong> hasta que el cliente efectúe el abono del 50% (${Math.round(totalFinalClp * 0.5).toLocaleString('es-CL')} CLP).
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2385,9 +2492,13 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 )}
                 <div className="border-t border-sky-800/80 pt-2 flex flex-wrap items-baseline justify-between gap-2">
                   <div>
-                    <span className="text-sm font-serif font-bold block">TOTAL FINAL A COBRAR:</span>
+                    <span className="text-sm font-serif font-bold block">TOTAL FINAL:</span>
                     <span className="text-xs text-sky-200 font-mono font-light">
-                      {installmentsCount === 1 ? '1 Pago al 100% Contado' : `${installmentsCount} cuotas de $${installmentAmountClp.toLocaleString('es-CL')} CLP`}
+                      {paymentScheme === '100'
+                        ? '1 Pago del 100% Contado (Reserva Confirmada)'
+                        : paymentScheme === '50'
+                        ? `Abono 50% ($${Math.round(totalFinalClp * 0.5).toLocaleString('es-CL')} CLP) + Saldo 50% a 60 días`
+                        : '0% Sin Abono (Lead Comercial • Sin Cupo)'}
                     </span>
                   </div>
                   <span className="text-xl sm:text-2xl font-mono font-bold text-sky-300">
@@ -2436,8 +2547,18 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <div className="text-xl font-mono font-bold text-[#0f2b48]">
                       ${totalFinalClp.toLocaleString('es-CL')} CLP
                     </div>
-                    <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                      {installmentsCount === 1 ? '100% Contado' : `${installmentsCount} cuotas de $${installmentAmountClp.toLocaleString('es-CL')}`}
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                      paymentScheme === '100'
+                        ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                        : paymentScheme === '50'
+                        ? 'text-sky-700 bg-sky-50 border-sky-200'
+                        : 'text-amber-700 bg-amber-50 border-amber-200'
+                    }`}>
+                      {paymentScheme === '100'
+                        ? '100% Contado (Confirmada)'
+                        : paymentScheme === '50'
+                        ? `50% Abono ($${Math.round(totalFinalClp * 0.5).toLocaleString('es-CL')} CLP)`
+                        : '0% Lead / Cotización (Sin Cupo)'}
                     </span>
                   </div>
                 </div>

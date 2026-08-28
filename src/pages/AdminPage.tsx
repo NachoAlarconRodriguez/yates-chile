@@ -2168,22 +2168,27 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           nationality: pax.nationality || 'Chilena',
           city: 'Chile',
           category: idx === 0 && data.totalAmountClp >= 5000000 ? 'vip' : 'regular',
-          tags: ['Reserva Wizard', idx === 0 ? 'Titular' : 'Acompañante', ...data.categories.map((c) => c.toUpperCase())],
-          totalSpentClp: idx === 0 ? data.totalAmountClp : 0,
-          bookingsCount: 1,
+          tags: [
+            data.paymentScheme === '0' ? 'Lead Cotización (Sin Cupo)' : 'Reserva Wizard',
+            idx === 0 ? 'Titular' : 'Acompañante',
+            data.paymentScheme === '100' ? '100% Confirmado' : data.paymentScheme === '50' ? '50% Abono' : '0% Lead',
+            ...data.categories.map((c) => c.toUpperCase())
+          ],
+          totalSpentClp: idx === 0 && data.paymentScheme !== '0' ? (data.paymentScheme === '100' ? data.totalAmountClp : Math.round(data.totalAmountClp * 0.5)) : 0,
+          bookingsCount: data.paymentScheme === '0' ? 0 : 1,
           lastActivityDate: nowStr,
           dietaryPreferences: pax.dietaryPreferences || 'Sin requerimientos especiales informados',
           divingLevel: pax.notes || 'No especificado',
           beveragePreference: 'A elección',
           emergencyContact: pax.phone ? `${pax.fullName} (${pax.phone})` : 'No registrado',
-          notes: `Ingresado desde Asistente de Reservas Guiado en 6 pasos. Código: ${data.bookingCode}.`,
+          notes: `Ingresado desde Asistente de Reservas (${data.paymentScheme === '100' ? '100% Confirmado' : data.paymentScheme === '50' ? '50% Cupo Reservado' : '0% Lead Sin Cupo'}). Código: ${data.bookingCode}.`,
           timeline: [
             {
               id: `t-${Date.now()}-${idx}`,
               date: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
               type: 'booking',
-              title: `Reserva Generada: ${data.bookingCode}`,
-              description: `Programas: ${data.selectedPrograms.map((p) => p.title).join(' + ')}. ${data.passengers.length} pasajeros registrados.`,
+              title: data.paymentScheme === '0' ? `Cotización Lead: ${data.bookingCode}` : `Reserva Generada: ${data.bookingCode}`,
+              description: `Programas: ${data.selectedPrograms.map((p) => p.title).join(' + ')}. Esquema: ${data.paymentScheme === '100' ? '100% Contado' : data.paymentScheme === '50' ? '50% Abono (Saldo a 60 días)' : '0% Lead (No ocupa cupo)'}. ${data.passengers.length} pasajeros registrados.`,
             },
           ],
         };
@@ -2195,8 +2200,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setCrmClients((prev) => [...newClients, ...prev]);
     }
 
-    // Register into Lodge blocks if lodge category selected
-    if (data.categories.includes('lodge') && rooms.length > 0) {
+    // Register into Lodge blocks only if lodge category selected AND paymentScheme !== '0'
+    if (data.paymentScheme !== '0' && data.categories.includes('lodge') && rooms.length > 0) {
       const targetRoom = rooms[0];
       await adminBlockRoom({
         roomId: targetRoom.id,
@@ -2208,7 +2213,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       });
     }
 
-    setActionMessage(`¡Reserva ${data.bookingCode} registrada con éxito! ${data.passengers.length} ficha(s) de pasajeros creada(s) en Clientes.`);
+    const schemeLabel = data.paymentScheme === '100' ? '100% Confirmada' : data.paymentScheme === '50' ? '50% Cupo Reservado' : 'Lead Comercial (Sin Cupo)';
+    setActionMessage(`¡Registro ${data.bookingCode} (${schemeLabel}) completado con éxito! ${data.passengers.length} ficha(s) procesada(s) en Clientes.`);
     setTimeout(() => setActionMessage(null), 5000);
     fetchAllData();
   };
