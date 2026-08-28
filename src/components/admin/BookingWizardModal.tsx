@@ -19,7 +19,9 @@ import {
   Sailboat,
   AlertCircle,
   Check,
-  Clock
+  Clock,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { useLodge } from '../../hooks/useLodge';
 import { formatPhone, formatRut } from '../../lib/formatters';
@@ -2056,34 +2058,31 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   </p>
                 </div>
 
-                {/* MODERN LUXURY PAX STEPPER */}
-                <div className="flex items-center bg-[#f4f7fa] border border-slate-200/90 rounded-2xl p-1 shadow-xs">
+                {/* MODERN LUXURY CIRCULAR PAX STEPPER */}
+                <div className="flex items-center bg-[#f4f7fa] border border-slate-200/90 rounded-full p-1 shadow-xs">
                   <button
                     type="button"
                     onClick={() => handlePaxCountChange(passengersCount - 1)}
                     disabled={passengersCount <= 1}
-                    className="w-8 h-8 rounded-xl bg-white border border-slate-200/80 text-slate-700 hover:text-[#0f2b48] hover:border-slate-300 hover:shadow-xs active:scale-95 flex items-center justify-center font-bold text-base disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-white border border-slate-200/90 text-slate-700 hover:text-[#0f2b48] hover:bg-slate-50 active:scale-95 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer shadow-2xs"
                     title="Disminuir pasajero"
                   >
-                    −
+                    <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
-                  <div className="flex items-center gap-1.5 px-3.5 min-w-[110px] justify-center select-none">
-                    <Users className="w-3.5 h-3.5 text-sky-600" />
+                  <div className="flex items-center gap-1.5 px-3 min-w-[56px] justify-center select-none">
+                    <Users className="w-4 h-4 text-sky-600 shrink-0" />
                     <span className="font-mono font-bold text-sm text-[#0f2b48]">
                       {passengersCount}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-sans font-medium">
-                      {passengersCount === 1 ? 'Pasajero' : 'Pasajeros'}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => handlePaxCountChange(passengersCount + 1)}
                     disabled={passengersCount >= 12}
-                    className="w-8 h-8 rounded-xl bg-[#0f2b48] text-white hover:bg-[#0a1e34] hover:shadow-xs active:scale-95 flex items-center justify-center font-bold text-base disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-[#0f2b48] text-white hover:bg-[#182a44] active:scale-95 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer shadow-xs"
                     title="Agregar pasajero"
                   >
-                    +
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
                 </div>
               </div>
@@ -2261,29 +2260,31 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   </div>
 
                   {/* Modern Stepper Counter */}
-                  <div className="flex items-center gap-3 bg-white border border-slate-200 p-1.5 rounded-2xl shadow-2xs">
-                    <span className="text-[11px] uppercase font-mono font-bold text-slate-500 pl-2">
+                  <div className="flex items-center gap-3 bg-white border border-slate-200 p-1.5 rounded-full shadow-2xs">
+                    <span className="text-[11px] uppercase font-mono font-bold text-slate-500 pl-3">
                       N° de Cuotas:
                     </span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 pr-1">
                       <button
                         type="button"
                         onClick={() => setInstallmentsCount((prev) => Math.max(1, prev - 1))}
                         disabled={installmentsCount <= 1}
-                        className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-[#0f2b48] font-bold text-sm flex items-center justify-center transition cursor-pointer"
+                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-[#0f2b48] flex items-center justify-center transition cursor-pointer"
+                        title="Disminuir cuotas"
                       >
-                        −
+                        <Minus className="w-3 h-3 stroke-[2.5]" />
                       </button>
-                      <span className="w-10 text-center font-mono font-bold text-sm text-[#0f2b48]">
+                      <span className="w-8 text-center font-mono font-bold text-sm text-[#0f2b48]">
                         {installmentsCount}
                       </span>
                       <button
                         type="button"
                         onClick={() => setInstallmentsCount((prev) => Math.min(12, prev + 1))}
                         disabled={installmentsCount >= 12}
-                        className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-[#0f2b48] font-bold text-sm flex items-center justify-center transition cursor-pointer"
+                        className="w-7 h-7 rounded-full bg-[#0f2b48] text-white hover:bg-[#182a44] disabled:opacity-40 flex items-center justify-center transition cursor-pointer shadow-2xs"
+                        title="Aumentar cuotas"
                       >
-                        +
+                        <Plus className="w-3 h-3 stroke-[2.5]" />
                       </button>
                     </div>
                   </div>
