@@ -632,8 +632,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   // Estados de la pestaña dedicada de Reservas
   const [bookingsTypeFilter, setBookingsTypeFilter] = useState<'all' | 'lodge' | 'expedition' | 'service'>('all');
   const [bookingsStatusFilter, setBookingsStatusFilter] = useState<'all' | 'approved' | 'confirmed' | 'reserved' | 'scheduled' | 'pending_transfer' | 'blocked'>('all');
-  const [isTypeFilterExpanded, setIsTypeFilterExpanded] = useState(false);
-  const [isStatusFilterExpanded, setIsStatusFilterExpanded] = useState(false);
+  const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
+  const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [bookingsSearchQuery, setBookingsSearchQuery] = useState('');
   const [bookingsViewMode, setBookingsViewMode] = useState<'list' | 'grid'>('list');
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState<any | null>(null);
@@ -4527,233 +4527,331 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     )}
                   </div>
 
-                  {/* Grupo de Controles: Filtros Segmentados de Categoría + Estado + Vistas */}
+                  {/* Grupo de Controles: Filtros Dropdown de Categoría + Estado + Vistas */}
                   <div className="flex flex-wrap items-center gap-2.5">
                     
-                    {/* FILTROS POR CATEGORÍA (DESPLEGABLE LATERAL) */}
-                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs transition-all duration-300">
-                      {/* Botón Principal / Toggle */}
+                    {/* DROPDOWN FILTRO TIPO DE SERVICIO */}
+                    <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setIsTypeFilterExpanded(!isTypeFilterExpanded)}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                        onClick={() => {
+                          setIsTypeFilterOpen(!isTypeFilterOpen);
+                          setIsStatusFilterOpen(false);
+                        }}
+                        className={`h-8.5 px-3.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-2 border shadow-2xs active:scale-95 select-none ${
                           bookingsTypeFilter !== 'all'
-                            ? 'bg-[#0b192c] text-white shadow-xs'
-                            : isTypeFilterExpanded
-                            ? 'bg-white text-[#0b192c] shadow-xs'
-                            : 'bg-[#0b192c] text-white shadow-xs'
+                            ? 'bg-[#0b192c] text-white border-[#0b192c]'
+                            : isTypeFilterOpen
+                            ? 'bg-slate-100 text-[#0b192c] border-slate-300'
+                            : 'bg-[#0b192c] text-white border-[#0b192c]'
                         }`}
-                        title={isTypeFilterExpanded ? 'Contraer filtro de tipo' : 'Desplegar opciones de tipo'}
+                        title="Filtrar por tipo de servicio"
                       >
                         {bookingsTypeFilter === 'all' && (
                           <span>Tipo: Todas ({allUnifiedBookings.length})</span>
                         )}
                         {bookingsTypeFilter === 'lodge' && (
-                          <>
+                          <div className="flex items-center gap-1.5">
                             <BedDouble className="w-3.5 h-3.5 text-purple-300" />
-                            <span>Lodge</span>
-                          </>
+                            <span>Tipo: Lodge ({allUnifiedBookings.filter((b) => b.type === 'lodge').length})</span>
+                          </div>
                         )}
                         {bookingsTypeFilter === 'expedition' && (
-                          <>
+                          <div className="flex items-center gap-1.5">
                             <Ship className="w-3.5 h-3.5 text-sky-300" />
-                            <span>Expediciones</span>
-                          </>
+                            <span>Tipo: Expediciones ({allUnifiedBookings.filter((b) => b.type === 'expedition').length})</span>
+                          </div>
                         )}
                         {bookingsTypeFilter === 'service' && (
-                          <>
+                          <div className="flex items-center gap-1.5">
                             <Tag className="w-3.5 h-3.5 text-amber-300" />
-                            <span>Servicios</span>
-                          </>
+                            <span>Tipo: Servicios ({allUnifiedBookings.filter((b) => (b.type as string) === 'service').length})</span>
+                          </div>
                         )}
-                        <ChevronRight
-                          className={`w-3.5 h-3.5 transition-transform duration-300 ${
-                            isTypeFilterExpanded ? 'rotate-180' : ''
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            isTypeFilterOpen ? 'rotate-180 text-sky-300' : 'text-slate-300'
                           }`}
                         />
                       </button>
 
-                      {/* Opciones Desplegables hacia el Lado */}
-                      <div
-                        className={`flex items-center gap-1 transition-all duration-300 ease-in-out overflow-hidden ${
-                          isTypeFilterExpanded ? 'max-w-xl opacity-100 ml-1.5' : 'max-w-0 opacity-0 pointer-events-none'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsTypeFilter('all');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-                            bookingsTypeFilter === 'all'
-                              ? 'bg-[#0b192c] text-white shadow-xs'
-                              : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-200/70'
-                          }`}
-                        >
-                          Todas ({allUnifiedBookings.length})
-                        </button>
+                      {/* Menú Desplegable Tipo */}
+                      {isTypeFilterOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={() => setIsTypeFilterOpen(false)}
+                          />
+                          <div className="absolute left-0 top-full mt-1.5 z-40 w-52 bg-white border border-slate-200/90 rounded-2xl shadow-[0_12px_30px_rgba(11,25,44,0.15)] p-1.5 space-y-0.5 animate-fadeIn">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsTypeFilter('all');
+                                setIsTypeFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsTypeFilter === 'all'
+                                  ? 'bg-[#0b192c] text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span>Todas</span>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  bookingsTypeFilter === 'all'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {allUnifiedBookings.length}
+                              </span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsTypeFilter('lodge');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                            bookingsTypeFilter === 'lodge'
-                              ? 'bg-[#0b192c] text-white shadow-xs'
-                              : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-200/70'
-                          }`}
-                        >
-                          <BedDouble className="w-3.5 h-3.5" />
-                          <span>Lodge</span>
-                        </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsTypeFilter('lodge');
+                                setIsTypeFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsTypeFilter === 'lodge'
+                                  ? 'bg-[#0b192c] text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <BedDouble className="w-3.5 h-3.5 text-purple-500" />
+                                <span>Lodge Rincón</span>
+                              </div>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  bookingsTypeFilter === 'lodge'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {allUnifiedBookings.filter((b) => b.type === 'lodge').length}
+                              </span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsTypeFilter('expedition');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                            bookingsTypeFilter === 'expedition'
-                              ? 'bg-[#0b192c] text-white shadow-xs'
-                              : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-200/70'
-                          }`}
-                        >
-                          <Ship className="w-3.5 h-3.5" />
-                          <span>Expediciones</span>
-                        </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsTypeFilter('expedition');
+                                setIsTypeFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsTypeFilter === 'expedition'
+                                  ? 'bg-[#0b192c] text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Ship className="w-3.5 h-3.5 text-sky-500" />
+                                <span>Expediciones</span>
+                              </div>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  bookingsTypeFilter === 'expedition'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {allUnifiedBookings.filter((b) => b.type === 'expedition').length}
+                              </span>
+                            </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsTypeFilter('service');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                            bookingsTypeFilter === 'service'
-                              ? 'bg-[#0b192c] text-white shadow-xs'
-                              : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-200/70'
-                          }`}
-                        >
-                          <Tag className="w-3.5 h-3.5" />
-                          <span>Servicios</span>
-                        </button>
-                      </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsTypeFilter('service');
+                                setIsTypeFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsTypeFilter === 'service'
+                                  ? 'bg-[#0b192c] text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Tag className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Servicios</span>
+                              </div>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  bookingsTypeFilter === 'service'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {allUnifiedBookings.filter((b) => (b.type as string) === 'service').length}
+                              </span>
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    {/* FILTRO POR ESTADO (DESPLEGABLE LATERAL) */}
-                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs transition-all duration-300">
-                      {/* Botón Principal / Toggle */}
+                    {/* DROPDOWN FILTRO ESTADO */}
+                    <div className="relative">
                       <button
                         type="button"
-                        onClick={() => setIsStatusFilterExpanded(!isStatusFilterExpanded)}
-                        className={`px-3 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                        onClick={() => {
+                          setIsStatusFilterOpen(!isStatusFilterOpen);
+                          setIsTypeFilterOpen(false);
+                        }}
+                        className={`h-8.5 px-3.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-2 border shadow-2xs active:scale-95 select-none ${
                           bookingsStatusFilter === 'confirmed' || bookingsStatusFilter === 'approved'
-                            ? 'bg-emerald-600 text-white shadow-xs'
+                            ? 'bg-emerald-700 text-white border-emerald-700'
                             : bookingsStatusFilter === 'reserved'
-                            ? 'bg-amber-600 text-white shadow-xs'
+                            ? 'bg-amber-600 text-white border-amber-600'
                             : bookingsStatusFilter === 'scheduled' || bookingsStatusFilter === 'pending_transfer'
-                            ? 'bg-sky-600 text-white shadow-xs'
+                            ? 'bg-sky-700 text-white border-sky-700'
                             : bookingsStatusFilter === 'blocked'
-                            ? 'bg-purple-700 text-white shadow-xs'
-                            : isStatusFilterExpanded
-                            ? 'bg-white text-[#0b192c] shadow-xs'
-                            : 'bg-[#0b192c] text-white shadow-xs'
+                            ? 'bg-purple-700 text-white border-purple-700'
+                            : isStatusFilterOpen
+                            ? 'bg-slate-100 text-[#0b192c] border-slate-300'
+                            : 'bg-[#0b192c] text-white border-[#0b192c]'
                         }`}
-                        title={isStatusFilterExpanded ? 'Contraer filtro de estado' : 'Desplegar opciones de estado'}
+                        title="Filtrar por estado de reserva"
                       >
                         {bookingsStatusFilter === 'all' && <span>Estado: Todos</span>}
-                        {(bookingsStatusFilter === 'confirmed' || bookingsStatusFilter === 'approved') && <span>Estado: Confirmadas</span>}
-                        {bookingsStatusFilter === 'reserved' && <span>Estado: Reservadas (50%)</span>}
-                        {(bookingsStatusFilter === 'scheduled' || bookingsStatusFilter === 'pending_transfer') && <span>Estado: Agendadas (0%)</span>}
-                        {bookingsStatusFilter === 'blocked' && <span>Estado: Bloqueos</span>}
-                        <ChevronRight
-                          className={`w-3.5 h-3.5 transition-transform duration-300 ${
-                            isStatusFilterExpanded ? 'rotate-180' : ''
+                        {(bookingsStatusFilter === 'confirmed' || bookingsStatusFilter === 'approved') && (
+                          <span>Estado: Confirmadas</span>
+                        )}
+                        {bookingsStatusFilter === 'reserved' && (
+                          <span>Estado: Reservadas (50%)</span>
+                        )}
+                        {(bookingsStatusFilter === 'scheduled' || bookingsStatusFilter === 'pending_transfer') && (
+                          <span>Estado: Agendadas (0%)</span>
+                        )}
+                        {bookingsStatusFilter === 'blocked' && (
+                          <span>Estado: Bloqueos</span>
+                        )}
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            isStatusFilterOpen ? 'rotate-180 text-sky-300' : 'text-slate-300'
                           }`}
                         />
                       </button>
 
-                      {/* Opciones Desplegables hacia el Lado */}
-                      <div
-                        className={`flex items-center gap-1 transition-all duration-300 ease-in-out overflow-hidden ${
-                          isStatusFilterExpanded ? 'max-w-xl opacity-100 ml-1.5' : 'max-w-0 opacity-0 pointer-events-none'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsStatusFilter('all');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
-                            bookingsStatusFilter === 'all'
-                              ? 'bg-[#0b192c] text-white shadow-xs'
-                              : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-200/70'
-                          }`}
-                        >
-                          Todos
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsStatusFilter('confirmed');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
-                            bookingsStatusFilter === 'confirmed' || bookingsStatusFilter === 'approved'
-                              ? 'bg-emerald-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-emerald-700 hover:bg-slate-200/70'
-                          }`}
-                        >
-                          Confirmadas
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsStatusFilter('reserved');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
-                            bookingsStatusFilter === 'reserved'
-                              ? 'bg-amber-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-amber-700 hover:bg-slate-200/70'
-                          }`}
-                        >
-                          Reservadas (50%)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsStatusFilter('scheduled');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
-                            bookingsStatusFilter === 'scheduled' || bookingsStatusFilter === 'pending_transfer'
-                              ? 'bg-sky-600 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-sky-700 hover:bg-slate-200/70'
-                          }`}
-                        >
-                          Agendadas (0%)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setBookingsStatusFilter('blocked');
-                          }}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer whitespace-nowrap ${
-                            bookingsStatusFilter === 'blocked'
-                              ? 'bg-purple-700 text-white shadow-xs'
-                              : 'text-slate-600 hover:text-purple-800 hover:bg-slate-200/70'
-                          }`}
-                        >
-                          Bloqueos
-                        </button>
-                      </div>
+                      {/* Menú Desplegable Estado */}
+                      {isStatusFilterOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={() => setIsStatusFilterOpen(false)}
+                          />
+                          <div className="absolute left-0 top-full mt-1.5 z-40 w-56 bg-white border border-slate-200/90 rounded-2xl shadow-[0_12px_30px_rgba(11,25,44,0.15)] p-1.5 space-y-0.5 animate-fadeIn">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsStatusFilter('all');
+                                setIsStatusFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsStatusFilter === 'all'
+                                  ? 'bg-[#0b192c] text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span>Todos los Estados</span>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  bookingsStatusFilter === 'all'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {allUnifiedBookings.length}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsStatusFilter('confirmed');
+                                setIsStatusFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsStatusFilter === 'confirmed' || bookingsStatusFilter === 'approved'
+                                  ? 'bg-emerald-700 text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span>Confirmadas (100%)</span>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsStatusFilter('reserved');
+                                setIsStatusFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsStatusFilter === 'reserved'
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-amber-50 hover:text-amber-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                <span>Reservadas (50%)</span>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsStatusFilter('scheduled');
+                                setIsStatusFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsStatusFilter === 'scheduled' || bookingsStatusFilter === 'pending_transfer'
+                                  ? 'bg-sky-700 text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-sky-50 hover:text-sky-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-sky-500" />
+                                <span>Agendadas (0%)</span>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsStatusFilter('blocked');
+                                setIsStatusFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                                bookingsStatusFilter === 'blocked'
+                                  ? 'bg-purple-700 text-white shadow-xs'
+                                  : 'text-slate-700 hover:bg-purple-50 hover:text-purple-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-purple-500" />
+                                <span>Bloqueos</span>
+                              </div>
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Vista (Lista / Cards) */}
-                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
+                    <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-full border border-slate-200/60 shadow-2xs h-8.5">
                       <button
                         type="button"
                         onClick={() => setBookingsViewMode('list')}
-                        className={`p-1.5 rounded-full transition cursor-pointer ${
-                          bookingsViewMode === 'list' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
+                        className={`h-7.5 px-2.5 rounded-full transition cursor-pointer flex items-center justify-center ${
+                          bookingsViewMode === 'list'
+                            ? 'bg-white text-[#0b192c] shadow-xs'
+                            : 'text-slate-500 hover:text-[#0b192c]'
                         }`}
                         title="Vista de Lista"
                       >
@@ -4762,8 +4860,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <button
                         type="button"
                         onClick={() => setBookingsViewMode('grid')}
-                        className={`p-1.5 rounded-full transition cursor-pointer ${
-                          bookingsViewMode === 'grid' ? 'bg-white text-[#0b192c] shadow-xs' : 'text-slate-500 hover:text-[#0b192c]'
+                        className={`h-7.5 px-2.5 rounded-full transition cursor-pointer flex items-center justify-center ${
+                          bookingsViewMode === 'grid'
+                            ? 'bg-white text-[#0b192c] shadow-xs'
+                            : 'text-slate-500 hover:text-[#0b192c]'
                         }`}
                         title="Vista de Tarjetas"
                       >
@@ -4799,7 +4899,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       title="Descargar tabla filtrada en formato Excel (.xlsx)"
                     >
                       <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 group-hover:text-white transition-colors" />
-                      <span className="font-mono text-[11px] font-bold">Descargar Excel</span>
+                      <span>Descargar Excel</span>
                     </button>
                   </div>
                 </div>
