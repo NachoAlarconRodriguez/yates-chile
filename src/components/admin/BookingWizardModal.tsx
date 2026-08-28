@@ -578,6 +578,26 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           const vName = d.vessel?.name || (d.vessel_id?.toLowerCase().includes('terranova') ? 'Yate Terranova' : 'Velero Vegvisir');
           const isVegvisir = vName.toLowerCase().includes('vegvisir');
 
+          const rawMax = typeof d.maxPax === 'number'
+            ? d.maxPax
+            : typeof d.total_slots === 'number'
+            ? d.total_slots
+            : typeof d.max_pax === 'number'
+            ? d.max_pax
+            : 6;
+
+          const rawAvailable = typeof d.availablePax === 'number'
+            ? d.availablePax
+            : typeof d.available_slots === 'number'
+            ? d.available_slots
+            : typeof d.spotsLeft === 'number'
+            ? d.spotsLeft
+            : typeof d.bookedPax === 'number'
+            ? Math.max(0, rawMax - d.bookedPax)
+            : 6;
+
+          const isSoldOut = rawAvailable <= 0 || (typeof d.status === 'string' && (d.status === 'sold_out' || d.status === 'completed' || d.status === 'closed'));
+
           return {
             id: d.id,
             title: d.routeTitle || d.name || 'Expedición Archipiélago Juan Fernández',
@@ -587,8 +607,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             duration: d.departure_date && d.return_date ? `${formatDateDDMMYYYY(d.departure_date)} ➔ ${formatDateDDMMYYYY(d.return_date)}` : '7 Días / 6 Noches',
             priceClp: numPrice,
             unitType: 'pax' as const,
-            description: `${vName} • ${d.availablePax ?? 6} cupos disponibles de ${d.maxPax ?? 6} PAX.`,
-            paxLimit: d.maxPax ?? 6,
+            description: `${vName} • ${rawAvailable} ${rawAvailable === 1 ? 'cupo disponible' : 'cupos disponibles'} de ${rawMax} PAX.`,
+            paxLimit: rawMax,
+            availablePax: rawAvailable,
+            isSoldOut,
             departureDate: d.departure_date,
             returnDate: d.return_date,
           };
@@ -712,8 +734,15 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   // Single selection of program in Step 2 (Radio behavior: only 1 package at a time)
   const selectProgram = (progId: string, autoAdvance = true) => {
-    setSelectedProgramIds([progId]);
     const found = availablePrograms.find((p) => p.id === progId);
+    if (found && (found as any).isSoldOut) {
+      showNotification(
+        `La expedición "${found.title}" ya tiene todos sus cupos reservados (Agotada). Selecciona otra expedición con cupos disponibles.`,
+        'Expedición Agotada'
+      );
+      return;
+    }
+    setSelectedProgramIds([progId]);
     if (found && (found as any).departureDate && (found as any).returnDate) {
       setStartDate((found as any).departureDate);
       setEndDate((found as any).returnDate);
@@ -745,19 +774,22 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     return isRoomBookedForRange(targetRoomId, startDate, endDate);
   }, [isOnlyLodge, startDate, endDate, activeSelectedProgram, isRoomBookedForRange]);
 
-  // Sync selectedProgramIds when availablePrograms change
+  // Sync selectedProgramIds when availablePrograms change (avoid pre-selecting sold out)
   useEffect(() => {
     if (availablePrograms.length > 0) {
       const hasValidSelection = selectedProgramIds.some((id) =>
-        availablePrograms.some((p) => p.id === id)
+        availablePrograms.some((p) => p.id === id && !(p as any).isSoldOut)
       );
       if (!hasValidSelection) {
-        setSelectedProgramIds([availablePrograms[0].id]);
-        const first = availablePrograms[0] as any;
-        if (first && first.departureDate && first.returnDate) {
-          setStartDate(first.departureDate);
-          setEndDate(first.returnDate);
-          setSelectedDepartureId(first.id);
+        const firstAvailable = availablePrograms.find((p: any) => !p.isSoldOut) || availablePrograms[0];
+        if (firstAvailable && !(firstAvailable as any).isSoldOut) {
+          setSelectedProgramIds([firstAvailable.id]);
+          const first = firstAvailable as any;
+          if (first && first.departureDate && first.returnDate) {
+            setStartDate(first.departureDate);
+            setEndDate(first.returnDate);
+            setSelectedDepartureId(first.id);
+          }
         }
       }
     } else {
@@ -1678,39 +1710,66 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
               <div className="space-y-2.5 pt-1">
                 {displayedProgramsInStep2.length > 0 ? (
-                  displayedProgramsInStep2.map((prog) => {
+                  displayedProgramsInStep2.map((prog: any) => {
                     const isSelected = selectedProgramIds.includes(prog.id);
+                    const isSoldOut = Boolean(prog.isSoldOut || (typeof prog.availablePax === 'number' && prog.availablePax <= 0));
+                    const availableSpots = typeof prog.availablePax === 'number' ? prog.availablePax : 6;
+                    const maxSpots = prog.paxLimit || 6;
+
                     return (
                       <div
                         key={prog.id}
-                        onClick={() => selectProgram(prog.id)}
-                        className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-wrap items-center justify-between gap-3 select-none ${
-                          isSelected
-                            ? 'bg-sky-50/40 border-sky-400 ring-1 ring-sky-300 shadow-xs'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                        onClick={() => {
+                          if (isSoldOut) {
+                            showNotification(
+                              `La expedición "${prog.title}" (${prog.duration}) ya tiene todos sus cupos reservados (Agotada). Selecciona otra expedición con cupos disponibles.`,
+                              'Expedición Agotada'
+                            );
+                            return;
+                          }
+                          selectProgram(prog.id);
+                        }}
+                        className={`p-4 rounded-2xl border transition-all duration-200 flex flex-wrap items-center justify-between gap-3 select-none ${
+                          isSoldOut
+                            ? 'bg-slate-50/80 border-slate-200 opacity-60 cursor-not-allowed text-slate-400'
+                            : isSelected
+                            ? 'bg-sky-50/50 border-sky-400 ring-2 ring-sky-300/40 shadow-xs cursor-pointer'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center gap-3.5 min-w-0 flex-1">
                           <div
                             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
-                              isSelected
+                              isSoldOut
+                                ? 'bg-slate-200 border-slate-300 text-slate-400'
+                                : isSelected
                                 ? 'bg-[#0f2b48] border-[#0f2b48] text-white'
                                 : 'bg-white border-slate-300'
                             }`}
                           >
-                            {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                            {isSelected && !isSoldOut && <div className="w-2 h-2 bg-white rounded-full" />}
+                            {isSoldOut && <span className="text-[10px] leading-none font-bold text-slate-500">✕</span>}
                           </div>
 
-                          <div className="min-w-0">
+                          <div className="min-w-0 space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h5 className="font-serif font-bold text-sm text-[#0f2b48] truncate">
+                              <h5 className={`font-serif font-bold text-sm truncate ${isSoldOut ? 'text-slate-500' : 'text-[#0f2b48]'}`}>
                                 {prog.title}
                               </h5>
                               <span className="text-[10px] text-slate-400 font-mono shrink-0">
                                 • {prog.duration}
                               </span>
+                              {isSoldOut ? (
+                                <span className="text-[9px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full">
+                                  ✕ Agotada (0 cupos)
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  ✓ {availableSpots} de {maxSpots} PAX disponibles
+                                </span>
+                              )}
                             </div>
-                            <p className="text-[11px] text-slate-500 font-light line-clamp-1 mt-0.5">
+                            <p className={`text-[11px] font-light line-clamp-1 ${isSoldOut ? 'text-slate-400' : 'text-slate-500'}`}>
                               {prog.description}
                             </p>
                           </div>
@@ -1720,7 +1779,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
                             Tarifa
                           </span>
-                          <div className="text-sm font-mono font-bold text-[#0f2b48]">
+                          <div className={`text-sm font-mono font-bold ${isSoldOut ? 'text-slate-400' : 'text-[#0f2b48]'}`}>
                             ${prog.priceClp.toLocaleString('es-CL')}{' '}
                             <span className="text-[10px] font-normal text-slate-500 font-sans">
                               {prog.unitType === 'pax' ? 'CLP / pax' : prog.unitType === 'night' ? 'CLP / noche' : 'CLP total'}
