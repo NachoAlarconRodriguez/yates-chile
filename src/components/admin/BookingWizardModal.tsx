@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
-  ChevronDown,
   DollarSign,
   Percent,
   Sparkles,
@@ -386,7 +385,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   // Month filter for expeditions in Step 2
   const [expeditionMonthFilter, setExpeditionMonthFilter] = useState<string>('all');
-  const [isMoreMonthsOpen, setIsMoreMonthsOpen] = useState<boolean>(false);
 
   // Step state (1 to 6)
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -648,10 +646,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     return months;
   }, [mainModality, availablePrograms]);
 
-  const first6Months = useMemo(() => upcoming12Months.slice(0, 6), [upcoming12Months]);
-  const other6Months = useMemo(() => upcoming12Months.slice(6, 12), [upcoming12Months]);
-  const isOtherMonthActive = useMemo(() => other6Months.some((m) => m.key === expeditionMonthFilter), [other6Months, expeditionMonthFilter]);
-  const activeOtherMonth = useMemo(() => other6Months.find((m) => m.key === expeditionMonthFilter), [other6Months, expeditionMonthFilter]);
+  const upcomingMonths = useMemo(() => upcoming12Months.slice(0, 6), [upcoming12Months]);
 
   // Filter displayed programs in Step 2 based on selected month
   const displayedProgramsInStep2 = useMemo(() => {
@@ -1538,15 +1533,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   </p>
                 </div>
 
-                {/* FILTRO DE FECHAS: PRÓXIMOS 6 MESES DIRECTOS + DROPDOWN 12 MESES EN TOTAL */}
+                {/* FILTRO DE MESES DIRECTOS */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  {/* Botón Todos */}
+                  {/* Botón Todos los meses */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setExpeditionMonthFilter('all');
-                      setIsMoreMonthsOpen(false);
-                    }}
+                    onClick={() => setExpeditionMonthFilter('all')}
                     className={`h-8 px-3.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95 border select-none ${
                       expeditionMonthFilter === 'all'
                         ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-2xs'
@@ -1565,17 +1557,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     </span>
                   </button>
 
-                  {/* Próximos 6 Meses como Botones Directos */}
-                  {first6Months.map((m) => {
+                  {/* Meses como Botones Directos */}
+                  {upcomingMonths.map((m) => {
                     const isActive = expeditionMonthFilter === m.key;
                     return (
                       <button
                         key={m.key}
                         type="button"
-                        onClick={() => {
-                          setExpeditionMonthFilter(m.key);
-                          setIsMoreMonthsOpen(false);
-                        }}
+                        onClick={() => setExpeditionMonthFilter(m.key)}
                         className={`h-8 px-3 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95 border select-none ${
                           isActive
                             ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-2xs'
@@ -1597,84 +1586,6 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       </button>
                     );
                   })}
-
-                  {/* Botón Dropdown para los Otros 6 Meses (Meses 7 a 12) */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setIsMoreMonthsOpen(!isMoreMonthsOpen)}
-                      className={`h-8 px-3.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap active:scale-95 border select-none ${
-                        isOtherMonthActive
-                          ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-2xs'
-                          : isMoreMonthsOpen
-                          ? 'bg-slate-200 text-[#0f2b48] border-slate-300'
-                          : 'bg-slate-100 text-slate-600 border-slate-200/80 hover:bg-slate-200/70 hover:text-[#0f2b48]'
-                      }`}
-                      title="Seleccionar otros meses más adelante (12 meses en total)"
-                    >
-                      <Calendar className="w-3.5 h-3.5 opacity-80" />
-                      <span>
-                        {isOtherMonthActive && activeOtherMonth
-                          ? activeOtherMonth.shortLabel
-                          : 'Más meses'}
-                      </span>
-                      {isOtherMonthActive && activeOtherMonth && activeOtherMonth.count > 0 && (
-                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-white/20 text-white">
-                          {activeOtherMonth.count}
-                        </span>
-                      )}
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                          isMoreMonthsOpen ? 'rotate-180 text-sky-300' : 'text-slate-400'
-                        }`}
-                      />
-                    </button>
-
-                    {isMoreMonthsOpen && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-30"
-                          onClick={() => setIsMoreMonthsOpen(false)}
-                        />
-                        <div className="absolute right-0 top-full mt-1.5 z-40 w-56 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-1.5 space-y-0.5 animate-fadeIn">
-                          <div className="px-3 py-1.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                            Meses Siguientes (7 a 12)
-                          </div>
-                          {other6Months.map((m) => {
-                            const isActive = expeditionMonthFilter === m.key;
-                            return (
-                              <button
-                                key={m.key}
-                                type="button"
-                                onClick={() => {
-                                  setExpeditionMonthFilter(m.key);
-                                  setIsMoreMonthsOpen(false);
-                                }}
-                                className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
-                                  isActive
-                                    ? 'bg-[#0f2b48] text-white shadow-xs'
-                                    : 'text-slate-700 hover:bg-slate-50'
-                                }`}
-                              >
-                                <span>{m.fullLabel}</span>
-                                <span
-                                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                                    isActive
-                                      ? 'bg-white/20 text-white'
-                                      : m.count > 0
-                                      ? 'bg-sky-100 text-sky-800'
-                                      : 'bg-slate-100 text-slate-400'
-                                  }`}
-                                >
-                                  {m.count > 0 ? `${m.count} ${m.count === 1 ? 'zarpe' : 'zarpes'}` : '0'}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
                 </div>
               </div>
 
