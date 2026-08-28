@@ -616,13 +616,18 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   }, [mainModality, departures, rooms, selectedCategories]);
 
   // Single selection of program in Step 2 (Radio behavior: only 1 package at a time)
-  const selectProgram = (progId: string) => {
+  const selectProgram = (progId: string, autoAdvance = true) => {
     setSelectedProgramIds([progId]);
     const found = availablePrograms.find((p) => p.id === progId);
     if (found && (found as any).departureDate && (found as any).returnDate) {
       setStartDate((found as any).departureDate);
       setEndDate((found as any).returnDate);
       setSelectedDepartureId(found.id);
+    }
+    if (autoAdvance) {
+      setTimeout(() => {
+        setCurrentStep(3);
+      }, 150);
     }
   };
 
@@ -679,6 +684,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     setSelectedDepartureId(dep.id);
     setStartDate(dep.startDate);
     setEndDate(dep.endDate);
+    setTimeout(() => {
+      setCurrentStep(4);
+    }, 150);
   };
 
   // Sync passengers list length with passengersCount
@@ -968,6 +976,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   onClick={() => {
                     setMainModality('expedition');
                     setSelectedCategories(['vegvisir']);
+                    setTimeout(() => {
+                      setCurrentStep(2);
+                    }, 120);
                   }}
                   className={`p-5 rounded-3xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-4 relative group ${
                     mainModality === 'expedition'
@@ -1027,6 +1038,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   onClick={() => {
                     setMainModality('lodge');
                     setSelectedCategories(['lodge']);
+                    setTimeout(() => {
+                      setCurrentStep(2);
+                    }, 120);
                   }}
                   className={`p-5 rounded-3xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-4 relative group ${
                     mainModality === 'lodge'
