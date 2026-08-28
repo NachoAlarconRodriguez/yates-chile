@@ -422,6 +422,21 @@ const DEFAULT_PROGRAM_DEPARTURES: ProgramDeparture[] = [
   },
 ];
 
+// Helper to guarantee Chilean Date format DD/MM/YYYY
+export const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  const cleanStr = String(dateStr).split('T')[0].trim();
+  if (cleanStr.includes('/')) return cleanStr;
+  const parts = cleanStr.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    if (year.length === 4) {
+      return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+    }
+  }
+  return cleanStr;
+};
+
 export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   isOpen,
   onClose,
@@ -431,6 +446,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 }) => {
   // Main Modality: 'expedition' | 'lodge' | 'custom'
   const [mainModality, setMainModality] = useState<'expedition' | 'lodge' | 'custom' | null>(null);
+
+  // Month filter for expeditions in Step 2
+  const [expeditionMonthFilter, setExpeditionMonthFilter] = useState<string>('all');
 
   // Step state (1 to 6)
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -495,6 +513,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setMainModality(null);
+      setExpeditionMonthFilter('all');
       setCurrentStep(1);
       setSelectedCategories([]);
       setSelectedProgramIds([]);
@@ -563,7 +582,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             category: isVegvisir ? 'vegvisir' : 'terranova',
             categoryLabel: vName,
             includedAssets: isVegvisir ? ['vegvisir'] : ['terranova'],
-            duration: d.departure_date && d.return_date ? `${d.departure_date} ➔ ${d.return_date}` : '7 Días / 6 Noches',
+            duration: d.departure_date && d.return_date ? `${formatDateDDMMYYYY(d.departure_date)} ➔ ${formatDateDDMMYYYY(d.return_date)}` : '7 Días / 6 Noches',
             priceClp: numPrice,
             unitType: 'pax' as const,
             description: `${vName} • ${d.availablePax ?? 6} cupos disponibles de ${d.maxPax ?? 6} PAX.`,
@@ -614,6 +633,44 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       return true;
     });
   }, [mainModality, departures, rooms, selectedCategories]);
+
+  // Compute available months for expeditions in Step 2
+  const availableExpeditionMonths = useMemo(() => {
+    if (mainModality !== 'expedition') return [];
+    const monthMap = new Map<string, string>();
+
+    availablePrograms.forEach((p: any) => {
+      if (p.departureDate) {
+        const cleanDate = String(p.departureDate).split('T')[0];
+        const parts = cleanDate.split('-');
+        if (parts.length >= 2) {
+          const key = `${parts[0]}-${parts[1]}`;
+          const year = parseInt(parts[0], 10);
+          const monthIndex = parseInt(parts[1], 10) - 1;
+          const monthNames = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+          ];
+          const monthName = monthNames[monthIndex] || `Mes ${parts[1]}`;
+          monthMap.set(key, `${monthName} ${year}`);
+        }
+      }
+    });
+
+    return Array.from(monthMap.entries()).map(([key, label]) => ({ key, label }));
+  }, [mainModality, availablePrograms]);
+
+  // Filter displayed programs in Step 2 based on selected month
+  const displayedProgramsInStep2 = useMemo(() => {
+    if (mainModality !== 'expedition' || expeditionMonthFilter === 'all') {
+      return availablePrograms;
+    }
+    return availablePrograms.filter((p: any) => {
+      if (!p.departureDate) return true;
+      const cleanDate = String(p.departureDate).split('T')[0];
+      return cleanDate.startsWith(expeditionMonthFilter);
+    });
+  }, [mainModality, expeditionMonthFilter, availablePrograms]);
 
   // Single selection of program in Step 2 (Radio behavior: only 1 package at a time)
   const selectProgram = (progId: string, autoAdvance = true) => {
@@ -1239,41 +1296,63 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           {/* ========================================================================= */}
           {currentStep === 2 && (
             <div className="space-y-4 animate-fadeIn">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border ${
-                    mainModality === 'lodge'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      : mainModality === 'expedition'
-                      ? 'bg-sky-50 text-sky-800 border-sky-200'
-                      : 'bg-amber-50 text-amber-800 border-amber-200'
-                  }`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                      mainModality === 'lodge'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : mainModality === 'expedition'
+                        ? 'bg-sky-50 text-sky-800 border-sky-200'
+                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                    }`}>
+                      {mainModality === 'lodge'
+                        ? 'Lodge Rincón de Navegantes'
+                        : mainModality === 'expedition'
+                        ? 'Expediciones Náuticas Creadas'
+                        : 'Catálogo Personalizado'}
+                    </span>
+                  </div>
+                  <h4 className="font-serif text-base font-bold text-[#0f2b48]">
                     {mainModality === 'lodge'
-                      ? 'Lodge Rincón de Navegantes'
+                      ? 'Paso 2: Selecciona la cabina o habitación del Lodge'
                       : mainModality === 'expedition'
-                      ? 'Expediciones Náuticas Creadas'
-                      : 'Catálogo Personalizado'}
-                  </span>
+                      ? 'Paso 2: Selecciona la expedición náutica programada'
+                      : 'Paso 2: Selecciona los programas o servicios a incluir'}
+                  </h4>
+                  <p className="text-slate-500 text-xs font-light">
+                    {mainModality === 'lodge'
+                      ? 'Selecciona una de las 4 cabinas privadas frente a Bahía Cumberland para esta estadía.'
+                      : mainModality === 'expedition'
+                      ? 'Selecciona una de las expediciones con zarpes configurados para asignar los pasajeros.'
+                      : 'Se muestran los programas y servicios disponibles según las opciones seleccionadas.'}
+                  </p>
                 </div>
-                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  {mainModality === 'lodge'
-                    ? 'Paso 2: Selecciona la cabina o habitación del Lodge'
-                    : mainModality === 'expedition'
-                    ? 'Paso 2: Selecciona la expedición náutica programada'
-                    : 'Paso 2: Selecciona los programas o servicios a incluir'}
-                </h4>
-                <p className="text-slate-500 text-xs font-light">
-                  {mainModality === 'lodge'
-                    ? 'Selecciona una de las 4 cabinas privadas frente a Bahía Cumberland para esta estadía.'
-                    : mainModality === 'expedition'
-                    ? 'Selecciona una de las expediciones con zarpes configurados para asignar los pasajeros.'
-                    : 'Se muestran los programas y servicios disponibles según las opciones seleccionadas.'}
-                </p>
+
+                {/* FILTRO DE FECHA (MES) PARA EXPEDICIONES */}
+                {mainModality === 'expedition' && (
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 px-3.5 py-2 rounded-2xl shadow-2xs">
+                    <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
+                    <span className="text-[10px] font-mono font-bold uppercase text-slate-500">Mes:</span>
+                    <select
+                      value={expeditionMonthFilter}
+                      onChange={(e) => setExpeditionMonthFilter(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-[#0f2b48] focus:outline-hidden cursor-pointer pr-1 font-mono"
+                    >
+                      <option value="all">Todos los meses ({availablePrograms.length})</option>
+                      {availableExpeditionMonths.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2.5 pt-1">
-                {availablePrograms.length > 0 ? (
-                  availablePrograms.map((prog) => {
+                {displayedProgramsInStep2.length > 0 ? (
+                  displayedProgramsInStep2.map((prog) => {
                     const isSelected = selectedProgramIds.includes(prog.id);
                     return (
                       <div
@@ -1333,23 +1412,35 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     );
                   })
                 ) : (
-                  <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-6 text-center space-y-2">
-                    <Compass className="w-8 h-8 text-amber-600 mx-auto" />
-                    <h5 className="font-serif font-bold text-sm text-amber-900">
-                      No hay un paquete predeterminado con todas estas opciones combinadas
-                    </h5>
-                    <p className="text-xs text-amber-800/80 max-w-md mx-auto">
-                      Puedes regresar al Paso 1 para ajustar las opciones seleccionadas o crear un paquete a medida para esta combinación.
-                    </p>
-                    <div className="pt-2">
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-6 text-center space-y-3">
+                    <Calendar className="w-8 h-8 text-slate-400 mx-auto" />
+                    <div className="space-y-1">
+                      <h5 className="font-serif font-bold text-sm text-slate-700">
+                        No hay programas o expediciones disponibles para esta selección
+                      </h5>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        {mainModality === 'expedition'
+                          ? 'Prueba cambiando el filtro de mes a "Todos los meses" para ver todas las salidas programadas.'
+                          : 'Puedes regresar al Paso 1 para ajustar las opciones seleccionadas.'}
+                      </p>
+                    </div>
+                    {mainModality === 'expedition' && expeditionMonthFilter !== 'all' ? (
+                      <button
+                        type="button"
+                        onClick={() => setExpeditionMonthFilter('all')}
+                        className="px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-bold transition hover:bg-sky-700 cursor-pointer"
+                      >
+                        Ver todos los meses
+                      </button>
+                    ) : (
                       <button
                         type="button"
                         onClick={handleBack}
-                        className="px-4 py-2 rounded-xl bg-[#0f2b48] text-white text-xs font-bold transition hover:bg-[#0a1e34]"
+                        className="px-4 py-2 rounded-xl bg-[#0f2b48] text-white text-xs font-bold transition hover:bg-[#0a1e34] cursor-pointer"
                       >
-                        ← Volver a Seleccionar Opciones
+                        ← Volver al Paso Anterior
                       </button>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1427,7 +1518,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                         Habitación no disponible en estas fechas
                       </strong>
                       <p className="text-[11px] leading-relaxed text-rose-800">
-                        La cabina <strong>{activeSelectedProgram?.title}</strong> ya cuenta con una reserva u ocupación confirmada entre el <strong>{startDate}</strong> y el <strong>{endDate}</strong>. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación disponible.
+                        La cabina <strong>{activeSelectedProgram?.title}</strong> ya cuenta con una reserva u ocupación confirmada entre el <strong>{formatDateDDMMYYYY(startDate)}</strong> y el <strong>{formatDateDDMMYYYY(endDate)}</strong>. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación disponible.
                       </p>
                     </div>
                   </div>
@@ -1442,7 +1533,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           {calculatedNights} {calculatedNights === 1 ? 'Noche de Estadía' : 'Noches de Estadía'} Calculadas
                         </span>
                         <span className="text-[11px] text-emerald-800 font-mono">
-                          Del {startDate} al {endDate} ({activeSelectedProgram?.title})
+                          Del {formatDateDDMMYYYY(startDate)} al {formatDateDDMMYYYY(endDate)} ({activeSelectedProgram?.title})
                         </span>
                       </div>
                     </div>
@@ -1509,7 +1600,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                         Fecha de Zarpe (Inicio)
                       </span>
                       <span className="text-sm font-mono font-bold text-[#0f2b48] block">
-                        {startDate || '31/10/2026'}
+                        {formatDateDDMMYYYY(startDate) || '31/10/2026'}
                       </span>
                     </div>
                     <div className="p-4 bg-slate-50 border border-slate-200/70 rounded-2xl space-y-1">
@@ -1517,7 +1608,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                         Fecha de Desembarque (Fin)
                       </span>
                       <span className="text-sm font-mono font-bold text-[#0f2b48] block">
-                        {endDate || '11/11/2026'}
+                        {formatDateDDMMYYYY(endDate) || '11/11/2026'}
                       </span>
                     </div>
                   </div>
@@ -1552,7 +1643,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                             <div className="flex items-center gap-2">
                               <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
                               <strong className="text-sm font-mono font-bold text-[#0f2b48]">
-                                {dep.label}
+                                {formatDateDDMMYYYY(dep.startDate)} al {formatDateDDMMYYYY(dep.endDate)}
                               </strong>
                             </div>
                             <span className="text-[11px] text-slate-500 font-mono mt-0.5 block">
@@ -1592,7 +1683,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   <div>
                     <span className="font-bold text-xs text-[#0f2b48] block">Fecha de Salida Seleccionada</span>
                     <span className="text-[11px] text-slate-500 font-mono">
-                      {startDate} ➔ {endDate}
+                      {formatDateDDMMYYYY(startDate)} ➔ {formatDateDDMMYYYY(endDate)}
                     </span>
                   </div>
                 </div>
@@ -2100,7 +2191,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <div className="text-xs text-[#0f2b48] space-y-1">
                       <div className="flex items-center gap-1.5 font-medium">
                         <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                        <span><strong>Fechas:</strong> {startDate} ➔ {endDate} ({calculatedNights} días)</span>
+                        <span><strong>Fechas:</strong> {formatDateDDMMYYYY(startDate)} ➔ {formatDateDDMMYYYY(endDate)} ({calculatedNights} días)</span>
                       </div>
                       <div className="flex items-center gap-1.5 font-medium">
                         <Users className="w-3.5 h-3.5 text-sky-600 shrink-0" />
