@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   X,
   Sailboat,
@@ -21,11 +21,16 @@ import {
   ArrowRight,
   CalendarDays,
   Plus,
+  Minus,
+  Tag,
   ShieldCheck,
-  Info
+  Info,
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 import { expeditionService, type DepartureRow } from '../../services/expeditionService';
 import { lodgeService, type LodgeRoom, type LodgeBooking } from '../../services/lodgeService';
+import { useCatalogServices } from '../../hooks/useCatalogServices';
 import { useFleet } from '../../hooks/useFleet';
 import confetti from 'canvas-confetti';
 
@@ -48,7 +53,9 @@ export interface ExpeditionWizardData {
   publicLocation: string;
   publicCoverImage: string;
   publicDescription: string;
-  publicTempEstimate: string;
+  publicBrochureUrl?: string;
+  publicPolicyUrl?: string;
+  publicTempEstimate?: string;
   publicPillars: Array<{ title: string; desc: string; iconKey: 'sail' | 'food' | 'anchor' | 'waves' | 'compass' | 'footprints' }>;
   publicIncluded: string[];
   publicWeatherPolicy: string;
@@ -59,7 +66,19 @@ interface ExpeditionWizardModalProps {
   onClose: () => void;
   onSuccess: (data: ExpeditionWizardData) => void;
   existingDepartures?: DepartureRow[];
+  initialRouteId?: string;
+  initialVesselId?: 'vegvisir' | 'terranova';
 }
+
+const formatDateDDMMYYYY = (d?: string | null | undefined): string => {
+  if (!d) return '-';
+  const clean = String(d).split('T')[0].trim();
+  const p = clean.split('-');
+  if (p.length === 3 && p[0].length === 4) {
+    return `${p[2]}/${p[1]}/${p[0]}`;
+  }
+  return clean;
+};
 
 export interface CustomVesselItem {
   id: string;
@@ -144,11 +163,26 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   // Step 3: Hospedaje (A Bordo vs En el Lodge)
   const [lodgingType, setLodgingType] = useState<'onboard' | 'lodge' | 'mixed'>('onboard');
 
+  // Catalog Services hook
+  const { services: catalogServices } = useCatalogServices();
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const initializedServicesRef = useRef(false);
+
   // Step 4: Pax & Pricing
   const [totalSlots, setTotalSlots] = useState<number>(8);
   const [pricePerPaxClp, setPricePerPaxClp] = useState<number>(1850000);
   const [priceCharterFullClp, setPriceCharterFullClp] = useState<number>(14800000);
-  const [status, setStatus] = useState<'scheduled' | 'guaranteed'>('scheduled');
+
+  // Initialize selected service IDs from active catalog services once per open
+  useEffect(() => {
+    if (isOpen && !initializedServicesRef.current && catalogServices.length > 0) {
+      setSelectedServiceIds(catalogServices.filter(s => s.is_active).map(s => s.id));
+      initializedServicesRef.current = true;
+    }
+    if (!isOpen) {
+      initializedServicesRef.current = false;
+    }
+  }, [isOpen, catalogServices]);
 
   // Step 5: Public Content & Photo
   const [publicName, setPublicName] = useState<string>('Travesía Robinson Crusoe');
@@ -158,8 +192,9 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   const [publicDescription, setPublicDescription] = useState<string>(
     'Aventura oceánica de ida y vuelta navegando hacia Juan Fernández. Ideal para navegantes apasionados que buscan el reto del mar abierto, combinada con descanso frente al mar en nuestro Lodge de Bahía Cumberland.'
   );
-  const [publicTempEstimate, setPublicTempEstimate] = useState<string>('12°C – 18°C');
-  const [publicPillars, setPublicPillars] = useState<Array<{ title: string; desc: string; iconKey: 'sail' | 'food' | 'anchor' | 'waves' | 'compass' | 'footprints' }>>([
+  const [publicBrochureUrl, setPublicBrochureUrl] = useState<string>('');
+  const [publicTempEstimate] = useState<string>('12°C – 18°C');
+  const [publicPillars] = useState<Array<{ title: string; desc: string; iconKey: 'sail' | 'food' | 'anchor' | 'waves' | 'compass' | 'footprints' }>>([
     {
       title: 'Velerismo Oceánico de Altura',
       desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.',
@@ -189,9 +224,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     'Combustible, tasas de puerto, seguros y fondeo',
     'Hospedaje frente al mar en Bahía Cumberland'
   ]);
-  const [publicWeatherPolicy, setPublicWeatherPolicy] = useState<string>(
-    'La derrota náutica, los tiempos de navegación y los puntos de fondeo se ajustan de manera dinámica según la evolución meteorológica de los vientos y corrientes oceánicas, bajo el mando experto del Capitán para garantizar una travesía segura y placentera.'
-  );
+  const [publicWeatherPolicy, setPublicWeatherPolicy] = useState<string>('');
 
   // Load backend dependencies
   useEffect(() => {
@@ -302,6 +335,46 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
       image: '/velero-vegvisir.jpg',
     };
   }, [allFleet, vesselId]);
+
+  // Dynamic maximum passenger capacity calculation (Lodge vs Vessel)
+  const lodgeMaxPax = useMemo(() => {
+    if (rooms && rooms.length > 0) {
+      return rooms.reduce((sum, r) => sum + ((r as any).max_guests || (r as any).capacity || 2), 0);
+    }
+    return 8; // 4 double cabins = 8 PAX
+  }, [rooms]);
+
+  const vesselMaxPax = selectedVesselMeta.maxPax || 12;
+
+  const maxAllowedPax = useMemo(() => {
+    if (lodgingType === 'lodge') {
+      return lodgeMaxPax > 0 ? lodgeMaxPax : 8;
+    }
+    return vesselMaxPax;
+  }, [lodgingType, lodgeMaxPax, vesselMaxPax]);
+
+  // Automatically adjust totalSlots if it exceeds maximum allowed
+  useEffect(() => {
+    if (totalSlots > maxAllowedPax) {
+      setTotalSlots(maxAllowedPax);
+    }
+  }, [maxAllowedPax, totalSlots]);
+
+  // Selected services objects
+  const selectedServicesList = useMemo(() => {
+    return catalogServices.filter(s => selectedServiceIds.includes(s.id));
+  }, [catalogServices, selectedServiceIds]);
+
+  const activePillars = useMemo(() => {
+    if (selectedServicesList.length > 0) {
+      return selectedServicesList.map(s => ({
+        title: s.name,
+        desc: s.description || '',
+        iconKey: (s.category === 'buceo' ? 'waves' : s.category === 'gastronomia' ? 'food' : s.category === 'cabalgatas' || s.category === 'trekking' ? 'footprints' : 'sail') as any
+      }));
+    }
+    return publicPillars;
+  }, [selectedServicesList, publicPillars]);
 
   // Update defaults when changing vessel
   const handleVesselChange = (newVesselId: string) => {
@@ -465,21 +538,23 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
         routeId: 'custom-expedition',
         lodgingType,
         selectedRoomIds,
-        selectedServiceIds: [],
+        selectedServiceIds,
         durationDays,
         departureDate,
         returnDate,
         totalSlots,
         pricePerPaxClp,
         priceCharterFullClp,
-        status,
+        status: 'scheduled',
         publicName,
         publicHeadline,
         publicLocation,
         publicCoverImage,
         publicDescription,
-        publicTempEstimate,
-        publicPillars,
+        publicBrochureUrl,
+        publicPolicyUrl: publicWeatherPolicy,
+        publicTempEstimate: publicBrochureUrl ? 'Brochure disponible' : publicTempEstimate,
+        publicPillars: activePillars,
         publicIncluded,
         publicWeatherPolicy,
       };
@@ -575,11 +650,11 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
           <div className="pt-4 border-t border-white/10 space-y-1 font-mono text-[11px] text-slate-300">
             <div className="flex justify-between">
               <span className="text-slate-400">Zarpe:</span>
-              <span className="text-white font-bold">{departureDate}</span>
+              <span className="text-white font-bold">{formatDateDDMMYYYY(departureDate)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Retorno:</span>
-              <span className="text-white font-bold">{returnDate}</span>
+              <span className="text-white font-bold">{formatDateDDMMYYYY(returnDate)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Duración:</span>
@@ -841,7 +916,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       Selecciona la Embarcación para la Expedición
                     </h4>
                     <p className="text-slate-500 text-xs font-light">
-                      Comprobación inteligente para el rango: <strong>{departureDate} ➔ {returnDate}</strong>
+                      Comprobación inteligente para el rango: <strong>{formatDateDDMMYYYY(departureDate)} ➔ {formatDateDDMMYYYY(returnDate)}</strong>
                     </p>
                   </div>
 
@@ -1065,7 +1140,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       <span>Bloqueo Automático del Lodge Garantizado</span>
                     </div>
                     <p className="text-purple-800 font-light">
-                      Al confirmar esta expedición, el sistema bloqueará automáticamente las 4 habitaciones (<strong>Albatros, Cumberland, Selkirk, Vidriola</strong>) entre el <strong>{departureDate}</strong> y el <strong>{returnDate}</strong> a nombre de la expedición en el calendario del Lodge.
+                      Al confirmar esta expedición, el sistema bloqueará automáticamente las 4 habitaciones (<strong>Albatros, Cumberland, Selkirk, Vidriola</strong>) entre el <strong>{formatDateDDMMYYYY(departureDate)}</strong> y el <strong>{formatDateDDMMYYYY(returnDate)}</strong> a nombre de la expedición en el calendario del Lodge.
                     </p>
                   </div>
                 )}
@@ -1079,7 +1154,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     <ul className="list-disc pl-5 space-y-1 text-rose-800">
                       {lodgeAvailability.conflictingRooms.map((c, idx) => (
                         <li key={idx}>
-                          <strong>{c.roomName}</strong>: ocupada del {c.checkIn} al {c.checkOut} ({c.reason})
+                          <strong>{c.roomName}</strong>: ocupada del {formatDateDDMMYYYY(c.checkIn)} al {formatDateDDMMYYYY(c.checkOut)} ({c.reason})
                         </li>
                       ))}
                     </ul>
@@ -1108,45 +1183,119 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                   </p>
                 </div>
 
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-5">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-6">
                   
-                  {/* Pax Stepper */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                    <div>
-                      <label className="text-xs font-bold text-[#0f2b48] uppercase tracking-wider block mb-1">
-                        Cupos Totales de Pasajeros (PAX)
-                      </label>
-                      <p className="text-[11px] text-slate-500 font-light">
-                        Límite sugerido para {selectedVesselMeta.name}: hasta {selectedVesselMeta.maxPax} PAX.
-                      </p>
+                  {/* Selector Moderno y Dinámico de Pasajeros (PAX) */}
+                  <div className="bg-gradient-to-br from-slate-50 to-sky-50/30 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-[#0b192c]" />
+                          <label className="text-xs font-bold text-[#0b192c] uppercase tracking-wider">
+                            Cupos Totales de Pasajeros (PAX)
+                          </label>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-light mt-0.5">
+                          {lodgingType === 'lodge' ? (
+                            <span className="inline-flex items-center gap-1 text-purple-800 font-medium">
+                              <BedDouble className="w-3.5 h-3.5 text-purple-600" />
+                              Lodge Bahía Cumberland: máx. {maxAllowedPax} PAX (4 cabinas dobles)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-sky-900 font-medium">
+                              <Sailboat className="w-3.5 h-3.5 text-sky-600" />
+                              Embarcación {selectedVesselMeta.name}: máx. {maxAllowedPax} PAX a bordo
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Badge de Capacidad */}
+                      <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-full shrink-0 self-start sm:self-auto ${
+                        totalSlots === maxAllowedPax 
+                          ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                          : 'bg-slate-200/70 text-slate-700'
+                      }`}>
+                        {totalSlots} de {maxAllowedPax} Cupos Máx.
+                      </span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setTotalSlots(prev => Math.max(1, prev - 1))}
-                        className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 flex items-center justify-center font-bold text-lg cursor-pointer"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        max={selectedVesselMeta.maxPax || 30}
-                        value={totalSlots}
-                        onChange={(e) => setTotalSlots(Math.max(1, Number(e.target.value)))}
-                        className="w-20 text-center font-mono font-bold text-lg bg-slate-50 border border-slate-200 rounded-xl py-2 text-[#0f2b48]"
+
+                    {/* Controles de Stepper y Presets Rápidos */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                      {/* Stepper Premium */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={totalSlots <= 1}
+                          onClick={() => setTotalSlots(prev => Math.max(1, prev - 1))}
+                          className="w-11 h-11 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:scale-95 text-[#0b192c] flex items-center justify-center font-bold text-xl shadow-xs transition cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        
+                        <div className="bg-white border-2 border-[#0b192c] rounded-2xl px-6 py-2 shadow-xs flex items-center justify-center min-w-[110px]">
+                          <span className="text-2xl font-serif font-extrabold text-[#0b192c]">
+                            {totalSlots}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-400 ml-1.5 uppercase">
+                            PAX
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={totalSlots >= maxAllowedPax}
+                          onClick={() => setTotalSlots(prev => Math.min(maxAllowedPax, prev + 1))}
+                          className="w-11 h-11 rounded-2xl bg-[#0b192c] hover:bg-[#182a44] active:scale-95 text-white flex items-center justify-center font-bold text-xl shadow-xs transition cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed disabled:active:scale-100"
+                        >
+                          <Plus className="w-4 h-4 text-sky-300" />
+                        </button>
+                      </div>
+
+                      {/* Presets Rápidos */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[2, 4, 6, 8, 10, 12, 16, 20]
+                          .filter(p => p <= maxAllowedPax)
+                          .map((val) => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setTotalSlots(val)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer active:scale-95 ${
+                                totalSlots === val
+                                  ? 'bg-[#0b192c] text-white shadow-xs'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-[#0b192c]'
+                              }`}
+                            >
+                              {val} PAX
+                            </button>
+                          ))}
+                        {maxAllowedPax && ![2, 4, 6, 8, 10, 12, 16, 20].includes(maxAllowedPax) && (
+                          <button
+                            type="button"
+                            onClick={() => setTotalSlots(maxAllowedPax)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer active:scale-95 ${
+                              totalSlots === maxAllowedPax
+                                ? 'bg-[#0b192c] text-white shadow-xs'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-[#0b192c]'
+                            }`}
+                          >
+                            Máx ({maxAllowedPax})
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Barra Visual de Capacidad */}
+                    <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-sky-500 to-[#0b192c] h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (totalSlots / maxAllowedPax) * 100)}%` }}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setTotalSlots(prev => Math.min(selectedVesselMeta.maxPax || 30, prev + 1))}
-                        className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 flex items-center justify-center font-bold text-lg cursor-pointer"
-                      >
-                        +
-                      </button>
-                      <span className="text-xs font-mono font-bold text-slate-600">Pasajeros</span>
                     </div>
                   </div>
 
+                  {/* Precios y Tarifas */}
                   <div className="border-t border-slate-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-[#0f2b48] uppercase tracking-wider block mb-1">
@@ -1166,6 +1315,9 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                           className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-sm text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
                         />
                       </div>
+                      <span className="text-[11px] text-slate-400 font-mono block mt-1">
+                        ${pricePerPaxClp.toLocaleString('es-CL')} CLP / pax
+                      </span>
                     </div>
 
                     <div>
@@ -1182,38 +1334,9 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                           className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-sm text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
                         />
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-4">
-                    <label className="text-xs font-bold text-[#0f2b48] uppercase tracking-wider block mb-2">
-                      Estado Inicial de la Expedición
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setStatus('scheduled')}
-                        className={`p-3 rounded-xl border text-left cursor-pointer transition ${
-                          status === 'scheduled'
-                            ? 'border-[#0f2b48] bg-sky-50 text-[#0f2b48] font-bold'
-                            : 'border-slate-200 text-slate-600 bg-white'
-                        }`}
-                      >
-                        <div className="text-xs">Programada (Abierta a cupos)</div>
-                        <div className="text-[10px] text-slate-500 font-normal">Disponible para reservas individuales por pax</div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStatus('guaranteed')}
-                        className={`p-3 rounded-xl border text-left cursor-pointer transition ${
-                          status === 'guaranteed'
-                            ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold'
-                            : 'border-slate-200 text-slate-600 bg-white'
-                        }`}
-                      >
-                        <div className="text-xs">Zarpe Garantizado</div>
-                        <div className="text-[10px] text-slate-500 font-normal">Zarpe confirmado con aforo mínimo alcanzado</div>
-                      </button>
+                      <span className="text-[11px] text-slate-400 font-mono block mt-1">
+                        ${priceCharterFullClp.toLocaleString('es-CL')} CLP (embarcación completa)
+                      </span>
                     </div>
                   </div>
 
@@ -1222,23 +1345,23 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
             )}
 
             {/* ========================================================================= */}
-            {/* PASO 5: DESCRIPCIÓN & FOTOGRAFÍA PARA LA WEB PÚBLICA */}
+            {/* PASO 5: DESCRIPCIÓN & EXPERIENCIAS DEL CATÁLOGO */}
             {/* ========================================================================= */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-fadeIn">
                 <div>
                   <span className="text-[10px] uppercase font-mono font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-md">
-                    Paso 5 de 6 • Ficha Web
+                    Paso 5 de 6 • Ficha Web & Experiencias
                   </span>
                   <h4 className="font-serif text-lg font-bold text-[#0f2b48] mt-1.5">
-                    Descripción, Fotografía & Pilares para la Web Pública
+                    Descripción, Fotografía & Experiencias del Catálogo
                   </h4>
                   <p className="text-slate-500 text-xs font-light">
-                    Personaliza los textos, imágenes y pilares que verán los clientes en la página de expediciones:
+                    Personaliza la ficha pública y selecciona los servicios y experiencias configuradas en el Catálogo que tendrá incluidas esta expedición:
                   </p>
                 </div>
 
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
@@ -1316,67 +1439,161 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
-                        Temperatura / Clima Estimado
-                      </label>
+                    {/* CAMPO 1: LINK DE GOOGLE DRIVE PARA EL BROCHURE */}
+                    <div className="space-y-1.5">
+                      <div className="h-6 flex items-center justify-between gap-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] flex items-center gap-1.5 truncate">
+                          <FileText className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                          <span className="truncate">Link Brochure (Google Drive / PDF)</span>
+                        </label>
+                        {publicBrochureUrl && (
+                          <a
+                            href={publicBrochureUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-sky-600 hover:text-sky-800 font-semibold flex items-center gap-0.5 hover:underline shrink-0"
+                          >
+                            <span>Probar</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
                       <input
-                        type="text"
-                        value={publicTempEstimate}
-                        onChange={(e) => setPublicTempEstimate(e.target.value)}
-                        className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-[#0f2b48] text-xs font-mono focus:border-[#0f2b48] focus:outline-none"
+                        type="url"
+                        placeholder="https://drive.google.com/file/d/... o URL del PDF"
+                        value={publicBrochureUrl}
+                        onChange={(e) => setPublicBrochureUrl(e.target.value)}
+                        className="w-full h-10 bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-[#0f2b48] text-xs font-mono focus:border-[#0f2b48] focus:outline-none shadow-2xs placeholder:text-slate-400 placeholder:font-sans"
                       />
+                      <p className="text-[10px] text-slate-500 font-light truncate">
+                        Pega el enlace de Google Drive con el brochure comercial.
+                      </p>
                     </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
-                        Política de Navegación & Clima
-                      </label>
+
+                    {/* CAMPO 2: LINK DE GOOGLE DRIVE PARA POLÍTICAS DE NAVEGACIÓN */}
+                    <div className="space-y-1.5">
+                      <div className="h-6 flex items-center justify-between gap-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] flex items-center gap-1.5 truncate">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">Link Políticas (Google Drive / Doc)</span>
+                        </label>
+                        {publicWeatherPolicy && (publicWeatherPolicy.startsWith('http://') || publicWeatherPolicy.startsWith('https://')) && (
+                          <a
+                            href={publicWeatherPolicy}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-emerald-600 hover:text-emerald-800 font-semibold flex items-center gap-0.5 hover:underline shrink-0"
+                          >
+                            <span>Probar</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
                       <input
                         type="text"
+                        placeholder="https://drive.google.com/file/d/... o URL de políticas"
                         value={publicWeatherPolicy}
                         onChange={(e) => setPublicWeatherPolicy(e.target.value)}
-                        className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-[#0f2b48] text-xs focus:border-[#0f2b48] focus:outline-none"
+                        className="w-full h-10 bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-[#0f2b48] text-xs font-mono focus:border-[#0f2b48] focus:outline-none shadow-2xs placeholder:text-slate-400 placeholder:font-sans"
                       />
+                      <p className="text-[10px] text-slate-500 font-light truncate">
+                        Pega el enlace de Google Drive con las políticas de navegación.
+                      </p>
                     </div>
                   </div>
 
-                  {/* 4 Pillars of Experience */}
-                  <div className="space-y-3 pt-3 border-t border-slate-100">
-                    <label className="text-xs font-bold text-[#0f2b48] uppercase tracking-wider block">
-                      Pilares & Experiencias de la Expedición (4 Pilares)
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {publicPillars.map((p, idx) => (
-                        <div key={idx} className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-md bg-[#0f2b48] text-white flex items-center justify-center text-[10px] font-bold">
-                              {idx + 1}
-                            </span>
-                            <input
-                              type="text"
-                              value={p.title}
-                              onChange={(e) => {
-                                const newPillars = [...publicPillars];
-                                newPillars[idx].title = e.target.value;
-                                setPublicPillars(newPillars);
-                              }}
-                              placeholder="Título del Pilar"
-                              className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-900"
-                            />
-                          </div>
-                          <textarea
-                            rows={2}
-                            value={p.desc}
-                            onChange={(e) => {
-                              const newPillars = [...publicPillars];
-                              newPillars[idx].desc = e.target.value;
-                              setPublicPillars(newPillars);
-                            }}
-                            placeholder="Descripción del pilar"
-                            className="w-full bg-white border border-slate-200 rounded-lg p-2 text-[11px] text-slate-600"
-                          />
+                  {/* EXPERIENCIAS & SERVICIOS DEL CATÁLOGO */}
+                  <div className="space-y-3 pt-4 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-[#0b192c]" />
+                          <label className="text-xs font-bold text-[#0f2b48] uppercase tracking-wider">
+                            Experiencias & Servicios Incluidos (Catálogo & Servicios)
+                          </label>
                         </div>
-                      ))}
+                        <p className="text-[11px] text-slate-500 font-light mt-0.5">
+                          Selecciona las actividades configuradas en el Catálogo de Servicios que formarán las experiencias incluidas de la expedición:
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200 px-2.5 py-1 rounded-full">
+                          {selectedServiceIds.length} seleccionados
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedServiceIds.length > 0) {
+                              setSelectedServiceIds([]);
+                            } else {
+                              setSelectedServiceIds(catalogServices.map(s => s.id));
+                            }
+                          }}
+                          className="text-[10px] font-semibold text-slate-600 hover:text-[#0b192c] underline cursor-pointer"
+                        >
+                          {selectedServiceIds.length > 0 ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                      {catalogServices.map((svc) => {
+                        const isSelected = selectedServiceIds.includes(svc.id);
+                        return (
+                          <div
+                            key={svc.id}
+                            onClick={() => {
+                              setSelectedServiceIds(prev =>
+                                prev.includes(svc.id) ? prev.filter(x => x !== svc.id) : [...prev, svc.id]
+                              );
+                            }}
+                            className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3 text-left ${
+                              isSelected
+                                ? 'border-[#0b192c] bg-sky-50/30 shadow-xs ring-1 ring-[#0b192c]/10'
+                                : 'border-slate-200 hover:border-slate-300 bg-white opacity-80 hover:opacity-100'
+                            }`}
+                          >
+                            {/* Checkbox Icon */}
+                            <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 mt-0.5 transition ${
+                              isSelected
+                                ? 'bg-[#0b192c] text-white shadow-2xs'
+                                : 'border-2 border-slate-300 bg-white'
+                            }`}>
+                              {isSelected && <Check className="w-3.5 h-3.5" />}
+                            </div>
+
+                            {/* Service Image */}
+                            {svc.image_url ? (
+                              <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
+                                <img src={svc.image_url} alt={svc.name} className="w-full h-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-400">
+                                <Sparkles className="w-5 h-5" />
+                              </div>
+                            )}
+
+                            {/* Content */}
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[9px] uppercase font-mono font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md">
+                                  {svc.category}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono truncate">
+                                  {svc.duration_label || 'Flexible'}
+                                </span>
+                              </div>
+                              <h5 className="font-serif font-bold text-xs text-[#0b192c] leading-snug line-clamp-1">
+                                {svc.name}
+                              </h5>
+                              <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-light">
+                                {svc.description}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -1385,9 +1602,9 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowPreviewModal(true)}
-                      className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer hover:scale-[1.02]"
+                      className="inline-flex items-center gap-2 bg-[#0b192c] hover:bg-[#182a44] text-white px-5 py-2.5 rounded-full text-xs font-semibold transition shadow-md cursor-pointer hover:scale-[1.02] active:scale-95"
                     >
-                      <Eye className="w-4 h-4 text-blue-400" />
+                      <Eye className="w-4 h-4 text-sky-300" />
                       <span>Ver Previsualización Pública en Vivo</span>
                     </button>
                   </div>
@@ -1425,11 +1642,11 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     <div className="space-y-2 text-xs divide-y divide-slate-100 font-mono">
                       <div className="flex justify-between pt-1">
                         <span className="text-slate-500">Zarpe / Inicio:</span>
-                        <strong className="text-slate-900">{departureDate}</strong>
+                        <strong className="text-slate-900">{formatDateDDMMYYYY(departureDate)}</strong>
                       </div>
                       <div className="flex justify-between pt-2">
                         <span className="text-slate-500">Retorno / Término:</span>
-                        <strong className="text-slate-900">{returnDate}</strong>
+                        <strong className="text-slate-900">{formatDateDDMMYYYY(returnDate)}</strong>
                       </div>
                       <div className="flex justify-between pt-2">
                         <span className="text-slate-500">Duración:</span>
@@ -1472,6 +1689,49 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
 
                 </div>
 
+                {/* Experiencias & Servicios Seleccionados del Catálogo */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#0f2b48] uppercase tracking-wider">
+                      <Tag className="w-4 h-4 text-sky-600" />
+                      <span>Experiencias & Servicios Incluidos</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full font-bold">
+                      {selectedServicesList.length} seleccionados
+                    </span>
+                  </div>
+
+                  {selectedServicesList.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      {selectedServicesList.map((svc) => (
+                        <div key={svc.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-150">
+                          {svc.image_url ? (
+                            <img src={svc.image_url} alt={svc.name} className="w-9 h-9 rounded-lg object-cover shrink-0 border border-slate-200" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-lg bg-[#0b192c] text-white flex items-center justify-center shrink-0">
+                              <Sparkles className="w-4 h-4 text-sky-300" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-[#0b192c] truncate">{svc.name}</p>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                              <span className="uppercase text-sky-700">{svc.category}</span>
+                              <span>•</span>
+                              <span>{svc.duration_label || 'Incluido'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-left">
+                      <p className="text-xs text-slate-500 font-light">
+                        Sin experiencias ni servicios extras seleccionados. La expedición incluirá únicamente navegación y comodidades base de la embarcación / lodge.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Ficha Web Preview Strip */}
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
                   <div className="flex items-center justify-between">
@@ -1488,10 +1748,53 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
                       <img src={publicCoverImage} alt={publicName} className="w-full h-full object-cover" />
                     </div>
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-1 min-w-0 flex-1">
                       <h5 className="font-serif font-bold text-sm text-[#0f2b48] truncate">{publicName}</h5>
                       <p className="text-xs text-slate-500 font-light truncate">{publicHeadline}</p>
                       <span className="text-[10px] font-mono text-slate-400 block">{publicLocation}</span>
+                    </div>
+                  </div>
+
+                  {/* Brochure & Policy Document summary */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100 text-xs">
+                    <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-150">
+                      <FileText className="w-4 h-4 text-sky-600 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] text-slate-400 font-mono block uppercase">Brochure Comercial</span>
+                        {publicBrochureUrl ? (
+                          <a
+                            href={publicBrochureUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sky-700 font-semibold hover:underline flex items-center gap-1 truncate"
+                          >
+                            <span className="truncate">Google Drive</span>
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 font-light">No adjunto</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-150">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] text-slate-400 font-mono block uppercase">Políticas de Navegación</span>
+                        {publicWeatherPolicy && (publicWeatherPolicy.startsWith('http://') || publicWeatherPolicy.startsWith('https://')) ? (
+                          <a
+                            href={publicWeatherPolicy}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-700 font-semibold hover:underline flex items-center gap-1 truncate"
+                          >
+                            <span className="truncate">Google Drive</span>
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="text-slate-600 font-medium truncate block">{publicWeatherPolicy || 'Estándar'}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1503,7 +1806,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     <div>
                       <strong className="block font-bold">Bloqueo Automático en el Lodge:</strong>
                       <span>
-                        Al hacer clic en "Guardar & Publicar", el sistema reservará de manera inmediata las 4 habitaciones (Albatros, Cumberland, Selkirk, Vidriola) del {departureDate} al {returnDate} bajo el nombre "Expedición: {publicName}".
+                        Al hacer clic en "Guardar & Publicar", el sistema reservará de manera inmediata las 4 habitaciones (Albatros, Cumberland, Selkirk, Vidriola) del {formatDateDDMMYYYY(departureDate)} al {formatDateDDMMYYYY(returnDate)} bajo el nombre "Expedición: {publicName}".
                       </span>
                     </div>
                   </div>
@@ -1725,11 +2028,11 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                 <div className="border-t border-white/10 pt-3.5 space-y-2.5 font-mono text-[11px] text-slate-300">
                   <div className="flex justify-between">
                     <span>Zarpe:</span>
-                    <span className="font-bold text-white">{departureDate}</span>
+                    <span className="font-bold text-white">{formatDateDDMMYYYY(departureDate)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Retorno:</span>
-                    <span className="font-bold text-white">{returnDate}</span>
+                    <span className="font-bold text-white">{formatDateDDMMYYYY(returnDate)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Embarcación:</span>
@@ -1738,22 +2041,37 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Temp. Estimada:</span>
-                    <span className="font-bold text-white">{publicTempEstimate}</span>
+                    <span>Brochure Oficial:</span>
+                    <span className="font-bold text-white truncate max-w-[140px] text-right">
+                      {publicBrochureUrl ? 'Drive Adjunto' : 'Disponible'}
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="relative z-10 pt-6 border-t border-white/10 space-y-2.5">
-                <button
-                  type="button"
-                  onClick={() => alert(`Descargando Brochure Oficial PDF de la expedición: ${publicName}`)}
-                  className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
-                >
-                  <Download className="w-4 h-4 text-blue-300" />
-                  <span>Descargar Brochure en PDF</span>
-                </button>
+                {publicBrochureUrl ? (
+                  <a
+                    href={publicBrochureUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
+                  >
+                    <FileText className="w-4 h-4 text-blue-300" />
+                    <span>Ver Brochure Oficial (Google Drive)</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-300 ml-0.5" />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => alert(`Descargando Brochure Oficial PDF de la expedición: ${publicName}`)}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
+                  >
+                    <Download className="w-4 h-4 text-blue-300" />
+                    <span>Descargar Brochure en PDF</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -1784,27 +2102,52 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                   </p>
                 </div>
 
-                {/* 4 Pillars */}
+                {/* Experiencias del Catálogo */}
                 <div className="space-y-3">
                   <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
-                    Pilares & Experiencias de la Expedición
+                    Experiencias & Pilares de la Expedición ({selectedServicesList.length > 0 ? selectedServicesList.length : publicPillars.length})
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {publicPillars.map((pillar, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-blue-900 shadow-2xs">
-                            {idx === 0 ? <Sailboat className="w-4 h-4" /> : idx === 1 ? <Utensils className="w-4 h-4" /> : idx === 2 ? <Anchor className="w-4 h-4" /> : <Waves className="w-4 h-4" />}
+                    {selectedServicesList.length > 0 ? (
+                      selectedServicesList.map((svc) => (
+                        <div key={svc.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2">
+                          <div className="flex items-center gap-2.5">
+                            {svc.image_url ? (
+                              <img src={svc.image_url} alt={svc.name} className="w-8 h-8 rounded-xl object-cover shrink-0 border border-slate-200" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-blue-900 shadow-2xs">
+                                <Sparkles className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[9px] uppercase font-mono font-bold text-sky-700 block">{svc.category}</span>
+                              <h4 className="font-serif font-bold text-xs sm:text-sm text-slate-900 leading-tight truncate">
+                                {svc.name}
+                              </h4>
+                            </div>
                           </div>
-                          <h4 className="font-serif font-bold text-xs sm:text-sm text-slate-900 leading-tight">
-                            {pillar.title}
-                          </h4>
+                          <p className="text-slate-600 text-xs leading-relaxed font-light">
+                            {svc.description}
+                          </p>
                         </div>
-                        <p className="text-slate-600 text-xs leading-relaxed font-light">
-                          {pillar.desc}
-                        </p>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      publicPillars.map((pillar, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-blue-900 shadow-2xs">
+                              {idx === 0 ? <Sailboat className="w-4 h-4" /> : idx === 1 ? <Utensils className="w-4 h-4" /> : idx === 2 ? <Anchor className="w-4 h-4" /> : <Waves className="w-4 h-4" />}
+                            </div>
+                            <h4 className="font-serif font-bold text-xs sm:text-sm text-slate-900 leading-tight">
+                              {pillar.title}
+                            </h4>
+                          </div>
+                          <p className="text-slate-600 text-xs leading-relaxed font-light">
+                            {pillar.desc}
+                          </p>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 

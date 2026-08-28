@@ -89,3 +89,74 @@ export const exportBookingsToExcel = (
   // 6. Download file
   XLSX.writeFile(workbook, filename);
 };
+
+export interface ExpeditionManifestExportRow {
+  expedition_name: string;
+  vessel_name: string;
+  booking_code: string;
+  departure_date: string;
+  return_date: string;
+  duration_days: number;
+  passenger_name: string;
+  passenger_phone: string;
+  passenger_email: string;
+  reservation_status: string;
+  amount_paid: number;
+  total_amount: number;
+  pending_balance: number;
+  pax_count: number;
+  booking_type: string;
+}
+
+export const exportExpeditionManifestToExcel = (
+  rows: ExpeditionManifestExportRow[],
+  filenamePrefix = 'Manifiesto_Pasajeros_Expediciones'
+) => {
+  const data = rows.map((r) => ({
+    'Nombre Expedición': r.expedition_name,
+    'Embarcación': r.vessel_name,
+    'Código Reserva': r.booking_code,
+    'Fecha de Zarpe': r.departure_date,
+    'Fecha de Regreso': r.return_date,
+    'Duración (Días)': r.duration_days,
+    'Nombre Pasajero': r.passenger_name,
+    'Teléfono / WhatsApp': r.passenger_phone,
+    'Email': r.passenger_email,
+    'Estado de Reserva': r.reservation_status,
+    'Monto Pagado (CLP)': r.amount_paid,
+    'Monto Total (CLP)': r.total_amount,
+    'Saldo Pendiente (CLP)': r.pending_balance,
+    'Cupos (Pax)': r.pax_count,
+    'Modalidad': r.booking_type,
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+
+  worksheet['!cols'] = [
+    { wch: 38 }, // Nombre Expedición
+    { wch: 22 }, // Embarcación
+    { wch: 16 }, // Código Reserva
+    { wch: 16 }, // Fecha Zarpe
+    { wch: 16 }, // Fecha Regreso
+    { wch: 16 }, // Duración
+    { wch: 28 }, // Pasajero
+    { wch: 20 }, // Teléfono
+    { wch: 28 }, // Email
+    { wch: 28 }, // Estado de Reserva
+    { wch: 20 }, // Monto Pagado
+    { wch: 20 }, // Monto Total
+    { wch: 20 }, // Saldo Pendiente
+    { wch: 12 }, // Cupos
+    { wch: 18 }, // Modalidad
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Manifiesto Pasajeros');
+
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const filename = `${filenamePrefix}_${dateStr}.xlsx`;
+
+  XLSX.writeFile(workbook, filename);
+};
+

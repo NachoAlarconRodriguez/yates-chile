@@ -33,22 +33,32 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   const { t } = useLanguage();
 
   const slides: Slide[] = useMemo(() => {
-    // Filter active upcoming expeditions with available spots
-    const available = expeditions
-      .filter((e) => {
-        const spots = typeof e.spotsLeft === 'number' ? e.spotsLeft : (e.availableSlots ?? 0);
-        return spots > 0 && e.status !== 'completed';
-      })
-      .sort((a, b) => {
-        const timeA = new Date(a.departureDate || '2099-01-01').getTime();
-        const timeB = new Date(b.departureDate || '2099-01-01').getTime();
-        return timeA - timeB;
-      })
-      .slice(0, 3);
+    // 1. Prioritize expeditions marked with star (isFeatured: true)
+    const featured = expeditions.filter((e) => e.isFeatured && e.status !== 'cancelled');
 
-    return available.map((exp, idx) => {
-      const spots = typeof exp.spotsLeft === 'number' ? exp.spotsLeft : exp.availableSlots;
-      const spotsText = spots === 1 ? '1 CUPO DISPONIBLE' : `${spots} CUPOS DISPONIBLES`;
+    // 2. If fewer than 3 featured, fill with upcoming departures
+    let selected = [...featured];
+    if (selected.length < 3) {
+      const remaining = expeditions
+        .filter((e) => !selected.some((s) => s.id === e.id) && e.status !== 'cancelled')
+        .sort((a, b) => {
+          const timeA = new Date(a.departureDate || '2099-01-01').getTime();
+          const timeB = new Date(b.departureDate || '2099-01-01').getTime();
+          return timeA - timeB;
+        });
+      selected = [...selected, ...remaining].slice(0, 3);
+    } else {
+      selected = selected.slice(0, 3);
+    }
+
+    return selected.map((exp, idx) => {
+      const spots = typeof exp.spotsLeft === 'number' ? exp.spotsLeft : (exp.availableSlots ?? 0);
+      const spotsText =
+        spots === 1
+          ? '1 CUPO DISPONIBLE'
+          : spots === 0 || exp.spotsLeft === 'completo'
+          ? 'CUPOS AGOTADOS'
+          : `${spots} CUPOS DISPONIBLES`;
 
       let icon = <Compass className="w-3.5 h-3.5 text-amber-400" />;
       if (exp.vessel.toLowerCase().includes('velero') || exp.vesselId === 'vegvisir') {

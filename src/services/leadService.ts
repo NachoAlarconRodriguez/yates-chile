@@ -6,7 +6,7 @@ export interface LeadItem {
   fullName: string;
   email: string;
   phone: string;
-  origin: 'brochure' | 'contacto_web' | 'expedicion_interest' | 'lodge_interest' | 'whatsapp' | 'manual';
+  origin: 'reserva_incompleta' | 'newsletter' | 'brochure' | 'contacto_web' | 'expedicion_interest' | 'lodge_interest' | 'whatsapp' | 'manual';
   originDetails: string;
   dateCreated: string;
   status: 'nuevo' | 'contactado' | 'cotizando' | 'convertido' | 'descartado';
@@ -16,6 +16,7 @@ export interface LeadItem {
   notes?: string;
   city?: string;
   country?: string;
+  docId?: string;
   estimatedBudgetClp?: number;
   convertedCustomerId?: string;
 }
@@ -23,13 +24,45 @@ export interface LeadItem {
 export const INITIAL_LEADS: LeadItem[] = [
   {
     id: 'lead-1',
+    fullName: 'Ignacio Alarcón Rodríguez',
+    email: 'ignacio.alarcon@orangedesign.cl',
+    phone: '+56 9 8412 9901',
+    docId: '17.318.824-2',
+    origin: 'reserva_incompleta',
+    originDetails: 'Reserva Web Incompleta (Sin Pago)',
+    dateCreated: '2026-08-28',
+    status: 'nuevo',
+    interestType: 'expediciones',
+    estimatedPax: 1,
+    tentativeDate: '31 oct 2026 - 10 nov 2026',
+    notes: 'RUT: 17.318.824-2. Llenó el formulario de reserva para Expedición Juan Fernández pero no registró abono ni pago.',
+    city: 'Santiago',
+    country: 'Chile',
+    estimatedBudgetClp: 1850000,
+  },
+  {
+    id: 'lead-nl-1',
+    fullName: 'Matías Larraín Palma',
+    email: 'matias.larrain@inversioneslp.cl',
+    phone: '',
+    origin: 'newsletter',
+    originDetails: 'Suscripción Newsletter Web',
+    dateCreated: '2026-08-27',
+    status: 'nuevo',
+    interestType: 'general',
+    notes: 'Suscripción directa al Newsletter oficial desde el sitio web público.',
+    city: 'Chile',
+    country: 'Chile',
+  },
+  {
+    id: 'lead-2',
     fullName: 'Francisca Vial Ochagavía',
     email: 'fvial@vialabogados.cl',
     phone: '+56 9 9821 4433',
     origin: 'brochure',
     originDetails: 'Descarga Brochure Travesías 2026/2027',
     dateCreated: '2026-08-19',
-    status: 'nuevo',
+    status: 'contactado',
     interestType: 'expediciones',
     estimatedPax: 2,
     tentativeDate: 'Noviembre 2026',

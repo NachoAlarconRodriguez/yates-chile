@@ -10,9 +10,12 @@ export type DepartureRow = Database['public']['Tables']['expedition_departures']
   image?: string;
   description?: string;
   tempEstimate?: string;
+  brochureUrl?: string;
+  policyUrl?: string;
   bestViewTime?: string;
   route?: any;
   vessel?: any;
+  isFeatured?: boolean;
 };
 export type ExpeditionBookingRow = Database['public']['Tables']['expedition_bookings']['Row'];
 
@@ -38,7 +41,10 @@ export interface PublicExpedition {
   image: string;
   bestViewTime?: string;
   tempEstimate?: string;
+  brochureUrl?: string;
+  policyUrl?: string;
   status: 'scheduled' | 'guaranteed' | 'completed' | 'cancelled';
+  isFeatured?: boolean;
 }
 
 export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
@@ -316,11 +322,18 @@ const getStoredDepartures = (): PublicExpedition[] => {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map(sanitizePublicExpedition);
+        const sanitized = parsed.map(sanitizePublicExpedition);
+        const hasAnyFeatured = sanitized.some((e) => e.isFeatured);
+        if (!hasAnyFeatured) {
+          sanitized.slice(0, 3).forEach((e) => (e.isFeatured = true));
+        }
+        return sanitized;
       }
     }
   } catch {}
-  return INITIAL_EXPEDITIONS.map(sanitizePublicExpedition);
+  const initial = INITIAL_EXPEDITIONS.map(sanitizePublicExpedition);
+  initial.slice(0, 3).forEach((e) => (e.isFeatured = true));
+  return initial;
 };
 
 const saveStoredDepartures = (items: PublicExpedition[]) => {
@@ -367,38 +380,8 @@ export const expeditionService = {
   },
 
   async getDepartures(): Promise<DepartureRow[]> {
-    try {
-      const { data, error } = await supabase
-        .from('expedition_departures')
-        .select('*, route:expedition_routes(*), vessel:vessels(*)')
-        .order('departure_date', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        return (data as any[]).map((d) => {
-          const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
-          const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
-          const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
-          let routeName = d.name || d.route?.title || 'Expedición Robinson Crusoe';
-          if (routeName.startsWith('JF ')) {
-            routeName = routeName.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
-          }
-          return {
-            ...d,
-            name: routeName,
-            vessel_id: isTerranova ? 'terranova' : 'vegvisir',
-            vessel: {
-              id: isTerranova ? 'terranova' : 'vegvisir',
-              name: vesselName,
-              type: vesselType,
-            },
-          };
-        }) as DepartureRow[];
-      }
-    } catch {}
-
-    // Convert local public expeditions into DepartureRow format
     const local = getStoredDepartures();
-    return local.map((e) => {
+    const mapLocalToRow = (e: PublicExpedition): DepartureRow => {
       const isTerranova = e.vessel.toLowerCase().includes('terranova') || e.vesselId === 'terranova';
       const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
       const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
@@ -424,6 +407,7 @@ export const expeditionService = {
         description: e.description,
         tempEstimate: e.tempEstimate,
         bestViewTime: e.bestViewTime,
+        isFeatured: e.isFeatured ?? false,
         route: EXPEDITION_ROUTES.find((r) => r.id === e.routeId) || {
           id: e.routeId,
           title: name,
@@ -436,10 +420,8 @@ export const expeditionService = {
           type: vesselType,
         },
       };
-    }) as DepartureRow[];
-  },
+    };
 
-  async getPublicExpeditions(): Promise<PublicExpedition[]> {
     try {
       const { data, error } = await supabase
         .from('expedition_departures')
@@ -447,14 +429,59 @@ export const expeditionService = {
         .order('departure_date', { ascending: true });
 
       if (!error && data && data.length > 0) {
-        // Map Supabase rows
-        const local = getStoredDepartures();
+        const mappedDb = (data as any[]).map((d) => {
+          const matchedLocal = local.find((l) => l.id === d.id);
+          const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
+          const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+          const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
+          let routeName = d.name || matchedLocal?.name || d.route?.title || 'Expedición Robinson Crusoe';
+          if (routeName.startsWith('JF ')) {
+            routeName = routeName.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
+          }
+          return {
+            ...d,
+            name: routeName,
+            location: matchedLocal?.location || 'Archipiélago Juan Fernández',
+            image: matchedLocal?.image || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
+            description: matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
+            tempEstimate: matchedLocal?.tempEstimate || '14°C - 18°C',
+            bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
+            isFeatured: matchedLocal?.isFeatured ?? false,
+            vessel_id: isTerranova ? 'terranova' : 'vegvisir',
+            vessel: {
+              id: isTerranova ? 'terranova' : 'vegvisir',
+              name: vesselName,
+              type: vesselType,
+            },
+          };
+        }) as DepartureRow[];
+
+        const extraLocal = local
+          .filter((l) => !data.some((d: any) => d.id === l.id))
+          .map(mapLocalToRow);
+
+        return [...mappedDb, ...extraLocal];
+      }
+    } catch {}
+
+    return local.map(mapLocalToRow);
+  },
+
+  async getPublicExpeditions(): Promise<PublicExpedition[]> {
+    const local = getStoredDepartures();
+    try {
+      const { data, error } = await supabase
+        .from('expedition_departures')
+        .select('*, route:expedition_routes(*), vessel:vessels(*)')
+        .order('departure_date', { ascending: true });
+
+      if (!error && data && data.length > 0) {
         const mapped: PublicExpedition[] = data.map((d: any) => {
           const matchedLocal = local.find((l) => l.id === d.id);
           const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
           const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
           const vesselId = isTerranova ? 'terranova' : 'vegvisir';
-          let routeTitle = d.name || d.route?.title || matchedLocal?.name || 'Expedición Austral';
+          let routeTitle = d.name || matchedLocal?.name || d.route?.title || 'Expedición Austral';
           if (routeTitle.startsWith('JF ')) {
             routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
           }
@@ -487,11 +514,13 @@ export const expeditionService = {
             status: d.status || 'scheduled',
           };
         });
-        return mapped;
+
+        const extraLocal = local.filter((l) => !data.some((d: any) => d.id === l.id));
+        return [...mapped, ...extraLocal];
       }
     } catch {}
 
-    return getStoredDepartures();
+    return local;
   },
 
   async getAllBookings(): Promise<ExpeditionBookingRow[]> {
@@ -744,6 +773,8 @@ export const expeditionService = {
     publicCoverImage?: string;
     publicDescription?: string;
     publicTempEstimate?: string;
+    publicBrochureUrl?: string;
+    publicPolicyUrl?: string;
   }): Promise<{ success: boolean; data?: DepartureRow; error?: string }> {
     try {
       const newId = `exp-dep-${Date.now()}`;
@@ -776,15 +807,21 @@ export const expeditionService = {
         image: params.publicCoverImage || (params.vesselId === 'terranova' ? '/yate-terranova.jpg' : '/travesia-robinson.jpg'),
         bestViewTime: 'Zarpe matutino',
         tempEstimate: params.publicTempEstimate || '14°C - 18°C',
+        brochureUrl: params.publicBrochureUrl,
+        policyUrl: params.publicPolicyUrl,
         status: params.status || 'scheduled',
       };
 
       // Try Supabase insert
       try {
+        const validRouteId = ['ruta-fiordos-glaciares', 'ruta-cabo-hornos', 'ruta-juan-fernandez', 'ruta-selkirk'].includes(params.routeId)
+          ? params.routeId
+          : 'ruta-juan-fernandez';
+
         const { data } = await supabase
           .from('expedition_departures')
           .insert({
-            route_id: params.routeId,
+            route_id: validRouteId,
             vessel_id: params.vesselId,
             departure_date: params.departureDate,
             return_date: params.returnDate,
@@ -800,11 +837,19 @@ export const expeditionService = {
         if (data) {
           newPublicExp.id = data.id;
         }
-      } catch {}
+      } catch (sbErr) {
+        console.warn('Supabase createDeparture notice:', sbErr);
+      }
 
       // Save locally
       const stored = getStoredDepartures();
-      saveStoredDepartures([newPublicExp, ...stored]);
+      saveStoredDepartures([newPublicExp, ...stored.filter(s => s.id !== newPublicExp.id)]);
+
+      // Dispatch global events for instant sync across tabs and hooks
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
+        window.dispatchEvent(new CustomEvent('storage'));
+      }
 
       const depRow: DepartureRow = {
         id: newPublicExp.id,
@@ -823,6 +868,8 @@ export const expeditionService = {
         image: newPublicExp.image,
         description: newPublicExp.description,
         tempEstimate: newPublicExp.tempEstimate,
+        brochureUrl: newPublicExp.brochureUrl,
+        policyUrl: newPublicExp.policyUrl,
         bestViewTime: newPublicExp.bestViewTime,
         route: EXPEDITION_ROUTES.find((r) => r.id === newPublicExp.routeId),
         vessel: FLEET_DATA.find((v) => v.id === newPublicExp.vesselId),
@@ -983,6 +1030,49 @@ export const expeditionService = {
 
       if (error) return { success: false, error: error.message };
       return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  async toggleFeaturedDeparture(departureId: string): Promise<{ success: boolean; isFeatured?: boolean; error?: string }> {
+    try {
+      const stored = getStoredDepartures();
+      const target = stored.find((e) => e.id === departureId);
+      if (!target) {
+        return { success: false, error: 'Expedición no encontrada.' };
+      }
+
+      const currentlyFeatured = stored.filter((e) => e.isFeatured);
+      const willBeFeatured = !target.isFeatured;
+
+      if (willBeFeatured && currentlyFeatured.length >= 3) {
+        return {
+          success: false,
+          error: 'Solo puedes seleccionar un máximo de 3 expediciones para mostrar en el carrusel de inicio. Desmarca una primero.',
+        };
+      }
+
+      const updated = stored.map((e) => {
+        if (e.id === departureId) {
+          return {
+            ...e,
+            isFeatured: willBeFeatured,
+          };
+        }
+        return e;
+      });
+
+      saveStoredDepartures(updated);
+
+      try {
+        await supabase
+          .from('expedition_departures')
+          .update({ is_featured: willBeFeatured } as any)
+          .eq('id', departureId);
+      } catch {}
+
+      return { success: true, isFeatured: willBeFeatured };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }

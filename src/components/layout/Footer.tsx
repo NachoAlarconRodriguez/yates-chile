@@ -1,6 +1,7 @@
 import React from 'react';
 import { Mail, MapPin } from 'lucide-react';
 import { PatagoniaLiveCanvas } from '../modules/PatagoniaLiveCanvas';
+import { NewsletterSection } from '../modules/NewsletterSection';
 
 interface FooterProps {
   onNavigate?: (path: string) => void;
@@ -17,6 +18,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
   return (
     <footer className="bg-[#0B1528] text-white border-t border-white/5">
+      {/* Newsletter Subscription Section */}
+      <NewsletterSection />
+
       {/* Subtle Patagonia Live Canvas Telemetry */}
       <PatagoniaLiveCanvas />
 
