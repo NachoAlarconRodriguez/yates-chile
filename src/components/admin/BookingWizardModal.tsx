@@ -28,6 +28,8 @@ import { LuxuryDatePicker } from './LuxuryDatePicker';
 
 export interface BookingWizardData {
   bookingCode: string;
+  mainModality: 'expedition' | 'lodge' | 'custom';
+  selectedProgramIds?: string[];
   categories: string[];
   selectedPrograms: {
     id: string;
@@ -432,6 +434,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const [isDiscountEnabled, setIsDiscountEnabled] = useState<boolean>(false);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [specialNotes, setSpecialNotes] = useState<string>('');
+  const [customPriceOverrides, setCustomPriceOverrides] = useState<Record<string, number>>({});
 
   // Custom In-App Notification State
   const [notification, setNotification] = useState<{
@@ -452,6 +455,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       setCurrentStep(1);
       setSelectedCategories([]);
       setSelectedProgramIds([]);
+      setCustomPriceOverrides({});
       setStartDate('');
       setEndDate('');
       setPassengersCount(1);
@@ -475,18 +479,32 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     }
   }, [isOpen]);
 
-  // Toggle category in Step 1 (for Custom Mode)
+  // Toggle category in Step 2 (for Custom Mode)
   const toggleCategory = (catId: string) => {
-    if (selectedCategories.includes(catId)) {
-      setSelectedCategories(selectedCategories.filter((c) => c !== catId));
-    } else {
+    if (!selectedCategories.includes(catId)) {
+      if (catId === 'vegvisir' && passengersCount > 6) {
+        showNotification(
+          `El Velero Vegvisir tiene capacidad máxima de 6 personas (actualmente hay ${passengersCount} pasajeros configurados). Ajusta los pasajeros a 6 o menos para incluir el velero.`,
+          'Capacidad Excedida'
+        );
+        return;
+      }
+      if (catId === 'terranova' && passengersCount > 8) {
+        showNotification(
+          `El Yate Terranova tiene capacidad máxima de 8 personas (actualmente hay ${passengersCount} pasajeros configurados). Ajusta los pasajeros a 8 o menos para incluir el yate.`,
+          'Capacidad Excedida'
+        );
+        return;
+      }
       setSelectedCategories([...selectedCategories, catId]);
+    } else {
+      setSelectedCategories(selectedCategories.filter((c) => c !== catId));
     }
   };
 
   // Helper booleans for dynamic wizard mode
   const isOnlyLodge = mainModality === 'lodge' || (selectedCategories.length === 1 && selectedCategories[0] === 'lodge');
-  const { isRoomBookedForRange } = useLodge();
+  const { isRoomBookedForRange, isDateBookedForRoom, bookings: lodgeBookings, rooms: lodgeRooms } = useLodge();
 
   const getRoomIdFromProgId = (progId: string): string => {
     if (progId === 'prog-lodge-1' || progId.toLowerCase().includes('albatros') || progId.toLowerCase().includes('room-1')) return 'room-1';
@@ -495,6 +513,153 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     if (progId === 'prog-lodge-4' || progId.toLowerCase().includes('vidriola') || progId.toLowerCase().includes('room-4')) return 'room-4';
     return progId;
   };
+
+  // =========================================================================
+  // MOTOR INTELIGENTE DE DISPONIBILIDAD DE ACTIVOS (VELERO, YATE, LODGE)
+  // =========================================================================
+  const getVesselDisabledRanges = (vesselKeyword: 'vegvisir' | 'terranova') => {
+    const ranges: { start: string; end: string; reason: string }[] = [];
+    const isMatch = (nameOrId?: string) => Boolean(nameOrId && nameOrId.toLowerCase().includes(vesselKeyword));
+
+    (departures || []).forEach((d: any) => {
+      const vName = d.vessel?.name || d.vessel_id || d.vessel || '';
+      const cat = d.category || '';
+      if (isMatch(vName) || isMatch(cat)) {
+        const s = (d.departure_date || d.departureDate || '').split('T')[0];
+        const e = (d.return_date || d.returnDate || '').split('T')[0];
+        const status = d.status || '';
+        if (s && e && status !== 'cancelled') {
+          const vTitle = vesselKeyword === 'vegvisir' ? 'Velero Vegvisir' : 'Yate Terranova';
+          ranges.push({
+            start: s,
+            end: e,
+            reason: `${vTitle} ocupado en travesía (${formatDateDDMMYYYY(s)} al ${formatDateDDMMYYYY(e)})`,
+          });
+        }
+      }
+    });
+    return ranges;
+  };
+
+  // Rangos bloqueados para las embarcaciones seleccionadas en el modo personalizado
+  const customDisabledDateRanges = useMemo(() => {
+    if (mainModality !== 'custom') return [];
+    const ranges: { start: string; end: string; reason: string }[] = [];
+
+    if (selectedCategories.includes('vegvisir')) {
+      ranges.push(...getVesselDisabledRanges('vegvisir'));
+    }
+    if (selectedCategories.includes('terranova')) {
+      ranges.push(...getVesselDisabledRanges('terranova'));
+    }
+
+    return ranges;
+  }, [mainModality, selectedCategories, departures]);
+
+  // Verificar si un día individual está bloqueado por falta de activos seleccionados
+  const isCustomDateBlocked = (dateIso: string) => {
+    // 1. Embarcaciones (Velero / Yate)
+    for (const r of customDisabledDateRanges) {
+      if (dateIso >= r.start && dateIso <= r.end) {
+        return { disabled: true, reason: r.reason };
+      }
+    }
+
+    // 2. Capacidad del Lodge Rincón si está seleccionado
+    if (selectedCategories.includes('lodge')) {
+      const cabinsNeeded = Math.max(1, Math.ceil(passengersCount / 3));
+      const totalRooms = (rooms && rooms.length > 0 ? rooms.length : (lodgeRooms && lodgeRooms.length > 0 ? lodgeRooms.length : 4));
+      
+      const bookedRoomsOnDate = (lodgeBookings || []).filter((b) => {
+        if (!['pending_transfer', 'approved', 'blocked'].includes(b.status)) return false;
+        return dateIso >= b.check_in && dateIso < b.check_out;
+      }).length;
+
+      const availableCount = Math.max(0, totalRooms - bookedRoomsOnDate);
+      if (availableCount < cabinsNeeded) {
+        return {
+          disabled: true,
+          reason: `Lodge Rincón: Solo ${availableCount} ${availableCount === 1 ? 'cabina disponible' : 'cabinas disponibles'} (se requieren ${cabinsNeeded})`,
+        };
+      }
+    }
+
+    return false;
+  };
+
+  // Verificar disponibilidad de un activo específico en un rango de fechas
+  const checkAssetAvailabilityForRange = (catId: string, sDate: string, eDate: string): { available: boolean; reason?: string; assetName: string } => {
+    const meta = ASSET_META[catId] || { label: catId };
+    if (!sDate || !eDate || sDate >= eDate) {
+      return { available: true, assetName: meta.label };
+    }
+
+    if (catId === 'vegvisir') {
+      const vegRanges = getVesselDisabledRanges('vegvisir');
+      const conflict = vegRanges.find((r) => r.start < eDate && r.end > sDate);
+      if (conflict) {
+        return { available: false, reason: conflict.reason, assetName: 'Velero Vegvisir' };
+      }
+      return { available: true, assetName: 'Velero Vegvisir' };
+    }
+
+    if (catId === 'terranova') {
+      const terraRanges = getVesselDisabledRanges('terranova');
+      const conflict = terraRanges.find((r) => r.start < eDate && r.end > sDate);
+      if (conflict) {
+        return { available: false, reason: conflict.reason, assetName: 'Yate Terranova' };
+      }
+      return { available: true, assetName: 'Yate Terranova' };
+    }
+
+    if (catId === 'lodge') {
+      const cabinsNeeded = Math.max(1, Math.ceil(passengersCount / 3));
+      const totalRooms = (rooms && rooms.length > 0 ? rooms.length : (lodgeRooms && lodgeRooms.length > 0 ? lodgeRooms.length : 4));
+      
+      const s = new Date(sDate);
+      const e = new Date(eDate);
+      const curr = new Date(s);
+      while (curr < e) {
+        const iso = curr.toISOString().split('T')[0];
+        const bookedCount = (lodgeBookings || []).filter((b) => {
+          if (!['pending_transfer', 'approved', 'blocked'].includes(b.status)) return false;
+          return iso >= b.check_in && iso < b.check_out;
+        }).length;
+
+        if (totalRooms - bookedCount < cabinsNeeded) {
+          return {
+            available: false,
+            reason: `Sin cabinas suficientes el ${formatDateDDMMYYYY(iso)} (${Math.max(0, totalRooms - bookedCount)} disponibles de ${cabinsNeeded} requeridas)`,
+            assetName: 'Lodge Rincón',
+          };
+        }
+        curr.setDate(curr.getDate() + 1);
+      }
+      return { available: true, assetName: 'Lodge Rincón' };
+    }
+
+    if (catId === 'aeronave') {
+      return { available: true, assetName: 'Traslado en Avioneta' };
+    }
+
+    if (catId === 'servicios') {
+      return { available: true, assetName: 'Excursiones & Buceo' };
+    }
+
+    return { available: true, assetName: meta.label };
+  };
+
+  // Resumen global de conflictos en el rango para el modo personalizado
+  const customRangeConflict = useMemo(() => {
+    if (mainModality !== 'custom' || !startDate || !endDate || startDate >= endDate) return null;
+    for (const catId of selectedCategories) {
+      const check = checkAssetAvailabilityForRange(catId, startDate, endDate);
+      if (!check.available) {
+        return check;
+      }
+    }
+    return null;
+  }, [mainModality, startDate, endDate, selectedCategories, departures, lodgeBookings, rooms, lodgeRooms, passengersCount]);
 
   // Dynamic Programs List based on Main Modality or Custom Asset Scope
   const availablePrograms = useMemo(() => {
@@ -573,20 +738,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       return CATALOG_PROGRAMS.filter((p) => p.includedAssets.includes('lodge') && p.includedAssets.length === 1);
     }
 
-    // 3. Custom Mode: match selected categories
-    if (selectedCategories.length === 0) return [];
-
-    return CATALOG_PROGRAMS.filter((prog) => {
-      const matchesAll = selectedCategories.every((catId) => prog.includedAssets.includes(catId));
-      if (!matchesAll) return false;
-
-      if (selectedCategories.length === 1) {
-        return prog.includedAssets.length === 1 && prog.includedAssets[0] === selectedCategories[0];
-      }
-
-      return true;
-    });
-  }, [mainModality, departures, rooms, selectedCategories]);
+    return [];
+  }, [mainModality, departures, rooms]);
 
   // Compute upcoming 12 months for expedition filtering in Step 2
   const upcoming12Months = useMemo(() => {
@@ -649,23 +802,24 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   // Filter displayed programs in Step 2 based on selected month
   const displayedProgramsInStep2 = useMemo(() => {
-    if (mainModality !== 'expedition' || expeditionMonthFilter === 'all') {
-      return availablePrograms;
+    if (mainModality === 'expedition') {
+      if (expeditionMonthFilter === 'all') return availablePrograms;
+      return availablePrograms.filter((prog: any) => {
+        if (!prog.departureDate) return false;
+        const cleanDate = String(prog.departureDate).split('T')[0];
+        return cleanDate.startsWith(expeditionMonthFilter);
+      });
     }
-    return availablePrograms.filter((p: any) => {
-      if (!p.departureDate) return true;
-      const cleanDate = String(p.departureDate).split('T')[0];
-      return cleanDate.startsWith(expeditionMonthFilter);
-    });
-  }, [mainModality, expeditionMonthFilter, availablePrograms]);
+    return availablePrograms;
+  }, [mainModality, availablePrograms, expeditionMonthFilter]);
 
-  // Single selection of program (Radio behavior: only 1 package at a time)
+  // Select a single program
   const selectProgram = (progId: string, autoAdvance = true) => {
     const found = availablePrograms.find((p) => p.id === progId);
     if (found && (found as any).isSoldOut) {
       showNotification(
-        `La expedición "${found.title}" ya tiene todos sus cupos reservados (Agotada). Selecciona otra expedición con cupos disponibles.`,
-        'Expedición Agotada'
+        `El programa "${found.title}" se encuentra totalmente agotado. Por favor selecciona otra opción disponible.`,
+        'Cupos Agotados'
       );
       return;
     }
@@ -694,60 +848,153 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     }
   };
 
+  // Custom Mode dynamic line items calculation
+  // Custom Mode dynamic line items calculation with custom pricing support
+  const customProgramsData = useMemo(() => {
+    if (mainModality !== 'custom') return [];
+    const items: {
+      id: string;
+      title: string;
+      categoryLabel: string;
+      defaultPriceClp: number;
+      priceClp: number;
+      unitType: 'pax' | 'fixed' | 'night';
+      description: string;
+      pricingUnitLabel: string;
+    }[] = [];
+
+    if (selectedCategories.includes('vegvisir')) {
+      const defaultPrice = 11100000;
+      const effectivePrice = typeof customPriceOverrides['custom-vegvisir'] === 'number'
+        ? customPriceOverrides['custom-vegvisir']
+        : defaultPrice;
+      items.push({
+        id: 'custom-vegvisir',
+        title: 'Chárter Exclusivo Privado Velero Vegvisir',
+        categoryLabel: 'Velero Vegvisir',
+        defaultPriceClp: defaultPrice,
+        priceClp: effectivePrice,
+        unitType: 'fixed',
+        description: 'Barco completo a vela con patrón y tripulación (Capacidad máx: 6 PAX)',
+        pricingUnitLabel: 'Total Chárter Barco Completo',
+      });
+    }
+
+    if (selectedCategories.includes('terranova')) {
+      const defaultPrice = 16800000;
+      const effectivePrice = typeof customPriceOverrides['custom-terranova'] === 'number'
+        ? customPriceOverrides['custom-terranova']
+        : defaultPrice;
+      items.push({
+        id: 'custom-terranova',
+        title: 'Chárter Exclusivo Privado Yate Terranova',
+        categoryLabel: 'Yate Terranova',
+        defaultPriceClp: defaultPrice,
+        priceClp: effectivePrice,
+        unitType: 'fixed',
+        description: 'Yate oceánico motorizado de 60 ft exclusivo (Capacidad máx: 8 PAX)',
+        pricingUnitLabel: 'Total Chárter Barco Completo',
+      });
+    }
+
+    if (selectedCategories.includes('lodge')) {
+      const cabinsNeeded = Math.max(1, Math.ceil(passengersCount / 3));
+      const defaultPrice = cabinsNeeded * 240000;
+      const effectivePrice = typeof customPriceOverrides['custom-lodge'] === 'number'
+        ? customPriceOverrides['custom-lodge']
+        : defaultPrice;
+      items.push({
+        id: 'custom-lodge',
+        title: `Estadía Lodge Rincón (${cabinsNeeded} ${cabinsNeeded === 1 ? 'Cabina' : 'Cabinas'})`,
+        categoryLabel: 'Lodge Rincón',
+        defaultPriceClp: defaultPrice,
+        priceClp: effectivePrice,
+        unitType: 'night',
+        description: `Hospedaje frente al mar (${cabinsNeeded} cabinas para ${passengersCount} huéspedes)`,
+        pricingUnitLabel: 'Tarifa por Noche (Total Cabinas)',
+      });
+    }
+
+    if (selectedCategories.includes('aeronave')) {
+      const defaultPrice = 650000;
+      const effectivePrice = typeof customPriceOverrides['custom-aeronave'] === 'number'
+        ? customPriceOverrides['custom-aeronave']
+        : defaultPrice;
+      items.push({
+        id: 'custom-aeronave',
+        title: 'Traslado Aéreo Santiago ⇄ Isla Robinson Crusoe',
+        categoryLabel: 'Aeronave & Vuelos',
+        defaultPriceClp: defaultPrice,
+        priceClp: effectivePrice,
+        unitType: 'pax',
+        description: `Vuelo ida y vuelta con 15kg equipaje (${passengersCount} PAX)`,
+        pricingUnitLabel: 'Tarifa por Pasajero',
+      });
+    }
+
+    if (selectedCategories.includes('servicios')) {
+      const defaultPrice = 270000;
+      const effectivePrice = typeof customPriceOverrides['custom-servicios'] === 'number'
+        ? customPriceOverrides['custom-servicios']
+        : defaultPrice;
+      items.push({
+        id: 'custom-servicios',
+        title: 'Pack de Excursiones, Buceo & Actividades',
+        categoryLabel: 'Excursiones & Actividades',
+        defaultPriceClp: defaultPrice,
+        priceClp: effectivePrice,
+        unitType: 'pax',
+        description: `Buceo con lobos marinos, cabalgatas y gastronomía (${passengersCount} PAX)`,
+        pricingUnitLabel: 'Tarifa por Pasajero',
+      });
+    }
+
+    return items;
+  }, [mainModality, selectedCategories, passengersCount, customPriceOverrides]);
+
   // Selected program data
   const selectedProgramsData = useMemo(() => {
+    if (mainModality === 'custom') {
+      return customProgramsData;
+    }
     return availablePrograms.filter((p) => selectedProgramIds.includes(p.id));
-  }, [availablePrograms, selectedProgramIds]);
+  }, [mainModality, customProgramsData, availablePrograms, selectedProgramIds]);
 
   const activeSelectedProgram = selectedProgramsData[0] || availablePrograms[0] || CATALOG_PROGRAMS[0];
 
   // Check if currently active selected lodge room is booked for the date range
   const isSelectedLodgeRoomBooked = useMemo(() => {
-    if (!isOnlyLodge || !startDate || !endDate) return false;
-    const targetRoomId = getRoomIdFromProgId(activeSelectedProgram?.id || '');
+    if (!isOnlyLodge || !startDate || !endDate || selectedProgramIds.length === 0) return false;
+    const targetRoomId = getRoomIdFromProgId(selectedProgramIds[0] || '');
     if (!targetRoomId) return false;
     return isRoomBookedForRange(targetRoomId, startDate, endDate);
-  }, [isOnlyLodge, startDate, endDate, activeSelectedProgram, isRoomBookedForRange]);
+  }, [isOnlyLodge, startDate, endDate, selectedProgramIds, isRoomBookedForRange]);
 
-  // Sync selectedProgramIds when availablePrograms change (avoid pre-selecting sold out)
+  // Sync selectedProgramIds when availablePrograms change (clear if invalid or sold out)
   useEffect(() => {
-    if (availablePrograms.length > 0) {
+    if (availablePrograms.length > 0 && selectedProgramIds.length > 0) {
       const hasValidSelection = selectedProgramIds.some((id) =>
         availablePrograms.some((p) => p.id === id && !(p as any).isSoldOut)
       );
       if (!hasValidSelection) {
-        const firstAvailable = availablePrograms.find((p: any) => !p.isSoldOut) || availablePrograms[0];
-        if (firstAvailable && !(firstAvailable as any).isSoldOut) {
-          setSelectedProgramIds([firstAvailable.id]);
-          const first = firstAvailable as any;
-          if (first && first.departureDate && first.returnDate) {
-            setStartDate(first.departureDate);
-            setEndDate(first.returnDate);
-          }
-        }
+        setSelectedProgramIds([]);
       }
-    } else {
-      setSelectedProgramIds([]);
     }
-  }, [availablePrograms]);
-
-  // Pre-fill default dates for Lodge when entering Step 3
-  useEffect(() => {
-    if (isOnlyLodge && currentStep === 3 && !startDate) {
-      const todayObj = new Date();
-      const startStr = todayObj.toISOString().split('T')[0];
-      const endObj = new Date();
-      endObj.setDate(endObj.getDate() + 2);
-      const endStr = endObj.toISOString().split('T')[0];
-      setStartDate(startStr);
-      setEndDate(endStr);
-    }
-  }, [isOnlyLodge, currentStep, startDate]);
+  }, [availablePrograms, selectedProgramIds]);
 
   // Sync passengers list length with passengersCount
   const handlePaxCountChange = (newCount: number) => {
     const clamped = Math.max(1, Math.min(12, newCount));
     setPassengersCount(clamped);
+
+    // Si el nuevo recuento de pasajeros supera la capacidad de una nave ya seleccionada, deseleccionarla
+    if (clamped > 6 && selectedCategories.includes('vegvisir')) {
+      setSelectedCategories((prev) => prev.filter((c) => c !== 'vegvisir'));
+    }
+    if (clamped > 8 && selectedCategories.includes('terranova')) {
+      setSelectedCategories((prev) => prev.filter((c) => c !== 'terranova'));
+    }
+
     if (clamped > passengers.length) {
       const added = Array.from({ length: clamped - passengers.length }, () => ({
         fullName: '',
@@ -877,7 +1124,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
         if (!startDate || !endDate || startDate >= endDate) return false;
         if (selectedProgramIds.length === 0) return false;
         if (isSelectedLodgeRoomBooked) return false;
-        if (passengersCount > (activeSelectedProgram?.paxLimit || 3)) return false;
+        if (passengersCount > ((activeSelectedProgram as any)?.paxLimit || 3)) return false;
         return true;
       }
       if (currentStep === 3) {
@@ -893,14 +1140,19 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     // PERSONALIZADO
     if (mainModality === 'custom') {
       if (currentStep === 2) {
-        return selectedCategories.length > 0;
-      }
-      if (currentStep === 3) {
-        return Boolean(startDate && endDate && startDate <= endDate);
-      }
-      if (currentStep === 4) {
+        // Step 2: Pasajeros (requiere datos del titular)
         const lead = passengers[0];
         return Boolean(lead && lead.fullName.trim() && (lead.email.trim() || lead.phone.trim()));
+      }
+      if (currentStep === 3) {
+        // Step 3: Servicios (al menos 1 activo)
+        return selectedCategories.length > 0;
+      }
+      if (currentStep === 4) {
+        // Step 4: Fechas (fechas válidas y sin conflictos de disponibilidad en los activos elegidos)
+        if (!startDate || !endDate || startDate >= endDate) return false;
+        if (customRangeConflict !== null) return false;
+        return true;
       }
       if (currentStep === 5) return true; // Payment
       if (currentStep === 6) return true; // Summary
@@ -933,19 +1185,23 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             showNotification('Por favor selecciona una de las habitaciones disponibles para continuar.', 'Habitación Requerida');
           } else if (isSelectedLodgeRoomBooked) {
             showNotification(`La cabina seleccionada no está disponible en las fechas (${formatDateDDMMYYYY(startDate)} al ${formatDateDDMMYYYY(endDate)}). Elige otra habitación disponible.`, 'Habitación no disponible');
-          } else if (passengersCount > (activeSelectedProgram?.paxLimit || 3)) {
-            showNotification(`La habitación seleccionada tiene capacidad máxima para ${activeSelectedProgram?.paxLimit} huéspedes (solicitados: ${passengersCount}). Elige una habitación con mayor capacidad.`, 'Capacidad Excedida');
+          } else if (passengersCount > ((activeSelectedProgram as any)?.paxLimit || 3)) {
+            showNotification(`La habitación seleccionada tiene capacidad máxima para ${(activeSelectedProgram as any)?.paxLimit || 3} huéspedes (solicitados: ${passengersCount}). Elige una habitación con mayor capacidad.`, 'Capacidad Excedida');
           }
         } else if (currentStep === 3) {
           showNotification('Por favor completa los datos del huésped principal.', 'Datos Requeridos');
         }
       } else if (mainModality === 'custom') {
         if (currentStep === 2) {
-          showNotification('Por favor activa al menos uno de los servicios para continuar con esta expedición personalizada.', 'Servicios Requeridos');
+          showNotification('Por favor completa al menos el nombre y teléfono/correo del pasajero titular para continuar a la selección de servicios.', 'Datos de Pasajero Requeridos');
         } else if (currentStep === 3) {
-          showNotification('Por favor define las fechas de inicio y término.', 'Fechas Requeridas');
+          showNotification('Por favor activa al menos uno de los servicios (Velero, Yate, Lodge, Vuelo o Excursiones) para continuar.', 'Servicios Requeridos');
         } else if (currentStep === 4) {
-          showNotification('Por favor completa los datos del pasajero principal.', 'Datos Requeridos');
+          if (!startDate || !endDate || startDate >= endDate) {
+            showNotification('Por favor define las fechas de inicio y término de la travesía (mínimo 1 noche).', 'Fechas Requeridas');
+          } else if (customRangeConflict) {
+            showNotification(`Conflicto de disponibilidad en ${customRangeConflict.assetName}: ${customRangeConflict.reason || 'Ocupado en las fechas seleccionadas'}. Por favor selecciona otro rango de fechas.`, 'Fechas No Disponibles');
+          }
         }
       } else {
         showNotification('Por favor complete los campos requeridos para continuar.', 'Atención');
@@ -965,6 +1221,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     const randomCode = `RES-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     const finalData: BookingWizardData = {
       bookingCode: randomCode,
+      mainModality: mainModality || 'custom',
+      selectedProgramIds: selectedProgramIds,
       categories: selectedCategories,
       selectedPrograms: selectedProgramsData.map((p) => ({
         id: p.id,
@@ -1073,9 +1331,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 ]
               : [
                   { step: 1, label: '1. Modalidad' },
-                  { step: 2, label: '2. Servicios' },
-                  { step: 3, label: '3. Fechas' },
-                  { step: 4, label: '4. Pasajeros' },
+                  { step: 2, label: '2. Pasajeros' },
+                  { step: 3, label: '3. Servicios' },
+                  { step: 4, label: '4. Fechas' },
                   { step: 5, label: '5. Pago' },
                   { step: 6, label: '6. Resumen' },
                 ]
@@ -1200,14 +1458,9 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   onClick={() => {
                     setMainModality('lodge');
                     setSelectedCategories(['lodge']);
-                    if (!startDate) {
-                      const d1 = new Date();
-                      d1.setDate(d1.getDate() + 14);
-                      const d2 = new Date(d1);
-                      d2.setDate(d2.getDate() + 3);
-                      setStartDate(d1.toISOString().split('T')[0]);
-                      setEndDate(d2.toISOString().split('T')[0]);
-                    }
+                    setSelectedProgramIds([]);
+                    setStartDate('');
+                    setEndDate('');
                     setTimeout(() => {
                       setCurrentStep(2);
                     }, 120);
@@ -1269,9 +1522,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   type="button"
                   onClick={() => {
                     setMainModality('custom');
-                    if (selectedCategories.length === 0) {
-                      setSelectedCategories(['vegvisir', 'lodge']);
-                    }
+                    setSelectedCategories([]);
+                    setSelectedProgramIds([]);
+                    setStartDate('');
+                    setEndDate('');
                     setTimeout(() => {
                       setCurrentStep(2);
                     }, 120);
@@ -1391,12 +1645,15 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       value={startDate}
                       defaultYear={new Date().getFullYear()}
                       minDate={new Date().toISOString().split('T')[0]}
+                      isDateDisabled={(dIso) =>
+                        selectedProgramIds.length > 0
+                          ? isDateBookedForRoom(getRoomIdFromProgId(selectedProgramIds[0]), dIso)
+                          : false
+                      }
                       onChange={(newStart) => {
                         setStartDate(newStart);
-                        if (!endDate || endDate <= newStart) {
-                          const d = new Date(newStart);
-                          d.setDate(d.getDate() + 2);
-                          setEndDate(d.toISOString().split('T')[0]);
+                        if (endDate && endDate <= newStart) {
+                          setEndDate('');
                         }
                       }}
                       inputClassName="bg-white border-slate-300 focus:border-[#0f2b48] py-2 px-3 text-xs font-mono font-bold text-[#0f2b48]"
@@ -1412,6 +1669,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       value={endDate}
                       defaultYear={new Date().getFullYear()}
                       minDate={startDate || new Date().toISOString().split('T')[0]}
+                      isDateDisabled={(dIso) =>
+                        selectedProgramIds.length > 0
+                          ? isDateBookedForRoom(getRoomIdFromProgId(selectedProgramIds[0]), dIso)
+                          : false
+                      }
                       onChange={(val) => setEndDate(val)}
                       inputClassName="bg-white border-slate-300 focus:border-[#0f2b48] py-2 px-3 text-xs font-mono font-bold text-[#0f2b48]"
                     />
@@ -1452,16 +1714,24 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
                 {availablePrograms.map((room) => {
                   const roomId = getRoomIdFromProgId(room.id);
-                  const isOccupied = startDate && endDate ? isRoomBookedForRange(roomId, startDate, endDate) : false;
+                  const hasDates = Boolean(startDate && endDate && startDate < endDate);
+                  const isOccupied = hasDates ? isRoomBookedForRange(roomId, startDate, endDate) : false;
                   const isCapacityExceeded = passengersCount > (room.paxLimit || 3);
-                  const isRoomAvailable = !isOccupied && !isCapacityExceeded && Boolean(startDate && endDate && startDate < endDate);
+                  const isRoomAvailable = hasDates && !isOccupied && !isCapacityExceeded;
                   const isSelected = selectedProgramIds.includes(room.id);
-                  const totalRoomStay = (room.priceClp || 240000) * (calculatedNights || 1);
+                  const totalRoomStay = (room.priceClp || 240000) * (hasDates ? calculatedNights : 1);
 
                   return (
                     <div
                       key={room.id}
                       onClick={() => {
+                        if (!hasDates) {
+                          showNotification(
+                            'Por favor selecciona las fechas de Check-in y Check-out para consultar disponibilidad y reservar.',
+                            'Fechas Requeridas'
+                          );
+                          return;
+                        }
                         if (!isRoomAvailable) {
                           if (isOccupied) {
                             showNotification(
@@ -1481,7 +1751,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                         selectProgram(room.id, true);
                       }}
                       className={`p-4.5 rounded-2xl border transition-all duration-200 flex flex-wrap items-center justify-between gap-3 select-none ${
-                        !isRoomAvailable
+                        !hasDates
+                          ? isCapacityExceeded
+                            ? 'bg-slate-50/70 border-slate-200 opacity-60 cursor-not-allowed'
+                            : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-slate-50/60 cursor-pointer'
+                          : !isRoomAvailable
                           ? 'bg-slate-50/70 border-slate-200 opacity-60 cursor-not-allowed'
                           : isSelected
                           ? 'bg-emerald-50/60 border-emerald-500 ring-2 ring-emerald-300/40 shadow-xs cursor-pointer'
@@ -1508,19 +1782,29 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                             <h5 className="font-serif font-bold text-sm text-[#0f2b48] truncate">
                               {room.title}
                             </h5>
-                            {isRoomAvailable ? (
-                              <span className="text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">
-                                ✓ Disponible para {passengersCount} PAX
-                              </span>
-                            ) : isOccupied ? (
-                              <span className="text-[9px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full">
-                                ✕ Ocupada en estas fechas
-                              </span>
+                            {hasDates ? (
+                              isRoomAvailable ? (
+                                <span className="text-[9px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">
+                                  ✓ Disponible para {passengersCount} PAX
+                                </span>
+                              ) : isOccupied ? (
+                                <span className="text-[9px] font-mono font-bold bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full">
+                                  ✕ Ocupada en estas fechas
+                                </span>
+                              ) : isCapacityExceeded ? (
+                                <span className="text-[9px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full">
+                                  ⚠ Capacidad máx: {room.paxLimit} PAX
+                                </span>
+                              ) : null
                             ) : isCapacityExceeded ? (
                               <span className="text-[9px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full">
                                 ⚠ Capacidad máx: {room.paxLimit} PAX
                               </span>
-                            ) : null}
+                            ) : (
+                              <span className="text-[9px] font-mono font-medium bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full">
+                                Ingresa fechas para verificar disponibilidad
+                              </span>
+                            )}
                           </div>
                           <p className="text-[11px] text-slate-500 font-light line-clamp-1">
                             {room.description}
@@ -1530,10 +1814,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
                       <div className="text-right shrink-0">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
-                          {calculatedNights > 0 ? `Total ${calculatedNights} ${calculatedNights === 1 ? 'Noche' : 'Noches'}` : 'Tarifa por Noche'}
+                          {hasDates
+                            ? `Total ${calculatedNights} ${calculatedNights === 1 ? 'Noche' : 'Noches'}`
+                            : 'Tarifa por Noche'}
                         </span>
                         <div className="text-sm font-mono font-bold text-[#0f2b48]">
-                          ${totalRoomStay.toLocaleString('es-CL')}{' '}
+                          ${(hasDates ? totalRoomStay : (room.priceClp || 240000)).toLocaleString('es-CL')}{' '}
                           <span className="text-[10px] font-normal text-slate-500 font-sans">CLP</span>
                         </div>
                         <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
@@ -1743,61 +2029,90 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 2: PERSONALIZADO — SELECCIÓN DE SERVICIOS DE LA EXPEDICIÓN           */}
+          {/* PASO 3: PERSONALIZADO — SELECCIÓN DE ACTIVOS / SERVICIOS (ÍCONOS CIRCULARES) */}
           {/* ========================================================================= */}
-          {currentStep === 2 && mainModality === 'custom' && (
+          {currentStep === 3 && mainModality === 'custom' && (
             <div className="space-y-5 animate-fadeIn">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-200">
                     Expedición Personalizada a Medida
                   </span>
+                  <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-bold">
+                    {passengersCount} {passengersCount === 1 ? 'Pasajero configurado' : 'Pasajeros configurados'}
+                  </span>
                 </div>
                 <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  Paso 2: Selecciona los servicios de esta expedición personalizada
+                  Paso 3: Selecciona los servicios de esta expedición personalizada
                 </h4>
                 <p className="text-slate-500 text-xs font-light">
-                  Haz clic en los íconos circulares para activar o desactivar cada componente que integrará esta travesía (puedes activar uno o varios):
+                  Haz clic en los íconos circulares para activar o desactivar cada componente que integrará esta travesía:
                 </p>
               </div>
 
               {/* SELECTOR DE SERVICIOS CON ÍCONOS CIRCULARES */}
-              <div className="bg-slate-50/70 border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4">
-                <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 py-2">
+              <div className="bg-slate-50/70 border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-2xs space-y-5">
+                <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 py-2">
                   {[
-                    { id: 'vegvisir', title: 'Velero Vegvisir', desc: 'Travesía oceánica', icon: Sailboat },
-                    { id: 'terranova', title: 'Yate Terranova', desc: 'Yate a motor', icon: Ship },
-                    { id: 'lodge', title: 'Lodge Rincón', desc: 'Cabinas & Estadía', icon: BedDouble },
-                    { id: 'servicios', title: 'Excursiones & Buceo', desc: 'Actividades & Tours', icon: Compass },
-                    { id: 'aeronave', title: 'Aeronave & Vuelos', desc: 'Vuelos Robinson Crusoe', icon: Plane },
+                    { id: 'vegvisir', title: 'Velero Vegvisir', desc: 'Travesía oceánica', maxPax: 6, icon: Sailboat },
+                    { id: 'terranova', title: 'Yate Terranova', desc: 'Yate a motor', maxPax: 8, icon: Ship },
+                    { id: 'lodge', title: 'Lodge Rincón', desc: 'Cabinas & Estadía', maxPax: 12, icon: BedDouble },
+                    { id: 'servicios', title: 'Excursiones & Buceo', desc: 'Actividades & Tours', maxPax: 12, icon: Compass },
+                    { id: 'aeronave', title: 'Aeronave & Vuelos', desc: 'Vuelos Robinson Crusoe', maxPax: 12, icon: Plane },
                   ].map((item) => {
                     const isSelected = selectedCategories.includes(item.id);
+                    const isOverCapacity = Boolean(item.maxPax && passengersCount > item.maxPax);
                     const Icon = item.icon;
+
                     return (
                       <div key={item.id} className="relative group/iconbtn flex flex-col items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => toggleCategory(item.id)}
-                          className={`w-18 h-18 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-md hover:scale-105 active:scale-95 relative border-2 ${
-                            isSelected
+                          onClick={() => {
+                            if (isOverCapacity) {
+                              showNotification(
+                                `El ${item.title} tiene una capacidad máxima de ${item.maxPax} pasajeros y has configurado ${passengersCount} personas en el grupo.`,
+                                'Capacidad Excedida'
+                              );
+                              return;
+                            }
+                            toggleCategory(item.id);
+                          }}
+                          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-md hover:scale-105 active:scale-95 relative border-2 ${
+                            isOverCapacity
+                              ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-50 shadow-none hover:scale-100'
+                              : isSelected
                               ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-lg shadow-[#0f2b48]/30 scale-105 ring-4 ring-amber-100'
                               : 'bg-white text-slate-400 border-slate-200 hover:border-[#0f2b48]/40 hover:text-[#0f2b48] hover:bg-slate-50'
                           }`}
-                          title={`Activar/Desactivar ${item.title}`}
+                          title={
+                            isOverCapacity
+                              ? `No disponible para ${passengersCount} pasajeros (Capacidad máx: ${item.maxPax})`
+                              : `Activar/Desactivar ${item.title}`
+                          }
                         >
-                          <Icon className="w-7 h-7" />
+                          <Icon className="w-8 h-8" />
                           {isSelected && (
-                            <div className="absolute -top-1 -right-1 w-5.5 h-5.5 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-md border-2 border-white animate-scale-in">
-                              <Check className="w-3 h-3 stroke-[3]" />
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-md border-2 border-white animate-scale-in">
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            </div>
+                          )}
+                          {isOverCapacity && (
+                            <div className="absolute -top-1 -right-1 w-5.5 h-5.5 bg-slate-300 text-slate-600 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white">
+                              ✕
                             </div>
                           )}
                         </button>
                         <div className="text-center">
-                          <span className={`text-xs font-bold block leading-tight transition ${isSelected ? 'text-[#0f2b48]' : 'text-slate-500'}`}>
+                          <span
+                            className={`text-xs font-bold block leading-tight transition ${
+                              isOverCapacity ? 'text-slate-300 line-through' : isSelected ? 'text-[#0f2b48]' : 'text-slate-600'
+                            }`}
+                          >
                             {item.title}
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            {item.desc}
+                            {isOverCapacity ? `Máx ${item.maxPax} PAX` : item.desc}
                           </span>
                         </div>
                       </div>
@@ -1808,103 +2123,32 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 {/* Resumen de servicios activos */}
                 <div className="pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-xs font-semibold text-[#0f2b48]">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className={`w-2.5 h-2.5 rounded-full ${selectedCategories.length > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                     <span>
                       {selectedCategories.length > 0
-                        ? `${selectedCategories.length} ${selectedCategories.length === 1 ? 'servicio activo' : 'servicios activos'} seleccionados`
-                        : 'Ningún servicio activo. Haz clic en los íconos para activar.'}
+                        ? `${selectedCategories.length} ${selectedCategories.length === 1 ? 'servicio activo' : 'servicios activos'} seleccionados para el grupo (${passengersCount} PAX)`
+                        : 'Haz clic en los íconos para seleccionar al menos 1 servicio'}
                     </span>
                   </div>
                   {selectedCategories.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => setCurrentStep(3)}
-                      className="px-4 py-1.5 rounded-full bg-[#0f2b48] text-white text-xs font-bold transition hover:bg-[#182a44] cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      onClick={() => setCurrentStep(4)}
+                      className="px-5 py-2 rounded-full bg-[#0f2b48] text-white text-xs font-bold transition hover:bg-[#182a44] cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
-                      <span>Siguiente: Fechas</span>
+                      <span>Siguiente: Fechas de Travesía</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
               </div>
-
-              {/* LISTA DE PROGRAMAS O PAQUETES ASOCIADOS */}
-              {displayedProgramsInStep2.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-serif font-bold text-sm text-[#0f2b48]">
-                      Programas y Paquetes Disponibles para los Servicios Activos:
-                    </h5>
-                    <span className="text-[11px] font-mono text-slate-400">
-                      {displayedProgramsInStep2.length} disponibles
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {displayedProgramsInStep2.map((prog) => {
-                      const isSelected = selectedProgramIds.includes(prog.id);
-                      return (
-                        <div
-                          key={prog.id}
-                          onClick={() => selectProgram(prog.id, false)}
-                          className={`p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-wrap items-center justify-between gap-3 select-none ${
-                            isSelected
-                              ? 'bg-amber-50/50 border-amber-400 ring-1 ring-amber-300 shadow-xs'
-                              : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div
-                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
-                                isSelected
-                                  ? 'bg-[#0f2b48] border-[#0f2b48] text-white'
-                                  : 'bg-white border-slate-300'
-                              }`}
-                            >
-                              {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                            </div>
-
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h6 className="font-serif font-bold text-sm text-[#0f2b48] truncate">
-                                  {prog.title}
-                                </h6>
-                                <span className="text-[10px] text-slate-400 font-mono shrink-0">
-                                  • {prog.duration}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 font-light line-clamp-1 mt-0.5">
-                                {prog.description}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
-                              Tarifa
-                            </span>
-                            <div className="text-sm font-mono font-bold text-[#0f2b48]">
-                              ${prog.priceClp.toLocaleString('es-CL')}{' '}
-                              <span className="text-[10px] font-normal text-slate-500 font-sans">
-                                {prog.unitType === 'pax' ? 'CLP / pax' : prog.unitType === 'night' ? 'CLP / noche' : 'CLP total'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-
-
           {/* ========================================================================= */}
-          {/* PASO 3: FECHAS DE LA TRAVESÍA (SOLO PERSONALIZADO)                       */}
+          {/* PASO 4: FECHAS DE LA TRAVESÍA (SOLO PERSONALIZADO)                        */}
           {/* ========================================================================= */}
-          {currentStep === 3 && mainModality === 'custom' && (
+          {currentStep === 4 && mainModality === 'custom' && (
             <div className="space-y-4 animate-fadeIn">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
@@ -1913,7 +2157,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   </span>
                 </div>
                 <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  Paso 3: Define las fechas de la travesía personalizada
+                  Paso 4: Define las fechas de la travesía personalizada
                 </h4>
                 <p className="text-slate-500 text-xs font-light">
                   Selecciona la fecha de inicio (zarpe o check-in) y fecha de término para la expedición a medida:
@@ -1931,6 +2175,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       value={startDate}
                       defaultYear={new Date().getFullYear()}
                       minDate={new Date().toISOString().split('T')[0]}
+                      disabledDateRanges={customDisabledDateRanges}
+                      isDateDisabled={isCustomDateBlocked}
                       onChange={(val) => setStartDate(val)}
                       inputClassName="bg-slate-50 border-slate-300/80 focus:border-[#0f2b48] focus:bg-white py-2.5 px-3 text-xs font-mono font-bold text-[#0f2b48]"
                     />
@@ -1945,12 +2191,15 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       value={endDate}
                       defaultYear={new Date().getFullYear()}
                       minDate={startDate || new Date().toISOString().split('T')[0]}
+                      disabledDateRanges={customDisabledDateRanges}
+                      isDateDisabled={isCustomDateBlocked}
                       onChange={(val) => setEndDate(val)}
                       inputClassName="bg-slate-50 border-slate-300/80 focus:border-[#0f2b48] focus:bg-white py-2.5 px-3 text-xs font-mono font-bold text-[#0f2b48]"
                     />
                   </div>
                 </div>
 
+                {/* Resumen de Duración */}
                 <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-2xl flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#0f2b48] shadow-2xs">
@@ -1969,16 +2218,83 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     Travesía a Medida
                   </span>
                 </div>
+
+                {/* VERIFICACIÓN DE DISPONIBILIDAD EN TIEMPO REAL POR ACTIVO */}
+                <div className="bg-slate-50/60 border border-slate-200/90 rounded-2xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 font-mono flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#0f2b48]" />
+                      Disponibilidad en Tiempo Real ({selectedCategories.length} {selectedCategories.length === 1 ? 'servicio' : 'servicios'})
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-slate-500">
+                      {startDate && endDate && startDate < endDate
+                        ? `${formatDateDDMMYYYY(startDate)} ➔ ${formatDateDDMMYYYY(endDate)}`
+                        : 'Ingresa fechas para validar'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedCategories.map((catId) => {
+                      const check = checkAssetAvailabilityForRange(catId, startDate, endDate);
+                      const hasDates = Boolean(startDate && endDate && startDate < endDate);
+
+                      return (
+                        <div
+                          key={catId}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                            !hasDates
+                              ? 'bg-white border-slate-200 text-slate-600'
+                              : check.available
+                              ? 'bg-emerald-50/80 border-emerald-200/90 text-emerald-900 shadow-2xs'
+                              : 'bg-rose-50 border-rose-200 text-rose-900 shadow-2xs'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {!hasDates ? (
+                              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                            ) : check.available ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                            )}
+                            <span className="font-bold truncate">{check.assetName}</span>
+                          </div>
+
+                          <span className="text-[10px] font-mono font-bold shrink-0 ml-2">
+                            {!hasDates
+                              ? 'Pendiente'
+                              : check.available
+                              ? '✓ Disponible'
+                              : '✕ Ocupado'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Alerta si hay conflicto */}
+                  {customRangeConflict && (
+                    <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-start gap-2.5 text-xs text-rose-800 animate-fadeIn">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="block font-bold">Conflicto de disponibilidad detectado:</strong>
+                        <span>
+                          {customRangeConflict.assetName}: {customRangeConflict.reason || 'No cuenta con disponibilidad en las fechas indicadas'}. Por favor selecciona otro rango de fechas.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* PASO DE PASAJEROS: Step 2 para expedición, Step 3 para lodge, Step 4 para custom */}
+          {/* PASO DE PASAJEROS: Step 2 para expedición, Step 3 para lodge, Step 2 para custom */}
           {/* ========================================================================= */}
           {((mainModality === 'expedition' && currentStep === 2) ||
             (mainModality === 'lodge' && currentStep === 3) ||
-            (mainModality === 'custom' && currentStep === 4)) && (
+            (mainModality === 'custom' && currentStep === 2)) && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -1996,12 +2312,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       ? 'Paso 2: Cantidad de Pasajeros y Datos Personales'
                       : mainModality === 'lodge'
                       ? 'Paso 3: Fichas y Datos de los Huéspedes'
-                      : 'Paso 4: Cantidad de Pasajeros y Fichas de Clientes'}
+                      : 'Paso 2: Cantidad de Pasajeros y Fichas de Clientes'}
                   </h4>
                   <p className="text-slate-500 text-xs font-light">
                     {mainModality === 'expedition'
                       ? 'Indica cuántos pasajeros viajarán y completa sus datos para consultar las expediciones con cupos disponibles.'
-                      : 'Cada pasajero será creado automáticamente en la base de datos de Clientes CRM.'}
+                      : mainModality === 'lodge'
+                      ? 'Cada huésped será registrado automáticamente en la base de datos de Clientes CRM.'
+                      : 'Define el tamaño del grupo y sus datos personales antes de seleccionar los activos y servicios de la travesía.'}
                   </p>
                 </div>
 
@@ -2203,6 +2521,131 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   </span>
                 </div>
               </div>
+
+              {/* DETALLE DESGLOSADO DE SERVICIOS / ACTIVOS */}
+              {selectedProgramsData.length > 0 && (
+                <div className="bg-[#fbfcfd] border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">
+                      Componentes & Servicios Incluidos ({selectedProgramsData.length})
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {passengersCount} PAX • {calculatedNights} {calculatedNights === 1 ? 'día' : 'días'}
+                    </span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {selectedProgramsData.map((item) => {
+                      const itemSubtotal = item.unitType === 'fixed'
+                        ? item.priceClp
+                        : item.unitType === 'night'
+                        ? item.priceClp * calculatedNights
+                        : item.priceClp * passengersCount;
+
+                      const isCustomMode = mainModality === 'custom';
+                      const defaultPrice = (item as any).defaultPriceClp;
+                      const isOverridden = isCustomMode && defaultPrice !== undefined && item.priceClp !== defaultPrice;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 bg-white border border-slate-200/90 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 text-xs shadow-2xs hover:border-slate-300 transition"
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-[#0f2b48] block text-xs sm:text-sm">
+                                {item.title}
+                              </span>
+                              {isOverridden && (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-mono font-bold shrink-0">
+                                  Tarifa Editada
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-500 font-light block">
+                              {item.description}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono block">
+                              {item.unitType === 'fixed'
+                                ? 'Chárter Barco Completo'
+                                : item.unitType === 'night'
+                                ? `${calculatedNights} ${calculatedNights === 1 ? 'noche' : 'noches'} (${formatDateDDMMYYYY(startDate)} al ${formatDateDDMMYYYY(endDate)})`
+                                : `${passengersCount} PAX`}
+                            </span>
+                          </div>
+
+                          {/* CONTROLES DE PRECIO */}
+                          {isCustomMode ? (
+                            <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+                              {/* Campo de edición directa del valor */}
+                              <div className="space-y-1 text-right">
+                                <label className="text-[9px] uppercase font-bold text-slate-400 font-mono block">
+                                  {(item as any).pricingUnitLabel || 'Modificar Tarifa'}
+                                </label>
+                                <div className="relative flex items-center">
+                                  <span className="absolute left-2.5 text-xs font-mono font-bold text-slate-400">$</span>
+                                  <input
+                                    type="text"
+                                    value={item.priceClp ? item.priceClp.toLocaleString('es-CL') : ''}
+                                    onChange={(e) => {
+                                      const digitsOnly = e.target.value.replace(/[^0-9]/g, '');
+                                      const parsed = parseInt(digitsOnly, 10);
+                                      setCustomPriceOverrides((prev) => ({
+                                        ...prev,
+                                        [item.id]: isNaN(parsed) ? 0 : parsed,
+                                      }));
+                                    }}
+                                    placeholder="0"
+                                    className="w-36 bg-slate-50 hover:bg-slate-100 focus:bg-white border-2 border-slate-200 focus:border-[#0f2b48] rounded-xl pl-6 pr-2.5 py-1.5 text-right font-mono font-bold text-xs text-[#0f2b48] focus:outline-none transition shadow-2xs"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Columna de Subtotal & Restablecer */}
+                              <div className="text-right min-w-[115px] pl-3 border-l border-slate-100 space-y-0.5">
+                                <span className="text-[9px] uppercase font-bold text-slate-400 font-mono block">
+                                  Subtotal
+                                </span>
+                                <span className="font-mono font-bold text-xs sm:text-sm text-[#0f2b48] block">
+                                  ${itemSubtotal.toLocaleString('es-CL')}
+                                </span>
+                                {isOverridden && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCustomPriceOverrides((prev) => {
+                                        const next = { ...prev };
+                                        delete next[item.id];
+                                        return next;
+                                      });
+                                    }}
+                                    className="text-[10px] text-sky-700 hover:text-sky-900 font-mono underline hover:no-underline cursor-pointer block"
+                                    title="Restablecer tarifa estándar original"
+                                  >
+                                    Restablecer
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-right shrink-0">
+                              <span className="font-mono font-bold text-[#0f2b48] text-sm block">
+                                ${itemSubtotal.toLocaleString('es-CL')} CLP
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono block">
+                                {item.unitType === 'fixed'
+                                  ? 'Chárter Barco Completo'
+                                  : item.unitType === 'night'
+                                  ? `${calculatedNights} ${calculatedNights === 1 ? 'noche' : 'noches'}`
+                                  : `${passengersCount} PAX`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* MODALIDAD DE PAGO Y RESERVA OFICIAL */}
               <div className="bg-[#fbfcfd] border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
@@ -2632,13 +3075,33 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <span className="text-[10px] uppercase font-bold text-slate-400 font-mono block">
                       Programas & Servicios Incluidos
                     </span>
-                    <ul className="space-y-1">
-                      {selectedProgramsData.map((prog) => (
-                        <li key={prog.id} className="text-xs font-semibold text-[#0f2b48] flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>{prog.title}</span>
-                        </li>
-                      ))}
+                    <ul className="space-y-1.5">
+                      {selectedProgramsData.map((prog) => {
+                        const itemSubtotal = prog.unitType === 'fixed'
+                          ? prog.priceClp
+                          : prog.unitType === 'night'
+                          ? prog.priceClp * calculatedNights
+                          : prog.priceClp * passengersCount;
+
+                        const isOverridden = mainModality === 'custom' && (prog as any).defaultPriceClp !== undefined && prog.priceClp !== (prog as any).defaultPriceClp;
+
+                        return (
+                          <li key={prog.id} className="text-xs font-semibold text-[#0f2b48] flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{prog.title}</span>
+                              {isOverridden && (
+                                <span className="text-[9px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-mono shrink-0">
+                                  Tarifa editada
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono text-xs font-bold text-slate-700 shrink-0">
+                              ${itemSubtotal.toLocaleString('es-CL')}
+                            </span>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
 

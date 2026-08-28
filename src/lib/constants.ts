@@ -35,7 +35,7 @@ export const FLEET_DATA: Vessel[] = [
       'Desalinizador 140 ltrs/hr con autonomía de agua dulce',
       'Zodiac desembarco 4.3 mts con motor Mercury 4T de 15 hp',
     ],
-    mainImage: '/travesia-robinson.jpg',
+    mainImage: '/velero-vegvisir.jpg',
     hotspots: [
       {
         id: 'veg-1',
@@ -87,7 +87,7 @@ export const FLEET_DATA: Vessel[] = [
       'Conexión Satelital Starlink 24/7 y 2 Generadores Northern Lights 10kVA',
       '2 Desalinizadores 140 ltrs/hr y Zodiac semirrígido Yamaha 4T 70hp',
     ],
-    mainImage: '/zarpe-archipielago.jpg',
+    mainImage: '/yate-terranova.jpg',
     hotspots: [
       {
         id: 'ter-1',

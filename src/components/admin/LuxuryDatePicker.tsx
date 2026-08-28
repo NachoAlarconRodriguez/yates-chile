@@ -8,6 +8,9 @@ interface LuxuryDatePickerProps {
   required?: boolean;
   minDate?: string;
   maxDate?: string;
+  disabledDates?: string[];
+  disabledDateRanges?: { start: string; end: string; reason?: string }[];
+  isDateDisabled?: (dateIso: string) => boolean | { disabled: boolean; reason?: string };
   defaultYear?: number;
   className?: string;
   inputClassName?: string;
@@ -27,6 +30,9 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
   required = false,
   minDate,
   maxDate,
+  disabledDates,
+  disabledDateRanges,
+  isDateDisabled,
   defaultYear,
   className = '',
   inputClassName = '',
@@ -274,11 +280,11 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
           </div>
 
           {/* Días de la Semana */}
-          <div className="grid grid-cols-7 gap-1 text-center mt-3 mb-1">
+          <div className="grid grid-cols-7 gap-1 text-center mt-3 mb-1.5">
             {DAY_NAMES.map((dayName) => (
               <span
                 key={dayName}
-                className="text-[10px] font-mono font-bold uppercase text-slate-400 py-1"
+                className="text-[11px] font-mono font-bold uppercase text-slate-500 py-1"
               >
                 {dayName}
               </span>
@@ -293,7 +299,7 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
               return (
                 <div
                   key={`prev-${i}`}
-                  className="w-8 h-8 sm:w-9 sm:h-9 mx-auto flex items-center justify-center text-[11px] font-mono text-slate-300 pointer-events-none"
+                  className="w-8 h-8 sm:w-9 sm:h-9 mx-auto flex items-center justify-center text-[11px] font-mono text-slate-300 pointer-events-none select-none"
                 >
                   {dayNum}
                 </div>
@@ -306,7 +312,41 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
               const dateIso = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
               const isBeforeMin = minDate ? dateIso < minDate : false;
               const isAfterMax = maxDate ? dateIso > maxDate : false;
-              const isDisabled = isBeforeMin || isAfterMax;
+              
+              let isConflictDisabled = false;
+              let disableTooltip = '';
+
+              if (isBeforeMin) {
+                isConflictDisabled = true;
+                disableTooltip = 'Fecha pasada';
+              } else if (isAfterMax) {
+                isConflictDisabled = true;
+                disableTooltip = 'Fecha fuera de rango';
+              } else if (disabledDates && disabledDates.includes(dateIso)) {
+                isConflictDisabled = true;
+                disableTooltip = 'Fecha no disponible / ocupada';
+              } else if (disabledDateRanges && disabledDateRanges.length > 0) {
+                for (const r of disabledDateRanges) {
+                  if (dateIso >= r.start && dateIso <= r.end) {
+                    isConflictDisabled = true;
+                    disableTooltip = r.reason || 'Fecha no disponible / ocupada';
+                    break;
+                  }
+                }
+              }
+
+              if (!isConflictDisabled && isDateDisabled) {
+                const customCheck = isDateDisabled(dateIso);
+                if (typeof customCheck === 'boolean' && customCheck) {
+                  isConflictDisabled = true;
+                  disableTooltip = 'Fecha no disponible';
+                } else if (typeof customCheck === 'object' && customCheck.disabled) {
+                  isConflictDisabled = true;
+                  disableTooltip = customCheck.reason || 'Fecha no disponible';
+                }
+              }
+
+              const isDisabled = isConflictDisabled;
 
               const isSelected =
                 currentDateObj &&
@@ -325,21 +365,36 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
                   key={`current-${dayNum}`}
                   type="button"
                   disabled={isDisabled}
+                  title={isDisabled ? disableTooltip : undefined}
                   onClick={() => !isDisabled && handleSelectDay(dayNum)}
-                  className={`w-8 h-8 sm:w-9 sm:h-9 mx-auto rounded-xl flex items-center justify-center text-xs font-mono font-semibold transition-all ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 mx-auto rounded-xl flex items-center justify-center text-xs font-mono transition-all ${
                     isDisabled
-                      ? 'opacity-20 cursor-not-allowed pointer-events-none text-slate-300'
+                      ? 'bg-slate-100/90 text-slate-400 font-medium cursor-not-allowed pointer-events-none select-none border border-slate-200/50'
                       : isSelected
-                      ? 'bg-[#0b192c] text-white shadow-md font-bold scale-105 ring-2 ring-sky-200 cursor-pointer'
+                      ? 'bg-[#0f2b48] text-white shadow-md font-bold scale-105 ring-2 ring-amber-300 cursor-pointer'
                       : isToday
-                      ? 'bg-sky-50 text-sky-800 border border-sky-300 font-bold hover:bg-sky-100 cursor-pointer'
-                      : 'text-slate-700 hover:bg-slate-100 hover:text-[#0b192c] cursor-pointer'
+                      ? 'bg-sky-50 text-sky-900 border-2 border-sky-400 font-bold hover:bg-sky-100 cursor-pointer shadow-2xs'
+                      : 'text-[#0f2b48] font-bold hover:bg-sky-50 hover:text-sky-900 cursor-pointer'
                   }`}
                 >
                   {dayNum}
                 </button>
               );
             })}
+
+            {/* Días del mes siguiente (padding para cuadrícula completa) */}
+            {(() => {
+              const totalCells = startOffset + daysInCurrentMonth;
+              const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+              return Array.from({ length: remaining }).map((_, i) => (
+                <div
+                  key={`next-${i}`}
+                  className="w-8 h-8 sm:w-9 sm:h-9 mx-auto flex items-center justify-center text-[11px] font-mono text-slate-300 pointer-events-none select-none"
+                >
+                  {i + 1}
+                </div>
+              ));
+            })()}
           </div>
 
           {/* Footer de Acciones Rápidas (Hoy / Borrar) */}

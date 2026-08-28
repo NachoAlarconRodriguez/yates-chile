@@ -1,7 +1,11 @@
 import { supabase } from '../lib/supabase';
 import type { Database } from '../types/database.types';
 
-export type LodgeRoom = Database['public']['Tables']['lodge_rooms']['Row'];
+export type LodgeRoom = Database['public']['Tables']['lodge_rooms']['Row'] & {
+  description?: string;
+  image_url?: string;
+  amenities?: string[];
+};
 export type LodgeBooking = Database['public']['Tables']['lodge_bookings']['Row'];
 
 export const FALLBACK_ROOMS: LodgeRoom[] = [
@@ -15,6 +19,9 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
+    image_url: '/rincon-de-navegantes.jpg',
+    description: 'Habitación doble superior con cama matrimonial king, baño en suite de mármol y ventanal panorámico con vista a Bahía Cumberland.',
+    amenities: ['Cama King / Doble', 'Baño en suite privado', 'Vista panorámica al mar', 'Calefacción central', 'Starlink WiFi']
   },
   {
     id: 'room-2',
@@ -26,6 +33,9 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
+    image_url: '/jf-noviembre.jpg',
+    description: 'Habitación triple espaciosa ideal para familias o pequeños grupos, con cama matrimonial y cama single, baño privado y vista a la bahía.',
+    amenities: ['1 Cama King + 1 Single', 'Baño privado completo', 'Vista a Bahía Cumberland', 'Ropa de cama premium', 'Starlink WiFi']
   },
   {
     id: 'room-3',
@@ -37,6 +47,9 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
+    image_url: '/juan-fernandez-selkirk.jpg',
+    description: 'Acogedora habitación triple con maderas nobles nativas, vista a los acantilados y al mar, equipada para el máximo descanso tras un día de expedición.',
+    amenities: ['3 Camas o 1 Matrimonial + 1 Single', 'Baño en suite', 'Vista a acantilados y mar', 'Calefacción', 'Starlink WiFi']
   },
   {
     id: 'room-4',
@@ -48,6 +61,9 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
+    image_url: '/jf-marzo.jpg',
+    description: 'Habitación triple con terraza exterior y acceso directo al muelle de la bahía. Bautizada en honor al pez rey de Juan Fernández.',
+    amenities: ['Capacidad 3 huéspedes', 'Terraza exterior privada', 'Baño en suite', 'Vista a la bahía', 'Starlink WiFi']
   },
 ];
 
@@ -144,6 +160,36 @@ export const lodgeService = {
     }
   },
 
+  async createRoom(newRoomData: Partial<LodgeRoom>): Promise<LodgeRoom> {
+    const current = getCachedRooms();
+    const newId = newRoomData.id || `room-${Date.now()}`;
+    const nextNumber = newRoomData.room_number || (current.length > 0 ? Math.max(...current.map(r => r.room_number)) + 1 : 1);
+    
+    const newRoom: LodgeRoom = {
+      id: newId,
+      room_number: nextNumber,
+      room_name: newRoomData.room_name || `Habitación ${nextNumber}`,
+      room_type: newRoomData.room_type || 'doble',
+      max_pax: newRoomData.max_pax || 2,
+      base_price_clp: newRoomData.base_price_clp || 220000,
+      has_ocean_view: newRoomData.has_ocean_view !== undefined ? newRoomData.has_ocean_view : true,
+      is_active: newRoomData.is_active !== undefined ? newRoomData.is_active : true,
+      created_at: new Date().toISOString(),
+      description: newRoomData.description || 'Habitación con vista al mar y baño en suite en Lodge Bahía Cumberland.',
+      image_url: newRoomData.image_url || '/rincon-de-navegantes.jpg',
+      amenities: newRoomData.amenities || ['Baño privado en suite', 'Vista al mar', 'Starlink WiFi']
+    };
+
+    const updated = [...current, newRoom].sort((a, b) => a.room_number - b.room_number);
+    saveCachedRooms(updated);
+
+    try {
+      await (supabase.from('lodge_rooms') as any).insert([newRoom]);
+    } catch {}
+
+    return newRoom;
+  },
+
   async updateRoom(roomId: string, updates: Partial<LodgeRoom>): Promise<{ success: boolean; error?: string }> {
     try {
       // 1. Update local cache immediately
@@ -152,8 +198,7 @@ export const lodgeService = {
       saveCachedRooms(updatedList);
 
       // 2. Update Supabase
-      const { error } = await supabase
-        .from('lodge_rooms')
+      const { error } = await (supabase.from('lodge_rooms') as any)
         .update(updates)
         .eq('id', roomId);
 
@@ -164,6 +209,18 @@ export const lodgeService = {
     } catch {
       return { success: true };
     }
+  },
+
+  async deleteRoom(roomId: string): Promise<{ success: boolean; message?: string }> {
+    const current = getCachedRooms();
+    const filtered = current.filter(r => r.id !== roomId);
+    saveCachedRooms(filtered);
+
+    try {
+      await supabase.from('lodge_rooms').delete().eq('id', roomId);
+    } catch {}
+
+    return { success: true };
   },
 
   async getBookingsAndBlocks(): Promise<LodgeBooking[]> {

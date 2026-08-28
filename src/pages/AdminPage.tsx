@@ -58,7 +58,6 @@ import {
   Bell,
   Phone,
   Wind,
-  MoreHorizontal,
   Info,
   Printer,
   X
@@ -69,10 +68,14 @@ import { useSiteContent } from '../hooks/useSiteContent';
 import { useLeads } from '../hooks/useLeads';
 import { type LeadItem } from '../services/leadService';
 import { paymentService, type PaymentInstallment } from '../services/paymentService';
-import { lodgeService, type LodgeRoom } from '../services/lodgeService';
+import { lodgeService, type LodgeRoom, type LodgeBooking } from '../services/lodgeService';
 import { BookingWizardModal, type BookingWizardData } from '../components/admin/BookingWizardModal';
 import { ExpeditionWizardModal, type ExpeditionWizardData } from '../components/admin/ExpeditionWizardModal';
 import { VisualCmsEditor } from '../components/admin/VisualCmsEditor';
+import { VesselsConfigTab } from '../components/admin/VesselsConfigTab';
+import { LodgeConfigTab } from '../components/admin/LodgeConfigTab';
+import { AccessRequestsTab } from '../components/admin/AccessRequestsTab';
+import { useAccessRequests } from '../hooks/useAccessRequests';
 import {
   expeditionService,
   INITIAL_EXPEDITIONS,
@@ -618,8 +621,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Active Tab: 'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms'>('dashboard');
+  // Active Tab: 'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests'>('dashboard');
+
+  // Estados de Solicitud de Acceso en Login
+  const [loginViewMode, setLoginViewMode] = useState<'login' | 'request_access'>('login');
+  const [reqFullName, setReqFullName] = useState('');
+  const [reqEmail, setReqEmail] = useState('');
+  const [reqPhone, setReqPhone] = useState('');
+  const [reqSentSuccess, setReqSentSuccess] = useState(false);
+  const [reqSubmitting, setReqSubmitting] = useState(false);
+  const [reqError, setReqError] = useState('');
+
+  // Hook de Solicitudes de Acceso
+  const { pendingCount, createRequest: createAccessRequest } = useAccessRequests();
 
   // Secciones en Dashboard
   const [isRecentBookingsOpen, setIsRecentBookingsOpen] = useState(true);
@@ -661,7 +676,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // CRM & Gestión de Clientes (Fichas de Cliente)
   const [crmActiveSubTab, setCrmActiveSubTab] = useState<'clients' | 'leads'>('clients');
-  const [crmClients, setCrmClients] = useState<CustomerProfile[]>(INITIAL_CRM_CLIENTS);
+  const [crmClients, setCrmClients] = useState<CustomerProfile[]>(() => {
+    try {
+      const stored = localStorage.getItem('yates_chile_crm_clients');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_CRM_CLIENTS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('yates_chile_crm_clients', JSON.stringify(crmClients));
+    } catch {}
+  }, [crmClients]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerProfile | null>(null);
   const [customerDossierTab, setCustomerDossierTab] = useState<'profile' | 'bookings' | 'payments' | 'timeline'>('profile');
   const [customerFilter] = useState<'all' | 'vip' | 'expeditions' | 'lodge' | 'pending_payment'>('all');
@@ -787,6 +817,73 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   };
   const handleLodgeNextMonth = () => {
     setLodgeCalendarMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  // Simplificador de Nombres / Motivos de Lodge para visualización limpia
+  const getCleanLodgeDetail = (booking: LodgeBooking): string => {
+    const gName = (booking.guest_name || '').trim();
+    const notes = (booking.notes || '').trim();
+    const channel = (booking.channel_source || '').toLowerCase();
+
+    // 1. Airbnb
+    if (channel === 'airbnb' || gName.toLowerCase().includes('airbnb') || notes.toLowerCase().includes('airbnb')) {
+      return 'Airbnb';
+    }
+
+    // 2. Expedición Náutica / Travesía
+    if (
+      notes.toLowerCase().includes('expedición:') ||
+      notes.toLowerCase().includes('expedicion:') ||
+      notes.toLowerCase().includes('travesía') ||
+      notes.toLowerCase().includes('travesia') ||
+      gName.toLowerCase().includes('expedición') ||
+      gName.toLowerCase().includes('expedicion')
+    ) {
+      const match = notes.match(/expedici[oó]n:\s*([^(\n,]+)/i);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+      const matchTravesia = notes.match(/(traves[ií]a\s+[^(\n,]+)/i);
+      if (matchTravesia && matchTravesia[1]) {
+        return matchTravesia[1].trim();
+      }
+      if (gName.toLowerCase().includes('travesía') || gName.toLowerCase().includes('travesia')) {
+        return gName.replace(/bloqueo\s*/gi, '').trim();
+      }
+      return 'Expedición Náutica';
+    }
+
+    // 3. Reserva Wizard / Personalizada
+    if (notes.toLowerCase().includes('reserva personalizada') || gName.toLowerCase().includes('reserva personalizada')) {
+      const matchName = notes.match(/•\s*([^•\d\n]+)/);
+      if (matchName && matchName[1] && !matchName[1].toLowerCase().includes('cabina') && !matchName[1].toLowerCase().includes('pax')) {
+        return matchName[1].trim();
+      }
+      if (gName && !gName.toLowerCase().startsWith('bloqueo') && !gName.toLowerCase().startsWith('huésped yates')) {
+        return gName;
+      }
+      return 'Reserva Personalizada';
+    }
+
+    // 4. Bloqueo Manual / Mantenimiento
+    if (channel === 'maintenance' || gName.toLowerCase().includes('bloqueo') || notes.toLowerCase().includes('mantenimiento') || notes.toLowerCase().includes('bloqueo manual')) {
+      if (notes && !notes.toLowerCase().includes('mantenim') && !notes.toLowerCase().includes('bloqueo manual') && notes.length < 35) {
+        return notes;
+      }
+      return 'Bloqueo Manual';
+    }
+
+    // 5. Booking.com
+    if (channel === 'booking_com' || gName.toLowerCase().includes('booking.com')) {
+      return 'Booking.com';
+    }
+
+    // 6. Huésped directo
+    if (gName && !gName.toLowerCase().includes('huésped yates chile') && !gName.toLowerCase().includes('bloqueo')) {
+      return gName;
+    }
+
+    return gName || 'Huésped Lodge';
   };
 
   // Live Weather & Wind State for Current Login Device
@@ -2126,33 +2223,42 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   };
 
   // ----------------------------------------------------
-  // CONFIRM BOOKING WIZARD HANDLER (6 STEPS & CRM MULTI-PAX)
+  // CONFIRM BOOKING WIZARD HANDLER (PERSISTENCIA TOTAL EN BASE DE DATOS)
   // ----------------------------------------------------
   const handleConfirmBookingWizard = async (data: BookingWizardData) => {
     const nowStr = new Date().toISOString().split('T')[0];
-    const newClients: CustomerProfile[] = [];
+    const leadPax = data.passengers[0] || {
+      fullName: 'Cliente Yates Chile',
+      email: 'contacto@yateschile.cl',
+      phone: '+56 9 0000 0000',
+      rutOrPassport: 'Sin documento',
+      nationality: 'Chilena',
+      dietaryPreferences: '',
+      notes: '',
+    };
 
-    // Create or update CRM Profile for EACH passenger
+    // 1. REGISTRAR O ACTUALIZAR CLIENTES CRM (TODOS LOS PASAJEROS)
+    const newClients: CustomerProfile[] = [];
     data.passengers.forEach((pax, idx) => {
       const existing = crmClients.find(
         (c) =>
           (pax.email && c.email.toLowerCase() === pax.email.toLowerCase()) ||
-          (pax.rutOrPassport && c.rutOrPassport.toLowerCase() === pax.rutOrPassport.toLowerCase())
+          (pax.rutOrPassport && pax.rutOrPassport !== 'Sin documento' && c.rutOrPassport.toLowerCase() === pax.rutOrPassport.toLowerCase())
       );
 
       if (existing) {
         const updated: CustomerProfile = {
           ...existing,
-          bookingsCount: existing.bookingsCount + 1,
-          totalSpentClp: existing.totalSpentClp + (idx === 0 ? data.totalAmountClp : 0),
+          bookingsCount: existing.bookingsCount + (data.paymentScheme === '0' ? 0 : 1),
+          totalSpentClp: existing.totalSpentClp + (idx === 0 && data.paymentScheme !== '0' ? data.totalAmountClp : 0),
           lastActivityDate: nowStr,
           timeline: [
             {
               id: `t-${Date.now()}-${idx}`,
               date: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
               type: 'booking',
-              title: `Reserva ${data.bookingCode} — ${data.selectedPrograms.map((p) => p.title).join(', ')}`,
-              description: `Reserva paquetizada por $${data.totalAmountClp.toLocaleString('es-CL')} CLP (${data.installmentsCount} cuotas). Fechas: ${data.startDate} a ${data.endDate}.`,
+              title: data.paymentScheme === '0' ? `Cotización Lead: ${data.bookingCode}` : `Reserva ${data.bookingCode} — ${data.selectedPrograms.map((p) => p.title).join(', ')}`,
+              description: `Reserva por $${data.totalAmountClp.toLocaleString('es-CL')} CLP (${data.installmentsCount} cuotas). Fechas: ${data.startDate} a ${data.endDate}. Modalidad: ${data.mainModality}.`,
             },
             ...existing.timeline,
           ],
@@ -2172,6 +2278,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             data.paymentScheme === '0' ? 'Lead Cotización (Sin Cupo)' : 'Reserva Wizard',
             idx === 0 ? 'Titular' : 'Acompañante',
             data.paymentScheme === '100' ? '100% Confirmado' : data.paymentScheme === '50' ? '50% Abono' : '0% Lead',
+            data.mainModality.toUpperCase(),
             ...data.categories.map((c) => c.toUpperCase())
           ],
           totalSpentClp: idx === 0 && data.paymentScheme !== '0' ? (data.paymentScheme === '100' ? data.totalAmountClp : Math.round(data.totalAmountClp * 0.5)) : 0,
@@ -2200,23 +2307,122 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setCrmClients((prev) => [...newClients, ...prev]);
     }
 
-    // Register into Lodge blocks only if lodge category selected AND paymentScheme !== '0'
-    if (data.paymentScheme !== '0' && data.categories.includes('lodge') && rooms.length > 0) {
-      const targetRoom = rooms[0];
-      await adminBlockRoom({
-        roomId: targetRoom.id,
-        checkIn: data.startDate,
-        checkOut: data.endDate,
-        channelSource: 'phone_whatsapp',
-        reason: `Reserva Wizard ${data.bookingCode} • ${data.passengers[0]?.fullName || 'Titular'} • ${data.passengers.length} pax`,
-        guestName: data.passengers[0]?.fullName || 'Huésped Yates Chile',
-      });
+    // 2. PERSISTENCIA EN BASE DE DATOS SEGÚN MODALIDAD
+    try {
+      if (data.mainModality === 'expedition') {
+        // --- MODALIDAD EXPEDICIÓN NÁUTICA ---
+        const depId = data.selectedProgramIds?.[0] || data.selectedPrograms[0]?.id;
+        const targetDep = departures.find((d) => d.id === depId);
+        const vName = targetDep?.vessel?.name || data.selectedPrograms[0]?.categoryLabel || 'Velero Vegvisir';
+        const rTitle = (targetDep as any)?.routeTitle || targetDep?.name || data.selectedPrograms[0]?.title || 'Expedición';
+
+        await expeditionService.createBooking({
+          departureId: targetDep ? targetDep.id : undefined,
+          routeId: targetDep?.route_id || (targetDep as any)?.routeId,
+          vesselId: targetDep?.vessel_id || (targetDep as any)?.vesselId,
+          expeditionName: rTitle,
+          vesselName: vName,
+          departureDate: data.startDate || targetDep?.departure_date || (targetDep as any)?.departureDate,
+          returnDate: data.endDate || targetDep?.return_date || (targetDep as any)?.returnDate,
+          guestName: leadPax.fullName,
+          guestEmail: leadPax.email,
+          guestPhone: leadPax.phone,
+          guestRutPassport: leadPax.rutOrPassport || undefined,
+          bookingType: 'per_pax',
+          paxCount: data.passengersCount,
+          totalAmount: data.totalAmountClp,
+          dietaryMedicalNotes: leadPax.dietaryPreferences || leadPax.notes || data.specialNotes,
+          passengers: data.passengers.map((p) => ({
+            fullName: p.fullName,
+            docId: p.rutOrPassport,
+            nationality: p.nationality || 'Chilena',
+            emergencyContact: p.phone,
+            medicalNotes: p.notes,
+          })),
+        });
+
+      } else if (data.mainModality === 'lodge') {
+        // --- MODALIDAD LODGE RINCÓN ---
+        const progId = data.selectedProgramIds?.[0] || data.selectedPrograms[0]?.id || '';
+        const targetRoomId = (progId === 'prog-lodge-1' || progId.includes('room-1') || progId.toLowerCase().includes('albatros')) ? 'room-1'
+          : (progId === 'prog-lodge-2' || progId.includes('room-2') || progId.toLowerCase().includes('cumberland')) ? 'room-2'
+          : (progId === 'prog-lodge-3' || progId.includes('room-3') || progId.toLowerCase().includes('selkirk')) ? 'room-3'
+          : (progId === 'prog-lodge-4' || progId.includes('room-4') || progId.toLowerCase().includes('vidriola')) ? 'room-4'
+          : (rooms[0]?.id || 'room-1');
+
+        await lodgeService.createBooking({
+          roomId: targetRoomId,
+          guestName: leadPax.fullName,
+          guestEmail: leadPax.email || 'contacto@yateschile.cl',
+          guestPhone: leadPax.phone || '+56 9 0000 0000',
+          guestRutPassport: leadPax.rutOrPassport || undefined,
+          checkIn: data.startDate,
+          checkOut: data.endDate,
+          paxCount: data.passengersCount,
+          totalAmount: data.totalAmountClp,
+          notes: `Reserva Lodge: ${data.bookingCode} • ${data.passengers.length} Huéspedes • ${data.specialNotes || ''}`,
+        });
+
+      } else if (data.mainModality === 'custom') {
+        // --- MODALIDAD PERSONALIZADA (MULTI-ACTIVOS) ---
+        const hasVessel = data.categories.includes('vegvisir') || data.categories.includes('terranova');
+        const hasLodge = data.categories.includes('lodge');
+
+        // A. Embarcación (Chárter Privado)
+        if (hasVessel) {
+          const isVeg = data.categories.includes('vegvisir');
+          const isTerra = data.categories.includes('terranova');
+          const vTitle = isVeg && isTerra ? 'Velero Vegvisir + Yate Terranova' : isVeg ? 'Velero Vegvisir' : 'Yate Terranova';
+
+          await expeditionService.createBooking({
+            expeditionName: `Chárter Privado a Medida (${vTitle})`,
+            vesselName: vTitle,
+            departureDate: data.startDate,
+            returnDate: data.endDate,
+            guestName: leadPax.fullName,
+            guestEmail: leadPax.email || 'contacto@yateschile.cl',
+            guestPhone: leadPax.phone || '+56 9 0000 0000',
+            guestRutPassport: leadPax.rutOrPassport || undefined,
+            bookingType: 'full_charter',
+            paxCount: data.passengersCount,
+            totalAmount: data.totalAmountClp,
+            dietaryMedicalNotes: data.specialNotes,
+            passengers: data.passengers.map((p) => ({
+              fullName: p.fullName,
+              docId: p.rutOrPassport,
+              nationality: p.nationality || 'Chilena',
+              emergencyContact: p.phone,
+              medicalNotes: p.notes,
+            })),
+          });
+        }
+
+        // B. Lodge Rincón (Bloqueo/Reserva de Cabinas Requeridas)
+        if (hasLodge && rooms.length > 0) {
+          const cabinsNeeded = Math.max(1, Math.ceil(data.passengersCount / 3));
+          for (let i = 0; i < Math.min(cabinsNeeded, rooms.length); i++) {
+            await lodgeService.adminBlockRoom({
+              roomId: rooms[i].id,
+              checkIn: data.startDate,
+              checkOut: data.endDate,
+              channelSource: 'phone_whatsapp',
+              reason: `Reserva Personalizada ${data.bookingCode} (Cabina ${i + 1}/${cabinsNeeded}) • ${leadPax.fullName} • ${data.passengersCount} PAX`,
+              guestName: leadPax.fullName,
+            });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Error al persistir reserva en base de datos:', err);
     }
 
     const schemeLabel = data.paymentScheme === '100' ? '100% Confirmada' : data.paymentScheme === '50' ? '50% Cupo Reservado' : 'Lead Comercial (Sin Cupo)';
-    setActionMessage(`¡Registro ${data.bookingCode} (${schemeLabel}) completado con éxito! ${data.passengers.length} ficha(s) procesada(s) en Clientes.`);
+    setActionMessage(`¡Registro ${data.bookingCode} (${schemeLabel}) completado y guardado en la base de datos! ${data.passengers.length} ficha(s) procesada(s).`);
     setTimeout(() => setActionMessage(null), 5000);
+    
+    // Refrescar todos los datos en tiempo real
     fetchAllData();
+    refreshLodge();
   };
 
   const handleCreateService = async (e: React.FormEvent) => {
@@ -2648,12 +2854,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   };
 
   // ----------------------------------------------------
-  // LOGIN SCREEN (COMPACT LUXURY WHITE & NAVY BLUE CARD)
+  // LOGIN & SOLICITUD DE ACCESO SCREEN
   // ----------------------------------------------------
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#f4f7fb] text-[#0b192c] flex items-center justify-center p-4 sm:p-6 selection:bg-[#0b192c] selection:text-white">
         <div className="max-w-md w-full bg-white border border-slate-200/80 rounded-3xl p-8 sm:p-10 shadow-[0_20px_50px_rgba(11,25,44,0.06)] space-y-6 my-auto">
+          
           <div className="text-center space-y-2">
             <div className="w-16 h-16 rounded-2xl bg-[#0b192c] flex items-center justify-center mx-auto shadow-md shadow-[#0b192c]/20 p-2.5 transition-transform hover:scale-105">
               <img
@@ -2667,106 +2874,253 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 Yates Chile • Maritime & Lodge
               </span>
               <h1 className="font-serif text-2xl font-bold text-[#0b192c] tracking-tight mt-0.5">
-                Panel de Administración
+                {loginViewMode === 'login' ? 'Panel de Administración' : 'Solicitar Acceso al Panel'}
               </h1>
             </div>
             <p className="text-xs text-slate-500 font-light">
-              Acceso exclusivo para concierge, capitanes y administración general
+              {loginViewMode === 'login'
+                ? 'Acceso exclusivo para concierge, capitanes y administración general'
+                : 'Ingresa tus datos para solicitar autorización como colaborador'}
             </p>
           </div>
 
-          {loginError && (
-            <div className="bg-rose-50 border border-rose-200/90 text-rose-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 font-medium shadow-2xs animate-fadeIn">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{loginError}</span>
+          {loginViewMode === 'login' ? (
+            <>
+              {loginError && (
+                <div className="bg-rose-50 border border-rose-200/90 text-rose-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 font-medium shadow-2xs animate-fadeIn">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1.5 pl-1">
+                    Usuario / Correo
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="admin"
+                      className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl px-4 py-3 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
+                      required
+                    />
+                    <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1.5 pl-1">
+                    Contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl pl-4 pr-11 py-3 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0b192c] p-1.5 rounded-xl transition cursor-pointer"
+                      title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-3.5 rounded-full text-xs transition-all duration-200 shadow-md shadow-[#0b192c]/20 flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-[0.99]"
+                >
+                  <Lock className="w-4 h-4 text-sky-300" />
+                  <span>Ingresar al Sistema</span>
+                </button>
+
+                <div className="pt-3 text-center space-y-2.5">
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPasswordModal(true);
+                        setForgotSent(false);
+                        setForgotEmail(username.includes('@') ? username : '');
+                      }}
+                      className="text-xs text-sky-700 hover:text-[#0b192c] font-semibold hover:underline cursor-pointer transition inline-flex items-center gap-1"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  </div>
+
+                  {/* Botón Solicitar Acceso como Administrador */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginViewMode('request_access');
+                        setReqSentSuccess(false);
+                        setReqError('');
+                      }}
+                      className="w-full py-2.5 px-4 rounded-2xl bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200/70 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
+                    >
+                      <UserPlus className="w-4 h-4 text-sky-700" />
+                      <span>Solicitar Acceso como Administrador</span>
+                    </button>
+                  </div>
+
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => (onNavigate ? onNavigate('/') : (window.location.hash = '/'))}
+                      className="text-xs text-slate-400 hover:text-[#0b192c] transition font-medium cursor-pointer"
+                    >
+                      ← Volver al Sitio Web Público
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </>
+          ) : (
+            /* MODO: SOLICITUD DE ACCESO INLINE */
+            <div className="space-y-4 animate-fadeIn">
+              {reqSentSuccess ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-7 h-7" />
+                  </div>
+                  <h3 className="font-serif font-bold text-base text-emerald-950">
+                    ¡Solicitud Enviada con Éxito!
+                  </h3>
+                  <p className="text-xs text-emerald-800 font-light leading-relaxed">
+                    Hemos registrado tu solicitud para <strong>{reqFullName}</strong> ({reqEmail}). El Administrador General revisará tu acceso en el panel y te contactará.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginViewMode('login');
+                        setReqSentSuccess(false);
+                        setReqFullName('');
+                        setReqEmail('');
+                        setReqPhone('');
+                      }}
+                      className="px-5 py-2.5 rounded-full bg-[#0b192c] text-white text-xs font-bold cursor-pointer hover:bg-[#182a44] transition shadow-md"
+                    >
+                      Volver al Inicio de Sesión
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!reqFullName.trim() || !reqEmail.trim() || !reqPhone.trim()) {
+                      setReqError('Por favor completa todos los campos requeridos.');
+                      return;
+                    }
+                    setReqSubmitting(true);
+                    setReqError('');
+                    try {
+                      await createAccessRequest({
+                        fullName: reqFullName.trim(),
+                        email: reqEmail.trim(),
+                        phone: reqPhone.trim()
+                      });
+                      setReqSentSuccess(true);
+                    } catch (err: any) {
+                      setReqError(err?.message || 'Error al enviar la solicitud.');
+                    } finally {
+                      setReqSubmitting(false);
+                    }
+                  }}
+                  className="space-y-3.5"
+                >
+                  {reqError && (
+                    <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2 font-medium">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{reqError}</span>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1 pl-1">
+                      Nombre y Apellido <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej: Martín Valenzuela"
+                      value={reqFullName}
+                      onChange={(e) => setReqFullName(e.target.value)}
+                      className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1 pl-1">
+                      Correo Electrónico (Mail) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="ejemplo@yateschile.cl"
+                      value={reqEmail}
+                      onChange={(e) => setReqEmail(e.target.value)}
+                      className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1 pl-1">
+                      Teléfono / WhatsApp <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="+56 9 1234 5678"
+                      value={reqPhone}
+                      onChange={(e) => setReqPhone(e.target.value)}
+                      className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl px-4 py-2.5 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs font-mono"
+                    />
+                  </div>
+
+                  <div className="pt-2 space-y-2">
+                    <button
+                      type="submit"
+                      disabled={reqSubmitting}
+                      className="w-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-3 rounded-full text-xs transition-all duration-200 shadow-md shadow-[#0b192c]/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <UserPlus className="w-4 h-4 text-sky-400" />
+                      <span>{reqSubmitting ? 'Enviando Solicitud...' : 'Enviar Solicitud de Acceso'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginViewMode('login');
+                        setReqError('');
+                      }}
+                      className="w-full py-2 text-xs text-slate-500 hover:text-[#0b192c] font-medium cursor-pointer transition"
+                    >
+                      ← Cancelar y volver al login
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1.5 pl-1">
-                Usuario / Correo
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin"
-                  className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl px-4 py-3 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
-                  required
-                />
-                <User className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
-              </div>
-            </div>
-            <div>
-              <label className="text-[11px] uppercase tracking-wider text-[#0b192c] font-bold block mb-1.5 pl-1">
-                Contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl pl-4 pr-11 py-3 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0b192c] p-1.5 rounded-xl transition cursor-pointer"
-                  title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
-                  tabIndex={-1}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold py-3.5 rounded-full text-xs transition-all duration-200 shadow-md shadow-[#0b192c]/20 flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-[0.99]"
-            >
-              <Lock className="w-4 h-4 text-sky-300" />
-              <span>Ingresar al Sistema</span>
-            </button>
-
-            <div className="pt-2 text-center space-y-2">
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForgotPasswordModal(true);
-                    setForgotSent(false);
-                    setForgotEmail(username.includes('@') ? username : '');
-                  }}
-                  className="text-xs text-sky-700 hover:text-[#0b192c] font-semibold hover:underline cursor-pointer transition inline-flex items-center gap-1"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => (onNavigate ? onNavigate('/') : (window.location.hash = '/'))}
-                  className="text-xs text-slate-500 hover:text-[#0b192c] transition font-medium cursor-pointer"
-                >
-                  ← Volver al Sitio Web Público
-                </button>
-              </div>
-
-              <div className="pt-2 flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Conexión Encriptada • Supabase DB</span>
-              </div>
-            </div>
-          </form>
         </div>
 
         {/* MODAL: RECUPERAR CONTRASEÑA */}
@@ -3013,7 +3367,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               >
                 <div className="flex items-center gap-3">
                   <BedDouble className={`w-4 h-4 ${activeTab === 'lodge' ? 'text-sky-300' : 'text-slate-400'}`} />
-                  <span>Lodge Rincón</span>
+                  <span>Lodge</span>
                 </div>
                 {activeTab === 'lodge' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
@@ -3060,6 +3414,28 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
                 {activeTab === 'payments' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
+
+              {/* Solicitudes de Acceso */}
+              <button
+                onClick={() => setActiveTab('access-requests')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  activeTab === 'access-requests'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <UserPlus className={`w-4 h-4 ${activeTab === 'access-requests' ? 'text-sky-300' : 'text-slate-400'}`} />
+                  <span>Solicitudes de Acceso</span>
+                </div>
+                {pendingCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500 text-white shadow-2xs">
+                    {pendingCount}
+                  </span>
+                ) : activeTab === 'access-requests' ? (
+                  <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                ) : null}
+              </button>
             </div>
 
             {/* SECCIÓN 4: CONTENIDO & CATÁLOGO */}
@@ -3084,6 +3460,38 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 {activeTab === 'services' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
 
+              {/* Config Embarcaciones */}
+              <button
+                onClick={() => setActiveTab('config-vessels')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  activeTab === 'config-vessels'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Sailboat className={`w-4 h-4 ${activeTab === 'config-vessels' ? 'text-sky-300' : 'text-slate-400'}`} />
+                  <span>Config Embarcaciones</span>
+                </div>
+                {activeTab === 'config-vessels' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
+              </button>
+
+              {/* Config Lodge */}
+              <button
+                onClick={() => setActiveTab('config-lodge')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  activeTab === 'config-lodge'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <BedDouble className={`w-4 h-4 ${activeTab === 'config-lodge' ? 'text-sky-300' : 'text-slate-400'}`} />
+                  <span>Config Lodge</span>
+                </div>
+                {activeTab === 'config-lodge' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
+              </button>
+
               {/* CMS Web */}
               <button
                 onClick={() => setActiveTab('cms')}
@@ -3095,7 +3503,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               >
                 <div className="flex items-center gap-3">
                   <Sparkles className={`w-4 h-4 ${activeTab === 'cms' ? 'text-sky-300' : 'text-slate-400'}`} />
-                  <span>CMS Web (Textos & Medios)</span>
+                  <span>CMS Web</span>
                 </div>
                 {activeTab === 'cms' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
@@ -3149,7 +3557,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 crmActiveSubTab === 'clients' ? <UserCheck className="w-4.5 h-4.5 text-[#0b192c]" /> : <Users className="w-4.5 h-4.5 text-[#0b192c]" />
               )}
               {activeTab === 'services' && <Tag className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'config-vessels' && <Sailboat className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'config-lodge' && <BedDouble className="w-4.5 h-4.5 text-[#0b192c]" />}
               {activeTab === 'cms' && <Sparkles className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'access-requests' && <UserPlus className="w-4.5 h-4.5 text-[#0b192c]" />}
             </div>
             <div>
               <h2 className="font-bold text-base text-[#0b192c] leading-tight tracking-tight">
@@ -3167,7 +3578,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   ? (crmActiveSubTab === 'clients' ? 'CRM de Clientes & Concierge' : 'Gestión de Leads & Prospectos')
                   : activeTab === 'services'
                   ? 'Catálogo de Experiencias'
-                  : 'CMS Web (Textos & Medios)'}
+                  : activeTab === 'config-vessels'
+                  ? 'Configuración de Embarcaciones & Flota'
+                  : activeTab === 'config-lodge'
+                  ? 'Configuración del Lodge & Habitaciones'
+                  : activeTab === 'cms'
+                  ? 'CMS Web'
+                  : 'Solicitudes de Acceso Administrativo'}
               </h2>
               <span className="text-[11px] text-slate-400 font-light block">
                 {activeTab === 'dashboard'
@@ -3177,7 +3594,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   : activeTab === 'analytics'
                   ? 'Monitoreo de visitas y procedencia en tiempo real'
                   : activeTab === 'lodge'
-                  ? 'Disponibilidad y reservas de las 4 habitaciones (11 Huéspedes)'
+                  ? 'Disponibilidad y reservas de las habitaciones'
                   : activeTab === 'expeditions'
                   ? 'Gestión de salidas programadas, cupos e itinerarios'
                   : activeTab === 'payments'
@@ -3186,7 +3603,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       : `${leads.length} prospectos en seguimiento • ${newLeadsCount} nuevos por contactar`)
                   : activeTab === 'services'
                   ? `${services.length} experiencias activas en catálogo`
-                  : 'Editor de portada y contenidos públicos'}
+                  : activeTab === 'cms'
+                  ? 'Editor de portada y contenidos públicos'
+                  : activeTab === 'config-vessels'
+                  ? 'Gestión de barcos, fichas técnicas, aforos y fotos de flota'
+                  : activeTab === 'config-lodge'
+                  ? 'Gestión de habitaciones, tarifas, capacidades y fotos del Lodge'
+                  : `${pendingCount} solicitudes pendientes de autorización`}
               </span>
             </div>
           </div>
@@ -5877,82 +6300,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
             return (
               <div className="space-y-7">
-                {/* 1. TOP HEADER & KPI METRICS STRIP */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shrink-0 shadow-2xs">
-                        <BedDouble className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-serif font-bold text-lg text-[#0b192c] tracking-tight">
-                          Ocupación & Disponibilidad del Lodge
-                        </h3>
-                        <p className="text-xs text-slate-500 font-light">
-                          Línea de tiempo de reservas y aforo en Bahía Cumberland (4 Habitaciones · 11 Huéspedes)
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions & Month Navigator */}
-                  <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
-                    {/* Month Switcher */}
-                    <div className="flex items-center bg-white border border-slate-200/90 rounded-full p-1 shadow-2xs">
-                      <button
-                        onClick={handleLodgePrevMonth}
-                        className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-[#0b192c] transition cursor-pointer"
-                        title="Mes Anterior"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <div className="px-4 py-0.5 text-xs font-semibold text-[#0b192c] min-w-[120px] text-center tracking-wide">
-                        {lodgeMonthHeader}
-                      </div>
-                      <button
-                        onClick={handleLodgeNextMonth}
-                        className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-[#0b192c] transition cursor-pointer"
-                        title="Mes Siguiente"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setLodgeCalendarMonthDate(new Date())}
-                      className="px-4 py-2 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 text-[#0b192c] text-xs font-semibold transition cursor-pointer shadow-2xs active:scale-95"
-                    >
-                      Hoy
-                    </button>
-
-                    {/* Nueva Reserva */}
-                    <button
-                      onClick={() => {
-                        const targetRoomId = lodgeFilterRoomId !== 'all' ? lodgeFilterRoomId : (rooms[0] ? rooms[0].id : '');
-                        setBlockForm({
-                          roomId: targetRoomId,
-                          checkIn: new Date().toISOString().split('T')[0],
-                          checkOut: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-                          channelSource: 'phone_whatsapp',
-                          reason: '',
-                          guestName: '',
-                          guestEmail: '',
-                          guestPhone: '',
-                          paxCount: 2,
-                          status: 'approved',
-                        });
-                        setShowBlockModal(true);
-                      }}
-                      className="inline-flex items-center gap-1.5 bg-[#0b192c] hover:bg-[#182a44] text-white px-4 py-2 rounded-full text-xs font-semibold transition shadow-xs cursor-pointer active:scale-95"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-sky-300" />
-                      <span>Nueva Reserva</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. BOUTIQUE STATS PILLS STRIP */}
+                {/* 1. BOUTIQUE STATS PILLS STRIP (CARDS SUPERIORES) */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
                   <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
                     <div>
@@ -5995,9 +6343,57 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </div>
                 </div>
 
-                {/* 3. TIMELINE GANTT MATRIX COMPONENT */}
+                {/* 2. UNIFIED LODGE TIMELINE & AVAILABILITY CARD */}
                 <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden">
                   
+                  {/* Top Integrated Section Header: Title + Month Controls */}
+                  <div className="p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shrink-0 shadow-2xs">
+                        <BedDouble className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif font-bold text-lg text-[#0b192c] tracking-tight">
+                          Ocupación & Disponibilidad del Lodge
+                        </h3>
+                        <p className="text-xs text-slate-500 font-light">
+                          Línea de tiempo de reservas y aforo en Bahía Cumberland (4 Habitaciones · 11 Huéspedes)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Month Navigator Controls */}
+                    <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
+                      <div className="flex items-center bg-[#fbfcfd] border border-slate-200/90 rounded-full p-1 shadow-2xs">
+                        <button
+                          onClick={handleLodgePrevMonth}
+                          className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-[#0b192c] transition cursor-pointer"
+                          title="Mes Anterior"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <div className="px-4 py-0.5 text-xs font-semibold text-[#0b192c] min-w-[120px] text-center tracking-wide">
+                          {lodgeMonthHeader}
+                        </div>
+                        <button
+                          onClick={handleLodgeNextMonth}
+                          className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-[#0b192c] transition cursor-pointer"
+                          title="Mes Siguiente"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setLodgeCalendarMonthDate(new Date())}
+                        className="px-4 py-2 rounded-full border border-slate-200/90 bg-[#fbfcfd] hover:bg-slate-100 text-[#0b192c] text-xs font-semibold transition cursor-pointer shadow-2xs active:scale-95"
+                      >
+                        Hoy
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Segmented Filter Bar */}
                   <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-[#fbfcfd]">
                     <div className="inline-flex items-center bg-slate-100 p-1 rounded-full border border-slate-200/60 shadow-2xs">
@@ -6051,23 +6447,31 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <div className="min-w-[900px]">
                       
                       {/* Timeline Header Row (Days of the Month) */}
-                      <div className="grid grid-cols-[240px_1fr] border-b border-slate-100 bg-[#fbfcfd] sticky top-0 z-20">
-                        <div className="p-3.5 text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 border-r border-slate-100 bg-[#fbfcfd] sticky left-0 z-30 flex items-center justify-between">
+                      <div className="grid grid-cols-[240px_1fr] border-b border-slate-100 bg-[#fbfcfd] sticky top-0 z-10">
+                        <div className="p-3.5 text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 border-r border-slate-100 bg-[#fbfcfd] sticky left-0 z-20 flex items-center justify-between">
                           <span>Habitación / Capacidad</span>
                         </div>
                         <div className="grid" style={{ gridTemplateColumns: `repeat(${lodgeDaysCount}, minmax(0, 1fr))` }}>
                           {daysArray.map((d) => (
                             <div
                               key={d.dayNum}
-                              className={`py-2 text-center border-r border-slate-100 flex flex-col items-center justify-center ${
-                                d.isWeekend ? 'bg-slate-50/70' : 'bg-transparent'
-                              } ${d.isToday ? 'bg-sky-50/80 font-bold' : ''}`}
+                              className={`py-2 text-center border-r border-slate-100 flex flex-col items-center justify-center transition-colors ${
+                                d.isToday
+                                  ? 'bg-emerald-50/90 text-emerald-900 border-x border-emerald-300/80 font-bold'
+                                  : d.isPast
+                                  ? 'bg-slate-100/70 text-slate-400'
+                                  : d.isWeekend
+                                  ? 'bg-slate-50/70 text-slate-600'
+                                  : 'bg-transparent text-slate-700'
+                              }`}
                             >
-                              <span className="text-[9px] font-mono font-semibold text-slate-400 uppercase leading-none">
+                              <span className={`text-[9px] font-mono uppercase leading-none font-semibold ${
+                                d.isToday ? 'text-emerald-700 font-bold' : d.isPast ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
                                 {d.label}
                               </span>
                               <span className={`text-[11px] font-mono mt-0.5 leading-none font-bold ${
-                                d.isToday ? 'text-sky-700' : 'text-slate-700'
+                                d.isToday ? 'text-emerald-800 font-extrabold' : d.isPast ? 'text-slate-400' : 'text-slate-700'
                               }`}>
                                 {d.dayNum}
                               </span>
@@ -6078,7 +6482,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                       {/* Timeline Room Lanes */}
                       <div className="divide-y divide-slate-100">
-                        {displayedRooms.map((room) => {
+                        {displayedRooms.map((room, roomIdx) => {
                           const cleanName = room.room_number === 1
                             ? 'Albatros'
                             : room.room_number === 2
@@ -6102,7 +6506,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           });
 
                           return (
-                            <div key={room.id} className="grid grid-cols-[240px_1fr] hover:bg-slate-50/40 transition-colors group">
+                            <div key={room.id} className="grid grid-cols-[240px_1fr] hover:bg-slate-50/40 transition-colors group relative hover:z-30">
                               {/* Sticky Left Room Card */}
                               <div className="p-3.5 flex items-center justify-between border-r border-slate-100 bg-white sticky left-0 z-10 shadow-[1px_0_0_0_#f1f5f9]">
                                 <div className="flex items-center gap-3 min-w-0">
@@ -6154,9 +6558,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         setShowBlockModal(true);
                                       }}
                                       className={`h-full border-r border-slate-100/80 transition-colors cursor-pointer flex items-center justify-center relative group/slot ${
-                                        d.isWeekend ? 'bg-slate-50/40' : 'bg-transparent'
-                                      } ${d.isToday ? 'bg-sky-50/20' : ''} hover:bg-slate-100/60`}
-                                      title={`Reservar ${cleanName} el ${d.dayNum} de ${monthNames[lodgeMonth]}`}
+                                        d.isToday
+                                          ? 'bg-emerald-50/70 border-x border-emerald-300/60 hover:bg-emerald-100/70'
+                                          : d.isPast
+                                          ? 'bg-slate-100/70 hover:bg-slate-200/60'
+                                          : d.isWeekend
+                                          ? 'bg-slate-50/40 hover:bg-slate-100/60'
+                                          : 'bg-transparent hover:bg-slate-100/60'
+                                      }`}
+                                      title={`Reservar ${cleanName} el ${d.dayNum} de ${monthNames[lodgeMonth]}${d.isToday ? ' (Hoy)' : ''}`}
                                     >
                                       <Plus className="w-3 h-3 text-slate-300 opacity-0 group-slot:opacity-100 transition-opacity" />
                                     </div>
@@ -6190,14 +6600,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                                   // Visual luxury color styling
                                   const barColorStyle = isAirbnb
-                                    ? 'bg-gradient-to-r from-[#FF385C] to-[#E00B41] text-white border-rose-400/40 shadow-xs'
+                                    ? 'bg-gradient-to-r from-[#FF385C] to-[#E00B41] text-white border-rose-400/40'
                                     : isBlocked
-                                    ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-500/40 shadow-xs'
+                                    ? 'bg-gradient-to-r from-slate-600 to-slate-700 text-white border-slate-500/40'
                                     : isPending
-                                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400/40 shadow-xs'
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-400/40'
                                     : isWhatsApp
-                                    ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white border-emerald-400/30 shadow-xs'
-                                    : 'bg-gradient-to-r from-[#0b192c] via-[#112845] to-[#1a385f] text-white border-sky-400/30 shadow-xs';
+                                    ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white border-emerald-400/30'
+                                    : 'bg-gradient-to-r from-[#0b192c] via-[#112845] to-[#1a385f] text-white border-sky-400/30';
 
                                   const channelLabel = isAirbnb
                                     ? 'Airbnb'
@@ -6207,83 +6617,94 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     ? 'WhatsApp'
                                     : 'Web Directa';
 
+                                  const isUpperRow = roomIdx <= 1;
+
                                   return (
                                     <div
                                       key={b.id}
                                       style={{
-                                        left: `calc(${leftPercent}% + 2px)`,
-                                        width: `calc(${widthPercent}% - 4px)`,
-                                        top: '8px',
-                                        height: '38px',
+                                        left: `${leftPercent}%`,
+                                        width: `${widthPercent}%`,
+                                        top: '0px',
+                                        height: '100%',
                                       }}
-                                      className="absolute z-10 lodge-res-menu-container"
+                                      className="absolute z-20 lodge-res-menu-container group/res hover:z-50"
                                     >
-                                      {/* Visual Bar strictly styled and contained */}
+                                      {/* Visual Bar strictly styled to fill the entire grid cell with NO gaps and NO letters */}
                                       <div
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setActiveLodgeResMenuId(isMenuOpen ? null : b.id);
                                         }}
-                                        className={`w-full h-full rounded-lg flex items-center transition-all duration-150 cursor-pointer border overflow-hidden shadow-xs ${barColorStyle} ${
-                                          isMenuOpen ? 'ring-2 ring-sky-400 ring-offset-1 z-30 shadow-md scale-[1.01]' : 'hover:brightness-105 hover:shadow-sm'
+                                        className={`w-full h-full rounded-none transition-all duration-150 cursor-pointer border-r border-white/20 overflow-hidden ${barColorStyle} ${
+                                          isMenuOpen ? 'ring-2 ring-sky-400 ring-inset z-30 brightness-110' : 'hover:brightness-110'
                                         }`}
-                                        title={`${b.guest_name || channelLabel} • ${formatDateDDMMYYYY(b.check_in)} al ${formatDateDDMMYYYY(b.check_out)} • ${channelLabel}`}
-                                      >
-                                        {spanDays === 1 ? (
-                                          <div className="w-full h-full flex items-center justify-center px-1 text-center select-none overflow-hidden">
-                                            {isAirbnb ? (
-                                              <span className="text-[10px] font-bold text-white tracking-tight leading-none drop-shadow-2xs">AB</span>
-                                            ) : isBlocked ? (
-                                              <Lock className="w-3.5 h-3.5 text-white/90" />
-                                            ) : (
-                                              <span className="text-[10px] font-bold text-white tracking-tight leading-none truncate drop-shadow-2xs">
-                                                {b.guest_name ? b.guest_name.split(' ')[0] : '1n'}
+                                      />
+
+                                      {/* Custom Luxury Floating Tooltip on Hover */}
+                                      {!isMenuOpen && (
+                                        <div
+                                          className={`absolute pointer-events-none opacity-0 group-hover/res:opacity-100 group-hover/res:scale-100 scale-95 transition-all duration-200 ease-out z-50 ${
+                                            isUpperRow ? 'top-full mt-2.5' : 'bottom-full mb-2.5'
+                                          } ${
+                                            leftPercent > 75 ? 'right-0' : leftPercent < 15 ? 'left-0' : 'left-1/2 -translate-x-1/2'
+                                          }`}
+                                        >
+                                          <div className="bg-[#0b192c]/95 backdrop-blur-md text-white border border-sky-400/30 shadow-[0_16px_36px_rgba(11,25,44,0.55)] rounded-2xl p-3.5 min-w-[220px] max-w-[270px] text-left space-y-2 relative">
+                                            {/* Badge & Channel */}
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                                                isAirbnb
+                                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                  : isBlocked
+                                                  ? 'bg-slate-500/20 text-slate-300 border border-slate-500/30'
+                                                  : isPending
+                                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                                  : isWhatsApp
+                                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                                  : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                              }`}>
+                                                {channelLabel}
                                               </span>
-                                            )}
-                                          </div>
-                                        ) : spanDays === 2 ? (
-                                          <div className="w-full h-full flex items-center justify-between px-2 min-w-0 select-none overflow-hidden">
-                                            <div className="min-w-0 flex-1 truncate">
-                                              <span className="font-semibold text-xs text-white truncate block leading-tight drop-shadow-2xs">
-                                                {b.guest_name ? b.guest_name.split(' ')[0] : (isAirbnb ? 'Airbnb' : 'Bloqueo')}
+                                              <span className="text-[10px] font-mono text-sky-200/80 font-bold">
+                                                {spanDays} {spanDays === 1 ? 'noche' : 'noches'}
                                               </span>
-                                              <span className="text-[9px] text-white/80 font-mono block leading-none truncate mt-0.5">
-                                                {channelLabel} • 2n
-                                              </span>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="w-full h-full flex items-center justify-between px-2.5 min-w-0 select-none overflow-hidden">
-                                            <div className="min-w-0 flex-1 truncate pr-1">
-                                              <div className="flex items-center gap-1.5 leading-tight truncate">
-                                                <span className="font-semibold text-xs text-white truncate drop-shadow-2xs">
-                                                  {b.guest_name || (isAirbnb ? 'Bloqueo Airbnb' : 'Bloqueo Operativo')}
-                                                </span>
-                                                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-white/20 text-white shrink-0">
-                                                  {spanDays}n
-                                                </span>
-                                              </div>
-                                              <div className="flex items-center gap-1 text-[9px] text-white/80 font-mono mt-0.5 truncate">
-                                                <span>{channelLabel}</span>
-                                                <span>•</span>
-                                                <span>{b.booking_code}</span>
-                                              </div>
                                             </div>
 
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveLodgeResMenuId(isMenuOpen ? null : b.id);
-                                              }}
-                                              className="w-5 h-5 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition shrink-0 cursor-pointer"
-                                              title="Ver Opciones"
-                                            >
-                                              <MoreHorizontal className="w-3 h-3" />
-                                            </button>
+                                            {/* Guest Name / Block Title */}
+                                            <div className="font-serif font-bold text-xs text-white truncate">
+                                              {getCleanLodgeDetail(b)}
+                                            </div>
+
+                                            {/* Dates & Range */}
+                                            <div className="flex items-center gap-1.5 text-[10px] text-slate-300 font-mono">
+                                              <Calendar className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                                              <span>{formatDateDDMMYYYY(b.check_in)} ➔ {formatDateDDMMYYYY(b.check_out)}</span>
+                                            </div>
+
+                                            {/* CTA hint */}
+                                            <div className="pt-1.5 border-t border-white/10 text-[9px] text-sky-300/80 font-light flex items-center gap-1.5">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse shrink-0" />
+                                              <span>Haz clic para ver opciones y detalles</span>
+                                            </div>
+
+                                            {/* Arrow indicator */}
+                                            {isUpperRow ? (
+                                              <div
+                                                className={`absolute -top-1.5 w-3 h-3 bg-[#0b192c] border-l border-t border-sky-400/30 rotate-45 ${
+                                                  leftPercent > 75 ? 'right-5' : leftPercent < 15 ? 'left-5' : 'left-1/2 -translate-x-1/2'
+                                                }`}
+                                              />
+                                            ) : (
+                                              <div
+                                                className={`absolute -bottom-1.5 w-3 h-3 bg-[#0b192c] border-r border-b border-sky-400/30 rotate-45 ${
+                                                  leftPercent > 75 ? 'right-5' : leftPercent < 15 ? 'left-5' : 'left-1/2 -translate-x-1/2'
+                                                }`}
+                                              />
+                                            )}
                                           </div>
-                                        )}
-                                      </div>
+                                        </div>
+                                      )}
 
                                       {/* Floating 3-Dots Options Popover */}
                                       {isMenuOpen && (
@@ -6486,12 +6907,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   {room ? room.room_name.replace(/\s*\(.*?\)/g, '').replace(/Cabina\s*/gi, '').trim() : 'Habitación sin asignar'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="flex items-center gap-1.5 max-w-[280px] truncate" title={`${booking.guest_name} ${booking.guest_phone || ''} ${booking.notes || ''}`}>
-                                    <span className="font-semibold text-[#0b192c] truncate">{booking.guest_name}</span>
-                                    {booking.notes && (
-                                      <span className="text-[10px] text-slate-400 italic truncate font-light">({booking.notes})</span>
-                                    )}
-                                  </div>
+                                  <span className="font-semibold text-[#0b192c]" title={`${booking.guest_name} ${booking.notes || ''}`}>
+                                    {getCleanLodgeDetail(booking)}
+                                  </span>
                                 </td>
                                 <td className="px-6 py-4 font-mono text-slate-600 whitespace-nowrap">
                                   {formatDateDDMMYYYY(booking.check_in)}
@@ -8459,6 +8877,27 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               refreshContent={refreshContent}
               onNavigate={onNavigate}
             />
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 5: CONFIG EMBARCACIONES */}
+          {/* ========================================================================= */}
+          {activeTab === 'config-vessels' && (
+            <VesselsConfigTab />
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 6: CONFIG LODGE */}
+          {/* ========================================================================= */}
+          {activeTab === 'config-lodge' && (
+            <LodgeConfigTab />
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 7: SOLICITUDES DE ACCESO ADMINISTRATIVO */}
+          {/* ========================================================================= */}
+          {activeTab === 'access-requests' && (
+            <AccessRequestsTab />
           )}
         </main>
       </div>

@@ -27,23 +27,26 @@ export interface VesselHotspot {
 }
 
 export interface Vessel {
-  id: 'vegvisir' | 'terranova';
+  id: 'vegvisir' | 'terranova' | string;
   name: string;
   type: string;
   tagline: string;
   description: string;
   length: string;
   capacity: string;
+  maxPax?: number;
   cabins?: string;
   bathrooms?: string;
   registration?: string;
   builder?: string;
-  crew: string;
+  crew?: string;
   features: string[];
   mainImage: string;
-  hotspots: VesselHotspot[];
+  gallery?: string[];
+  hotspots?: VesselHotspot[];
   badge?: string;
   specs?: Record<string, string>;
+  isActive?: boolean;
 }
 
 export interface FaunaSpot {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { FleetHotspotViewer } from '../components/modules/FleetHotspotViewer';
 import { Anchor, CheckCircle2, ArrowRight } from 'lucide-react';
-import { FLEET_DATA } from '../lib/constants';
+import { useFleet } from '../hooks/useFleet';
 import { useSiteContent } from '../hooks/useSiteContent';
 
 interface FlotaPageProps {
@@ -9,6 +9,7 @@ interface FlotaPageProps {
 }
 
 export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
+  const { activeVessels } = useFleet();
   const { getSection } = useSiteContent();
   const flotaHero = getSection('flota_hero');
   const vegvisirSec = getSection('flota_vegvisir');
@@ -59,7 +60,7 @@ export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {FLEET_DATA.map((vessel) => (
+            {activeVessels.map((vessel) => (
               <div
                 key={vessel.id}
                 className="bg-white rounded-3xl p-8 border border-slate-200 shadow-md flex flex-col justify-between space-y-6"

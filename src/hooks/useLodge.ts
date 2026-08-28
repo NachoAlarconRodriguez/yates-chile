@@ -53,8 +53,18 @@ export function useLodge() {
     createBooking: lodgeService.createBooking.bind(lodgeService),
     adminBlockRoom: lodgeService.adminBlockRoom.bind(lodgeService),
     deleteBookingOrBlock: lodgeService.deleteBookingOrBlock.bind(lodgeService),
+    createRoom: async (newRoom: Partial<LodgeRoom>) => {
+      const res = await lodgeService.createRoom(newRoom);
+      await fetchData();
+      return res;
+    },
     updateRoom: async (roomId: string, updates: Partial<LodgeRoom>) => {
       const res = await lodgeService.updateRoom(roomId, updates);
+      await fetchData();
+      return res;
+    },
+    deleteRoom: async (roomId: string) => {
+      const res = await lodgeService.deleteRoom(roomId);
       await fetchData();
       return res;
     },

@@ -1,18 +1,41 @@
 import React, { useState } from 'react';
-import { FLEET_DATA } from '../../lib/constants';
+import { useFleet } from '../../hooks/useFleet';
 import { Anchor, Compass, Info, Users, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export const FleetHotspotViewer: React.FC = () => {
+  const { activeVessels } = useFleet();
   const [selectedVesselId, setSelectedVesselId] = useState<string>('vegvisir');
   const [activeHotspotId, setActiveHotspotId] = useState<string>('veg-2');
 
-  const selectedVessel = FLEET_DATA.find(v => v.id === selectedVesselId) || FLEET_DATA[0];
-  const activeHotspot = selectedVessel.hotspots.find(h => h.id === activeHotspotId) || selectedVessel.hotspots[0];
+  const selectedVessel = activeVessels.find(v => v.id === selectedVesselId) || activeVessels[0] || {
+    id: 'vegvisir',
+    name: 'Velero Vegvisir',
+    type: 'Velero de Expedición',
+    tagline: 'Dufour 52.5 ft francés de expedición austral',
+    description: 'El Vegvisir es un velero de expedición diseñado para navegar las aguas australes.',
+    length: '52.5 Pies (16 metros)',
+    capacity: 'Capacidad 12 pax',
+    features: ['Astillero Francés', 'Starlink 24/7'],
+    mainImage: '/velero-vegvisir.jpg',
+    hotspots: []
+  };
+  const activeHotspot = (selectedVessel.hotspots && selectedVessel.hotspots.length > 0)
+    ? selectedVessel.hotspots.find(h => h.id === activeHotspotId) || selectedVessel.hotspots[0]
+    : {
+        id: 'default',
+        title: 'Cabinas & Equipamiento',
+        description: selectedVessel.description || 'Embarcación equipada con los más altos estándares náuticos.',
+        coordinates: { x: 0, y: 0.4, z: 0 },
+        category: 'Camarote' as const,
+        image: selectedVessel.mainImage
+      };
 
   const handleVesselChange = (id: string) => {
     setSelectedVesselId(id);
-    const newVessel = FLEET_DATA.find(v => v.id === id) || FLEET_DATA[0];
-    setActiveHotspotId(newVessel.hotspots[0].id);
+    const newVessel = activeVessels.find(v => v.id === id);
+    if (newVessel && newVessel.hotspots && newVessel.hotspots.length > 0) {
+      setActiveHotspotId(newVessel.hotspots[0].id);
+    }
   };
 
   return (
@@ -38,9 +61,9 @@ export const FleetHotspotViewer: React.FC = () => {
         </div>
 
         {/* Vessel Selector Buttons */}
-        <div className="flex justify-center gap-4 mb-10">
-          {FLEET_DATA.map((v) => {
-            const isSelected = selectedVesselId === v.id;
+        <div className="flex justify-center gap-4 mb-10 flex-wrap">
+          {activeVessels.map((v) => {
+            const isSelected = selectedVessel.id === v.id;
             return (
               <button
                 key={v.id}
@@ -82,7 +105,7 @@ export const FleetHotspotViewer: React.FC = () => {
 
             {/* Simulated 3D Hotspot Nodes */}
             <div className="relative z-10 my-12 grid sm:grid-cols-3 gap-4">
-              {selectedVessel.hotspots.map((hs) => {
+              {(selectedVessel.hotspots || []).map((hs) => {
                 const isActive = activeHotspotId === hs.id;
                 return (
                   <button

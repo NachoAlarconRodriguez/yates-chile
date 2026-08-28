@@ -341,8 +341,8 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / CABINAS</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">4 Cabinas</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / HABITACIONES</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{rooms.length} Habitaciones</span>
                     <span className="text-slate-500 text-[10px] block">Baño Privado & Vista al Mar</span>
                   </div>
                   <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
@@ -358,7 +358,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 >
                   <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Distribución</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    4 habitaciones: <strong>Albatros</strong> (Doble, 2 pax), <strong>Cumberland</strong> (Triple, 3 pax), <strong>Selkirk</strong> (Triple, 3 pax) y <strong>Vidriola</strong> (Triple, 3 pax). Baño privado y vista al mar.
+                    {rooms.map((r, i) => (
+                      <span key={r.id}>
+                        <strong>{r.room_name}</strong> ({r.room_type}, {r.max_pax} pax){i < rooms.length - 1 ? ', ' : '.'}
+                      </span>
+                    ))}
                   </p>
                   <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
@@ -390,7 +394,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   </div>
                   <div>
                     <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CAPACIDAD</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Hasta 11 Pasajeros</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">Hasta {rooms.reduce((acc, r) => acc + (r.max_pax || 2), 0)} Pasajeros</span>
                     <span className="text-slate-500 text-[10px] block">Exclusividad total</span>
                   </div>
                   <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
@@ -406,7 +410,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 >
                   <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Aforo Exclusivo</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Capacidad máxima de 11 pasajeros para una estadía íntima, conectada con el entorno y en absoluta tranquilidad isleña.
+                    Capacidad máxima de {rooms.reduce((acc, r) => acc + (r.max_pax || 2), 0)} pasajeros para una estadía íntima, conectada con el entorno y en absoluta tranquilidad isleña.
                   </p>
                   <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
