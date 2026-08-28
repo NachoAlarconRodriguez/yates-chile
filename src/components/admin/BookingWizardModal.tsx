@@ -2110,35 +2110,38 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {/* FILA 1: IDENTIFICACIÓN & NACIMIENTO (3 COLUMNAS AMPLIAS) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                       <div>
-                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1 font-mono">
                           Nombre Completo *
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej: Juan Pérez Mackenna"
+                          placeholder="Ej: Ignacio Alarcón Rodríguez"
                           value={pax.fullName}
                           onChange={(e) => updatePassengerField(idx, 'fullName', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          className="w-full bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-medium focus:outline-none focus:border-[#0f2b48] shadow-2xs transition"
                           required
                         />
                       </div>
+
                       <div>
-                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1 font-mono">
                           RUT o Pasaporte *
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej: 15.342.891-K"
+                          placeholder="Ej: 17.318.824-2"
                           value={pax.rutOrPassport}
                           onChange={(e) => updatePassengerField(idx, 'rutOrPassport', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          className="w-full bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-mono focus:outline-none focus:border-[#0f2b48] shadow-2xs transition"
                           required
                         />
                       </div>
+
                       <div>
-                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1 font-mono">
                           Fecha de Nacimiento
                         </label>
                         <LuxuryDatePicker
@@ -2146,11 +2149,15 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           defaultYear={1990}
                           placeholder="dd/mm/aaaa"
                           onChange={(val) => updatePassengerField(idx, 'birthDate', val)}
-                          inputClassName="bg-white border-slate-200 focus:border-[#0f2b48] py-2 px-3 text-xs text-[#0f2b48]"
+                          inputClassName="bg-white border-slate-200/90 focus:border-[#0f2b48] py-2.5 px-3.5 text-xs text-[#0f2b48]"
                         />
                       </div>
+                    </div>
+
+                    {/* FILA 2: CONTACTO DIRECTO (2 COLUMNAS AMPLIAS) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                       <div>
-                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1 font-mono">
                           Correo Electrónico *
                         </label>
                         <input
@@ -2158,12 +2165,13 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           placeholder="correo@ejemplo.com"
                           value={pax.email}
                           onChange={(e) => updatePassengerField(idx, 'email', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          className="w-full bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48] shadow-2xs transition"
                           required
                         />
                       </div>
+
                       <div>
-                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1 font-mono">
                           Teléfono / WhatsApp *
                         </label>
                         <input
@@ -2171,35 +2179,37 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           placeholder="+56 9 1234 5678"
                           value={pax.phone}
                           onChange={(e) => updatePassengerField(idx, 'phone', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          className="w-full bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] font-mono focus:outline-none focus:border-[#0f2b48] shadow-2xs transition"
                           required
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* FILA 3: REQUERIMIENTOS ESPECIALES & NOTAS (2 COLUMNAS AMPLIAS) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                       <div>
-                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1 font-mono">
                           Preferencias Alimentarias / Alergias (Opcional)
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej: Celíaco, vegetariano, alérgico a nueces"
+                          placeholder="Ej: Celíaco, vegetariano, alérgico a nueces, sin mariscos..."
                           value={pax.dietaryPreferences}
                           onChange={(e) => updatePassengerField(idx, 'dietaryPreferences', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          className="w-full bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48] shadow-2xs transition"
                         />
                       </div>
+
                       <div>
-                        <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
+                        <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1 font-mono">
                           Notas Médicas / Buceo (Opcional)
                         </label>
                         <input
                           type="text"
-                          placeholder="Ej: Certificación PADI Advanced, talla L"
+                          placeholder="Ej: Certificación PADI Advanced, talla L, seguro médico..."
                           value={pax.notes}
                           onChange={(e) => updatePassengerField(idx, 'notes', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          className="w-full bg-white border border-slate-200/90 rounded-xl px-3.5 py-2.5 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48] shadow-2xs transition"
                         />
                       </div>
                     </div>
