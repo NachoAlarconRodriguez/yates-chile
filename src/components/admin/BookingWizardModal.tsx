@@ -808,6 +808,42 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
 
   const totalFinalClp = Math.max(0, subtotalClp - calculatedDiscountClp);
 
+  // 60-day deadline calculation for the 2nd installment (50/50 payment scheme)
+  const secondInstallmentInfo = useMemo(() => {
+    if (!startDate) return null;
+    try {
+      const zarpeDate = new Date(`${startDate}T12:00:00`);
+      if (isNaN(zarpeDate.getTime())) return null;
+
+      const dueDate = new Date(zarpeDate);
+      dueDate.setDate(dueDate.getDate() - 60);
+
+      const formattedDueDate = dueDate.toLocaleDateString('es-CL', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+
+      const formattedZarpeDate = zarpeDate.toLocaleDateString('es-CL', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isDueSoonOrPassed = dueDate.getTime() <= today.getTime();
+
+      return {
+        formattedDueDate,
+        formattedZarpeDate,
+        isDueSoonOrPassed,
+      };
+    } catch {
+      return null;
+    }
+  }, [startDate]);
+
   // Validation before advancing
   const canProceed = () => {
     if (currentStep === 1) {
@@ -2272,7 +2308,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       <p className={`text-xs leading-relaxed font-light ${
                         paymentScheme === '50' ? 'text-slate-200' : 'text-slate-500'
                       }`}>
-                        Abona el 50% para asegurar el puesto oficial. El otro 50% restante lo debe pagar 60 días antes de la fecha de zarpe.
+                        Abona el 50% para asegurar el puesto oficial. El 50% restante vence el{' '}
+                        <strong className={paymentScheme === '50' ? 'text-white font-bold' : 'text-[#0f2b48] font-bold'}>
+                          {secondInstallmentInfo ? secondInstallmentInfo.formattedDueDate : '60 días antes del zarpe'}
+                        </strong>.
                       </p>
                     </div>
 
@@ -2379,14 +2418,30 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                         <div className="flex items-center justify-between text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
                           <span>Cuota #2 (50%)</span>
-                          <span>Saldo Final</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                            secondInstallmentInfo?.isDueSoonOrPassed
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : 'bg-sky-50 text-sky-800 border-sky-200'
+                          }`}>
+                            {secondInstallmentInfo ? `Vence: ${secondInstallmentInfo.formattedDueDate}` : 'Saldo Final (60 días antes)'}
+                          </span>
                         </div>
                         <div className="text-base font-mono font-bold text-[#0f2b48]">
                           ${(totalFinalClp - Math.round(totalFinalClp * 0.5)).toLocaleString('es-CL')} <span className="text-xs font-normal text-slate-500">CLP</span>
                         </div>
-                        <span className="text-[11px] text-slate-600 font-light block mt-1">
-                          A pagar a más tardar <strong>60 días antes</strong> de la fecha de zarpe / check-in.
-                        </span>
+                        <div className="mt-2 pt-2 border-t border-slate-200/70 text-[11px] text-slate-600 font-light flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                          {secondInstallmentInfo ? (
+                            <span>
+                              Fecha límite: <strong className="text-[#0f2b48] font-bold">{secondInstallmentInfo.formattedDueDate}</strong>{' '}
+                              <span className="text-slate-400 font-mono text-[10px]">(60 días antes del zarpe: {secondInstallmentInfo.formattedZarpeDate})</span>
+                            </span>
+                          ) : (
+                            <span>
+                              A pagar a más tardar <strong>60 días antes</strong> de la fecha de zarpe / check-in.
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2602,8 +2657,14 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       </div>
                       <div className="flex items-center gap-1.5 font-medium">
                         <CreditCard className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                        <span><strong>Pago:</strong> {paymentMethod === 'transfer' ? 'Transferencia' : paymentMethod === 'credit_card' ? 'Tarjeta' : paymentMethod}</span>
+                        <span><strong>Modalidad:</strong> {paymentScheme === '100' ? '100% Contado' : paymentScheme === '50' ? '50% Abono + 50% Saldo' : '0% Lead Comercial'}</span>
                       </div>
+                      {paymentScheme === '50' && secondInstallmentInfo && (
+                        <div className="p-2 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-[11px] leading-tight">
+                          <span className="font-bold font-mono">📅 Vencimiento Cuota #2 (50%):</span> {secondInstallmentInfo.formattedDueDate}{' '}
+                          <span className="text-sky-700/80 font-mono text-[10px]">(60 días antes de zarpe)</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
