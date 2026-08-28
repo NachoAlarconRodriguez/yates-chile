@@ -1088,7 +1088,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             <div className="space-y-6 py-2 animate-fadeIn">
               <div className="space-y-1 text-center max-w-xl mx-auto">
                 <span className="text-[10px] font-mono uppercase font-bold text-sky-800 bg-sky-100/70 border border-sky-200 px-2.5 py-0.5 rounded-full">
-                  Paso 1 de 6 • Selección de Servicio
+                  Paso 1 • Selección de Modalidad
                 </span>
                 <h4 className="font-serif text-xl font-bold text-[#0f2b48]">
                   ¿Qué tipo de reserva deseas registrar?
@@ -1951,111 +1951,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* PASO 3: FECHAS (DINÁMICO SEGÚN LODGE O EXPEDICIÓN) */}
-          {/* ========================================================================= */}
-          {currentStep === 3 && isOnlyLodge && (
-            <div className="space-y-5 animate-fadeIn">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] uppercase font-mono font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                    {activeSelectedProgram?.title || 'Habitación Lodge'}
-                  </span>
-                </div>
-                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                  Paso 3: Selecciona las fechas de estadía (Check-in & Check-out)
-                </h4>
-                <p className="text-slate-500 text-xs font-light">
-                  Ingresa las fechas de ingreso y salida en Lodge Rincón de Navegantes para calcular automáticamente las noches y tarifa total.
-                </p>
-              </div>
 
-              {/* DATE PICKERS GRID FOR LODGE */}
-              <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {/* Check-In */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
-                      Fecha de Check-in (Ingreso) *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => {
-                          const newStart = e.target.value;
-                          setStartDate(newStart);
-                          if (!endDate || endDate <= newStart) {
-                            const d = new Date(newStart);
-                            d.setDate(d.getDate() + 2);
-                            setEndDate(d.toISOString().split('T')[0]);
-                          }
-                        }}
-                        className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Check-Out */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
-                      Fecha de Check-out (Salida) *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={endDate}
-                        min={startDate || undefined}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* SUMMARY & NIGHTS CALCULATION */}
-                {isSelectedLodgeRoomBooked ? (
-                  <div className="bg-rose-50 border border-rose-200/90 p-4 rounded-2xl flex items-start gap-3 text-rose-900 animate-fadeIn">
-                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                    <div className="space-y-1">
-                      <strong className="font-bold text-xs block text-rose-950">
-                        Habitación no disponible en estas fechas
-                      </strong>
-                      <p className="text-[11px] leading-relaxed text-rose-800">
-                        La cabina <strong>{activeSelectedProgram?.title}</strong> ya cuenta con una reserva u ocupación confirmada entre el <strong>{formatDateDDMMYYYY(startDate)}</strong> y el <strong>{formatDateDDMMYYYY(endDate)}</strong>. Por favor modifica las fechas o regresa al Paso 2 para elegir otra habitación disponible.
-                      </p>
-                    </div>
-                  </div>
-                ) : startDate && endDate && startDate < endDate ? (
-                  <div className="bg-emerald-50/70 border border-emerald-200/80 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                        <CheckCircle2 className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <span className="font-bold text-xs text-emerald-950 block">
-                          {calculatedNights} {calculatedNights === 1 ? 'Noche de Estadía' : 'Noches de Estadía'} Calculadas
-                        </span>
-                        <span className="text-[11px] text-emerald-800 font-mono">
-                          Del {formatDateDDMMYYYY(startDate)} al {formatDateDDMMYYYY(endDate)} ({activeSelectedProgram?.title})
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] uppercase font-mono font-bold text-emerald-700 block">Subtotal Estadía</span>
-                      <span className="text-base font-mono font-bold text-emerald-950">
-                        ${((activeSelectedProgram?.priceClp || 240000) * calculatedNights).toLocaleString('es-CL')} CLP
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl text-center text-xs text-slate-500">
-                    Selecciona las fechas de Check-in y Check-out para calcular automáticamente las noches y tarifa.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* ========================================================================= */}
           {/* PASO 3: FECHAS DE LA TRAVESÍA (SOLO PERSONALIZADO)                       */}
