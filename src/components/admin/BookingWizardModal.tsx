@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useLodge } from '../../hooks/useLodge';
 import { formatPhone, formatRut } from '../../lib/formatters';
+import { LuxuryDatePicker } from './LuxuryDatePicker';
 
 export interface BookingWizardData {
   bookingCode: string;
@@ -1357,11 +1358,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <label className="block text-[11px] font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
                       Fecha Check-in (Entrada) *
                     </label>
-                    <input
-                      type="date"
+                    <LuxuryDatePicker
                       value={startDate}
-                      onChange={(e) => {
-                        const newStart = e.target.value;
+                      defaultYear={new Date().getFullYear()}
+                      minDate={new Date().toISOString().split('T')[0]}
+                      onChange={(newStart) => {
                         setStartDate(newStart);
                         if (!endDate || endDate <= newStart) {
                           const d = new Date(newStart);
@@ -1369,7 +1370,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                           setEndDate(d.toISOString().split('T')[0]);
                         }
                       }}
-                      className="w-full bg-white border border-slate-300 focus:border-[#0f2b48] rounded-xl py-2 px-3 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                      inputClassName="bg-white border-slate-300 focus:border-[#0f2b48] py-2 px-3 text-xs font-mono font-bold text-[#0f2b48]"
                     />
                   </div>
 
@@ -1378,12 +1379,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <label className="block text-[11px] font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
                       Fecha Check-out (Salida) *
                     </label>
-                    <input
-                      type="date"
+                    <LuxuryDatePicker
                       value={endDate}
-                      min={startDate || undefined}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full bg-white border border-slate-300 focus:border-[#0f2b48] rounded-xl py-2 px-3 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                      defaultYear={new Date().getFullYear()}
+                      minDate={startDate || new Date().toISOString().split('T')[0]}
+                      onChange={(val) => setEndDate(val)}
+                      inputClassName="bg-white border-slate-300 focus:border-[#0f2b48] py-2 px-3 text-xs font-mono font-bold text-[#0f2b48]"
                     />
                   </div>
                 </div>
@@ -1981,11 +1982,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
                       Fecha de Inicio / Zarpe *
                     </label>
-                    <input
-                      type="date"
+                    <LuxuryDatePicker
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                      defaultYear={new Date().getFullYear()}
+                      minDate={new Date().toISOString().split('T')[0]}
+                      onChange={(val) => setStartDate(val)}
+                      inputClassName="bg-slate-50 border-slate-300/80 focus:border-[#0f2b48] focus:bg-white py-2.5 px-3 text-xs font-mono font-bold text-[#0f2b48]"
                     />
                   </div>
 
@@ -1994,12 +1996,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <label className="block text-xs font-bold text-[#0f2b48] uppercase tracking-wider font-mono">
                       Fecha de Término / Desembarque *
                     </label>
-                    <input
-                      type="date"
+                    <LuxuryDatePicker
                       value={endDate}
-                      min={startDate || undefined}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300/80 focus:border-[#0f2b48] focus:bg-white rounded-2xl py-3 px-4 text-xs font-mono font-bold text-[#0f2b48] focus:outline-hidden transition"
+                      defaultYear={new Date().getFullYear()}
+                      minDate={startDate || new Date().toISOString().split('T')[0]}
+                      onChange={(val) => setEndDate(val)}
+                      inputClassName="bg-slate-50 border-slate-300/80 focus:border-[#0f2b48] focus:bg-white py-2.5 px-3 text-xs font-mono font-bold text-[#0f2b48]"
                     />
                   </div>
                 </div>
@@ -2139,11 +2141,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                         <label className="text-[9px] uppercase font-bold text-[#0f2b48] block mb-1">
                           Fecha de Nacimiento
                         </label>
-                        <input
-                          type="date"
+                        <LuxuryDatePicker
                           value={pax.birthDate || ''}
-                          onChange={(e) => updatePassengerField(idx, 'birthDate', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                          defaultYear={1990}
+                          placeholder="dd/mm/aaaa"
+                          onChange={(val) => updatePassengerField(idx, 'birthDate', val)}
+                          inputClassName="bg-white border-slate-200 focus:border-[#0f2b48] py-2 px-3 text-xs text-[#0f2b48]"
                         />
                       </div>
                       <div>

@@ -8,7 +8,9 @@ interface LuxuryDatePickerProps {
   required?: boolean;
   minDate?: string;
   maxDate?: string;
+  defaultYear?: number;
   className?: string;
+  inputClassName?: string;
 }
 
 const MONTH_NAMES = [
@@ -23,12 +25,16 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
   onChange,
   placeholder = 'dd/mm/aaaa',
   required = false,
+  minDate,
+  maxDate,
+  defaultYear,
   className = '',
+  inputClassName = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Parse initial date from value or fallback to reference date (e.g. 1990 for birthdates)
+  // Parse initial date from value or fallback
   const parseDate = (dStr: string) => {
     if (!dStr) return null;
     const parts = dStr.split('-');
@@ -45,12 +51,15 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
 
   const currentDateObj = parseDate(value);
 
+  // Fallback initial year
+  const initialYear = defaultYear || (currentDateObj ? currentDateObj.getFullYear() : (placeholder.toLowerCase().includes('aaaa') ? 1990 : new Date().getFullYear()));
+
   // View state for calendar (month and year)
   const [viewYear, setViewYear] = useState<number>(() => {
-    return currentDateObj ? currentDateObj.getFullYear() : 1990;
+    return currentDateObj ? currentDateObj.getFullYear() : initialYear;
   });
   const [viewMonth, setViewMonth] = useState<number>(() => {
-    return currentDateObj ? currentDateObj.getMonth() : 6;
+    return currentDateObj ? currentDateObj.getMonth() : new Date().getMonth();
   });
 
   // Display text in input (dd/mm/aaaa)
@@ -120,10 +129,10 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
     }
   };
 
-  // Generate Year options (descending from max year)
+  // Generate Year options (descending from future years to past years)
   const currentYear = new Date().getFullYear();
   const yearOptions: number[] = [];
-  for (let y = currentYear; y >= 1920; y--) {
+  for (let y = currentYear + 10; y >= 1920; y--) {
     yearOptions.push(y);
   }
 
@@ -196,7 +205,7 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
           onChange={handleTextChange}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs cursor-text"
+          className={`w-full ${inputClassName || 'bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90'} rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs cursor-text`}
         />
 
         {/* Botón icono calendario */}
@@ -212,7 +221,7 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
 
       {/* POPUP CALENDARIO LUXURY YATES CHILE */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-50 w-72 sm:w-80 bg-white rounded-3xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(11,25,44,0.25)] border border-slate-200 animate-scaleIn select-none">
+        <div className="absolute top-full left-0 mt-2 z-70 w-72 sm:w-80 bg-white rounded-3xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(11,25,44,0.25)] border border-slate-200 animate-scaleIn select-none">
           
           {/* Header del Calendario con Selectores de Mes y Año */}
           <div className="flex items-center justify-between gap-1.5 pb-3.5 border-b border-slate-100">
@@ -294,6 +303,11 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
             {/* Días del mes actual */}
             {Array.from({ length: daysInCurrentMonth }).map((_, i) => {
               const dayNum = i + 1;
+              const dateIso = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+              const isBeforeMin = minDate ? dateIso < minDate : false;
+              const isAfterMax = maxDate ? dateIso > maxDate : false;
+              const isDisabled = isBeforeMin || isAfterMax;
+
               const isSelected =
                 currentDateObj &&
                 currentDateObj.getFullYear() === viewYear &&
@@ -310,13 +324,16 @@ export const LuxuryDatePicker: React.FC<LuxuryDatePickerProps> = ({
                 <button
                   key={`current-${dayNum}`}
                   type="button"
-                  onClick={() => handleSelectDay(dayNum)}
-                  className={`w-8 h-8 sm:w-9 sm:h-9 mx-auto rounded-xl flex items-center justify-center text-xs font-mono font-semibold transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#0b192c] text-white shadow-md font-bold scale-105 ring-2 ring-sky-200'
+                  disabled={isDisabled}
+                  onClick={() => !isDisabled && handleSelectDay(dayNum)}
+                  className={`w-8 h-8 sm:w-9 sm:h-9 mx-auto rounded-xl flex items-center justify-center text-xs font-mono font-semibold transition-all ${
+                    isDisabled
+                      ? 'opacity-20 cursor-not-allowed pointer-events-none text-slate-300'
+                      : isSelected
+                      ? 'bg-[#0b192c] text-white shadow-md font-bold scale-105 ring-2 ring-sky-200 cursor-pointer'
                       : isToday
-                      ? 'bg-sky-50 text-sky-800 border border-sky-300 font-bold hover:bg-sky-100'
-                      : 'text-slate-700 hover:bg-slate-100 hover:text-[#0b192c]'
+                      ? 'bg-sky-50 text-sky-800 border border-sky-300 font-bold hover:bg-sky-100 cursor-pointer'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-[#0b192c] cursor-pointer'
                   }`}
                 >
                   {dayNum}
