@@ -819,11 +819,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   // Validation before advancing
   const canProceed = () => {
     if (currentStep === 1) {
-      if (!mainModality) return false;
-      if (mainModality === 'custom') return selectedCategories.length > 0;
-      return true;
+      return Boolean(mainModality);
     }
     if (currentStep === 2) {
+      if (mainModality === 'custom') {
+        return selectedCategories.length > 0;
+      }
       if (mainModality === 'lodge') {
         if (!startDate || !endDate || startDate >= endDate) return false;
         if (selectedProgramIds.length === 0) return false;
@@ -849,13 +850,11 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   const handleNext = () => {
     if (!canProceed()) {
       if (currentStep === 1) {
-        if (!mainModality) {
-          showNotification('Por favor selecciona una modalidad de reserva (Expedición Náutica, Lodge o Personalizado).', 'Selección Requerida');
-        } else if (mainModality === 'custom' && selectedCategories.length === 0) {
-          showNotification('Por favor activa al menos uno de los íconos circulares para componer la reserva personalizada.', 'Servicios Requeridos');
-        }
+        showNotification('Por favor selecciona una modalidad de reserva (Expedición Náutica, Lodge o Personalizado).', 'Selección Requerida');
       } else if (currentStep === 2) {
-        if (mainModality === 'lodge') {
+        if (mainModality === 'custom') {
+          showNotification('Por favor activa al menos uno de los servicios (Velero, Yate, Lodge, Buceo, Vuelos) para continuar con esta expedición personalizada.', 'Servicios Requeridos');
+        } else if (mainModality === 'lodge') {
           if (!startDate || !endDate || startDate >= endDate) {
             showNotification('Por favor selecciona una fecha de Check-in y Check-out válida (mínimo 1 noche) para consultar disponibilidad.', 'Fechas Requeridas');
           } else if (selectedProgramIds.length === 0) {
@@ -1005,7 +1004,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 ]
               : [
                   { step: 1, label: '1. Modalidad' },
-                  { step: 2, label: mainModality === 'expedition' ? '2. Zarpes' : '2. Programas' },
+                  { step: 2, label: mainModality === 'expedition' ? '2. Zarpes' : '2. Servicios' },
                   { step: 3, label: '3. Fechas' },
                   { step: 4, label: '4. Pasajeros' },
                   { step: 5, label: '5. Pago' },
@@ -1201,6 +1200,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                   type="button"
                   onClick={() => {
                     setMainModality('custom');
+                    if (selectedCategories.length === 0) {
+                      setSelectedCategories(['vegvisir', 'lodge']);
+                    }
+                    setTimeout(() => {
+                      setCurrentStep(2);
+                    }, 120);
                   }}
                   className={`p-5 rounded-3xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-4 relative group ${
                     mainModality === 'custom'
@@ -1255,83 +1260,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 </button>
               </div>
 
-              {/* SI SE ELIGE PERSONALIZADO: MOSTRAR ÍCONOS CIRCULARES */}
-              {mainModality === 'custom' && (
-                <div className="pt-4 border-t border-slate-100 space-y-4 animate-fadeIn">
-                  <div className="text-center space-y-0.5">
-                    <h5 className="font-serif text-sm font-bold text-[#0f2b48]">
-                      Selecciona los servicios que compondrán esta experiencia
-                    </h5>
-                    <p className="text-slate-500 text-[11px] font-light">
-                      Haz clic en los íconos circulares para activar o desactivar cada componente:
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 py-2">
-                    {[
-                      { id: 'vegvisir', title: 'Velero Vegvisir', icon: Sailboat },
-                      { id: 'terranova', title: 'Yate Terranova', icon: Ship },
-                      { id: 'lodge', title: 'Lodge Rincón', icon: BedDouble },
-                      { id: 'servicios', title: 'Excursiones & Buceo', icon: Compass },
-                      { id: 'aeronave', title: 'Aeronave & Vuelos', icon: Plane },
-                    ].map((item) => {
-                      const isSelected = selectedCategories.includes(item.id);
-                      const Icon = item.icon;
-                      return (
-                        <div key={item.id} className="relative group/iconbtn flex flex-col items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => toggleCategory(item.id)}
-                            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-md hover:scale-110 active:scale-95 relative border-2 ${
-                              isSelected
-                                ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-lg shadow-[#0f2b48]/30 scale-105 ring-4 ring-sky-100'
-                                : 'bg-white text-slate-400 border-slate-200 hover:border-[#0f2b48]/40 hover:text-[#0f2b48] hover:bg-slate-50'
-                            }`}
-                          >
-                            <Icon className="w-6 h-6" />
-                            {isSelected && (
-                              <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-md border-2 border-white animate-scale-in">
-                                <Check className="w-2.5 h-2.5 stroke-[3]" />
-                              </div>
-                            )}
-                          </button>
-                          <span className="text-[10px] font-medium text-slate-600 text-center">
-                            {item.title}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {/* Mensaje de guía inferior */}
-              <div
-                className={`border p-3.5 rounded-2xl flex items-center justify-center gap-2 text-xs font-medium max-w-lg mx-auto text-center transition-all ${
-                  mainModality
-                    ? 'bg-sky-50/70 border-sky-200/80 text-sky-900'
-                    : 'bg-slate-50 border-slate-200 text-slate-500'
-                }`}
-              >
-                <Sparkles
-                  className={`w-4 h-4 shrink-0 ${mainModality ? 'text-sky-600' : 'text-slate-400'}`}
-                />
-                <span>
-                  {mainModality === 'expedition' && (
-                    <>Modalidad <strong>Expedición Náutica</strong> seleccionada. Presiona <em>Siguiente Paso</em> para elegir el zarpe programado.</>
-                  )}
-                  {mainModality === 'lodge' && (
-                    <>Modalidad <strong>Lodge Rincón</strong> seleccionada. Presiona <em>Siguiente Paso</em> para elegir la cabina.</>
-                  )}
-                  {mainModality === 'custom' && (
-                    <>
-                      {selectedCategories.length > 0
-                        ? <>{selectedCategories.length} {selectedCategories.length === 1 ? 'servicio activo' : 'servicios activos'}. Presiona <em>Siguiente Paso</em> para ver los programas disponibles.</>
-                        : 'Activa al menos un servicio con los íconos circulares para continuar.'}
-                    </>
-                  )}
-                  {!mainModality && 'Elige una de las 3 modalidades de reserva arriba para comenzar.'}
-                </span>
+              <div className="border p-3.5 rounded-2xl flex items-center justify-center gap-2 text-xs font-medium max-w-lg mx-auto text-center bg-slate-50 border-slate-200 text-slate-500">
+                <Sparkles className="w-4 h-4 shrink-0 text-sky-600" />
+                <span>Haz clic en cualquiera de las 3 modalidades de reserva para avanzar automáticamente al siguiente paso.</span>
               </div>
             </div>
           )}
@@ -1547,54 +1479,42 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* PASO 2: PROGRAMAS O EXPEDICIONES (EXPEDICIÓN O PERSONALIZADO) */}
+          {/* PASO 2: EXPEDICIÓN NÁUTICA — ZARPES PROGRAMADOS CON FILTRO POR MES        */}
           {/* ========================================================================= */}
-          {currentStep === 2 && mainModality !== 'lodge' && (
+          {currentStep === 2 && mainModality === 'expedition' && (
             <div className="space-y-4 animate-fadeIn">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border ${
-                      mainModality === 'expedition'
-                        ? 'bg-sky-50 text-sky-800 border-sky-200'
-                        : 'bg-amber-50 text-amber-800 border-amber-200'
-                    }`}>
-                      {mainModality === 'expedition'
-                        ? 'Expediciones Náuticas Creadas'
-                        : 'Catálogo Personalizado'}
+                    <span className="text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border bg-sky-50 text-sky-800 border-sky-200">
+                      Expediciones Náuticas Creadas
                     </span>
                   </div>
                   <h4 className="font-serif text-base font-bold text-[#0f2b48]">
-                    {mainModality === 'expedition'
-                      ? 'Paso 2: Selecciona la expedición náutica programada'
-                      : 'Paso 2: Selecciona los programas o servicios a incluir'}
+                    Paso 2: Selecciona la expedición náutica programada
                   </h4>
                   <p className="text-slate-500 text-xs font-light">
-                    {mainModality === 'expedition'
-                      ? 'Selecciona una de las expediciones con zarpes configurados para asignar los pasajeros.'
-                      : 'Se muestran los programas y servicios disponibles según las opciones seleccionadas.'}
+                    Selecciona una de las expediciones con zarpes configurados para asignar los pasajeros.
                   </p>
                 </div>
 
                 {/* FILTRO DE FECHA (MES) PARA EXPEDICIONES */}
-                {mainModality === 'expedition' && (
-                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 px-3.5 py-2 rounded-2xl shadow-2xs">
-                    <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
-                    <span className="text-[10px] font-mono font-bold uppercase text-slate-500">Mes:</span>
-                    <select
-                      value={expeditionMonthFilter}
-                      onChange={(e) => setExpeditionMonthFilter(e.target.value)}
-                      className="bg-transparent text-xs font-bold text-[#0f2b48] focus:outline-hidden cursor-pointer pr-1 font-mono"
-                    >
-                      <option value="all">Todos los meses ({availablePrograms.length})</option>
-                      {availableExpeditionMonths.map((m) => (
-                        <option key={m.key} value={m.key}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 px-3.5 py-2 rounded-2xl shadow-2xs">
+                  <Calendar className="w-4 h-4 text-sky-600 shrink-0" />
+                  <span className="text-[10px] font-mono font-bold uppercase text-slate-500">Mes:</span>
+                  <select
+                    value={expeditionMonthFilter}
+                    onChange={(e) => setExpeditionMonthFilter(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-[#0f2b48] focus:outline-hidden cursor-pointer pr-1 font-mono"
+                  >
+                    <option value="all">Todos los meses ({availablePrograms.length})</option>
+                    {availableExpeditionMonths.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="space-y-2.5 pt-1">
@@ -1656,15 +1576,13 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                     <Calendar className="w-8 h-8 text-slate-400 mx-auto" />
                     <div className="space-y-1">
                       <h5 className="font-serif font-bold text-sm text-slate-700">
-                        No hay programas o expediciones disponibles para esta selección
+                        No hay expediciones disponibles para esta selección
                       </h5>
                       <p className="text-xs text-slate-500 max-w-md mx-auto">
-                        {mainModality === 'expedition'
-                          ? 'Prueba cambiando el filtro de mes a "Todos los meses" para ver todas las salidas programadas.'
-                          : 'Puedes regresar al Paso 1 para ajustar las opciones seleccionadas.'}
+                        Prueba cambiando el filtro de mes a "Todos los meses" para ver todas las salidas programadas.
                       </p>
                     </div>
-                    {mainModality === 'expedition' && expeditionMonthFilter !== 'all' ? (
+                    {expeditionMonthFilter !== 'all' && (
                       <button
                         type="button"
                         onClick={() => setExpeditionMonthFilter('all')}
@@ -1672,18 +1590,167 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                       >
                         Ver todos los meses
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleBack}
-                        className="px-4 py-2 rounded-xl bg-[#0f2b48] text-white text-xs font-bold transition hover:bg-[#0a1e34] cursor-pointer"
-                      >
-                        ← Volver al Paso Anterior
-                      </button>
                     )}
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* PASO 2: PERSONALIZADO — SELECCIÓN DE SERVICIOS DE LA EXPEDICIÓN           */}
+          {/* ========================================================================= */}
+          {currentStep === 2 && mainModality === 'custom' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] uppercase font-mono font-bold px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-200">
+                    Expedición Personalizada a Medida
+                  </span>
+                </div>
+                <h4 className="font-serif text-base font-bold text-[#0f2b48]">
+                  Paso 2: Selecciona los servicios de esta expedición personalizada
+                </h4>
+                <p className="text-slate-500 text-xs font-light">
+                  Haz clic en los íconos circulares para activar o desactivar cada componente que integrará esta travesía (puedes activar uno o varios):
+                </p>
+              </div>
+
+              {/* SELECTOR DE SERVICIOS CON ÍCONOS CIRCULARES */}
+              <div className="bg-slate-50/70 border border-slate-200/90 rounded-3xl p-6 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 py-2">
+                  {[
+                    { id: 'vegvisir', title: 'Velero Vegvisir', desc: 'Travesía oceánica', icon: Sailboat },
+                    { id: 'terranova', title: 'Yate Terranova', desc: 'Yate a motor', icon: Ship },
+                    { id: 'lodge', title: 'Lodge Rincón', desc: 'Cabinas & Estadía', icon: BedDouble },
+                    { id: 'servicios', title: 'Excursiones & Buceo', desc: 'Actividades & Tours', icon: Compass },
+                    { id: 'aeronave', title: 'Aeronave & Vuelos', desc: 'Vuelos Robinson Crusoe', icon: Plane },
+                  ].map((item) => {
+                    const isSelected = selectedCategories.includes(item.id);
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.id} className="relative group/iconbtn flex flex-col items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleCategory(item.id)}
+                          className={`w-18 h-18 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer shadow-md hover:scale-105 active:scale-95 relative border-2 ${
+                            isSelected
+                              ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-lg shadow-[#0f2b48]/30 scale-105 ring-4 ring-amber-100'
+                              : 'bg-white text-slate-400 border-slate-200 hover:border-[#0f2b48]/40 hover:text-[#0f2b48] hover:bg-slate-50'
+                          }`}
+                          title={`Activar/Desactivar ${item.title}`}
+                        >
+                          <Icon className="w-7 h-7" />
+                          {isSelected && (
+                            <div className="absolute -top-1 -right-1 w-5.5 h-5.5 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-md border-2 border-white animate-scale-in">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                          )}
+                        </button>
+                        <div className="text-center">
+                          <span className={`text-xs font-bold block leading-tight transition ${isSelected ? 'text-[#0f2b48]' : 'text-slate-500'}`}>
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {item.desc}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Resumen de servicios activos */}
+                <div className="pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-[#0f2b48]">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>
+                      {selectedCategories.length > 0
+                        ? `${selectedCategories.length} ${selectedCategories.length === 1 ? 'servicio activo' : 'servicios activos'} seleccionados`
+                        : 'Ningún servicio activo. Haz clic en los íconos para activar.'}
+                    </span>
+                  </div>
+                  {selectedCategories.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className="px-4 py-1.5 rounded-full bg-[#0f2b48] text-white text-xs font-bold transition hover:bg-[#182a44] cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    >
+                      <span>Siguiente: Fechas</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* LISTA DE PROGRAMAS O PAQUETES ASOCIADOS */}
+              {displayedProgramsInStep2.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-serif font-bold text-sm text-[#0f2b48]">
+                      Programas y Paquetes Disponibles para los Servicios Activos:
+                    </h5>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      {displayedProgramsInStep2.length} disponibles
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {displayedProgramsInStep2.map((prog) => {
+                      const isSelected = selectedProgramIds.includes(prog.id);
+                      return (
+                        <div
+                          key={prog.id}
+                          onClick={() => selectProgram(prog.id, false)}
+                          className={`p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-wrap items-center justify-between gap-3 select-none ${
+                            isSelected
+                              ? 'bg-amber-50/50 border-amber-400 ring-1 ring-amber-300 shadow-xs'
+                              : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${
+                                isSelected
+                                  ? 'bg-[#0f2b48] border-[#0f2b48] text-white'
+                                  : 'bg-white border-slate-300'
+                              }`}
+                            >
+                              {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h6 className="font-serif font-bold text-sm text-[#0f2b48] truncate">
+                                  {prog.title}
+                                </h6>
+                                <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                  • {prog.duration}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-light line-clamp-1 mt-0.5">
+                                {prog.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                              Tarifa
+                            </span>
+                            <div className="text-sm font-mono font-bold text-[#0f2b48]">
+                              ${prog.priceClp.toLocaleString('es-CL')}{' '}
+                              <span className="text-[10px] font-normal text-slate-500 font-sans">
+                                {prog.unitType === 'pax' ? 'CLP / pax' : prog.unitType === 'night' ? 'CLP / noche' : 'CLP total'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
