@@ -11601,6 +11601,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           isOpen={showBookingWizardModal}
           onClose={() => setShowBookingWizardModal(false)}
           onConfirmBooking={handleConfirmBookingWizard}
+          departures={departures}
+          rooms={rooms}
         />
       )}
 
