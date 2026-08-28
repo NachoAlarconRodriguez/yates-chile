@@ -429,9 +429,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   // Step 5: Payment & Installments
   const paymentMethod: 'transfer' | 'credit_card' | 'cash' | 'airbnb' | 'invoice' = 'transfer';
   const [paymentScheme, setPaymentScheme] = useState<'100' | '50' | '0'>('50');
-  const [discountType, setDiscountType] = useState<'none' | 'percent' | 'amount'>('none');
+  const [isDiscountEnabled, setIsDiscountEnabled] = useState<boolean>(false);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [specialNotes, setSpecialNotes] = useState<string>('');
 
   // Custom In-App Notification State
@@ -469,9 +468,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
           notes: '',
         },
       ]);
-      setDiscountType('none');
+      setIsDiscountEnabled(false);
       setDiscountPercent(0);
-      setDiscountAmount(0);
       setSpecialNotes('');
       setNotification(null);
     }
@@ -801,13 +799,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
   }, [selectedProgramsData, passengersCount, calculatedNights]);
 
   const calculatedDiscountClp = useMemo(() => {
-    if (discountType === 'percent') {
-      return Math.round((subtotalClp * discountPercent) / 100);
-    } else if (discountType === 'amount') {
-      return Math.min(subtotalClp, discountAmount);
+    if (isDiscountEnabled && discountPercent > 0) {
+      const validPercent = Math.min(100, Math.max(0, discountPercent));
+      return Math.round((subtotalClp * validPercent) / 100);
     }
     return 0;
-  }, [subtotalClp, discountType, discountPercent, discountAmount]);
+  }, [subtotalClp, isDiscountEnabled, discountPercent]);
 
   const totalFinalClp = Math.max(0, subtotalClp - calculatedDiscountClp);
 
@@ -947,8 +944,8 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       passengers: passengers.slice(0, passengersCount),
       paymentMethod,
       paymentScheme,
-      discountType,
-      discountValue: discountType === 'percent' ? discountPercent : discountAmount,
+      discountType: isDiscountEnabled && discountPercent > 0 ? 'percent' : 'none',
+      discountValue: isDiscountEnabled ? discountPercent : 0,
       installmentsCount: paymentScheme === '100' ? 1 : paymentScheme === '50' ? 2 : 0,
       specialNotes,
       totalAmountClp: totalFinalClp,
@@ -2411,71 +2408,82 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
                 </div>
               </div>
 
-              {/* DESCUENTOS Y BENEFICIOS ESPECIALES */}
-              <div className="bg-[#fbfcfd] border border-slate-200/90 p-4 rounded-2xl space-y-3 shadow-2xs">
-                <label className="text-[10px] uppercase font-bold text-[#0f2b48] flex items-center gap-1.5 font-mono">
-                  <Percent className="w-3.5 h-3.5 text-sky-600" />
-                  <span>Descuentos y Beneficios Especiales</span>
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => { setDiscountType('none'); setDiscountPercent(0); setDiscountAmount(0); }}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
-                      discountType === 'none'
-                        ? 'bg-[#0f2b48] text-white border-[#0f2b48]'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Sin Descuento (Tarifa Estándar)
-                  </button>
-
-                  <div
-                    onClick={() => setDiscountType('percent')}
-                    className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2 ${
-                      discountType === 'percent'
-                        ? 'bg-sky-50 border-sky-400 ring-1 ring-sky-300'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <span className="text-xs font-bold text-[#0f2b48]">Porcentaje:</span>
-                    <select
-                      value={discountPercent}
-                      onChange={(e) => {
-                        setDiscountType('percent');
-                        setDiscountPercent(Number(e.target.value));
-                      }}
-                      className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-[#0f2b48] focus:outline-none"
-                    >
-                      <option value="5">5% Descuento</option>
-                      <option value="10">10% Descuento (VIP)</option>
-                      <option value="15">15% Descuento</option>
-                      <option value="20">20% Preventa</option>
-                    </select>
+              {/* DESCUENTO PERSONALIZADO CON SWITCH */}
+              <div className="bg-[#fbfcfd] border border-slate-200/90 p-4 sm:p-5 rounded-2xl space-y-3.5 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-700 shrink-0 shadow-2xs">
+                      <Percent className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-[#0f2b48] block">
+                        Aplicar Descuento a la Reserva
+                      </label>
+                      <p className="text-[11px] text-slate-500 font-light">
+                        {isDiscountEnabled
+                          ? 'Ingresa el porcentaje que se descontará sobre el valor total.'
+                          : 'Activa el switch para aplicar un porcentaje de descuento comercial.'}
+                      </p>
+                    </div>
                   </div>
 
-                  <div
-                    onClick={() => setDiscountType('amount')}
-                    className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2 ${
-                      discountType === 'amount'
-                        ? 'bg-sky-50 border-sky-400 ring-1 ring-sky-300'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <span className="text-xs font-bold text-[#0f2b48] whitespace-nowrap">Monto Fijo:</span>
+                  {/* Switch Toggle */}
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
                     <input
-                      type="number"
-                      placeholder="$ CLP"
-                      value={discountAmount || ''}
+                      type="checkbox"
+                      checked={isDiscountEnabled}
                       onChange={(e) => {
-                        setDiscountType('amount');
-                        setDiscountAmount(Number(e.target.value));
+                        const enabled = e.target.checked;
+                        setIsDiscountEnabled(enabled);
+                        if (!enabled) {
+                          setDiscountPercent(0);
+                        }
                       }}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono font-bold text-[#0f2b48] focus:outline-none"
+                      className="sr-only peer"
                     />
-                  </div>
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0f2b48]"></div>
+                    <span className="ml-2.5 text-xs font-mono font-bold text-[#0f2b48]">
+                      {isDiscountEnabled ? 'Activado' : 'Desactivado'}
+                    </span>
+                  </label>
                 </div>
+
+                {/* Input de porcentaje cuando el Switch está activo */}
+                {isDiscountEnabled && (
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs font-bold text-[#0f2b48] font-mono whitespace-nowrap">
+                        Porcentaje de Descuento:
+                      </span>
+                      <div className="relative flex items-center w-28">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          autoFocus
+                          placeholder="0"
+                          value={discountPercent || ''}
+                          onChange={(e) => {
+                            const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                            setDiscountPercent(val);
+                          }}
+                          className="w-full bg-white border border-slate-300 focus:border-[#0f2b48] rounded-xl py-2 pl-3 pr-7 text-xs font-mono font-bold text-[#0f2b48] focus:outline-none shadow-2xs transition"
+                        />
+                        <span className="absolute right-3 text-xs font-mono font-bold text-slate-400 pointer-events-none">
+                          %
+                        </span>
+                      </div>
+                    </div>
+
+                    {discountPercent > 0 && (
+                      <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs">
+                        <span>Ahorro total:</span>
+                        <span>-${calculatedDiscountClp.toLocaleString('es-CL')} CLP ({discountPercent}%)</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* FINANCIAL SUMMARY BOX */}
