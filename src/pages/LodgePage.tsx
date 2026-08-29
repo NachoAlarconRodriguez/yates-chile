@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Compass, Users, Sparkles, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
 import { useCatalogServices } from '../hooks/useCatalogServices';
 import { useSiteContent } from '../hooks/useSiteContent';
@@ -39,10 +39,6 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const [currentStation, setCurrentStation] = React.useState<'exterior' | 'comedor' | 'habitacion'>('exterior');
-  const [isTransitioning, setIsTransitioning] = React.useState(false);
-  const [activeInfo, setActiveInfo] = React.useState<{ title: string; desc: string } | null>(null);
-
   const currentDateFormatted = React.useMemo(() => {
     return new Intl.DateTimeFormat('es-CL', {
       day: 'numeric',
@@ -50,14 +46,6 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
       year: 'numeric',
     }).format(new Date()).toUpperCase();
   }, []);
-
-  const navigateToStation = (station: 'exterior' | 'comedor' | 'habitacion') => {
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setCurrentStation(station);
-      setIsTransitioning(false);
-    }, 600);
-  };
 
   const [fullscreenIndex, setFullscreenIndex] = React.useState<number | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -85,97 +73,6 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fullscreenIndex]);
-
-  const tourStations = {
-    exterior: {
-      title: 'Terraza & Quincho Exterior',
-      image: '/jf-noviembre.jpg',
-      hotspots: [
-        {
-          x: '45%',
-          y: '60%',
-          type: 'info' as const,
-          title: 'Amplio Quincho Isleño',
-          desc: 'Espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre frente al paisaje de Robinson Crusoe tras recorrer la isla.',
-        },
-        {
-          x: '25%',
-          y: '42%',
-          type: 'info' as const,
-          title: 'Terraza & Atardeceres Frente al Mar',
-          desc: 'Ubicación privilegiada en Uberlindo Andaur 222 justo frente al mar para contemplar atardeceres inolvidables sobre el océano Pacífico.',
-        },
-        {
-          x: '75%',
-          y: '65%',
-          type: 'nav' as const,
-          label: 'Ingresar al Espacio Común',
-          target: 'comedor' as const,
-        },
-      ],
-    },
-    comedor: {
-      title: 'Espacio Común & Comedor',
-      image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
-      hotspots: [
-        {
-          x: '55%',
-          y: '50%',
-          type: 'info' as const,
-          title: 'Inspiración Náutica & Luz Natural',
-          desc: 'Estética funcional donde la luz natural, la brisa marina y las vistas acompañan cada espacio para una experiencia auténtica.',
-        },
-        {
-          x: '35%',
-          y: '68%',
-          type: 'info' as const,
-          title: 'Comedor & Encuentro',
-          desc: 'Lugar de reunión para compartir vivencias y sabores locales frente al mar de Bahía Cumberland.',
-        },
-        {
-          x: '20%',
-          y: '45%',
-          type: 'nav' as const,
-          label: 'Salir a la Terraza y Quincho',
-          target: 'exterior' as const,
-        },
-        {
-          x: '80%',
-          y: '60%',
-          type: 'nav' as const,
-          label: 'Ir a Cabinas Independientes',
-          target: 'habitacion' as const,
-        },
-      ],
-    },
-    habitacion: {
-      title: 'Cabinas Independientes Frente al Mar',
-      image: '/rincon-de-navegantes.jpg',
-      hotspots: [
-        {
-          x: '50%',
-          y: '60%',
-          type: 'info' as const,
-          title: '4 Cabinas (Hasta 11 Pasajeros)',
-          desc: 'Cuatro cabinas independientes (3 para hasta 3 personas y 1 para hasta 2 personas), todas con baño privado y vista directa al océano.',
-        },
-        {
-          x: '30%',
-          y: '55%',
-          type: 'info' as const,
-          title: 'Baño Privado & Vista al Océano',
-          desc: 'Todas las cabinas cuentan con su propio baño privado independiente y vistas panorámicas hacia la inmensidad del mar.',
-        },
-        {
-          x: '12%',
-          y: '58%',
-          type: 'nav' as const,
-          label: 'Regresar al Espacio Común',
-          target: 'comedor' as const,
-        },
-      ],
-    },
-  };
 
   const [selectedFeature, setSelectedFeature] = React.useState<'arquitectura' | 'quincho' | 'exploraciones' | 'atardeceres'>('arquitectura');
 
@@ -222,36 +119,44 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
     },
   };
 
+  const [currentPhotoIndex, setCurrentPhotoIndex] = React.useState<number>(0);
+
   const images = [
+    {
+      url: '/lodge/lodge-terraza-quincho.jpg',
+      title: 'Terraza & Quincho Panorámico',
+      location: 'Lodge Rincón de Navegantes • Vista al Mar',
+      desc: 'Terraza techada de madera noble con vista frontal al mar y bahía Cumberland, ideal para asados y encuentros al aire libre.',
+    },
+    {
+      url: '/lodge/lodge-suite-panoramica.jpg',
+      title: 'Suite Panorámica con Vista al Océano',
+      location: 'Cabina Principal • Revestimientos en Madera',
+      desc: 'Cama matrimonial con amplio ventanal panorámico, gaveteros integrados de madera y vista directa al horizonte del Pacífico.',
+    },
+    {
+      url: '/lodge/lodge-habitacion-velero.jpg',
+      title: 'Habitación Náutica con Altillo',
+      location: 'Cabina 2 • Inspiración Isleña',
+      desc: 'Espacio de gran altura con cama baja y altillo, decoración marinera artesanal, ventanales altos y luz natural.',
+    },
+    {
+      url: '/lodge/lodge-habitacion-individual.jpg',
+      title: 'Habitación Luminosa Frente al Mar',
+      location: 'Cabina 3 • Confort y Calidez',
+      desc: 'Habitación independiente con cama de descanso, escritorio plegable de madera noble y vista directa a la costanera marina.',
+    },
+    {
+      url: '/lodge/lodge-bano-privado.jpg',
+      title: 'Baño Privado en Suite',
+      location: '4 Cabinas con Baño Privado',
+      desc: 'Baño completo independiente con tocador de madera, espejo amplio, ducha y diseño contemporáneo para cada habitación.',
+    },
     {
       url: '/rincon-de-navegantes.jpg',
       title: 'Lodge Rincón de Navegantes',
-      desc: 'Refugio boutique ubicado en Uberlindo Andaur 222, justo en frente del mar en la Isla Robinson Crusoe.',
-    },
-    {
-      url: '/jf-noviembre.jpg',
-      title: 'Arquitectura e Inspiración Náutica',
-      desc: 'Diseño funcional en torno a 4 cabinas independientes, terraza, amplio quincho y áreas verdes.',
-    },
-    {
-      url: '/rincon-de-navegantes.jpg',
-      title: 'Cabinas con Vista al Océano',
-      desc: 'Todas las cabinas cuentan con baño privado y vistas panorámicas hacia el mar de Robinson Crusoe.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
-      title: 'Amplio Quincho & Encuentros',
-      desc: 'Espacio acogedor para compartir, cocinar y disfrutar de momentos inolvidables al aire libre tras recorrer la isla.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
-      title: 'Atardeceres Frente al Mar',
-      desc: 'Puestas de sol inolvidables mientras el cielo cambia de color y el sol se pierde en el horizonte del Pacífico.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
-      title: 'Exploraciones Exclusivas',
-      desc: 'Cabalgatas, senderismo entre helechos gigantes, buceo, snorkel y navegaciones guiadas por expertos locales.',
+      location: 'Uberlindo Andaur 222 • Robinson Crusoe',
+      desc: 'Refugio boutique frente al mar diseñado para albergar hasta 11 pasajeros en 4 cabinas privadas con baño en suite.',
     },
   ];
 
@@ -838,143 +743,97 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
         </div>
       </section>
 
-      {/* 3D VIRTUAL TOUR SECTION */}
+      {/* PHOTO GALLERY VIEWER IN PLACE OF TOUR */}
       <section className="py-20 bg-slate-50 border-t border-slate-200/80">
         <div className="max-w-7xl mx-auto px-6 sm:px-10 space-y-12">
           
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/10 border border-emerald-900/20 text-emerald-800 text-xs font-semibold uppercase tracking-wider">
               <Compass className="w-3.5 h-3.5 text-emerald-950 animate-[spin_30s_linear_infinite]" />
-              <span>Recorrido Virtual interactivo</span>
+              <span>Galería Fotográfica del Lodge</span>
             </span>
             <h3 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
-              Explora el Lodge
+              Espacios y Habitaciones
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Descubre los rincones del Lodge Rincón de Navegantes. Haz clic en los hotspots brújula para desplazarte a otras áreas o en los hotspots destello para ver detalles de las instalaciones.
+              Fotografías reales del Lodge Rincón de Navegantes en la Isla Robinson Crusoe: terraza con quincho exterior, suites panorámicas, habitaciones náuticas y baños en suite frente al mar.
             </p>
           </div>
 
-          <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between">
-            {/* The Active View Station Image */}
+          {/* Main Photo Gallery Container */}
+          <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between group">
+            {/* The Active Photo Image */}
             <div className="absolute inset-0 w-full h-full">
               <img
-                src={tourStations[currentStation].image}
-                alt={tourStations[currentStation].title}
-                className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${
-                  isTransitioning ? 'scale-150 blur-md opacity-0' : 'scale-100 blur-0 opacity-100'
-                }`}
+                src={images[currentPhotoIndex].url}
+                alt={images[currentPhotoIndex].title}
+                className="w-full h-full object-cover transition-all duration-700 ease-in-out scale-100"
               />
-              {/* Soft overlay vignette */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-black/30 pointer-events-none" />
+              {/* Soft luxury overlay vignette */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/40 pointer-events-none" />
             </div>
 
-            {/* Hotspots layer (rendered when not transitioning) */}
-            <div className="absolute inset-0 z-10 pointer-events-none">
-              {!isTransitioning && tourStations[currentStation].hotspots.map((hs, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    if (hs.type === 'nav' && hs.target) {
-                      navigateToStation(hs.target);
-                    } else if (hs.title && hs.desc) {
-                      setActiveInfo({ title: hs.title, desc: hs.desc });
-                    }
-                  }}
-                  className="absolute w-10 h-10 rounded-full bg-emerald-950/80 border-2 border-white flex items-center justify-center text-white shadow-lg cursor-pointer hover:scale-110 hover:bg-emerald-900 transition-all duration-300 pointer-events-auto group focus:outline-none focus:ring-4 focus:ring-emerald-900/50"
-                  style={{
-                    left: hs.x,
-                    top: hs.y,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  {/* Outer pulsing ring */}
-                  <span className="absolute -inset-2.5 rounded-full border-2 border-emerald-400/60 animate-ping opacity-75 pointer-events-none" />
-                  
-                  {hs.type === 'nav' ? (
-                    <Compass className="w-5 h-5 text-white animate-[spin_20s_linear_infinite]" />
-                  ) : (
-                    <Sparkles className="w-5 h-5 text-sky-400" />
-                  )}
-
-                  {/* Label tooltip on hover */}
-                  <span className="absolute bottom-12 bg-slate-950/90 border border-slate-800/80 backdrop-blur-md text-[10px] text-white px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-mono tracking-wide uppercase select-none pointer-events-none z-30">
-                    {hs.type === 'nav' ? (hs.label || 'Navegar') : (hs.title || 'Info')}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Overlay modal for information hotspots */}
-            {activeInfo && (
-              <div className="absolute inset-0 z-30 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-6 transition-all duration-300 pointer-events-auto">
-                <div className="bg-white/95 border border-slate-200/80 max-w-md w-full p-6 rounded-2xl shadow-2xl relative z-10 space-y-4 animate-[fadeIn_0.3s_ease-out] text-slate-800">
-                  <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-900/10 flex items-center justify-center text-emerald-900 shrink-0">
-                      <Sparkles className="w-4.5 h-4.5" />
-                    </div>
-                    <h4 className="font-serif font-bold text-lg text-slate-900">{activeInfo.title}</h4>
-                  </div>
-                  <p className="text-slate-655 text-xs sm:text-sm leading-relaxed">{activeInfo.desc}</p>
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      onClick={() => setActiveInfo(null)}
-                      className="bg-emerald-850 hover:bg-emerald-900 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-md min-h-[38px] cursor-pointer"
-                    >
-                      Entendido
-                    </button>
-                  </div>
-                </div>
+            {/* Top Bar HUD */}
+            <div className="relative z-20 w-full p-5 sm:p-6 flex justify-between items-center pointer-events-none">
+              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-white/95 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Lodge Cumberland • Foto 0{currentPhotoIndex + 1} de 0{images.length}</span>
               </div>
-            )}
-
-            {/* Top Bar Navigation HUD */}
-            <div className="relative z-20 w-full p-6 flex justify-between items-center pointer-events-none">
-              <div className="bg-slate-900/80 border border-slate-800/50 backdrop-blur-md px-4 py-2 rounded-xl text-white/90 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span>Vista Activa: {tourStations[currentStation].title}</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800/50 backdrop-blur-md px-4 py-2 rounded-xl text-white/70 font-mono text-[10px] sm:text-xs tracking-wider uppercase select-none shadow-md hidden sm:block">
-                FOV: 75°
+              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-emerald-300 font-mono text-[10px] sm:text-xs tracking-wider select-none shadow-md hidden sm:flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{images[currentPhotoIndex].location || 'Robinson Crusoe'}</span>
               </div>
             </div>
 
-            {/* Bottom HUD Station Selector Controls */}
-            <div className="relative z-20 w-full p-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-t from-slate-950/80 to-transparent">
-              <div className="flex gap-2 sm:gap-3 pointer-events-auto">
-                <button
-                  onClick={() => navigateToStation('exterior')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'exterior'
-                      ? 'bg-emerald-800 text-white border border-emerald-700 shadow-md shadow-emerald-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Terraza
-                </button>
-                <button
-                  onClick={() => navigateToStation('comedor')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'comedor'
-                      ? 'bg-emerald-800 text-white border border-emerald-700 shadow-md shadow-emerald-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Comedor & Cava
-                </button>
-                <button
-                  onClick={() => navigateToStation('habitacion')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'habitacion'
-                      ? 'bg-emerald-800 text-white border border-emerald-700 shadow-md shadow-emerald-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Suite Forestal
-                </button>
+            {/* Left & Right Slider Controls */}
+            <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 pointer-events-none z-20">
+              <button
+                type="button"
+                onClick={() => setCurrentPhotoIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
+                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                aria-label="Foto anterior"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPhotoIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))}
+                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                aria-label="Foto siguiente"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Bottom Caption Strip & Thumbnail Dots */}
+            <div className="relative z-20 w-full p-5 sm:p-7 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+              <div className="space-y-1 max-w-xl text-left">
+                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest block font-bold">
+                  {images[currentPhotoIndex].location}
+                </span>
+                <h4 className="font-serif font-bold text-lg sm:text-2xl text-white">
+                  {images[currentPhotoIndex].title}
+                </h4>
+                <p className="text-slate-300 text-xs sm:text-sm font-light leading-relaxed line-clamp-2">
+                  {images[currentPhotoIndex].desc}
+                </p>
               </div>
-              <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest select-none hidden sm:block">
-                Lodge Cumberland HUD v1.0
+
+              {/* Dots Selector */}
+              <div className="flex items-center gap-2 self-center sm:self-end bg-slate-900/70 border border-slate-800/80 backdrop-blur-md p-2 rounded-full">
+                {images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCurrentPhotoIndex(idx)}
+                    className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                      currentPhotoIndex === idx
+                        ? 'w-7 bg-white shadow-xs'
+                        : 'w-2.5 bg-white/30 hover:bg-white/60'
+                    }`}
+                    aria-label={`Ver foto ${idx + 1}`}
+                  />
+                ))}
               </div>
             </div>
 

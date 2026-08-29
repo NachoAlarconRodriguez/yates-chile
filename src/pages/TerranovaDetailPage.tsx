@@ -18,10 +18,6 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const [currentStation, setCurrentStation] = React.useState<'exterior' | 'salon' | 'camarote'>('exterior');
-  const [isTransitioning, setIsTransitioning] = React.useState(false);
-  const [activeInfo, setActiveInfo] = React.useState<{ title: string; desc: string } | null>(null);
-
   const currentDateFormatted = React.useMemo(() => {
     return new Intl.DateTimeFormat('es-CL', {
       day: 'numeric',
@@ -29,14 +25,6 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
       year: 'numeric',
     }).format(new Date()).toUpperCase();
   }, []);
-
-  const navigateToStation = (station: 'exterior' | 'salon' | 'camarote') => {
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setCurrentStation(station);
-      setIsTransitioning(false);
-    }, 600);
-  };
 
   const [fullscreenIndex, setFullscreenIndex] = React.useState<number | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -64,111 +52,6 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fullscreenIndex]);
-
-  const tourStations = {
-    exterior: {
-      title: 'Cubierta 3: Flybridge & Deck Superior',
-      image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
-      hotspots: [
-        {
-          x: '50%',
-          y: '55%',
-          type: 'info',
-          title: 'Deck Superior & Parrilla',
-          desc: 'Área social abierta en el tercer nivel equipada con parrilla para asados al aire libre frente a los glaciares australes.',
-        },
-        {
-          x: '72%',
-          y: '68%',
-          type: 'nav',
-          label: 'Bajar a Cubierta 2 (Salón & Comedor)',
-          target: 'salon' as const,
-        },
-        {
-          x: '25%',
-          y: '40%',
-          type: 'info',
-          title: '2do Puente de Gobierno & Navegación',
-          desc: 'Puesto de pilotaje elevado equipado con doble electrónica Raymarine y Garmin, Starlink 24/7 y visión panorámica 360°.',
-        },
-        {
-          x: '80%',
-          y: '45%',
-          type: 'info',
-          title: 'Zodiac Yamaha 70hp & Grúa 1 Ton',
-          desc: 'Bote auxiliar semirrígido con potente motor fuera de borda Yamaha 4T de 70 HP operado con pluma/grúa de 1 tonelada para desembarcos ágiles.',
-        },
-      ],
-    },
-    salon: {
-      title: 'Cubierta 2: Puente, Deck Central, Salón & Cocina',
-      image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
-      hotspots: [
-        {
-          x: '58%',
-          y: '52%',
-          type: 'info',
-          title: 'Puente de Gobierno Principal',
-          desc: 'Comando central con instrumental dual Raymarine y Garmin, Piloto Automático y consola de monitoreo de los 2 generadores Northern Lights.',
-        },
-        {
-          x: '35%',
-          y: '65%',
-          type: 'info',
-          title: 'Deck Central, Comedor & Popa',
-          desc: 'Espacio de estar de gran amplitud con comedor noble, ventanales panorámicos y salida directa a la cubierta exterior de popa.',
-        },
-        {
-          x: '22%',
-          y: '45%',
-          type: 'nav',
-          label: 'Subir a Cubierta 3 (Flybridge)',
-          target: 'exterior' as const,
-        },
-        {
-          x: '75%',
-          y: '60%',
-          type: 'nav',
-          label: 'Bajar a Cubierta 1 (Dormitorios)',
-          target: 'camarote' as const,
-        },
-        {
-          x: '15%',
-          y: '55%',
-          type: 'info',
-          title: 'Cocina Full Equipo',
-          desc: 'Cocina profesional completa integrada con provisión de agua continua mediante 2 plantas desalinizadoras (140 ltrs/hr c/u).',
-        },
-      ],
-    },
-    camarote: {
-      title: 'Cubierta 1: Dormitorios (5 Cabinas / 5 Baños)',
-      image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
-      hotspots: [
-        {
-          x: '50%',
-          y: '62%',
-          type: 'info',
-          title: '5 Cabinas Privadas (20 PAX)',
-          desc: 'Nivel completo de descanso con 5 cabinas suites independientes diseñadas para albergar con total holgura hasta 20 pasajeros.',
-        },
-        {
-          x: '30%',
-          y: '48%',
-          type: 'info',
-          title: '5 Baños Completos en Suite',
-          desc: 'Cinco baños privados independientes con duchas y confort térmico para todos los huéspedes a bordo.',
-        },
-        {
-          x: '12%',
-          y: '58%',
-          type: 'nav',
-          label: 'Subir a Cubierta 2 (Salón)',
-          target: 'salon' as const,
-        },
-      ],
-    },
-  };
 
   const [selectedFeature, setSelectedFeature] = React.useState<'climatizacion' | 'gastronomia' | 'casco' | 'desembarcos'>('climatizacion');
 
@@ -215,36 +98,44 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
     },
   };
 
+  const [currentPhotoIndex, setCurrentPhotoIndex] = React.useState<number>(0);
+
   const images = [
     {
+      url: '/flota/terranova/terranova-cubierta-proa.jpg',
+      title: 'Proa y Flybridge del Yate Terranova',
+      location: 'Cubierta 2 & 3 • Hatteras 65ft LRC',
+      desc: 'Vista de proa y flybridge exterior con segundo puesto de gobierno, molinete de fondeo y amplios accesos a cubierta.',
+    },
+    {
+      url: '/flota/terranova/terranova-camarote-master.jpg',
+      title: 'Camarote Suite Principal',
+      location: 'Cubierta 1 • Habitabilidad 20 PAX',
+      desc: 'Suite con cama doble y litera superior, revestimientos en madera noble, iluminación cálida y baño privado en suite.',
+    },
+    {
+      url: '/flota/terranova/terranova-camarote-twin.jpg',
+      title: 'Camarote Twin con Camas Gemelas',
+      location: 'Cubierta 1 • 5 Cabinas Privadas',
+      desc: 'Cabina twin con dos camas individuales bajas, mesita de noche central, acabados en caoba y confort térmico para expediciones.',
+    },
+    {
+      url: '/flota/terranova/terranova-camarote-triple.jpg',
+      title: 'Camarote Triple con Escotilla Cenital',
+      location: 'Cubierta 1 • Espacios Optimizados',
+      desc: 'Distribución de literas múltiples para familias o expedicionarios, con escotilla superior para luz natural y cajoneras de madera.',
+    },
+    {
+      url: '/flota/terranova/terranova-camarote-litera.jpg',
+      title: 'Camarote con Literas y Baño en Suite',
+      location: 'Cubierta 1 • Descanso de Alta Mar',
+      desc: 'Cabina privada con literas confortables, lámpara de lectura, espejo amplio y almacenamiento para largas travesías australes.',
+    },
+    {
       url: '/yate-terranova.jpg',
-      title: 'Yate Terranova en aguas australes',
-      desc: 'El Terranova Hatteras 65ft LRC navegando entre los canales australes. Su autonomía oceánica y robustez americana ofrecen una navegación incomparable.',
-    },
-    {
-      url: '/flota/terranova/terranova-cubiertas.jpg',
-      title: 'Deck Superior & Cubiertas del Terranova',
-      desc: 'Vista de proa y flybridge del Yate Terranova con segundo puesto de gobierno, zona de estar exterior y acceso a cubiertas.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
-      title: 'Cubierta 1: 5 Cabinas & 5 Baños (20 PAX)',
-      desc: 'Nivel completo de descanso con 5 cabinas independientes y 5 baños privados para albergar con total comodidad a grupos y expediciones.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
-      title: 'Cubierta 2: Salón, Comedor & Cocina Full',
-      desc: 'Espacio central panorámico con amplio comedor, cocina integral completamente equipada y terraza de popa para compartir la gastronomía de a bordo.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&w=1000&q=80',
-      title: 'Doble Puente de Gobierno (Raymarine + Garmin)',
-      desc: 'Doble estación de gobierno equipada con Plotter y Piloto Automático Raymarine y Garmin, junto a conectividad Starlink 24/7.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
-      title: 'Zodiac Yamaha 70 HP & Grúa de 1 Tonelada',
-      desc: 'Bote auxiliar semirrígido con motor Yamaha 4T 70 HP y grúa de 1 tonelada para aproximaciones y desembarcos seguros en glaciares.',
+      title: 'Yate Terranova • Hatteras 65ft LRC Americano',
+      location: 'Flota Yates Chile • Matrícula PMO 6128',
+      desc: 'Embarcación de expedición oceánica de 3 cubiertas, 2 motores Detroit de 450 HP y 3.000 MN de autonomía.',
     },
   ];
 
@@ -915,143 +806,97 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
         </div>
       </section>
 
-      {/* 3D VIRTUAL TOUR SECTION (NAVY BLUE DETAILS CONSOLE) */}
+      {/* PHOTO GALLERY VIEWER IN PLACE OF TOUR */}
       <section className="py-20 bg-slate-50 border-t border-slate-200/80">
         <div className="max-w-7xl mx-auto px-6 sm:px-10 space-y-12">
           
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-900/10 border border-blue-900/20 text-blue-900 text-xs font-semibold uppercase tracking-wider">
               <Ship className="w-3.5 h-3.5 text-blue-950 animate-[pulse_3s_infinite]" />
-              <span>Experiencia Interactiva</span>
+              <span>Galería Fotográfica del Yate Terranova</span>
             </span>
             <h3 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
-              Recorrido Interactivo a Bordo
+              Espacios y Cabinas a Bordo
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Explora las lujosas instalaciones del Yate Terranova. Haz clic en los hotspots brújula para desplazarte a otras áreas o en los hotspots destello para ver detalles técnicos de la vida a bordo.
+              Fotografías reales del Yate Terranova Hatteras 65ft LRC: cubiertas exteriores, suites principales, camarotes twin y cabinas de descanso en la Cubierta 1.
             </p>
           </div>
 
-          <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between">
-            {/* The Active View Station Image */}
+          {/* Main Photo Gallery Container */}
+          <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between group">
+            {/* The Active Photo Image */}
             <div className="absolute inset-0 w-full h-full">
               <img
-                src={tourStations[currentStation].image}
-                alt={tourStations[currentStation].title}
-                className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${
-                  isTransitioning ? 'scale-150 blur-md opacity-0' : 'scale-100 blur-0 opacity-100'
-                }`}
+                src={images[currentPhotoIndex].url}
+                alt={images[currentPhotoIndex].title}
+                className="w-full h-full object-cover transition-all duration-700 ease-in-out scale-100"
               />
-              {/* Soft overlay vignette */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-black/30 pointer-events-none" />
+              {/* Soft luxury overlay vignette */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/40 pointer-events-none" />
             </div>
 
-            {/* Hotspots layer (rendered when not transitioning) */}
-            <div className="absolute inset-0 z-10 pointer-events-none">
-              {!isTransitioning && tourStations[currentStation].hotspots.map((hs, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    if (hs.type === 'nav' && hs.target) {
-                      navigateToStation(hs.target);
-                    } else if (hs.title && hs.desc) {
-                      setActiveInfo({ title: hs.title, desc: hs.desc });
-                    }
-                  }}
-                  className="absolute w-10 h-10 rounded-full bg-blue-950/80 border-2 border-white flex items-center justify-center text-white shadow-lg cursor-pointer hover:scale-110 hover:bg-blue-900 transition-all duration-300 pointer-events-auto group focus:outline-none focus:ring-4 focus:ring-blue-900/50"
-                  style={{
-                    left: hs.x,
-                    top: hs.y,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  {/* Outer pulsing ring */}
-                  <span className="absolute -inset-2.5 rounded-full border-2 border-blue-400/60 animate-ping opacity-75 pointer-events-none" />
-                  
-                  {hs.type === 'nav' ? (
-                    <Compass className="w-5 h-5 text-white animate-[spin_20s_linear_infinite]" />
-                  ) : (
-                    <Sparkles className="w-5 h-5 text-sky-400" />
-                  )}
-
-                  {/* Label tooltip on hover */}
-                  <span className="absolute bottom-12 bg-slate-950/90 border border-slate-800/80 backdrop-blur-md text-[10px] text-white px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-mono tracking-wide uppercase select-none pointer-events-none z-30">
-                    {hs.type === 'nav' ? (hs.label || 'Navegar') : (hs.title || 'Info')}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Overlay modal for information hotspots */}
-            {activeInfo && (
-              <div className="absolute inset-0 z-30 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-6 transition-all duration-300 pointer-events-auto">
-                <div className="bg-white/95 border border-slate-200/80 max-w-md w-full p-6 rounded-2xl shadow-2xl relative z-10 space-y-4 animate-[fadeIn_0.3s_ease-out] text-slate-800">
-                  <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-900/10 flex items-center justify-center text-blue-900 shrink-0">
-                      <Sparkles className="w-4.5 h-4.5" />
-                    </div>
-                    <h4 className="font-serif font-bold text-lg text-slate-900">{activeInfo.title}</h4>
-                  </div>
-                  <p className="text-slate-655 text-xs sm:text-sm leading-relaxed">{activeInfo.desc}</p>
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      onClick={() => setActiveInfo(null)}
-                      className="bg-blue-900 hover:bg-blue-950 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-md min-h-[38px] cursor-pointer"
-                    >
-                      Entendido
-                    </button>
-                  </div>
-                </div>
+            {/* Top Bar HUD */}
+            <div className="relative z-20 w-full p-5 sm:p-6 flex justify-between items-center pointer-events-none">
+              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-white/95 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
+                <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                <span>Yate Terranova • Foto 0{currentPhotoIndex + 1} de 0{images.length}</span>
               </div>
-            )}
-
-            {/* Top Bar Navigation HUD */}
-            <div className="relative z-20 w-full p-6 flex justify-between items-center pointer-events-none">
-              <div className="bg-slate-900/80 border border-slate-800/50 backdrop-blur-md px-4 py-2 rounded-xl text-white/90 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span>Vista Activa: {tourStations[currentStation].title}</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800/50 backdrop-blur-md px-4 py-2 rounded-xl text-white/70 font-mono text-[10px] sm:text-xs tracking-wider uppercase select-none shadow-md hidden sm:block">
-                FOV: 75°
+              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-sky-300 font-mono text-[10px] sm:text-xs tracking-wider select-none shadow-md hidden sm:flex items-center gap-1.5">
+                <Ship className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                <span>{images[currentPhotoIndex].location || 'Hatteras 65ft LRC'}</span>
               </div>
             </div>
 
-            {/* Bottom HUD Station Selector Controls */}
-            <div className="relative z-20 w-full p-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-t from-slate-950/80 to-transparent">
-              <div className="flex gap-2 sm:gap-3 pointer-events-auto">
-                <button
-                  onClick={() => navigateToStation('exterior')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'exterior'
-                      ? 'bg-blue-900 text-white border border-blue-800 shadow-md shadow-blue-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Cubierta
-                </button>
-                <button
-                  onClick={() => navigateToStation('salon')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'salon'
-                      ? 'bg-blue-900 text-white border border-blue-800 shadow-md shadow-blue-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Salón Central
-                </button>
-                <button
-                  onClick={() => navigateToStation('camarote')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'camarote'
-                      ? 'bg-blue-900 text-white border border-blue-800 shadow-md shadow-blue-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Suite Principal
-                </button>
+            {/* Left & Right Slider Controls */}
+            <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 pointer-events-none z-20">
+              <button
+                type="button"
+                onClick={() => setCurrentPhotoIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
+                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                aria-label="Foto anterior"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPhotoIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))}
+                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                aria-label="Foto siguiente"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Bottom Caption Strip & Thumbnail Dots */}
+            <div className="relative z-20 w-full p-5 sm:p-7 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+              <div className="space-y-1 max-w-xl text-left">
+                <span className="text-[10px] font-mono text-sky-400 uppercase tracking-widest block font-bold">
+                  {images[currentPhotoIndex].location}
+                </span>
+                <h4 className="font-serif font-bold text-lg sm:text-2xl text-white">
+                  {images[currentPhotoIndex].title}
+                </h4>
+                <p className="text-slate-300 text-xs sm:text-sm font-light leading-relaxed line-clamp-2">
+                  {images[currentPhotoIndex].desc}
+                </p>
               </div>
-              <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest select-none hidden sm:block">
-                Terranova Travesía HUD v1.2
+
+              {/* Dots Selector */}
+              <div className="flex items-center gap-2 self-center sm:self-end bg-slate-900/70 border border-slate-800/80 backdrop-blur-md p-2 rounded-full">
+                {images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCurrentPhotoIndex(idx)}
+                    className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                      currentPhotoIndex === idx
+                        ? 'w-7 bg-white shadow-xs'
+                        : 'w-2.5 bg-white/30 hover:bg-white/60'
+                    }`}
+                    aria-label={`Ver foto ${idx + 1}`}
+                  />
+                ))}
               </div>
             </div>
 
