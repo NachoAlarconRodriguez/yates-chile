@@ -18,10 +18,6 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
     setFlipped((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const [currentStation, setCurrentStation] = React.useState<'exterior' | 'salon' | 'camarote'>('exterior');
-  const [isTransitioning, setIsTransitioning] = React.useState(false);
-  const [activeInfo, setActiveInfo] = React.useState<{ title: string; desc: string } | null>(null);
-
   const currentDateFormatted = React.useMemo(() => {
     return new Intl.DateTimeFormat('es-CL', {
       day: 'numeric',
@@ -29,14 +25,6 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       year: 'numeric',
     }).format(new Date()).toUpperCase();
   }, []);
-
-  const navigateToStation = (station: 'exterior' | 'salon' | 'camarote') => {
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setCurrentStation(station);
-      setIsTransitioning(false);
-    }, 600);
-  };
 
   const [fullscreenIndex, setFullscreenIndex] = React.useState<number | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -65,103 +53,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fullscreenIndex]);
 
-  const tourStations = {
-    exterior: {
-      title: 'Cubierta Exterior',
-      image: '/velero-vegvisir.jpg',
-      hotspots: [
-        {
-          x: '48%',
-          y: '30%',
-          type: 'info',
-          title: 'Aparejo Vélico Carbono',
-          desc: 'Mástil y botavara reforzados para vientos australes con velas enrollables de alta tenacidad operadas desde timonera.',
-        },
-        {
-          x: '62%',
-          y: '68%',
-          type: 'nav',
-          label: 'Entrar a Timonera / Salón',
-          target: 'salon' as const,
-        },
-        {
-          x: '78%',
-          y: '72%',
-          type: 'info',
-          title: 'Bitácora & Navegación Raymarine',
-          desc: 'Doble estación de gobierno con Plotter y Piloto Automático Raymarine, conexión Starlink 24/7 e instrumental náutico completo para navegación oceánica.',
-        },
-        {
-          x: '22%',
-          y: '73%',
-          type: 'info',
-          title: 'Sistema de Fondeo & Zodiac 4.3m',
-          desc: 'Molinete eléctrico de alta tracción y bote Zodiac de desembarco 4.3 mts con motor Mercury 4T 15hp para aproximaciones glaciares seguras.',
-        },
-      ],
-    },
-    salon: {
-      title: 'Salón y Comedor Central',
-      image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1000&q=80',
-      hotspots: [
-        {
-          x: '52%',
-          y: '62%',
-          type: 'info',
-          title: 'Amplio Salón Central',
-          desc: 'Espacio social panorámico con mesa noble para comensales, donde se comparten maridajes seleccionados y conectividad satelital Starlink 24/7.',
-        },
-        {
-          x: '25%',
-          y: '45%',
-          type: 'nav',
-          label: 'Subir a Cubierta Exterior',
-          target: 'exterior' as const,
-        },
-        {
-          x: '75%',
-          y: '58%',
-          type: 'nav',
-          label: 'Ir a Cabinas & Baños',
-          target: 'camarote' as const,
-        },
-        {
-          x: '15%',
-          y: '65%',
-          type: 'info',
-          title: 'Cocina Completa & Desalinizador',
-          desc: 'Cocina integral equipada para alta gastronomía y planta desalinizadora de 140 ltrs/hr que garantiza autonomía ilimitada de agua dulce.',
-        },
-      ],
-    },
-    camarote: {
-      title: 'Cabinas & Baños (5 Cabinas / 5 Baños)',
-      image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
-      hotspots: [
-        {
-          x: '50%',
-          y: '62%',
-          type: 'info',
-          title: '5 Cabinas Privadas (12 PAX)',
-          desc: 'Capacidad de habitabilidad para 12 pasajeros distribuidos en 5 cabinas independientes con climatización hidrónica y confort absoluto.',
-        },
-        {
-          x: '48%',
-          y: '22%',
-          type: 'info',
-          title: '5 Baños Completos',
-          desc: 'Cinco baños equipados con agua caliente continua y privacidad total para todos los tripulantes y huéspedes.',
-        },
-        {
-          x: '12%',
-          y: '58%',
-          type: 'nav',
-          label: 'Regresar al Salón',
-          target: 'salon' as const,
-        },
-      ],
-    },
-  };
+
 
   const [selectedFeature, setSelectedFeature] = React.useState<'climatizacion' | 'gastronomia' | 'casco' | 'desembarcos'>('climatizacion');
 
@@ -184,7 +76,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       wind: 'Calma',
       temp: '4°C Ext',
       text: 'Hemos fondeado al resguardo directo del glaciar. A bordo, nuestro chef ha preparado un plato de centolla austral recién extraída, acompañada de un Chardonnay frío. Cenar frente a la imponente pared de hielo azul es una experiencia mística.',
-      image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1000&q=80',
+      image: '/flota/vegvisir/vegvisir-gastronomia.jpg',
     },
     casco: {
       title: 'Casco Reforzado',
@@ -204,40 +96,48 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       wind: 'SW 15 Nudos',
       temp: '5°C Ext',
       text: 'Alistamos el bote Zodiac auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos. Una maniobra segura en un paraje de belleza salvaje.',
-      image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
+      image: '/flota/vegvisir/vegvisir-desembarcos.jpg',
     },
   };
 
+  const [currentPhotoIndex, setCurrentPhotoIndex] = React.useState<number>(0);
+
   const images = [
     {
+      url: '/flota/vegvisir/vegvisir-juan-fernandez.jpg',
+      title: 'Navegación a Vela Abierta',
+      location: 'Bahía Cumberland • Juan Fernández',
+      desc: 'El Velero Vegvisir avanzando a vela mayor y génova desplegadas frente a los imponentes farellones volcánicos de la Isla Robinson Crusoe.',
+    },
+    {
+      url: '/flota/vegvisir/vegvisir-glaciar-patagonia.jpg',
+      title: 'Fondeo Frente a Ventisqueros',
+      location: 'Seno Ventisquero & Glaciares • Patagonia',
+      desc: 'Aproximación en aguas calmas entre témpanos de hielo con el bote auxiliar Zodiac semirrígido para exploración costera.',
+    },
+    {
+      url: '/flota/vegvisir/vegvisir-cubierta-navegacion.jpg',
+      title: 'Vida en Cubierta & Avistamiento',
+      location: 'Canales Australes • Extremo Sur',
+      desc: 'Huéspedes disfrutando de la perspectiva de proa y la navegación en altamar con equipamiento técnico en días de mar calmo.',
+    },
+    {
+      url: '/flota/vegvisir/vegvisir-caleta-aerea.jpg?v=2',
+      title: 'Fondeo Protegido en Caleta Natural',
+      location: 'Caleta Secreta • Fiordos de la Patagonia',
+      desc: 'Maniobra de amarre de 4 puntas a tierra en una bahía resguardada de vientos oceánicos, garantizando descanso y quietud absoluta.',
+    },
+    {
+      url: '/flota/vegvisir/vegvisir-bahia-austral.jpg?v=2',
+      title: 'Bahías y Paisajes Vírgenes',
+      location: 'Tundra Subantártica & Fondeaderos Remotos',
+      desc: 'Contemplación de la naturaleza salvaje e indómita desde las alturas con el Velero Vegvisir al resguardo en la ensenada.',
+    },
+    {
       url: '/velero-vegvisir.jpg',
-      title: 'Velero Vegvisir en aguas australes',
-      desc: 'El Vegvisir navegando majestuosamente frente a las costas vírgenes del extremo sur de Chile. Su casco reforzado corta con solidez las frías aguas australes.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
-      title: 'Navegación a vela de alta mar',
-      desc: 'Una perspectiva de cubierta durante la travesía a vela con viento favorable. Experimenta la auténtica pasión del velerismo tradicional con la máxima seguridad.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
-      title: 'Camarote Suite Principal',
-      desc: 'Nuestra cabina principal ofrece un abrigo boutique con revestimientos de madera noble y climatización hidrónica personalizada para noches templadas.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1000&q=80',
-      title: 'Salón de caoba climatizado',
-      desc: 'El salón central es el punto de encuentro ideal para la sobremesa, donde se comparte la centolla fresca y vinos de guarda chilenos.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&w=1000&q=80',
-      title: 'Puente de mando exterior',
-      desc: 'Equipado con instrumentación de navegación de vanguardia, el puente ofrece total visibilidad y control sobre la geografía de fiordos.',
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
-      title: 'Fiordos y aproximaciones costeras',
-      desc: 'Nuestros itinerarios exclusivos contemplan aproximaciones a glaciares milenarios y desembarcos seguros en morrenas vírgenes de difícil acceso.',
+      title: 'Velero Vegvisir • Dufour 52.5 ft Francés',
+      location: 'Flota Yates Chile',
+      desc: 'Embarcación oceánica con casco reforzado, quilla de plomo y equipamiento de seguridad y confort para navegación de alta latitud.',
     },
   ];
 
@@ -911,143 +811,97 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
         </div>
       </section>
 
-      {/* 3D VIRTUAL TOUR SECTION (NAVY BLUE DETAILS CONSOLE) */}
+      {/* PHOTO GALLERY VIEWER IN PLACE OF TOUR */}
       <section className="py-20 bg-slate-50 border-t border-slate-200/80">
         <div className="max-w-7xl mx-auto px-6 sm:px-10 space-y-12">
           
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-900/10 border border-blue-900/20 text-blue-900 text-xs font-semibold uppercase tracking-wider">
               <Compass className="w-3.5 h-3.5 text-blue-950 animate-[spin_30s_linear_infinite]" />
-              <span>Experiencia Interactiva</span>
+              <span>Galería Fotográfica de Navegación</span>
             </span>
             <h3 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
-              Recorrido Interactivo a Bordo
+              Momentos y Vistas del Velero Vegvisir
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Explora las instalaciones del Velero Vegvisir tanto por fuera como por dentro. Haz clic en los hotspots brújula para desplazarte a otras áreas o en los hotspots destello para ver detalles técnicos de la navegación.
+              Fotografías reales a vela abierta, fondeos frente a glaciares patagónicos y caletas protegidas en el Archipiélago Juan Fernández y el Extremo Sur.
             </p>
           </div>
 
-          <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between">
-            {/* The Active View Station Image */}
+          {/* Main Photo Gallery Container (Identical dimensions and styling) */}
+          <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between group">
+            {/* The Active Photo Image */}
             <div className="absolute inset-0 w-full h-full">
               <img
-                src={tourStations[currentStation].image}
-                alt={tourStations[currentStation].title}
-                className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${
-                  isTransitioning ? 'scale-150 blur-md opacity-0' : 'scale-100 blur-0 opacity-100'
-                }`}
+                src={images[currentPhotoIndex].url}
+                alt={images[currentPhotoIndex].title}
+                className="w-full h-full object-cover transition-all duration-700 ease-in-out scale-100"
               />
-              {/* Soft overlay vignette */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-black/30 pointer-events-none" />
+              {/* Soft luxury overlay vignette */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/40 pointer-events-none" />
             </div>
 
-            {/* Hotspots layer (rendered when not transitioning) */}
-            <div className="absolute inset-0 z-10 pointer-events-none">
-              {!isTransitioning && tourStations[currentStation].hotspots.map((hs, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    if (hs.type === 'nav' && hs.target) {
-                      navigateToStation(hs.target);
-                    } else if (hs.title && hs.desc) {
-                      setActiveInfo({ title: hs.title, desc: hs.desc });
-                    }
-                  }}
-                  className="absolute w-10 h-10 rounded-full bg-blue-950/80 border-2 border-white flex items-center justify-center text-white shadow-lg cursor-pointer hover:scale-110 hover:bg-blue-900 transition-all duration-300 pointer-events-auto group focus:outline-none focus:ring-4 focus:ring-blue-900/50"
-                  style={{
-                    left: hs.x,
-                    top: hs.y,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  {/* Outer pulsing ring */}
-                  <span className="absolute -inset-2.5 rounded-full border-2 border-blue-400/60 animate-ping opacity-75 pointer-events-none" />
-                  
-                  {hs.type === 'nav' ? (
-                    <Compass className="w-5 h-5 text-white animate-[spin_20s_linear_infinite]" />
-                  ) : (
-                    <Sparkles className="w-5 h-5 text-sky-400" />
-                  )}
-
-                  {/* Label tooltip on hover */}
-                  <span className="absolute bottom-12 bg-slate-950/90 border border-slate-800/80 backdrop-blur-md text-[10px] text-white px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 font-mono tracking-wide uppercase select-none pointer-events-none z-30">
-                    {hs.type === 'nav' ? (hs.label || 'Navegar') : (hs.title || 'Info')}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Overlay modal for information hotspots */}
-            {activeInfo && (
-              <div className="absolute inset-0 z-30 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-6 transition-all duration-300 pointer-events-auto">
-                <div className="bg-white/95 border border-slate-200/80 max-w-md w-full p-6 rounded-2xl shadow-2xl relative z-10 space-y-4 animate-[fadeIn_0.3s_ease-out] text-slate-800">
-                  <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-900/10 flex items-center justify-center text-blue-900 shrink-0">
-                      <Sparkles className="w-4.5 h-4.5" />
-                    </div>
-                    <h4 className="font-serif font-bold text-lg text-slate-900">{activeInfo.title}</h4>
-                  </div>
-                  <p className="text-slate-655 text-xs sm:text-sm leading-relaxed">{activeInfo.desc}</p>
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      onClick={() => setActiveInfo(null)}
-                      className="bg-blue-900 hover:bg-blue-950 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-md min-h-[38px] cursor-pointer"
-                    >
-                      Entendido
-                    </button>
-                  </div>
-                </div>
+            {/* Top Bar HUD */}
+            <div className="relative z-20 w-full p-5 sm:p-6 flex justify-between items-center pointer-events-none">
+              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-white/95 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
+                <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                <span>Velero Vegvisir • Foto 0{currentPhotoIndex + 1} de 0{images.length}</span>
               </div>
-            )}
-
-            {/* Top Bar Navigation HUD */}
-            <div className="relative z-20 w-full p-6 flex justify-between items-center pointer-events-none">
-              <div className="bg-slate-900/80 border border-slate-800/50 backdrop-blur-md px-4 py-2 rounded-xl text-white/90 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span>Vista Activa: {tourStations[currentStation].title}</span>
-              </div>
-              <div className="bg-slate-900/80 border border-slate-800/50 backdrop-blur-md px-4 py-2 rounded-xl text-white/70 font-mono text-[10px] sm:text-xs tracking-wider uppercase select-none shadow-md hidden sm:block">
-                FOV: 75°
+              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-sky-300 font-mono text-[10px] sm:text-xs tracking-wider select-none shadow-md hidden sm:flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                <span>{images[currentPhotoIndex].location || 'Navegación Austral'}</span>
               </div>
             </div>
 
-            {/* Bottom HUD Station Selector Controls */}
-            <div className="relative z-20 w-full p-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gradient-to-t from-slate-950/80 to-transparent">
-              <div className="flex gap-2 sm:gap-3 pointer-events-auto">
-                <button
-                  onClick={() => navigateToStation('exterior')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'exterior'
-                      ? 'bg-blue-900 text-white border border-blue-800 shadow-md shadow-blue-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Cubierta
-                </button>
-                <button
-                  onClick={() => navigateToStation('salon')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'salon'
-                      ? 'bg-blue-900 text-white border border-blue-800 shadow-md shadow-blue-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Salón Central
-                </button>
-                <button
-                  onClick={() => navigateToStation('camarote')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer min-h-[38px] ${
-                    currentStation === 'camarote'
-                      ? 'bg-blue-900 text-white border border-blue-800 shadow-md shadow-blue-900/20'
-                      : 'bg-slate-900/70 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  Suite Principal
-                </button>
+            {/* Left & Right Slider Controls */}
+            <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 pointer-events-none z-20">
+              <button
+                type="button"
+                onClick={() => setCurrentPhotoIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
+                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                aria-label="Foto anterior"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPhotoIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))}
+                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                aria-label="Foto siguiente"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Bottom Caption Strip & Thumbnail Dots */}
+            <div className="relative z-20 w-full p-5 sm:p-7 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+              <div className="space-y-1 max-w-xl text-left">
+                <span className="text-[10px] font-mono text-sky-400 uppercase tracking-widest block font-bold">
+                  {images[currentPhotoIndex].location}
+                </span>
+                <h4 className="font-serif font-bold text-lg sm:text-2xl text-white">
+                  {images[currentPhotoIndex].title}
+                </h4>
+                <p className="text-slate-300 text-xs sm:text-sm font-light leading-relaxed line-clamp-2">
+                  {images[currentPhotoIndex].desc}
+                </p>
               </div>
-              <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest select-none hidden sm:block">
-                Vegvisir Travesía HUD v1.2
+
+              {/* Dots Selector */}
+              <div className="flex items-center gap-2 self-center sm:self-end bg-slate-900/70 border border-slate-800/80 backdrop-blur-md p-2 rounded-full">
+                {images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCurrentPhotoIndex(idx)}
+                    className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                      currentPhotoIndex === idx
+                        ? 'w-7 bg-white shadow-xs'
+                        : 'w-2.5 bg-white/30 hover:bg-white/60'
+                    }`}
+                    aria-label={`Ver foto ${idx + 1}`}
+                  />
+                ))}
               </div>
             </div>
 

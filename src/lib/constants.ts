@@ -51,7 +51,7 @@ export const FLEET_DATA: Vessel[] = [
         description: 'Espacio social panorámico con cocina completa equipada, mesa de navegación y Starlink 24/7.',
         coordinates: { x: 0, y: 0.4, z: 0 },
         category: 'Cubierta',
-        image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80',
+        image: '/flota/vegvisir/vegvisir-gastronomia.jpg',
       },
       {
         id: 'veg-3',
@@ -111,7 +111,7 @@ export const FLEET_DATA: Vessel[] = [
         description: 'Flybridge con 2do puesto de gobierno, parrilla, grúa de 1 tonelada y Zodiac semirrígido Yamaha 70hp.',
         coordinates: { x: 0.2, y: 1.1, z: 0 },
         category: 'Cubierta',
-        image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+        image: '/flota/terranova/terranova-cubiertas.jpg',
       },
     ],
   },

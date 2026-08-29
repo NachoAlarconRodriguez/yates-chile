@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Compass, Thermometer, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge, Download, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Compass, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge, Download, ArrowRight } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
 
@@ -174,43 +174,43 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
 
   const logbookEntries = {
     climatizacion: {
-      title: 'Climatización & Jacuzzi',
+      title: 'Deck Superior & Quincho Panorámico',
       day: 'Día 10 de Travesía',
       location: 'Glaciar Garibaldi',
       coordinates: '54°07\' S, 69°57\' W',
       wind: 'W 25 Nudos',
       temp: '3°C Ext',
-      text: 'El frío helado de la cordillera Darwin sopla con fuerza, pero en el flybridge el jacuzzi termo-regulado se mantiene a unos placenteros 38°C. Desde el agua caliente, con una copa en la mano, contemplamos los desprendimientos de hielo del glaciar Garibaldi. En el interior, la calefacción mantiene las cabinas a unos abrigados 22°C.',
-      image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
+      text: 'Fondeados frente al resguardo del glaciar Garibaldi, disfrutamos de la vista en 360° desde la Cubierta 3. La parrilla exterior y la amplitud del flybridge con su segundo puente de gobierno ofrecen el espacio perfecto para compartir al atardecer en los fiordos.',
+      image: '/flota/terranova/terranova-cubiertas.jpg',
     },
     gastronomia: {
-      title: 'Cena Gourmet 360°',
+      title: 'Salón Central & Gastronomía Austral',
       day: 'Día 14 de Travesía',
       location: 'Seno Eyre',
       coordinates: '48°58\' S, 74°20\' W',
       wind: 'Calma',
       temp: '5°C Ext',
-      text: 'Fondeados frente al majestuoso glaciar Pío XI. A través de los gigantescos ventanales de piso a techo de la sala principal, la pared de hielo azul de 70 metros de alto parece estar al alcance de la mano. A bordo, el Chef de cocina sirve centolla fresca austral marinada con vinos blancos de nuestra cava privada.',
+      text: 'En el amplio comedor de la Cubierta 2, rodeados de ventanales panorámicos frente al glaciar Pío XI, la cocina full equipo permite preparar centolla fresca austral y pesca del día maridadas con vinos selectos en un ambiente de total calidez y confort.',
       image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
     },
     casco: {
-      title: 'Estabilizadores Dinámicos',
+      title: 'Propulsión Detroit & 3.000 MN Autonomía',
       day: 'Día 17 de Travesía',
       location: 'Golfo de Penas',
       coordinates: '47°15\' S, 74°50\' W',
       wind: 'SW 38 Nudos',
       temp: '6°C Ext',
-      text: 'Enfrentamos el oleaje de mar abierto en el Golfo de Penas para cruzar hacia los canales del sur. Al activar los estabilizadores dinámicos del Terranova, el balanceo se reduce casi por completo. La navegación continúa con suavidad asombrosa, permitiendo almorzar sin movimiento alguno.',
+      text: 'Navegando a velocidad crucero de 10 nudos con el empuje firme de los 2 motores Detroit de 450 HP. Su estanque de 10.000 Litros de combustible brinda 3.000 millas náuticas de autonomía para explorar los canales y fiordos más remotos del extremo sur sin escalas.',
       image: '/zarpe-archipielago.jpg',
     },
     desembarcos: {
-      title: 'Exploración de Fiordos',
+      title: 'Zodiac Yamaha 70 HP & Grúa 1T',
       day: 'Día 19 de Travesía',
       location: 'Fiordo Peel',
       coordinates: '50°55\' S, 74°05\' W',
       wind: 'Calma',
       temp: '4°C Ext',
-      text: 'La plataforma hidráulica de popa desciende suavemente al nivel del agua, facilitando el desembarco del bote auxiliar Zodiac. Nos internamos en los brazos más estrechos del fiordo Peel, inaccesibles para barcos más grandes, deslizándonos en silencio total entre témpanos flotantes.',
+      text: 'Operamos la grúa de 1 tonelada de la Cubierta 3 para arriar el bote Zodiac semirrígido con motor Yamaha 70 HP. La potencia y maniobrabilidad nos permiten realizar aproximaciones directas y desembarcos seguros en playas y ventisqueros de difícil acceso.',
       image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
     },
   };
@@ -219,32 +219,32 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
     {
       url: '/yate-terranova.jpg',
       title: 'Yate Terranova en aguas australes',
-      desc: 'El Terranova navegando entre los canales australes. Su potencia y diseño contemporáneo ofrecen una navegación incomparable.',
+      desc: 'El Terranova Hatteras 65ft LRC navegando entre los canales australes. Su autonomía oceánica y robustez americana ofrecen una navegación incomparable.',
     },
     {
-      url: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
-      title: 'Flybridge Elevado con Jacuzzi',
-      desc: 'Nuestra terraza superior es el espacio ideal para relajarse en el jacuzzi templado mientras contemplas los ventisqueros del Cabo de Hornos.',
+      url: '/flota/terranova/terranova-cubiertas.jpg',
+      title: 'Deck Superior & Cubiertas del Terranova',
+      desc: 'Vista de proa y flybridge del Yate Terranova con segundo puesto de gobierno, zona de estar exterior y acceso a cubiertas.',
     },
     {
       url: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=1000&q=80',
-      title: 'Camarote Stateroom',
-      desc: 'Suite a toda manga con cama King-size, baño privado de mármol y ventanales que ofrecen vistas panorámicas al ras del agua.',
+      title: 'Cubierta 1: 5 Cabinas & 5 Baños (20 PAX)',
+      desc: 'Nivel completo de descanso con 5 cabinas independientes y 5 baños privados para albergar con total comodidad a grupos y expediciones.',
     },
     {
       url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
-      title: 'Salón con Cava de Maderas Nobles',
-      desc: 'El salón principal del yate cuenta con terminaciones de nogal y una cava gourmet integrada con vinos de guarda chilenos.',
+      title: 'Cubierta 2: Salón, Comedor & Cocina Full',
+      desc: 'Espacio central panorámico con amplio comedor, cocina integral completamente equipada y terraza de popa para compartir la gastronomía de a bordo.',
     },
     {
       url: 'https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&w=1000&q=80',
-      title: 'Puente de mando digitalizado',
-      desc: 'Estación de mando equipada con instrumentación de punta, ofreciendo total visibilidad y control absoluto de la ruta marina.',
+      title: 'Doble Puente de Gobierno (Raymarine + Garmin)',
+      desc: 'Doble estación de gobierno equipada con Plotter y Piloto Automático Raymarine y Garmin, junto a conectividad Starlink 24/7.',
     },
     {
       url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
-      title: 'Plataforma de baño hidráulica',
-      desc: 'Una plataforma hidráulica en popa facilita el descenso y abordaje de kayaks y botes auxiliares para desembarcos y exploraciones directas.',
+      title: 'Zodiac Yamaha 70 HP & Grúa de 1 Tonelada',
+      desc: 'Bote auxiliar semirrígido con motor Yamaha 4T 70 HP y grúa de 1 tonelada para aproximaciones y desembarcos seguros en glaciares.',
     },
   ];
 
@@ -817,7 +817,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
             {/* Right Column: Dynamic Feature selector cards (7 cols) */}
             <div className="lg:col-span-7 flex flex-col justify-center space-y-4">
               
-              {/* Feature 1: Climatizacion */}
+              {/* Feature 1: Deck Superior & Quincho */}
               <div
                 onClick={() => setSelectedFeature('climatizacion')}
                 onMouseEnter={() => setSelectedFeature('climatizacion')}
@@ -830,17 +830,17 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
                   selectedFeature === 'climatizacion' ? 'bg-blue-900 border-blue-800 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
                 }`}>
-                  <Thermometer className="w-5 h-5" />
+                  <Layers className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Climatización & Jacuzzi</h4>
+                  <h4 className="font-bold text-base text-slate-900">Deck Superior & Quincho</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Flybridge elevado con jacuzzi exterior termo-regulado a 38°C y calefacción hidrónica independiente en cada una de las suites.
+                    Cubierta 3 panorámica con segundo puesto de gobierno, terraza exterior, parrilla y grúa de 1 tonelada.
                   </p>
                 </div>
               </div>
 
-              {/* Feature 2: Gastronomia */}
+              {/* Feature 2: Salón Central & Gastronomía */}
               <div
                 onClick={() => setSelectedFeature('gastronomia')}
                 onMouseEnter={() => setSelectedFeature('gastronomia')}
@@ -856,14 +856,14 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Gastronomía Gourmet</h4>
+                  <h4 className="font-bold text-base text-slate-900">Salón Central & Comedor Full</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Chef gourmet dedicado preparando platos con centollas y pescados frescos australes, maridados con vinos selectos de nuestra cava integrada.
+                    Cubierta 2 equipada con amplio comedor, cocina integral completa y terraza de popa para compartir la gastronomía de a bordo.
                   </p>
                 </div>
               </div>
 
-              {/* Feature 3: Estabilizadores Activos */}
+              {/* Feature 3: Propulsión Detroit & Autonomía */}
               <div
                 onClick={() => setSelectedFeature('casco')}
                 onMouseEnter={() => setSelectedFeature('casco')}
@@ -876,17 +876,17 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
                   selectedFeature === 'casco' ? 'bg-blue-900 border-blue-800 text-white' : 'bg-slate-50 border-slate-100 text-slate-700'
                 }`}>
-                  <Ship className="w-5 h-5" />
+                  <Gauge className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Estabilizadores Activos</h4>
+                  <h4 className="font-bold text-base text-slate-900">2 Motores Detroit (3.000 MN)</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Sistema de estabilizadores hidráulicos de navegación que anula casi en su totalidad el balanceo del yate, incluso en cruces de mar abierto.
+                    Dos motores Detroit de 450 HP c/u y estanque de 10.000 Litros con 3.000 millas náuticas de autonomía continua a 10 nudos.
                   </p>
                 </div>
               </div>
 
-              {/* Feature 4: Plataforma Hidráulica */}
+              {/* Feature 4: Zodiac Yamaha 70 HP & Grúa 1T */}
               <div
                 onClick={() => setSelectedFeature('desembarcos')}
                 onMouseEnter={() => setSelectedFeature('desembarcos')}
@@ -902,9 +902,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <Anchor className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Plataforma Hidráulica</h4>
+                  <h4 className="font-bold text-base text-slate-900">Zodiac 70 HP & Grúa 1 Tonelada</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Plataforma sumergible en popa que facilita el descenso de kayaks, paddleboards y el abordaje del bote Zodiac para expediciones directas.
+                    Bote auxiliar semirrígido con motor Yamaha 4T 70 HP y grúa de 1 tonelada en Cubierta 3 para desembarcos rápidos y seguros.
                   </p>
                 </div>
               </div>
