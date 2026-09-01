@@ -154,7 +154,7 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           </h1>
 
           <p className="text-slate-200 text-[11px] sm:text-xs font-normal leading-relaxed text-shadow max-w-lg opacity-95">
-            Expediciones marítimas privadas a bordo del velero <strong className="text-white font-semibold">Vegvisir</strong> y el yate <strong className="text-white font-semibold">Terranova</strong> hacia el Archipiélago Juan Fernández, Isla Alejandro Selkirk y Cabo de Hornos.
+            Expediciones marítimas privadas a bordo del velero <strong className="text-white font-semibold">Vegvisir</strong> y el yate <strong className="text-white font-semibold">Terranova</strong> hacia el Archipiélago Juan Fernández, Parque Marino Francisco Coloane, Canal Beagle y Cabo de Hornos.
           </p>
 
           <div className="pt-1">

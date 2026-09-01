@@ -851,7 +851,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                             sectionKey="flota_vegvisir"
                             field="body_text"
                             tag="p"
-                            fallback="Velero Dufour 52.5 ft francés de expedición (12 PAX • 5 cabinas • 5 baños) con Starlink 24/7 y autonomía total."
+                            fallback="Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total."
                             multiline={true}
                             className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3 block"
                           />
@@ -1044,7 +1044,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                     sectionKey="flota_vegvisir"
                     field="body_text"
                     tag="p"
-                    fallback="Velero de expedición Dufour 52.5 ft (Astillero Francés, Matrícula QUI 2718) con capacidad para 12 PAX en 5 cabinas con 5 baños privados. Equipado con Starlink 24/7, instrumental Raymarine, desalinizador de 140 ltrs/hr y Zodiac de desembarco con motor Mercury 4T 15hp."
+                    fallback="Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total."
                     multiline={true}
                     className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl block"
                   />

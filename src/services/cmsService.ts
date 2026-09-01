@@ -45,14 +45,14 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
   },
   flota_vegvisir: {
     section_key: 'flota_vegvisir',
-    title: 'Velero Vegvisir (Dufour 52.5 Grand Large)',
+    title: 'Velero Vegvisir',
     subtitle: 'VELERO OCEÁNICO FRANCÉS • 6 PASAJEROS + TRIPULACIÓN',
-    body_text: '52.5 pies de pura navegación a vela con casco oceánico reforzado, 3 cabinas dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.',
+    body_text: 'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.',
     media_url: '/velero-vegvisir.jpg',
     metadata: {
-      title_en: 'Vegvisir Sailboat (Dufour 52.5 Grand Large)',
+      title_en: 'Vegvisir Sailboat',
       subtitle_en: 'FRENCH OCEANIC SAILBOAT • 6 GUESTS + CREW',
-      body_text_en: '52.5 feet of pure ocean sailing with reinforced hull, 3 double en-suite cabins, panoramic saloon and next-generation satellite navigation equipment.',
+      body_text_en: 'French Dufour 52.5 ft offshore expedition sailboat for austral voyages with 24/7 Starlink and total autonomy.',
     },
   },
   flota_terranova: {
@@ -147,7 +147,7 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
   },
 };
 
-const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v7';
+const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v8';
 
 function cleanMediaUrl(sectionKey: string, url?: string | null): string {
   const defaultUrl = DEFAULT_CMS_CONTENT[sectionKey]?.media_url || '';

@@ -177,10 +177,10 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
           <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
-            {vegvisirCms.title || 'Velero Vegvisir'}
+            {vegvisirCms.title ? vegvisirCms.title.replace(/\s*\([^)]*\)/g, '').trim() : 'Velero Vegvisir'}
           </h1>
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
-            {vegvisirCms.body_text || 'Velero de expedición Dufour 52.5 ft (Astillero Francés, Matrícula QUI 2718) con capacidad para 12 PAX en 5 cabinas con 5 baños privados. Equipado con Starlink 24/7, instrumental Raymarine, desalinizador de 140 ltrs/hr y Zodiac de desembarco con motor Mercury 4T 15hp.'}
+            {vegvisirCms.body_text || 'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.'}
           </p>
           <div className="pt-2">
             <button
@@ -335,8 +335,8 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   }}
                 >
                   <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Identificación</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Astillero Francés Dufour 52.5 ft (16 m). Matrícula oficial QUI 2718. Casco oceánico reforzado para aguas australes.
+                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[190px] mx-auto">
+                    Diseñado para navegar las aguas del Pacífico Sur, Archipiélago Juan Fernández, Canal Beagle y el Cabo de Hornos con total serenidad.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
@@ -384,7 +384,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 >
                   <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Habitabilidad</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Capacidad para 12 pasajeros con 5 cabinas privadas y 5 baños completos. Amplio salón central y cocina completa.
+                    Capacidad para 12 pasajeros con 5 cabinas y 5 baños completos. Amplio salón central y cocina completa.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
@@ -416,25 +416,43 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   </div>
                   <div>
                     <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / NAVEGACIÓN</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Raymarine</span>
-                    <span className="text-slate-500 text-[10px] block">Starlink 24/7</span>
+                    <span className="text-xs sm:text-[13px] font-bold text-slate-900 block mt-0.5 leading-tight max-w-[160px] mx-auto">
+                      Sistema de Navegación de Última Generación
+                    </span>
+                    <span className="text-slate-500 text-[10px] block mt-0.5">Starlink 24/7</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
 
                 {/* Back */}
                 <div
-                  className="absolute inset-0 bg-white p-5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-center space-y-2 text-slate-800"
+                  className="absolute inset-0 bg-white p-4 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-between text-slate-800"
                   style={{
                     backfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Electrónica</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Plotter Raymarine, Piloto Automático Raymarine y conexión satelital Starlink 24/7 de alta velocidad.
-                  </p>
-                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <div>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">Electrónica</span>
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block mt-0.5">RAYMARINE</span>
+                  </div>
+
+                  <ul className="text-slate-600 text-[9.5px] leading-snug space-y-1 text-left px-1 max-w-[190px]">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span>Plotter Raymarine</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span>Piloto Automático Raymarine</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span>Conexión satelital Starlink 24/7 de alta velocidad</span>
+                    </li>
+                  </ul>
+
+                  <span className="text-[8px] text-blue-900/60 font-mono uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>

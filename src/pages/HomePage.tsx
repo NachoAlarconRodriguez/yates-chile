@@ -59,7 +59,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
-                    {vegvisirSec.body_text || 'Velero Dufour 52.5 ft francés de expedición (12 PAX • 5 cabinas • 5 baños) con Starlink 24/7 y autonomía total.'}
+                    {vegvisirSec.body_text || 'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
