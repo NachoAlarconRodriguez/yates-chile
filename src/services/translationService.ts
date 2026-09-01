@@ -126,10 +126,14 @@ ${text}`;
         '52.5 feet of pure ocean sailing with reinforced hull, 3 double en-suite cabins, panoramic saloon and next-generation satellite navigation equipment.',
       'Yate Terranova (Yate Oceánico 60ft)': 'Terranova Yacht (Oceanic 60ft Yacht)',
       'CRUCERO EXPLORER • 8 PASAJEROS + TRIPULACIÓN': 'EXPLORER CRUISER • 8 GUESTS + CREW',
+      'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.':
+        'Expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and 5m rigid-inflatable Zodiac tender with Yamaha 70 HP (4-stroke) engine for coastal landings.',
       'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac auxiliar para desembarcos costeros.':
         'Expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and Zodiac tender for coastal landings.',
       'Lodge Rincón de Navegantes': 'Rincón de Navegantes Lodge',
       'Uberlindo Andaur 222 • Isla Robinson Crusoe': 'Uberlindo Andaur 222 • Robinson Crusoe Island',
+      'Ubicado justo frente al mar en la Bahía Cumberland. Diseñado en torno a 4 cabinas independientes con baño privado cada una y vista al océano para hasta 11 pasajeros, amplio quincho, terraza y expediciones exclusivas.':
+        'Located directly oceanfront in Cumberland Bay. Designed around 4 independent en-suite cabins each with ocean views for up to 11 guests, expansive BBQ terrace and exclusive expeditions.',
       'Ubicado justo frente al mar en la Bahía Cumberland. Diseñado en torno a 4 cabinas independientes con baño privado y vista al océano para hasta 11 pasajeros, amplio quincho, terraza y expediciones exclusivas.':
         'Located directly oceanfront in Cumberland Bay. Designed around 4 independent en-suite cabins with ocean views for up to 11 guests, expansive BBQ terrace and exclusive expeditions.',
       'Gastronomía de Mar & Quincho de Navegantes': 'Ocean Gastronomy & Navigators BBQ',

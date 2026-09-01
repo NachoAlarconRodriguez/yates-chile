@@ -178,7 +178,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
             {terranovaCms.title || 'Yate Terranova'}
           </h1>
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
-            {terranovaCms.body_text || 'Yate de expedición oceánica Hatteras 65ft LRC (Astillero Americano, Matrícula PMO 6128) distribuido en 3 cubiertas con capacidad para 20 PAX (5 cabinas / 5 baños). Equipado con 2 motores Detroit de 450 HP (3.000 MN de autonomía con estanque de 10.000 L), doble navegación Raymarine + Garmin, Starlink 24/7, 2 desalinizadores y Zodiac semirrígido con motor Yamaha 70hp y grúa de 1 tonelada.'}
+            {terranovaCms.body_text || 'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.'}
           </p>
           <div className="pt-2">
             <button
@@ -368,24 +368,40 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <div>
                     <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CUBIERTAS</span>
                     <span className="text-base font-bold text-slate-900 block mt-0.5">3 Cubiertas</span>
-                    <span className="text-slate-500 text-[10px] block">20 PAX • 5 Cab / 5 Baños</span>
+                    <span className="text-slate-500 text-[10px] block">20 PAX • 4 Cab / 4 Baños</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
 
                 {/* Back */}
                 <div
-                  className="absolute inset-0 bg-white p-5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-center space-y-2 text-slate-800"
+                  className="absolute inset-0 bg-white p-4 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-between text-slate-800"
                   style={{
                     backfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Distribución</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    3 cubiertas: Cubierta 1 (5 cabinas / 5 baños), Cubierta 2 (Puente, salón, comedor, cocina), Cubierta 3 (Flybridge, parrilla).
-                  </p>
-                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <div>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">Distribución</span>
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wide block mt-0.5">3 CUBIERTAS</span>
+                  </div>
+
+                  <ul className="text-slate-700 text-[9px] sm:text-[9.5px] leading-snug space-y-1.5 text-left px-1 w-full max-w-[195px]">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Cubierta 1:</strong> 4 cabinas con 4 baños</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Cubierta 2:</strong> Puente, salón, comedor y cocina</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Cubierta 3:</strong> Zodiac de desembarco</span>
+                    </li>
+                  </ul>
+
+                  <span className="text-[8px] text-blue-900/60 font-mono uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
@@ -414,24 +430,24 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / AUTONOMÍA</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">3.000 MN</span>
-                    <span className="text-slate-500 text-[10px] block">2x Detroit 450HP • 10.000L</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / PROPULSIÓN</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">2 Motores Detroit</span>
+                    <span className="text-slate-500 text-[10px] block">450 HP c/u • 10.000L Diésel</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
 
                 {/* Back */}
                 <div
-                  className="absolute inset-0 bg-white p-5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-center space-y-2 text-slate-800"
+                  className="absolute inset-0 bg-white p-5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-center space-y-2.5 text-slate-800"
                   style={{
                     backfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg)',
                   }}
                 >
                   <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Propulsión</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    2 motores Detroit 450 HP c/u, estanque de 10.000 ltrs, autonomía de 3.000 MN a 10 kts y 2 generadores Northern Lights 10kVA.
+                  <p className="text-slate-600 text-[10.5px] leading-relaxed max-w-[190px] mx-auto">
+                    Dos motores Detroit de 450 HP c/u y estanque de 10.000 Litros con 3.000 millas náuticas de autonomía continua a 10 nudos.
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
                 </div>
@@ -464,24 +480,40 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <div>
                     <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / EQUIPAMIENTO</span>
                     <span className="text-base font-bold text-slate-900 block mt-0.5">Raymarine + Garmin</span>
-                    <span className="text-slate-500 text-[10px] block">Starlink • Yamaha 70HP</span>
+                    <span className="text-slate-500 text-[10px] block">Starlink 24/7 • Cocina Full</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
                 </div>
 
                 {/* Back */}
                 <div
-                  className="absolute inset-0 bg-white p-5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-center space-y-2 text-slate-800"
+                  className="absolute inset-0 bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-between text-slate-800"
                   style={{
                     backfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Equipamiento</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Plotter & Piloto Raymarine + Garmin, Starlink 24/7, 2 desalinizadores 140 ltrs/hr, Zodiac semirrígido Yamaha 70hp y grúa 1T.
-                  </p>
-                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <div>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">Equipamiento & Confort</span>
+                    <span className="text-[11px] font-bold text-slate-900 uppercase tracking-wide block mt-0.5">RAYMARINE + GARMIN</span>
+                  </div>
+
+                  <ul className="text-slate-700 text-[8px] sm:text-[8.5px] leading-tight space-y-1 text-left px-1 w-full max-w-[200px]">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Navegación:</strong> Plotter, Piloto Automático & Starlink 24/7</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Habitabilidad:</strong> 4 Cabinas con 4 Baños</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Cocina Full Equipada:</strong> Horno eléctrico, encimera, 3 refris y 1 congelador</span>
+                    </li>
+                  </ul>
+
+                  <span className="text-[8px] text-blue-900/60 font-mono uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
@@ -501,7 +533,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
               Especificaciones Técnicas del Yate Terranova
             </h2>
             <p className="text-slate-600 text-sm max-w-xl mx-auto">
-              Yate de expedición oceánica de astillero americano Hatteras 65ft LRC de 3 cubiertas con autonomía de 3.000 millas náuticas y equipamiento de alta gama.
+              Yate de expedición oceánica de astillero americano Hatteras 65ft LRC de 3 cubiertas y equipamiento de alta gama.
             </p>
           </div>
 
@@ -536,61 +568,61 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
             </div>
 
             {/* Box 2: Distribución en 3 Cubiertas */}
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
               <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
                 <Layers className="w-6 h-6" />
               </div>
               <div>
                 <h4 className="font-serif font-bold text-lg text-slate-900">Distribución 3 Cubiertas</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Capacidad para 20 PAX</p>
+                <p className="text-xs text-slate-500 mt-0.5">4 Cabinas / 4 Baños • Cocina Full</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
-                <li className="flex justify-between items-start">
-                  <span className="text-slate-500">Cubierta 1:</span>
-                  <span className="font-bold text-slate-900 text-right">5 Cabinas / 5 Baños</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Cubierta 1:</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">4 Cabinas / 4 Baños</span>
                 </li>
-                <li className="flex justify-between items-start">
-                  <span className="text-slate-500">Cubierta 2:</span>
-                  <span className="font-bold text-slate-900 text-right">Puente, Salón, Comedor, Cocina & Popa</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Cubierta 2:</span>
+                  <span className="font-bold text-slate-900 text-right">Puente, Salón & Popa</span>
                 </li>
-                <li className="flex justify-between items-start">
-                  <span className="text-slate-500">Cubierta 3:</span>
-                  <span className="font-bold text-slate-900 text-right">2do Puente, Deck, Parrilla & Grúa</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Cubierta 3:</span>
+                  <span className="font-bold text-slate-900 text-right">Zodiac, Parrilla & Grúa</span>
+                </li>
+                <li className="flex justify-between items-center pt-1 border-t border-slate-100 gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Cocina:</span>
+                  <span className="font-bold text-blue-900 text-right">Full Equipada (3 Refris)</span>
                 </li>
               </ul>
             </div>
 
-            {/* Box 3: Propulsión & Autonomía */}
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+            {/* Box 3: Propulsión & Generación */}
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
               <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
                 <Gauge className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Propulsión & Autonomía</h4>
+                <h4 className="font-serif font-bold text-lg text-slate-900">Propulsión & Generación</h4>
                 <p className="text-xs text-slate-500 mt-0.5">Potencia oceánica</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Motores:</span>
-                  <span className="font-bold text-slate-900">2x Detroit 450 HP c/u</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Motores:</span>
+                  <span className="font-bold text-slate-900 text-right">2x Detroit 450 HP c/u</span>
                 </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Estanque Diésel:</span>
-                  <span className="font-bold text-slate-900">10.000 Litros</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Estanque Diésel:</span>
+                  <span className="font-bold text-slate-900 text-right">10.000 Litros</span>
                 </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Autonomía:</span>
-                  <span className="font-bold text-blue-900">3.000 MN (a 10 kts)</span>
-                </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Generadores:</span>
-                  <span className="font-bold text-slate-900">2x Northern Lights 10kVA</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Generadores:</span>
+                  <span className="font-bold text-slate-900 text-right">2x Northern Lights 10kVA</span>
                 </li>
               </ul>
             </div>
 
             {/* Box 4: Electrónica & Desembarcos */}
-            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
+            <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all space-y-4">
               <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-900">
                 <Radio className="w-6 h-6" />
               </div>
@@ -599,24 +631,28 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                 <p className="text-xs text-slate-500 mt-0.5">Equipamiento expedicionario</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Internet Satelital:</span>
-                  <span className="font-bold text-emerald-700 flex items-center gap-1">
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Internet Satelital:</span>
+                  <span className="font-bold text-emerald-700 flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     Starlink 24/7
                   </span>
                 </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Electrónica Dual:</span>
-                  <span className="font-bold text-slate-900">Raymarine + Garmin</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Electrónica Dual:</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Raymarine + Garmin</span>
                 </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Desalinizadores:</span>
-                  <span className="font-bold text-blue-900">2x 140 ltrs/hr</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Desalinizadores:</span>
+                  <span className="font-bold text-blue-900 text-right whitespace-nowrap">2x 140 ltrs/hr</span>
                 </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Zodiac Auxiliar:</span>
-                  <span className="font-bold text-slate-900">Yamaha 70hp + Grúa 1T</span>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Zodiac Auxiliar:</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Yamaha 70hp + Grúa</span>
+                </li>
+                <li className="flex justify-between items-center gap-2">
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Kayaks:</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">2 (1 Doble + 1 Single)</span>
                 </li>
               </ul>
             </div>

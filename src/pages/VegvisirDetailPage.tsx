@@ -59,23 +59,23 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
   const logbookEntries = {
     climatizacion: {
-      title: 'Climatización Hidrónica',
+      title: 'Climatización Sistema Webasto',
       day: 'Día 12 de Travesía',
       location: 'Canal Sarmiento',
       coordinates: '51°52\' S, 73°40\' W',
       wind: 'W 32 Nudos',
       temp: '2°C Ext',
-      text: 'El frío antártico cala hondo en cubierta, pero el Vegvisir nos abraza en su interior. La calefacción central hidrónica mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa de roble mientras contemplamos la ventisca desde el ventanal templado.',
+      text: 'El frío antártico cala hondo en cubierta, pero el Vegvisir nos abraza en su interior. La climatización con sistema Webasto mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa de roble mientras contemplamos la ventisca desde el ventanal templado.',
       image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
     },
     gastronomia: {
-      title: 'Gastronomía Gourmet',
+      title: 'Gastronomía',
       day: 'Día 15 de Travesía',
       location: 'Seno Ventisquero',
       coordinates: '54°30\' S, 69°12\' W',
       wind: 'Calma',
       temp: '4°C Ext',
-      text: 'Hemos fondeado al resguardo directo del glaciar. A bordo, nuestro chef ha preparado un plato de centolla austral recién extraída, acompañada de un Chardonnay frío. Cenar frente a la imponente pared de hielo azul es una experiencia mística.',
+      text: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
       image: '/flota/vegvisir/vegvisir-gastronomia.jpg',
     },
     casco: {
@@ -490,17 +490,48 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
                 {/* Back */}
                 <div
-                  className="absolute inset-0 bg-white p-5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-center space-y-2 text-slate-800"
+                  className="absolute inset-0 bg-white p-3 sm:p-3.5 rounded-2xl border-2 border-blue-900/50 shadow-md flex flex-col items-center text-center justify-between text-slate-800"
                   style={{
                     backfaceVisibility: 'hidden',
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Desembarco</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Planta Desalinizadora de 140 ltrs/hr. Bote Zodiac de 4.3 mts con Motor Mercury 4T 15hp para desembarcos remotos.
-                  </p>
-                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <div>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">Autonomía & Energía</span>
+                  </div>
+
+                  <ul className="text-slate-700 text-[8px] sm:text-[8.5px] leading-tight space-y-0.5 sm:space-y-1 text-left px-0.5 w-full max-w-[205px]">
+                    <li className="flex items-start gap-1">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Combustible:</strong> 500 L en 2 estanques independientes</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Agua:</strong> 1.000 L divididos en 4 estanques independientes</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span><strong>Motor:</strong> Perkins 90 HP</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span>Planta Desalinizadora</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span>Panel Solar 600 Wts</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span>2 Baterías de Litio</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                      <span>2 Calefacciones tipo Webasto</span>
+                    </li>
+                  </ul>
+
+                  <span className="text-[7.5px] text-blue-900/60 font-mono uppercase">Volver ➔</span>
                 </div>
               </div>
             </div>
@@ -608,10 +639,6 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   <span className="text-slate-500">Piloto Automático:</span>
                   <span className="font-bold text-slate-900">Raymarine</span>
                 </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Cocina a Bordo:</span>
-                  <span className="font-bold text-slate-900">Cocina Completa</span>
-                </li>
               </ul>
             </div>
 
@@ -636,10 +663,6 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">Motor Fuera de Borda:</span>
                   <span className="font-bold text-slate-900">Mercury 4T / 15 HP</span>
-                </li>
-                <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Salón Central:</span>
-                  <span className="font-bold text-slate-900">Amplio & Climatizado</span>
                 </li>
               </ul>
             </div>
@@ -747,7 +770,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   <Thermometer className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Climatización Hidrónica</h4>
+                  <h4 className="font-bold text-base text-slate-900">Climatización Sistema Webasto</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
                     Sistema de calefacción por radiadores de agua caliente controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.
                   </p>
@@ -770,9 +793,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Gastronomía Gourmet</h4>
+                  <h4 className="font-bold text-base text-slate-900">Gastronomía</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Chef dedicado preparando platos con pesca fresca del día, maridajes con prestigiosos vinos nacionales y centolla recién extraída frente a glaciares milenarios.
+                    La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.
                   </p>
                 </div>
               </div>
@@ -795,7 +818,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <div className="space-y-1">
                   <h4 className="font-bold text-base text-slate-900">Casco Reforzado</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Ingeniería de casco adaptada a la geografía extrema de fiordos e islas del extremo sur, asegurando una rigidez y estabilidad superiores frente a vientos australes.
+                    Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hacia el Archipiélago Juan Fernández y Robinson Crusoe, hasta la geografía extrema de los fiordos, canales e islas del extremo sur de Chile.
                   </p>
                 </div>
               </div>
@@ -818,7 +841,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <div className="space-y-1">
                   <h4 className="font-bold text-base text-slate-900">Desembarcos Seguros</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Equipado con un bote Zodiac auxiliar rígido de alta flotabilidad para realizar aproximaciones directas a ventisqueros y caminatas exclusivas por morrenas glaciares.
+                    Equipado con bote Zodiac auxiliar de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores donde no existen muelles o infraestructura portuaria, facilitando el acceso desde el velero a playas, caletas y otros puntos de interés.
                   </p>
                 </div>
               </div>

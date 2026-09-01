@@ -59,12 +59,12 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
     section_key: 'flota_terranova',
     title: 'Yate Terranova (Yate Oceánico 60ft)',
     subtitle: 'CRUCERO EXPLORER • 8 PASAJEROS + TRIPULACIÓN',
-    body_text: 'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac auxiliar para desembarcos costeros.',
+    body_text: 'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.',
     media_url: '/yate-terranova.jpg',
     metadata: {
       title_en: 'Terranova Yacht (Oceanic 60ft Yacht)',
       subtitle_en: 'EXPLORER CRUISER • 8 GUESTS + CREW',
-      body_text_en: 'Expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and Zodiac tender for coastal landings.',
+      body_text_en: 'Expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and 5m rigid-inflatable Zodiac tender with Yamaha 70 HP (4-stroke) engine for coastal landings.',
     },
   },
 
@@ -73,12 +73,12 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
     section_key: 'lodge_info',
     title: 'Lodge Rincón de Navegantes',
     subtitle: 'Uberlindo Andaur 222 • Isla Robinson Crusoe',
-    body_text: 'Ubicado justo frente al mar en la Bahía Cumberland. Diseñado en torno a 4 cabinas independientes con baño privado y vista al océano para hasta 11 pasajeros, amplio quincho, terraza y expediciones exclusivas.',
+    body_text: 'Ubicado justo frente al mar en la Bahía Cumberland. Diseñado en torno a 4 cabinas independientes con baño privado cada una y vista al océano para hasta 11 pasajeros, amplio quincho, terraza y expediciones exclusivas.',
     media_url: '/rincon-de-navegantes.jpg',
     metadata: {
       title_en: 'Rincón de Navegantes Lodge',
       subtitle_en: 'Uberlindo Andaur 222 • Robinson Crusoe Island',
-      body_text_en: 'Located directly oceanfront in Cumberland Bay. Designed around 4 independent en-suite cabins with ocean views for up to 11 guests, expansive BBQ terrace and exclusive expeditions.',
+      body_text_en: 'Located directly oceanfront in Cumberland Bay. Designed around 4 independent en-suite cabins each with ocean views for up to 11 guests, expansive BBQ terrace and exclusive expeditions.',
     },
   },
   lodge_dining: {
@@ -147,7 +147,7 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
   },
 };
 
-const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v8';
+const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v10';
 
 function cleanMediaUrl(sectionKey: string, url?: string | null): string {
   const defaultUrl = DEFAULT_CMS_CONTENT[sectionKey]?.media_url || '';
