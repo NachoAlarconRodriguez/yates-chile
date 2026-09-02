@@ -76,46 +76,53 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
 
   const [selectedFeature, setSelectedFeature] = React.useState<'arquitectura' | 'quincho' | 'exploraciones' | 'atardeceres'>('arquitectura');
 
+  const lodgeLogbookSec = getSection('lodge_logbook');
+  const cmsEntries = (lodgeLogbookSec?.metadata as any)?.entries || {};
+
   const logbookEntries = {
     arquitectura: {
-      title: 'Arquitectura & Aislación Térmica',
-      day: 'Diseño & Calidad Constructiva',
-      location: 'Uberlindo Andaur 222',
-      coordinates: '33°38\' S, 78°50\' W',
-      wind: 'Brisa Marina',
-      temp: '16°C Ext',
-      text: 'Rincón de Navegantes fue diseñado para integrarse de manera armónica al paisaje de Robinson Crusoe, privilegiando una arquitectura respetuosa con el entorno y preparada para las particulares condiciones de la isla. Su construcción incorpora altos estándares de calidad, excelente aislación térmica y materiales seleccionados por su resistencia y durabilidad, ofreciendo espacios confortables, eficientes y protegidos frente al viento, la humedad y las variaciones climáticas. Un diseño que combina calidad constructiva, funcionalidad y conexión con el paisaje, permitiendo disfrutar de la naturaleza de la isla con un alto nivel de confort.',
-      image: '/jf-noviembre.jpg',
+      title: cmsEntries.arquitectura?.nav_title || 'Arquitectura & Aislación Térmica',
+      nav_description: cmsEntries.arquitectura?.nav_description || 'Arquitectura armónica con el entorno, altos estándares de calidad, excelente aislación térmica y materiales resistentes para un confort total.',
+      day: cmsEntries.arquitectura?.day || 'Diseño & Calidad Constructiva',
+      location: cmsEntries.arquitectura?.location || 'Uberlindo Andaur 222',
+      coordinates: cmsEntries.arquitectura?.coordinates || '33°38\' S, 78°50\' W',
+      wind: cmsEntries.arquitectura?.wind || 'Brisa Marina',
+      temp: cmsEntries.arquitectura?.temp || '16°C Ext',
+      text: cmsEntries.arquitectura?.text || 'Rincón de Navegantes fue diseñado para integrarse de manera armónica al paisaje de Robinson Crusoe, privilegiando una arquitectura respetuosa con el entorno y preparada para las particulares condiciones de la isla. Su construcción incorpora altos estándares de calidad, excelente aislación térmica y materiales seleccionados por su resistencia y durabilidad, ofreciendo espacios confortables, eficientes y protegidos frente al viento, la humedad y las variaciones climáticas. Un diseño que combina calidad constructiva, funcionalidad y conexión con el paisaje, permitiendo disfrutar de la naturaleza de la isla con un alto nivel de confort.',
+      image: cmsEntries.arquitectura?.image || '/jf-noviembre.jpg',
     },
     quincho: {
-      title: lodgeDining.title || 'Amplio Quincho & Encuentros',
-      day: 'Momentos al Aire Libre',
-      location: 'Quincho del Lodge',
-      coordinates: '33°38\' S, 78°50\' W',
-      wind: 'Calma',
-      temp: '18°C Ext',
-      text: lodgeDining.body_text || 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.',
-      image: lodgeDining.media_url || 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
+      title: cmsEntries.quincho?.nav_title || lodgeDining.title || 'Amplio Quincho & Encuentros',
+      nav_description: cmsEntries.quincho?.nav_description || 'Quincho acogedor para compartir, cocinar y disfrutar de comidas al calor de las brasas frente al mar.',
+      day: cmsEntries.quincho?.day || 'Momentos al Aire Libre',
+      location: cmsEntries.quincho?.location || 'Quincho del Lodge',
+      coordinates: cmsEntries.quincho?.coordinates || '33°38\' S, 78°50\' W',
+      wind: cmsEntries.quincho?.wind || 'Calma',
+      temp: cmsEntries.quincho?.temp || '18°C Ext',
+      text: cmsEntries.quincho?.text || lodgeDining.body_text || 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.',
+      image: cmsEntries.quincho?.image || lodgeDining.media_url || 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
     },
     exploraciones: {
-      title: 'Exploraciones Exclusivas',
-      day: 'Aventura con Expertos Locales',
-      location: 'Isla Robinson Crusoe',
-      coordinates: '33°39\' S, 78°51\' W',
-      wind: 'SW 14 Nudos',
-      temp: '15°C Ext',
-      text: 'Guiados por expertos locales, exploramos la isla Robinson Crusoe a través de experiencias únicas: cabalgatas por paisajes de gran belleza, senderismo entre bosques de helechos gigantes y especies endémicas, buceo y snorkel en aguas de extraordinaria biodiversidad, y navegaciones que revelan acantilados, bahías y rincones inaccesibles por tierra. Cada aventura permite descubrir la historia, la naturaleza y el espíritu de una de las islas más fascinantes del mundo.',
-      image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
+      title: cmsEntries.exploraciones?.nav_title || 'Exploraciones Exclusivas',
+      nav_description: cmsEntries.exploraciones?.nav_description || 'Cabalgatas, senderismo en bosques endémicos, buceo y snorkel con fauna marina, y navegaciones costeras.',
+      day: cmsEntries.exploraciones?.day || 'Aventura con Expertos Locales',
+      location: cmsEntries.exploraciones?.location || 'Isla Robinson Crusoe',
+      coordinates: cmsEntries.exploraciones?.coordinates || '33°39\' S, 78°51\' W',
+      wind: cmsEntries.exploraciones?.wind || 'SW 14 Nudos',
+      temp: cmsEntries.exploraciones?.temp || '15°C Ext',
+      text: cmsEntries.exploraciones?.text || 'Guiados por expertos locales, exploramos la isla Robinson Crusoe a través de experiencias únicas: cabalgatas por paisajes de gran belleza, senderismo entre bosques de helechos gigantes y especies endémicas, buceo y snorkel en aguas de extraordinaria biodiversidad, y navegaciones que revelan acantilados, bahías y rincones inaccesibles por tierra. Cada aventura permite descubrir la historia, la naturaleza y el espíritu de una de las islas más fascinantes del mundo.',
+      image: cmsEntries.exploraciones?.image || 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
     },
     atardeceres: {
-      title: 'Atardeceres Frente al Mar',
-      day: 'Horizonte Infinito',
-      location: 'Frente al Mar (Bahía Cumberland)',
-      coordinates: '33°38\' S, 78°50\' W',
-      wind: 'Calma',
-      temp: '14°C Ext',
-      text: 'Desde Rincón de Navegantes, el océano se convierte en parte del paisaje cotidiano. Su ubicación privilegiada frente al mar permite contemplar atardeceres inolvidables, mientras el cielo cambia de color y el sol se pierde en el horizonte. Un escenario único para descansar, compartir y dejarse envolver por la inmensidad de Robinson Crusoe.',
-      image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
+      title: cmsEntries.atardeceres?.nav_title || 'Atardeceres Frente al Mar',
+      nav_description: cmsEntries.atardeceres?.nav_description || 'Ubicación privilegiada en Bahía Cumberland para contemplar la caída del sol sobre el océano.',
+      day: cmsEntries.atardeceres?.day || 'Horizonte Infinito',
+      location: cmsEntries.atardeceres?.location || 'Frente al Mar (Bahía Cumberland)',
+      coordinates: cmsEntries.atardeceres?.coordinates || '33°38\' S, 78°50\' W',
+      wind: cmsEntries.atardeceres?.wind || 'Calma',
+      temp: cmsEntries.atardeceres?.temp || '14°C Ext',
+      text: cmsEntries.atardeceres?.text || 'Desde Rincón de Navegantes, el océano se convierte en parte del paisaje cotidiano. Su ubicación privilegiada frente al mar permite contemplar atardeceres inolvidables, mientras el cielo cambia de color y el sol se pierde en el horizonte. Un escenario único para descansar, compartir y dejarse envolver por la inmensidad de Robinson Crusoe.',
+      image: cmsEntries.atardeceres?.image || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
     },
   };
 
@@ -667,9 +674,9 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   <Home className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Arquitectura & Aislación Térmica</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.arquitectura.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Arquitectura armónica con el entorno, altos estándares de calidad, excelente aislación térmica y materiales resistentes para un confort total.
+                    {logbookEntries.arquitectura.nav_description}
                   </p>
                 </div>
               </div>
@@ -690,9 +697,9 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   <UtensilsCrossed className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Amplio Quincho</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.quincho.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre frente al paisaje de Robinson Crusoe.
+                    {logbookEntries.quincho.nav_description}
                   </p>
                 </div>
               </div>
@@ -713,9 +720,9 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   <Compass className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Exploraciones Exclusivas</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.exploraciones.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Cabalgatas, senderismo entre helechos gigantes, buceo, snorkel y navegaciones por acantilados guiadas por expertos locales.
+                    {logbookEntries.exploraciones.nav_description}
                   </p>
                 </div>
               </div>
@@ -736,9 +743,9 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   <Sun className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Atardeceres Frente al Mar</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.atardeceres.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Ubicación en primera línea para contemplar puestas de sol inolvidables mientras el cielo cambia de color sobre el Pacífico.
+                    {logbookEntries.atardeceres.nav_description}
                   </p>
                 </div>
               </div>

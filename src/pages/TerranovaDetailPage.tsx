@@ -55,46 +55,53 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
 
   const [selectedFeature, setSelectedFeature] = React.useState<'climatizacion' | 'gastronomia' | 'casco' | 'desembarcos'>('climatizacion');
 
+  const terranovaLogbookSec = getSection('terranova_logbook');
+  const cmsEntries = (terranovaLogbookSec?.metadata as any)?.entries || {};
+
   const logbookEntries = {
     climatizacion: {
-      title: 'Deck Superior & Quincho Panorámico',
-      day: 'Día 10 de Travesía',
-      location: 'Glaciar Garibaldi',
-      coordinates: '54°07\' S, 69°57\' W',
-      wind: 'W 25 Nudos',
-      temp: '3°C Ext',
-      text: 'Fondeados frente al resguardo del glaciar Garibaldi, disfrutamos de la vista en 360° desde la Cubierta 3. La parrilla exterior y la amplitud del flybridge con su segundo puente de gobierno ofrecen el espacio perfecto para compartir al atardecer en los fiordos.',
-      image: '/flota/terranova/terranova-cubiertas.jpg',
+      title: cmsEntries.climatizacion?.nav_title || 'Deck Superior & Flybridge',
+      nav_description: cmsEntries.climatizacion?.nav_description || 'Parrilla exterior y amplitud en el flybridge con segundo puesto de gobierno, ofreciendo el espacio perfecto para compartir con vista panorámica de 360°.',
+      day: cmsEntries.climatizacion?.day || 'Día 10 de Travesía',
+      location: cmsEntries.climatizacion?.location || 'Glaciar Garibaldi',
+      coordinates: cmsEntries.climatizacion?.coordinates || '54°07\' S, 69°57\' W',
+      wind: cmsEntries.climatizacion?.wind || 'W 25 Nudos',
+      temp: cmsEntries.climatizacion?.temp || '3°C Ext',
+      text: cmsEntries.climatizacion?.text || 'Fondeados frente al resguardo del glaciar Garibaldi, disfrutamos de la vista en 360° desde la Cubierta 3. La parrilla exterior y la amplitud del flybridge con su segundo puente de gobierno ofrecen el espacio perfecto para compartir al atardecer en los fiordos.',
+      image: cmsEntries.climatizacion?.image || '/flota/terranova/terranova-cubiertas.jpg',
     },
     gastronomia: {
-      title: 'Salón Central & Gastronomía Austral',
-      day: 'Día 14 de Travesía',
-      location: 'Seno Eyre',
-      coordinates: '48°58\' S, 74°20\' W',
-      wind: 'Calma',
-      temp: '5°C Ext',
-      text: 'En el amplio comedor de la Cubierta 2, rodeados de ventanales panorámicos frente al glaciar Pío XI, la cocina full equipo permite preparar centolla fresca austral y pesca del día maridadas con vinos selectos en un ambiente de total calidez y confort.',
-      image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
+      title: cmsEntries.gastronomia?.nav_title || 'Salón Central & Gastronomía',
+      nav_description: cmsEntries.gastronomia?.nav_description || 'Cocina full equipo y amplio comedor en la Cubierta 2 para disfrutar de centolla y pesca fresca del día frente a ventanales panorámicos.',
+      day: cmsEntries.gastronomia?.day || 'Día 14 de Travesía',
+      location: cmsEntries.gastronomia?.location || 'Seno Eyre',
+      coordinates: cmsEntries.gastronomia?.coordinates || '48°58\' S, 74°20\' W',
+      wind: cmsEntries.gastronomia?.wind || 'Calma',
+      temp: cmsEntries.gastronomia?.temp || '5°C Ext',
+      text: cmsEntries.gastronomia?.text || 'En el amplio comedor de la Cubierta 2, rodeados de ventanales panorámicos frente al glaciar Pío XI, la cocina full equipo permite preparar centolla fresca austral y pesca del día maridadas con vinos selectos en un ambiente de total calidez y confort.',
+      image: cmsEntries.gastronomia?.image || 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
     },
     casco: {
-      title: 'Propulsión Detroit & 3.000 MN Autonomía',
-      day: 'Día 17 de Travesía',
-      location: 'Golfo de Penas',
-      coordinates: '47°15\' S, 74°50\' W',
-      wind: 'SW 38 Nudos',
-      temp: '6°C Ext',
-      text: 'Navegando a velocidad crucero de 10 nudos con el empuje firme de los 2 motores Detroit de 450 HP. Su estanque de 10.000 Litros de combustible brinda 3.000 millas náuticas de autonomía para explorar los canales y fiordos más remotos del extremo sur sin escalas.',
-      image: '/zarpe-archipielago.jpg',
+      title: cmsEntries.casco?.nav_title || 'Autonomía 3.000 MN & Motores Detroit',
+      nav_description: cmsEntries.casco?.nav_description || 'Doble motorización Detroit de 450 HP c/u y estanque diésel de 10.000 L para navegar sin escalas los canales y fiordos más remotos de la Patagonia.',
+      day: cmsEntries.casco?.day || 'Día 17 de Travesía',
+      location: cmsEntries.casco?.location || 'Golfo de Penas',
+      coordinates: cmsEntries.casco?.coordinates || '47°15\' S, 74°50\' W',
+      wind: cmsEntries.casco?.wind || 'SW 38 Nudos',
+      temp: cmsEntries.casco?.temp || '6°C Ext',
+      text: cmsEntries.casco?.text || 'Navegando a velocidad crucero de 10 nudos con el empuje firme de los 2 motores Detroit de 450 HP. Su estanque de 10.000 Litros de combustible brinda 3.000 millas náuticas de autonomía para explorar los canales y fiordos más remotos del extremo sur sin escalas.',
+      image: cmsEntries.casco?.image || '/zarpe-archipielago.jpg',
     },
     desembarcos: {
-      title: 'Zodiac Yamaha 70 HP & Grúa 1T',
-      day: 'Día 19 de Travesía',
-      location: 'Fiordo Peel',
-      coordinates: '50°55\' S, 74°05\' W',
-      wind: 'Calma',
-      temp: '4°C Ext',
-      text: 'Operamos la grúa de 1 tonelada de la Cubierta 3 para arriar el bote Zodiac semirrígido con motor Yamaha 70 HP. La potencia y maniobrabilidad nos permiten realizar aproximaciones directas y desembarcos seguros en playas y ventisqueros de difícil acceso.',
-      image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
+      title: cmsEntries.desembarcos?.nav_title || 'Zodiac Yamaha 70 HP & Grúa 1T',
+      nav_description: cmsEntries.desembarcos?.nav_description || 'Zodiac semirrígido de 5 metros con motor Yamaha 70 HP (4 tiempos) y grúa de 1 tonelada para desembarcos rápidos y seguros en cualquier costa.',
+      day: cmsEntries.desembarcos?.day || 'Día 19 de Travesía',
+      location: cmsEntries.desembarcos?.location || 'Fiordo Peel',
+      coordinates: cmsEntries.desembarcos?.coordinates || '50°55\' S, 74°05\' W',
+      wind: cmsEntries.desembarcos?.wind || 'Calma',
+      temp: cmsEntries.desembarcos?.temp || '4°C Ext',
+      text: cmsEntries.desembarcos?.text || 'Operamos la grúa de 1 tonelada de la Cubierta 3 para arriar el bote Zodiac semirrígido con motor Yamaha 70 HP. La potencia y maniobrabilidad nos permiten realizar aproximaciones directas y desembarcos seguros en playas y ventisqueros de difícil acceso.',
+      image: cmsEntries.desembarcos?.image || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
     },
   };
 
@@ -175,10 +182,10 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
           <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
-            {terranovaCms.title || 'Yate Terranova'}
+            {terranovaCms.title ? terranovaCms.title.replace(/\s*\([^)]*\)/g, '').trim() : 'Yate Terranova'}
           </h1>
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
-            {terranovaCms.body_text || 'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.'}
+            {terranovaCms.body_text || 'Yate oceánico 65ft de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.'}
           </p>
           <div className="pt-2">
             <button
@@ -589,9 +596,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <span className="text-slate-500 shrink-0 whitespace-nowrap">Cubierta 3:</span>
                   <span className="font-bold text-slate-900 text-right">Zodiac, Parrilla & Grúa</span>
                 </li>
-                <li className="flex justify-between items-center pt-1 border-t border-slate-100 gap-2">
+                <li className="flex justify-between items-start pt-1 border-t border-slate-100 gap-2">
                   <span className="text-slate-500 shrink-0 whitespace-nowrap">Cocina:</span>
-                  <span className="font-bold text-blue-900 text-right">Full Equipada (3 Refris)</span>
+                  <span className="font-bold text-blue-900 text-right text-[11px] sm:text-xs leading-snug">Horno, Congelador y 3 Refrigeradores</span>
                 </li>
               </ul>
             </div>
@@ -760,9 +767,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <Layers className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Deck Superior & Quincho</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.climatizacion.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Cubierta 3 panorámica con segundo puesto de gobierno, terraza exterior, parrilla y grúa de 1 tonelada.
+                    {logbookEntries.climatizacion.nav_description}
                   </p>
                 </div>
               </div>
@@ -783,9 +790,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Salón Central & Comedor Full</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.gastronomia.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Cubierta 2 equipada con amplio comedor, cocina integral completa y terraza de popa para compartir la gastronomía de a bordo.
+                    {logbookEntries.gastronomia.nav_description}
                   </p>
                 </div>
               </div>
@@ -806,9 +813,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <Gauge className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">2 Motores Detroit (3.000 MN)</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.casco.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Dos motores Detroit de 450 HP c/u y estanque de 10.000 Litros con 3.000 millas náuticas de autonomía continua a 10 nudos.
+                    {logbookEntries.casco.nav_description}
                   </p>
                 </div>
               </div>
@@ -829,9 +836,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   <Anchor className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Zodiac 70 HP & Grúa 1 Tonelada</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.desembarcos.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Bote auxiliar semirrígido con motor Yamaha 4T 70 HP y grúa de 1 tonelada en Cubierta 3 para desembarcos rápidos y seguros.
+                    {logbookEntries.desembarcos.nav_description}
                   </p>
                 </div>
               </div>

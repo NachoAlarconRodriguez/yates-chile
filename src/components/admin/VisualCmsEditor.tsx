@@ -23,7 +23,14 @@ import {
   Key,
   Bot,
   CheckCircle,
-  Wand2
+  Wand2,
+  BookOpen,
+  Wind,
+  Thermometer,
+  Gauge,
+  Layers,
+  UtensilsCrossed,
+  Sun
 } from 'lucide-react';
 import { DEFAULT_CMS_CONTENT, type SiteContent } from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
@@ -156,7 +163,9 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   onNavigate,
 }) => {
   // Navigation State
-  const [activePage, setActivePage] = useState<'home' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'contact'>('home');
+  const [activePage, setActivePage] = useState<'home' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'contact' | 'logbook'>('home');
+  const [activeLogbookVessel, setActiveLogbookVessel] = useState<'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook'>('vegvisir_logbook');
+  const [activeLogbookEntry, setActiveLogbookEntry] = useState<string>('climatizacion');
 
   // Language Mode: 'ES' (Spanish base) or 'EN' (English AI review/edit)
   const [editorLanguage, setEditorLanguage] = useState<'ES' | 'EN'>('ES');
@@ -173,11 +182,62 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   // Media Edit Modal State (only for image/video URLs & uploads)
   const [mediaModal, setMediaModal] = useState<{
     sectionKey: string;
+    entryId?: string;
     label: string;
     currentValue: string;
   } | null>(null);
 
   const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
+
+  // Logbook Dynamic Data Helpers
+  const getLogbookEntry = (vesselKey: 'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook', entryId: string) => {
+    const draftMeta = drafts[vesselKey]?.metadata as any;
+    const contentMeta = content[vesselKey]?.metadata as any;
+    const defaultMeta = DEFAULT_CMS_CONTENT[vesselKey]?.metadata as any;
+    return (
+      draftMeta?.entries?.[entryId] ||
+      contentMeta?.entries?.[entryId] ||
+      defaultMeta?.entries?.[entryId] ||
+      {}
+    );
+  };
+
+  const setLogbookEntryField = (
+    vesselKey: 'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook',
+    entryId: string,
+    field: string,
+    value: string
+  ) => {
+    const existingMeta =
+      (drafts[vesselKey]?.metadata as any) ||
+      (content[vesselKey]?.metadata as any) ||
+      (DEFAULT_CMS_CONTENT[vesselKey]?.metadata as any) ||
+      {};
+    const currentEntries = existingMeta.entries || {};
+    const targetEntry = currentEntries[entryId] || {};
+
+    const updatedEntries = {
+      ...currentEntries,
+      [entryId]: {
+        ...targetEntry,
+        [field]: value,
+      },
+    };
+
+    setDrafts((prev) => ({
+      ...prev,
+      [vesselKey]: {
+        section_key: vesselKey,
+        ...(content[vesselKey] || DEFAULT_CMS_CONTENT[vesselKey] || {}),
+        ...prev[vesselKey],
+        metadata: {
+          ...existingMeta,
+          ...((prev[vesselKey]?.metadata as any) || {}),
+          entries: updatedEntries,
+        },
+      },
+    }));
+  };
 
   // Get field with draft priority and proper fallback respecting active editorLanguage
   const getField = (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url'): string => {
@@ -259,18 +319,16 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       return;
     }
 
-    // Spanish mode:
     setDrafts((prev) => ({
       ...prev,
       [sectionKey]: {
         ...prev[sectionKey],
-        title: field === 'title' ? value : (prev[sectionKey]?.title ?? getField(sectionKey, 'title')),
-        subtitle: field === 'subtitle' ? value : (prev[sectionKey]?.subtitle ?? getField(sectionKey, 'subtitle')),
-        body_text: field === 'body_text' ? value : (prev[sectionKey]?.body_text ?? getField(sectionKey, 'body_text')),
+        [field]: value,
       },
     }));
   };
 
+  // Check if there are unsaved drafts
   const hasUnsavedChanges = useMemo(() => {
     return Object.keys(drafts).length > 0;
   }, [drafts]);
@@ -291,6 +349,14 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           (content[sectionKey]?.metadata as Record<string, any>) ||
           (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
           {};
+
+        if (sectionKey === 'vegvisir_logbook' || sectionKey === 'terranova_logbook' || sectionKey === 'lodge_logbook') {
+          finalDrafts[sectionKey] = {
+            ...d,
+            metadata: existingMeta,
+          };
+          continue;
+        }
 
         // If Spanish texts were edited, translate them to English
         const titleToTranslate = d.title ?? getField(sectionKey, 'title');
@@ -323,7 +389,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
         setSaveSuccessMsg(
           editorLanguage === 'EN'
             ? '¡Cambios en inglés guardados con éxito!'
-            : '¡Contenido en español guardado y traducido automáticamente al inglés con IA!'
+            : '¡Contenido guardado y publicado en la web con éxito!'
         );
         setTimeout(() => setSaveSuccessMsg(null), 4500);
       }
@@ -407,7 +473,11 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     const res = await onUploadMedia(file);
     setUploadingMedia(false);
     if (res.success && res.url) {
-      setField(mediaModal.sectionKey, 'media_url', res.url);
+      if (mediaModal.entryId) {
+        setLogbookEntryField(mediaModal.sectionKey as any, mediaModal.entryId, 'image', res.url);
+      } else {
+        setField(mediaModal.sectionKey, 'media_url', res.url);
+      }
       setMediaModal((prev) => (prev ? { ...prev, currentValue: res.url! } : null));
     }
   };
@@ -520,6 +590,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               { id: 'lodge', label: 'Lodge Rincón', icon: BedDouble },
               { id: 'expeditions', label: 'Expediciones', icon: Compass },
               { id: 'contact', label: 'Contacto & Concierge', icon: Phone },
+              { id: 'logbook', label: 'Bitácoras & Book', icon: BookOpen },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activePage === tab.id;
@@ -1503,6 +1574,435 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             </div>
           )}
 
+          {/* ======================================================================= */}
+          {/* 7. GESTOR DE CUADERNOS DE BITÁCORA (VELEROS, YATE & LODGE) */}
+          {/* ======================================================================= */}
+          {activePage === 'logbook' && (
+            <div className="p-6 sm:p-8 space-y-8 bg-slate-100/70">
+              
+              {/* Header Banner */}
+              <div className="bg-[#0f2b48] text-white p-6 sm:p-8 rounded-3xl shadow-xl space-y-4 relative overflow-hidden">
+                <div className="absolute right-0 top-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+                  <div className="space-y-1 max-w-2xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-400/20 text-sky-200 text-xs font-bold uppercase tracking-wider border border-sky-400/30">
+                      <BookOpen className="w-3.5 h-3.5 text-sky-300" />
+                      <span>Gestor de Bitácoras & Relatos Náuticos</span>
+                    </div>
+                    <h2 className="font-serif text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                      Cuadernos de Bitácora y Características
+                    </h2>
+                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                      Modifica los textos, coordenadas, clima, relatos del capitán y fotografías de las 4 características interactivas. Todo cambio se guarda en Supabase y se publica de inmediato en el sitio web.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveAll}
+                    disabled={!hasUnsavedChanges || isSaving}
+                    className={`px-5 py-3 rounded-2xl text-xs font-extrabold flex items-center gap-2 transition-all shadow-lg cursor-pointer ${
+                      hasUnsavedChanges
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 scale-105'
+                        : 'bg-white/10 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{hasUnsavedChanges ? `Guardar Cambios (${Object.keys(drafts).length})` : 'Sin Cambios Pendientes'}</span>
+                  </button>
+                </div>
+
+                {/* Vessel Selector Capsules (Centered & Modern) */}
+                <div className="pt-4 border-t border-white/10 flex justify-center">
+                  <div className="p-1.5 bg-black/25 border border-white/15 rounded-full flex flex-wrap items-center justify-center gap-1.5 shadow-inner backdrop-blur-md">
+                    {[
+                      { id: 'vegvisir_logbook', label: 'Velero Vegvisir (52.5 ft)', icon: Sailboat, defaultEntry: 'climatizacion' },
+                      { id: 'terranova_logbook', label: 'Yate Terranova (65ft LRC)', icon: Ship, defaultEntry: 'climatizacion' },
+                      { id: 'lodge_logbook', label: 'Lodge Rincón de Navegantes', icon: BedDouble, defaultEntry: 'arquitectura' },
+                    ].map((v) => {
+                      const Icon = v.icon;
+                      const isSelected = activeLogbookVessel === v.id;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveLogbookVessel(v.id as any);
+                            setActiveLogbookEntry(v.defaultEntry);
+                          }}
+                          className={`px-5 py-2.5 rounded-full text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                            isSelected
+                              ? 'bg-white text-[#0f2b48] shadow-md shadow-black/20 font-extrabold scale-[1.03]'
+                              : 'text-white/80 hover:text-white hover:bg-white/10 font-semibold'
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 ${isSelected ? 'text-blue-900' : 'text-slate-300'}`} />
+                          <span>{v.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECCIÓN 1: VISTA PREVIA INTERACTIVA EN VIVO (4 TARJETAS HORIZONTALES) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">
+                      Vista Previa Interactiva en Tiempo Real
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      (Haz clic sobre cualquiera de las 4 tarjetas para seleccionarla y editarla abajo)
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-blue-900 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                    {activeLogbookVessel === 'vegvisir_logbook'
+                      ? '⛵ Velero Vegvisir'
+                      : activeLogbookVessel === 'terranova_logbook'
+                      ? '🚢 Yate Terranova'
+                      : '🏡 Lodge Rincón'}
+                  </span>
+                </div>
+
+                {/* 4 Cards arranged horizontally in a single row */}
+                <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xl">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {activeLogbookVessel === 'vegvisir_logbook' && (
+                      <>
+                        {['climatizacion', 'gastronomia', 'casco', 'desembarcos'].map((key) => {
+                          const eData = getLogbookEntry('vegvisir_logbook', key);
+                          const isSelected = activeLogbookEntry === key;
+                          return (
+                            <div
+                              key={key}
+                              onClick={() => setActiveLogbookEntry(key)}
+                              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between gap-3 text-left ${
+                                isSelected
+                                  ? 'border-blue-900 bg-blue-50/25 shadow-md -translate-y-1 ring-2 ring-blue-900/20'
+                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                                  isSelected ? 'bg-blue-900 text-white' : 'bg-slate-50 text-slate-600'
+                                }`}>
+                                  {key === 'climatizacion' ? <Thermometer className="w-5 h-5" /> : key === 'gastronomia' ? <Sparkles className="w-5 h-5" /> : key === 'casco' ? <Anchor className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
+                                </div>
+                                {isSelected && (
+                                  <span className="text-[10px] font-bold text-blue-900 bg-blue-100/90 px-2.5 py-0.5 rounded-full">
+                                    Editando
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">{eData.nav_title || key}</h4>
+                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">{eData.nav_description || 'Descripción...'}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {activeLogbookVessel === 'terranova_logbook' && (
+                      <>
+                        {['climatizacion', 'gastronomia', 'casco', 'desembarcos'].map((key) => {
+                          const eData = getLogbookEntry('terranova_logbook', key);
+                          const isSelected = activeLogbookEntry === key;
+                          return (
+                            <div
+                              key={key}
+                              onClick={() => setActiveLogbookEntry(key)}
+                              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between gap-3 text-left ${
+                                isSelected
+                                  ? 'border-blue-900 bg-blue-50/25 shadow-md -translate-y-1 ring-2 ring-blue-900/20'
+                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                                  isSelected ? 'bg-blue-900 text-white' : 'bg-slate-50 text-slate-600'
+                                }`}>
+                                  {key === 'climatizacion' ? <Layers className="w-5 h-5" /> : key === 'gastronomia' ? <Sparkles className="w-5 h-5" /> : key === 'casco' ? <Gauge className="w-5 h-5" /> : <Anchor className="w-5 h-5" />}
+                                </div>
+                                {isSelected && (
+                                  <span className="text-[10px] font-bold text-blue-900 bg-blue-100/90 px-2.5 py-0.5 rounded-full">
+                                    Editando
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">{eData.nav_title || key}</h4>
+                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">{eData.nav_description || 'Descripción...'}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {activeLogbookVessel === 'lodge_logbook' && (
+                      <>
+                        {['arquitectura', 'quincho', 'exploraciones', 'atardeceres'].map((key) => {
+                          const eData = getLogbookEntry('lodge_logbook', key);
+                          const isSelected = activeLogbookEntry === key;
+                          return (
+                            <div
+                              key={key}
+                              onClick={() => setActiveLogbookEntry(key)}
+                              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between gap-3 text-left ${
+                                isSelected
+                                  ? 'border-emerald-800 bg-emerald-50/25 shadow-md -translate-y-1 ring-2 ring-emerald-800/20'
+                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                                  isSelected ? 'bg-emerald-800 text-white' : 'bg-slate-50 text-slate-600'
+                                }`}>
+                                  {key === 'arquitectura' ? <Home className="w-5 h-5" /> : key === 'quincho' ? <UtensilsCrossed className="w-5 h-5" /> : key === 'exploraciones' ? <Compass className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                                </div>
+                                {isSelected && (
+                                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-full">
+                                    Editando
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">{eData.nav_title || key}</h4>
+                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">{eData.nav_description || 'Descripción...'}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECCIÓN 2: FORMULARIO DE EDICIÓN (ABAJO CON MÁXIMO ESPACIO) */}
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl">
+                
+                {/* 2 Wide Columns Grid for Form Inputs */}
+                <div className="grid lg:grid-cols-2 gap-8 items-start">
+                  
+                  {/* Left Column: Botón Lateral y Fotografía */}
+                  <div className="space-y-6">
+                    
+                    {/* Card A: Configuración del Botón */}
+                    <div className="bg-slate-50/70 p-6 rounded-2xl border border-slate-200 space-y-4">
+                      <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2.5">
+                        <div className="w-6 h-6 rounded-md bg-blue-900 text-white flex items-center justify-center font-bold text-xs">
+                          1
+                        </div>
+                        <h4 className="font-bold text-sm text-slate-900">Tarjeta de Selección (Botón Lateral)</h4>
+                      </div>
+
+                      <div className="space-y-3.5">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                            Título de la Característica:
+                          </label>
+                          <input
+                            type="text"
+                            value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_title || ''}
+                            onChange={(e) =>
+                              setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'nav_title', e.target.value)
+                            }
+                            placeholder="Ej: Climatización Sistema Webasto"
+                            className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none transition shadow-2xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                            Descripción Breve del Botón:
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_description || ''}
+                            onChange={(e) =>
+                              setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'nav_description', e.target.value)
+                            }
+                            placeholder="Breve resumen visible en el botón..."
+                            className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-2 text-xs text-slate-700 leading-relaxed focus:outline-none transition resize-none shadow-2xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card B: Fotografía de la Bitácora */}
+                    <div className="bg-slate-50/70 p-6 rounded-2xl border border-slate-200 space-y-4">
+                      <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2.5">
+                        <div className="w-6 h-6 rounded-md bg-blue-900 text-white flex items-center justify-center font-bold text-xs">
+                          2
+                        </div>
+                        <h4 className="font-bold text-sm text-slate-900">Fotografía de la Bitácora (Snapshot)</h4>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Image Preview on Top */}
+                        <div className="w-full h-44 sm:h-48 rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-sm relative group">
+                          {getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.image ? (
+                            <img
+                              src={getLogbookEntry(activeLogbookVessel, activeLogbookEntry).image}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1.5">
+                              <ImageIcon className="w-8 h-8 opacity-40" />
+                              <span className="text-xs text-slate-400">Sin fotografía seleccionada</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* URL Field Below Image */}
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                            Enlace / URL de la Imagen:
+                          </label>
+                          <input
+                            type="text"
+                            value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.image || ''}
+                            onChange={(e) =>
+                              setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'image', e.target.value)
+                            }
+                            placeholder="https://... o sube una imagen"
+                            className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-mono focus:outline-none shadow-2xs"
+                          />
+                        </div>
+
+                        {/* Button in Single Line */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMediaModal({
+                              sectionKey: activeLogbookVessel,
+                              entryId: activeLogbookEntry,
+                              label: `Fotografía de Bitácora (${activeLogbookEntry})`,
+                              currentValue: getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.image || '',
+                            })
+                          }
+                          className="w-full py-2.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-sm whitespace-nowrap"
+                        >
+                          <Upload className="w-4 h-4 text-sky-300" />
+                          <span>Subir o Cambiar Fotografía</span>
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Right Column: Datos Geográficos y Relato del Capitán */}
+                  <div className="space-y-6 h-full flex flex-col">
+                    
+                    {/* Card C: Metadatos y Narrativa */}
+                    <div className="bg-slate-50/70 p-6 rounded-2xl border border-slate-200 space-y-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2.5">
+                          <div className="w-6 h-6 rounded-md bg-blue-900 text-white flex items-center justify-center font-bold text-xs">
+                            3
+                          </div>
+                          <h4 className="font-bold text-sm text-slate-900">Panel de Bitácora (Metadatos & Relato)</h4>
+                        </div>
+
+                        <div className="space-y-4">
+                          {/* Navigation Metadata Grid (Exact 2x2 like Public Site) */}
+                          <div className="grid grid-cols-2 gap-3.5 bg-slate-100/60 p-3.5 rounded-2xl border border-slate-200/80">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                Ubicación:
+                              </label>
+                              <input
+                                type="text"
+                                value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.location || ''}
+                                onChange={(e) =>
+                                  setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'location', e.target.value)
+                                }
+                                placeholder="Ej: Canal Sarmiento"
+                                className="w-full bg-white border border-slate-200 focus:border-blue-900 rounded-xl px-3 py-2 text-xs text-slate-900 font-extrabold focus:outline-none shadow-2xs"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                Coordenadas:
+                              </label>
+                              <input
+                                type="text"
+                                value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.coordinates || ''}
+                                onChange={(e) =>
+                                  setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'coordinates', e.target.value)
+                                }
+                                placeholder="51°52' S, 73°40' W"
+                                className="w-full bg-white border border-slate-200 focus:border-blue-900 rounded-xl px-3 py-2 text-xs font-mono text-blue-900 font-bold focus:outline-none shadow-2xs"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                <Wind className="w-3 h-3 text-slate-500" />
+                                <span>Viento:</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.wind || ''}
+                                onChange={(e) =>
+                                  setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'wind', e.target.value)
+                                }
+                                placeholder="W 32 Nudos"
+                                className="w-full bg-white border border-slate-200 focus:border-blue-900 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none shadow-2xs"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                <Thermometer className="w-3 h-3 text-slate-500" />
+                                <span>Clima:</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.temp || ''}
+                                onChange={(e) =>
+                                  setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'temp', e.target.value)
+                                }
+                                placeholder="2°C Ext"
+                                className="w-full bg-white border border-slate-200 focus:border-blue-900 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:outline-none shadow-2xs"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                              Relato del Capitán / Narrativa de Travesía:
+                            </label>
+                            <textarea
+                              rows={11}
+                              value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.text || ''}
+                              onChange={(e) =>
+                                setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'text', e.target.value)
+                              }
+                              placeholder="Escribe aquí el relato en primera persona..."
+                              className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-3 text-xs text-slate-700 italic leading-relaxed focus:outline-none transition resize-none shadow-2xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -1539,7 +2039,11 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                setField(mediaModal.sectionKey, 'media_url', mediaModal.currentValue);
+                if (mediaModal.entryId) {
+                  setLogbookEntryField(mediaModal.sectionKey as any, mediaModal.entryId, 'image', mediaModal.currentValue);
+                } else {
+                  setField(mediaModal.sectionKey, 'media_url', mediaModal.currentValue);
+                }
                 setMediaModal(null);
               }}
               className="space-y-4"

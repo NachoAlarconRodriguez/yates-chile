@@ -57,46 +57,53 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
   const [selectedFeature, setSelectedFeature] = React.useState<'climatizacion' | 'gastronomia' | 'casco' | 'desembarcos'>('climatizacion');
 
+  const vegvisirLogbookSec = getSection('vegvisir_logbook');
+  const cmsEntries = (vegvisirLogbookSec?.metadata as any)?.entries || {};
+
   const logbookEntries = {
     climatizacion: {
-      title: 'Climatización Sistema Webasto',
-      day: 'Día 12 de Travesía',
-      location: 'Canal Sarmiento',
-      coordinates: '51°52\' S, 73°40\' W',
-      wind: 'W 32 Nudos',
-      temp: '2°C Ext',
-      text: 'El frío antártico cala hondo en cubierta, pero el Vegvisir nos abraza en su interior. La climatización con sistema Webasto mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa de roble mientras contemplamos la ventisca desde el ventanal templado.',
-      image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
+      title: cmsEntries.climatizacion?.nav_title || 'Climatización Sistema Webasto',
+      nav_description: cmsEntries.climatizacion?.nav_description || 'Sistema de calefacción por radiadores de agua caliente controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.',
+      day: cmsEntries.climatizacion?.day || 'Día 12 de Travesía',
+      location: cmsEntries.climatizacion?.location || 'Canal Sarmiento',
+      coordinates: cmsEntries.climatizacion?.coordinates || '51°52\' S, 73°40\' W',
+      wind: cmsEntries.climatizacion?.wind || 'W 32 Nudos',
+      temp: cmsEntries.climatizacion?.temp || '2°C Ext',
+      text: cmsEntries.climatizacion?.text || 'El frío antártico cala hondo en cubierta, pero el Vegvisir nos abraza en su interior. La climatización con sistema Webasto mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa de roble mientras contemplamos la ventisca desde el ventanal templado.',
+      image: cmsEntries.climatizacion?.image || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
     },
     gastronomia: {
-      title: 'Gastronomía',
-      day: 'Día 15 de Travesía',
-      location: 'Seno Ventisquero',
-      coordinates: '54°30\' S, 69°12\' W',
-      wind: 'Calma',
-      temp: '4°C Ext',
-      text: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
-      image: '/flota/vegvisir/vegvisir-gastronomia.jpg',
+      title: cmsEntries.gastronomia?.nav_title || 'Gastronomía',
+      nav_description: cmsEntries.gastronomia?.nav_description || 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+      day: cmsEntries.gastronomia?.day || 'Día 15 de Travesía',
+      location: cmsEntries.gastronomia?.location || 'Seno Ventisquero',
+      coordinates: cmsEntries.gastronomia?.coordinates || '54°30\' S, 69°12\' W',
+      wind: cmsEntries.gastronomia?.wind || 'Calma',
+      temp: cmsEntries.gastronomia?.temp || '4°C Ext',
+      text: cmsEntries.gastronomia?.text || 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+      image: cmsEntries.gastronomia?.image || '/flota/vegvisir/vegvisir-gastronomia.jpg',
     },
     casco: {
-      title: 'Casco Reforzado',
-      day: 'Día 18 de Travesía',
-      location: 'Paso del Indio',
-      coordinates: '49°02\' S, 74°24\' W',
-      wind: 'NW 45 Nudos',
-      temp: '1°C Ext',
-      text: 'Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado y la quilla de plomo del Vegvisir infunden total confianza cuando el hielo roza suavemente la estructura. La embarcación corta el mar embravecido con firmeza impecable.',
-      image: '/velero-vegvisir.jpg',
+      title: cmsEntries.casco?.nav_title || 'Casco Reforzado',
+      nav_description: cmsEntries.casco?.nav_description || 'Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hacia el Archipiélago Juan Fernández y Robinson Crusoe, hasta la geografía extrema de los fiordos, canales e islas del extremo sur de Chile.',
+      day: cmsEntries.casco?.day || 'Día 18 de Travesía',
+      location: cmsEntries.casco?.location || 'Paso del Indio',
+      coordinates: cmsEntries.casco?.coordinates || '49°02\' S, 74°24\' W',
+      wind: cmsEntries.casco?.wind || 'NW 45 Nudos',
+      temp: cmsEntries.casco?.temp || '1°C Ext',
+      text: cmsEntries.casco?.text || 'Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado y la quilla de plomo del Vegvisir infunden total confianza cuando el hielo roza suavemente la estructura. La embarcación corta el mar embravecido con firmeza impecable.',
+      image: cmsEntries.casco?.image || '/velero-vegvisir.jpg',
     },
     desembarcos: {
-      title: 'Desembarcos Seguros',
-      day: 'Día 20 de Travesía',
-      location: 'Bahía Ainsworth',
-      coordinates: '54°22\' S, 69°38\' W',
-      wind: 'SW 15 Nudos',
-      temp: '5°C Ext',
-      text: 'Alistamos el bote Zodiac auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos. Una maniobra segura en un paraje de belleza salvaje.',
-      image: '/flota/vegvisir/vegvisir-desembarcos.jpg',
+      title: cmsEntries.desembarcos?.nav_title || 'Desembarcos Seguros',
+      nav_description: cmsEntries.desembarcos?.nav_description || 'Equipado con bote Zodiac auxiliar de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores donde no existen muelles o infraestructura portuaria, facilitando el acceso desde el velero a playas, caletas y otros puntos de interés.',
+      day: cmsEntries.desembarcos?.day || 'Día 20 de Travesía',
+      location: cmsEntries.desembarcos?.location || 'Bahía Ainsworth',
+      coordinates: cmsEntries.desembarcos?.coordinates || '54°22\' S, 69°38\' W',
+      wind: cmsEntries.desembarcos?.wind || 'SW 15 Nudos',
+      temp: cmsEntries.desembarcos?.temp || '5°C Ext',
+      text: cmsEntries.desembarcos?.text || 'Alistamos el bote Zodiac auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos. Una maniobra segura en un paraje de belleza salvaje.',
+      image: cmsEntries.desembarcos?.image || '/flota/vegvisir/vegvisir-desembarcos.jpg',
     },
   };
 
@@ -177,10 +184,10 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
           <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
-            {vegvisirCms.title ? vegvisirCms.title.replace(/\s*\([^)]*\)/g, '').trim() : 'Velero Vegvisir'}
+            {vegvisirCms.title ? vegvisirCms.title.replace(/Vegvisiri/gi, 'Vegvisir').replace(/\s*\([^)]*\)/g, '').trim() : 'Velero Vegvisir'}
           </h1>
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
-            {vegvisirCms.body_text || 'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.'}
+            {vegvisirCms.body_text || '52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.'}
           </p>
           <div className="pt-2">
             <button
@@ -770,9 +777,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   <Thermometer className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Climatización Sistema Webasto</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.climatizacion.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Sistema de calefacción por radiadores de agua caliente controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.
+                    {logbookEntries.climatizacion.nav_description}
                   </p>
                 </div>
               </div>
@@ -793,9 +800,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Gastronomía</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.gastronomia.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.
+                    {logbookEntries.gastronomia.nav_description}
                   </p>
                 </div>
               </div>
@@ -816,9 +823,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   <Anchor className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Casco Reforzado</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.casco.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hacia el Archipiélago Juan Fernández y Robinson Crusoe, hasta la geografía extrema de los fiordos, canales e islas del extremo sur de Chile.
+                    {logbookEntries.casco.nav_description}
                   </p>
                 </div>
               </div>
@@ -839,9 +846,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-bold text-base text-slate-900">Desembarcos Seguros</h4>
+                  <h4 className="font-bold text-base text-slate-900">{logbookEntries.desembarcos.title}</h4>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    Equipado con bote Zodiac auxiliar de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores donde no existen muelles o infraestructura portuaria, facilitando el acceso desde el velero a playas, caletas y otros puntos de interés.
+                    {logbookEntries.desembarcos.nav_description}
                   </p>
                 </div>
               </div>

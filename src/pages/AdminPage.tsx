@@ -2696,6 +2696,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           subtitle: (d.subtitle !== undefined && d.subtitle !== null ? d.subtitle : (existing.subtitle || '')) || '',
           body_text: (d.body_text !== undefined && d.body_text !== null ? d.body_text : (existing.body_text || '')) || '',
           media_url: (d.media_url !== undefined && d.media_url !== null ? d.media_url : (existing.media_url || '')) || '',
+          metadata: d.metadata !== undefined ? d.metadata : (existing.metadata || {}),
         });
       }
       refreshContent();

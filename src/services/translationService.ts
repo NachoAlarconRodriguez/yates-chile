@@ -119,13 +119,16 @@ ${text}`;
         'Heavy-tonnage vessels engineered for the most demanding seas of the South Pacific and austral fjords.',
       'Velero Vegvisir': 'Vegvisir Sailboat',
       'Velero Vegvisir (Dufour 52.5 Grand Large)': 'Vegvisir Sailboat',
-      'VELERO OCEÁNICO FRANCÉS • 6 PASAJEROS + TRIPULACIÓN': 'FRENCH OCEANIC SAILBOAT • 6 GUESTS + CREW',
-      'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.':
-        'French Dufour 52.5 ft offshore expedition sailboat for austral voyages with 24/7 Starlink and total autonomy.',
+      'VELERO OCEÁNICO FRANCÉS • 12 PASAJEROS + TRIPULACIÓN': 'FRENCH OCEANIC SAILBOAT • 12 GUESTS + CREW',
+      '52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.':
+        '52.5 feet of pure ocean sailing with reinforced hull, 5 triple and double en-suite cabins, panoramic saloon and next-generation satellite navigation equipment.',
       '52.5 pies de pura navegación a vela con casco oceánico reforzado, 3 cabinas dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.':
         '52.5 feet of pure ocean sailing with reinforced hull, 3 double en-suite cabins, panoramic saloon and next-generation satellite navigation equipment.',
-      'Yate Terranova (Yate Oceánico 60ft)': 'Terranova Yacht (Oceanic 60ft Yacht)',
+      'Yate Terranova': 'Terranova Yacht',
+      'Yate Terranova (Yate Oceánico 60ft)': 'Terranova Yacht',
       'CRUCERO EXPLORER • 8 PASAJEROS + TRIPULACIÓN': 'EXPLORER CRUISER • 8 GUESTS + CREW',
+      'Yate oceánico 65ft de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.':
+        '65ft oceanic expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and 5m rigid-inflatable Zodiac tender with Yamaha 70 HP (4-stroke) engine for coastal landings.',
       'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.':
         'Expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and 5m rigid-inflatable Zodiac tender with Yamaha 70 HP (4-stroke) engine for coastal landings.',
       'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac auxiliar para desembarcos costeros.':

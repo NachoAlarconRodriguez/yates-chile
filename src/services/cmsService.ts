@@ -46,25 +46,25 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
   flota_vegvisir: {
     section_key: 'flota_vegvisir',
     title: 'Velero Vegvisir',
-    subtitle: 'VELERO OCEÁNICO FRANCÉS • 6 PASAJEROS + TRIPULACIÓN',
-    body_text: 'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.',
+    subtitle: 'VELERO OCEÁNICO FRANCÉS • 12 PASAJEROS + TRIPULACIÓN',
+    body_text: '52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.',
     media_url: '/velero-vegvisir.jpg',
     metadata: {
       title_en: 'Vegvisir Sailboat',
-      subtitle_en: 'FRENCH OCEANIC SAILBOAT • 6 GUESTS + CREW',
-      body_text_en: 'French Dufour 52.5 ft offshore expedition sailboat for austral voyages with 24/7 Starlink and total autonomy.',
+      subtitle_en: 'FRENCH OCEANIC SAILBOAT • 12 GUESTS + CREW',
+      body_text_en: '52.5 ft pure ocean sailing with reinforced offshore hull, 5 triple and double en-suite cabins, panoramic salon, and next-gen satellite navigation.',
     },
   },
   flota_terranova: {
     section_key: 'flota_terranova',
-    title: 'Yate Terranova (Yate Oceánico 60ft)',
+    title: 'Yate Terranova',
     subtitle: 'CRUCERO EXPLORER • 8 PASAJEROS + TRIPULACIÓN',
-    body_text: 'Yate de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.',
+    body_text: 'Yate oceánico 65ft de expedición con casco de desplazamiento pesado, doble motorización marina, estabilizadores giroscópicos, flybridge panorámico y Zodiac semirrígido de 5 mts de eslora con motor Yamaha 70 HP (4 tiempos) para desembarcos costeros.',
     media_url: '/yate-terranova.jpg',
     metadata: {
-      title_en: 'Terranova Yacht (Oceanic 60ft Yacht)',
+      title_en: 'Terranova Yacht',
       subtitle_en: 'EXPLORER CRUISER • 8 GUESTS + CREW',
-      body_text_en: 'Expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and 5m rigid-inflatable Zodiac tender with Yamaha 70 HP (4-stroke) engine for coastal landings.',
+      body_text_en: '65ft oceanic expedition yacht with heavy displacement hull, twin marine diesel engines, gyroscopic stabilizers, panoramic flybridge and 5m rigid-inflatable Zodiac tender with Yamaha 70 HP (4-stroke) engine for coastal landings.',
     },
   },
 
@@ -145,9 +145,190 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
       body_text_en: 'Yates Chile SpA • Tax ID: 77.892.341-K • Checking Acct: 00-123456-78 • payments@yateschile.cl',
     },
   },
+
+  // 6. CUADERNOS DE BITÁCORA Y CARACTERÍSTICAS
+  vegvisir_logbook: {
+    section_key: 'vegvisir_logbook',
+    title: 'Cuaderno de Bitácora & Relatos • Velero Vegvisir',
+    subtitle: 'Relatos de altamar y especificaciones náuticas del Dufour 52.5 ft.',
+    body_text: '4 entradas oficiales de navegación y confort oceánico.',
+    media_url: '/velero-vegvisir.jpg',
+    metadata: {
+      entries: {
+        climatizacion: {
+          id: 'climatizacion',
+          nav_title: 'Climatización Sistema Webasto',
+          nav_description: 'Sistema de calefacción por radiadores de agua caliente controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.',
+          day: 'Día 12 de Travesía',
+          location: 'Canal Sarmiento',
+          coordinates: "51°52' S, 73°40' W",
+          wind: 'W 32 Nudos',
+          temp: '2°C Ext',
+          text: 'El frío antártico cala hondo en cubierta, pero el Vegvisir nos abraza en su interior. La climatización con sistema Webasto mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa de roble mientras contemplamos la ventisca desde el ventanal templado.',
+          image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
+        },
+        gastronomia: {
+          id: 'gastronomia',
+          nav_title: 'Gastronomía',
+          nav_description: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+          day: 'Día 15 de Travesía',
+          location: 'Seno Ventisquero',
+          coordinates: "54°30' S, 69°12' W",
+          wind: 'Calma',
+          temp: '4°C Ext',
+          text: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+          image: '/flota/vegvisir/vegvisir-gastronomia.jpg',
+        },
+        casco: {
+          id: 'casco',
+          nav_title: 'Casco Reforzado',
+          nav_description: 'Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hacia el Archipiélago Juan Fernández y Robinson Crusoe, hasta la geografía extrema de los fiordos, canales e islas del extremo sur de Chile.',
+          day: 'Día 18 de Travesía',
+          location: 'Paso del Indio',
+          coordinates: "49°02' S, 74°24' W",
+          wind: 'NW 45 Nudos',
+          temp: '1°C Ext',
+          text: 'Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado y la quilla de plomo del Vegvisir infunden total confianza cuando el hielo roza suavemente la estructura. La embarcación corta el mar embravecido con firmeza impecable.',
+          image: '/velero-vegvisir.jpg',
+        },
+        desembarcos: {
+          id: 'desembarcos',
+          nav_title: 'Desembarcos Seguros',
+          nav_description: 'Equipado con bote Zodiac auxiliar de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores donde no existen muelles o infraestructura portuaria, facilitando el acceso desde el velero a playas, caletas y otros puntos de interés.',
+          day: 'Día 20 de Travesía',
+          location: 'Bahía Ainsworth',
+          coordinates: "54°22' S, 69°38' W",
+          wind: 'SW 15 Nudos',
+          temp: '5°C Ext',
+          text: 'Alistamos el bote Zodiac auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos. Una maniobra segura en un paraje de belleza salvaje.',
+          image: '/flota/vegvisir/vegvisir-desembarcos.jpg',
+        },
+      },
+    },
+  },
+
+  terranova_logbook: {
+    section_key: 'terranova_logbook',
+    title: 'Cuaderno de Bitácora & Relatos • Yate Terranova',
+    subtitle: 'Relatos y capacidades oceánicas del Hatteras 65ft LRC.',
+    body_text: '4 entradas oficiales de habitabilidad, autonomía y navegación.',
+    media_url: '/yate-terranova.jpg',
+    metadata: {
+      entries: {
+        climatizacion: {
+          id: 'climatizacion',
+          nav_title: 'Deck Superior & Flybridge',
+          nav_description: 'Parrilla exterior y amplitud en el flybridge con segundo puente de gobierno, ofreciendo el espacio perfecto para compartir con vista panorámica de 360°.',
+          day: 'Día 10 de Travesía',
+          location: 'Glaciar Garibaldi',
+          coordinates: "54°07' S, 69°57' W",
+          wind: 'W 25 Nudos',
+          temp: '3°C Ext',
+          text: 'Fondeados frente al resguardo del glaciar Garibaldi, disfrutamos de la vista en 360° desde la Cubierta 3. La parrilla exterior y la amplitud del flybridge con su segundo puente de gobierno ofrecen el espacio perfecto para compartir al atardecer en los fiordos.',
+          image: '/flota/terranova/terranova-cubiertas.jpg',
+        },
+        gastronomia: {
+          id: 'gastronomia',
+          nav_title: 'Salón Central & Gastronomía',
+          nav_description: 'Cocina full equipo y amplio comedor en la Cubierta 2 para disfrutar de centolla y pesca fresca del día frente a ventanales panorámicos.',
+          day: 'Día 14 de Travesía',
+          location: 'Seno Eyre',
+          coordinates: "48°58' S, 74°20' W",
+          wind: 'Calma',
+          temp: '5°C Ext',
+          text: 'En el amplio comedor de la Cubierta 2, rodeados de ventanales panorámicos frente al glaciar Pío XI, la cocina full equipo permite preparar centolla fresca austral y pesca del día maridadas con vinos selectos en un ambiente de total calidez y confort.',
+          image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
+        },
+        casco: {
+          id: 'casco',
+          nav_title: 'Autonomía 3.000 MN & Motores Detroit',
+          nav_description: 'Doble motorización Detroit de 450 HP c/u y estanque diésel de 10.000 L para navegar sin escalas los canales y fiordos más remotos de la Patagonia.',
+          day: 'Día 17 de Travesía',
+          location: 'Golfo de Penas',
+          coordinates: "47°15' S, 74°50' W",
+          wind: 'SW 38 Nudos',
+          temp: '6°C Ext',
+          text: 'Navegando a velocidad crucero de 10 nudos con el empuje firme de los 2 motores Detroit de 450 HP. Su estanque de 10.000 Litros de combustible brinda 3.000 millas náuticas de autonomía para explorar los canales y fiordos más remotos del extremo sur sin escalas.',
+          image: '/zarpe-archipielago.jpg',
+        },
+        desembarcos: {
+          id: 'desembarcos',
+          nav_title: 'Zodiac Yamaha 70 HP & Grúa 1T',
+          nav_description: 'Zodiac semirrígido de 5 metros con motor Yamaha 70 HP (4 tiempos) y grúa de 1 tonelada para desembarcos rápidos y seguros en cualquier costa.',
+          day: 'Día 19 de Travesía',
+          location: 'Fiordo Peel',
+          coordinates: "50°55' S, 74°05' W",
+          wind: 'Calma',
+          temp: '4°C Ext',
+          text: 'Operamos la grúa de 1 tonelada de la Cubierta 3 para arriar el bote Zodiac semirrígido con motor Yamaha 70 HP. La potencia y maniobrabilidad nos permiten realizar aproximaciones directas y desembarcos seguros en playas y ventisqueros de difícil acceso.',
+          image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
+        },
+      },
+    },
+  },
+
+  lodge_logbook: {
+    section_key: 'lodge_logbook',
+    title: 'Cuaderno de Bitácora & Relatos • Lodge Rincón de Navegantes',
+    subtitle: 'Relatos y vivencias del refugio en Isla Robinson Crusoe.',
+    body_text: '4 relatos de arquitectura, quincho, exploraciones y atardeceres.',
+    media_url: '/rincon-de-navegantes.jpg',
+    metadata: {
+      entries: {
+        arquitectura: {
+          id: 'arquitectura',
+          nav_title: 'Arquitectura & Aislación Térmica',
+          nav_description: 'Arquitectura armónica con el entorno, altos estándares de calidad, excelente aislación térmica y materiales resistentes para un confort total.',
+          day: 'Diseño & Calidad Constructiva',
+          location: 'Uberlindo Andaur 222',
+          coordinates: "33°38' S, 78°50' W",
+          wind: 'Brisa Marina',
+          temp: '16°C Ext',
+          text: 'Rincón de Navegantes fue diseñado para integrarse de manera armónica al paisaje de Robinson Crusoe, privilegiando una arquitectura respetuosa con el entorno y preparada para las particulares condiciones de la isla. Su construcción incorpora altos estándares de calidad, excelente aislación térmica y materiales seleccionados por su resistencia y durabilidad, ofreciendo espacios confortables, eficientes y protegidos frente al viento, la humedad y las variaciones climáticas. Un diseño que combina calidad constructiva, funcionalidad y conexión con el paisaje, permitiendo disfrutar de la naturaleza de la isla con un alto nivel de confort.',
+          image: '/jf-noviembre.jpg',
+        },
+        quincho: {
+          id: 'quincho',
+          nav_title: 'Amplio Quincho & Encuentros',
+          nav_description: 'Quincho acogedor para compartir, cocinar y disfrutar de comidas al calor de las brasas frente al mar.',
+          day: 'Momentos al Aire Libre',
+          location: 'Quincho del Lodge',
+          coordinates: "33°38' S, 78°50' W",
+          wind: 'Calma',
+          temp: '18°C Ext',
+          text: 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.',
+          image: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
+        },
+        exploraciones: {
+          id: 'exploraciones',
+          nav_title: 'Exploraciones Exclusivas',
+          nav_description: 'Cabalgatas, senderismo en bosques endémicos, buceo y snorkel con fauna marina, y navegaciones costeras.',
+          day: 'Aventura con Expertos Locales',
+          location: 'Isla Robinson Crusoe',
+          coordinates: "33°39' S, 78°51' W",
+          wind: 'SW 14 Nudos',
+          temp: '15°C Ext',
+          text: 'Guiados por expertos locales, exploramos la isla Robinson Crusoe a través de experiencias únicas: cabalgatas por paisajes de gran belleza, senderismo entre bosques de helechos gigantes y especies endémicas, buceo y snorkel en aguas de extraordinaria biodiversidad, y navegaciones que revelan acantilados, bahías y rincones inaccesibles por tierra. Cada aventura permite descubrir la historia, la naturaleza y el espíritu de una de las islas más fascinantes del mundo.',
+          image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
+        },
+        atardeceres: {
+          id: 'atardeceres',
+          nav_title: 'Atardeceres Frente al Mar',
+          nav_description: 'Ubicación privilegiada en Bahía Cumberland para contemplar la caída del sol sobre el océano.',
+          day: 'Horizonte Infinito',
+          location: 'Frente al Mar (Bahía Cumberland)',
+          coordinates: "33°38' S, 78°50' W",
+          wind: 'Calma',
+          temp: '14°C Ext',
+          text: 'Desde Rincón de Navegantes, el océano se convierte en parte del paisaje cotidiano. Su ubicación privilegiada frente al mar permite contemplar atardeceres inolvidables, mientras el cielo cambia de color y el sol se pierde en el horizonte. Un escenario único para descansar, compartir y dejarse envolver por la inmensidad de Robinson Crusoe.',
+          image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
+        },
+      },
+    },
+  },
 };
 
-const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v10';
+const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v13';
 
 function cleanMediaUrl(sectionKey: string, url?: string | null): string {
   const defaultUrl = DEFAULT_CMS_CONTENT[sectionKey]?.media_url || '';
@@ -243,6 +424,8 @@ export const cmsService = {
     Object.keys(map).forEach((k) => {
       const remoteItem = map[k];
       if (remoteItem) {
+        const existingMeta = (merged[k]?.metadata as Record<string, any>) || {};
+        const remoteMeta = (remoteItem.metadata as Record<string, any>) || {};
         merged[k] = {
           ...merged[k],
           ...remoteItem,
@@ -250,6 +433,18 @@ export const cmsService = {
           subtitle: remoteItem.subtitle !== null && remoteItem.subtitle !== undefined && remoteItem.subtitle !== '' ? remoteItem.subtitle : merged[k]?.subtitle,
           body_text: remoteItem.body_text !== null && remoteItem.body_text !== undefined && remoteItem.body_text !== '' ? remoteItem.body_text : merged[k]?.body_text,
           media_url: cleanMediaUrl(k, remoteItem.media_url !== null && remoteItem.media_url !== undefined && remoteItem.media_url !== '' ? remoteItem.media_url : merged[k]?.media_url),
+          metadata: {
+            ...existingMeta,
+            ...remoteMeta,
+            ...(existingMeta.entries || remoteMeta.entries
+              ? {
+                  entries: {
+                    ...(existingMeta.entries || {}),
+                    ...(remoteMeta.entries || {}),
+                  },
+                }
+              : {}),
+          },
         };
       }
     });
@@ -272,10 +467,14 @@ export const cmsService = {
       subtitle?: string;
       body_text?: string;
       media_url?: string;
+      metadata?: any;
     }
   ): Promise<{ success: boolean; error?: string }> {
     const localCache = getLocalCmsCache();
     const existing = localCache[sectionKey] || DEFAULT_CMS_CONTENT[sectionKey] || {};
+    const existingMeta = (existing.metadata as Record<string, any>) || {};
+    const newMeta = updates.metadata !== undefined ? updates.metadata : existingMeta;
+
     const updatedItem: Partial<SiteContent> = {
       ...existing,
       section_key: sectionKey,
@@ -283,6 +482,7 @@ export const cmsService = {
       subtitle: updates.subtitle !== undefined ? updates.subtitle : existing.subtitle,
       body_text: updates.body_text !== undefined ? updates.body_text : existing.body_text,
       media_url: updates.media_url !== undefined ? updates.media_url : existing.media_url,
+      metadata: newMeta,
       updated_at: new Date().toISOString(),
     };
     localCache[sectionKey] = updatedItem;
@@ -309,6 +509,7 @@ export const cmsService = {
             subtitle: updates.subtitle !== undefined ? updates.subtitle : (existing.subtitle || null),
             body_text: updates.body_text !== undefined ? updates.body_text : (existing.body_text || null),
             media_url: updates.media_url !== undefined ? updates.media_url : (existing.media_url || null),
+            metadata: newMeta,
             updated_at: new Date().toISOString(),
           })
           .eq('section_key', sectionKey);
@@ -325,6 +526,7 @@ export const cmsService = {
             subtitle: updates.subtitle || null,
             body_text: updates.body_text || null,
             media_url: updates.media_url || null,
+            metadata: newMeta,
             updated_at: new Date().toISOString(),
           });
 
