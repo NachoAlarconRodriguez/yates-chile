@@ -328,7 +328,7 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
   },
 };
 
-const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v13';
+const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v14';
 
 function cleanMediaUrl(sectionKey: string, url?: string | null): string {
   const defaultUrl = DEFAULT_CMS_CONTENT[sectionKey]?.media_url || '';
@@ -369,6 +369,12 @@ export const cmsService = {
       if (merged[k]?.media_url) {
         merged[k].media_url = cleanMediaUrl(k, merged[k].media_url);
       }
+      if (k === 'flota_vegvisir' && merged[k]?.title) {
+        merged[k].title = merged[k].title.replace(/Vegvisiri/gi, 'Vegvisir');
+      }
+      if (k === 'flota_vegvisir' && merged[k]?.body_text) {
+        merged[k].body_text = merged[k].body_text.replace(/3 cabinas dobles con baño en suite/gi, '5 cabinas triples y dobles con baño en suite');
+      }
     });
     return merged;
   },
@@ -378,6 +384,9 @@ export const cmsService = {
     if (local[sectionKey]) {
       const item = { ...local[sectionKey] };
       item.media_url = cleanMediaUrl(sectionKey, item.media_url);
+      if (sectionKey === 'flota_vegvisir' && item.body_text) {
+        item.body_text = item.body_text.replace(/3 cabinas dobles con baño en suite/gi, '5 cabinas triples y dobles con baño en suite');
+      }
       return item;
     }
     try {
@@ -390,10 +399,14 @@ export const cmsService = {
       if (error || !data) {
         return DEFAULT_CMS_CONTENT[sectionKey] || { section_key: sectionKey };
       }
-      return {
+      const item = {
         ...data,
         media_url: cleanMediaUrl(sectionKey, data.media_url),
       };
+      if (sectionKey === 'flota_vegvisir' && item.body_text) {
+        item.body_text = item.body_text.replace(/3 cabinas dobles con baño en suite/gi, '5 cabinas triples y dobles con baño en suite');
+      }
+      return item;
     } catch {
       return DEFAULT_CMS_CONTENT[sectionKey] || { section_key: sectionKey };
     }
@@ -456,6 +469,9 @@ export const cmsService = {
       }
       if (k === 'flota_vegvisir' && merged[k]?.title) {
         merged[k].title = merged[k].title.replace(/Vegvisiri/gi, 'Vegvisir');
+      }
+      if (k === 'flota_vegvisir' && merged[k]?.body_text) {
+        merged[k].body_text = merged[k].body_text.replace(/3 cabinas dobles con baño en suite/gi, '5 cabinas triples y dobles con baño en suite');
       }
     });
 

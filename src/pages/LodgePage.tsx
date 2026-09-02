@@ -204,6 +204,17 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           </button>
         </div>
 
+        {/* Sernatur Official Circular Badge */}
+        <div className="absolute top-5 sm:top-6 right-6 sm:right-10 z-20 pointer-events-auto">
+          <div className="group relative flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full bg-white shadow-2xl border-2 border-white/90 p-1 sm:p-1.5 transition-all duration-300 hover:scale-105 hover:shadow-blue-900/20">
+            <img
+              src="/sernatur-circular.png"
+              alt="Servicio Turístico Registrado Sernatur"
+              className="w-full h-full object-contain rounded-full select-none"
+            />
+          </div>
+        </div>
+
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
           <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
             {lodgeInfo.title || t('Lodge Rincón de Navegantes', 'Rincón de Navegantes Lodge')}

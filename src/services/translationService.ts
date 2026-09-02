@@ -145,9 +145,13 @@ ${text}`;
       '52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.':
         '52.5 feet of pure ocean sailing with reinforced hull, 5 triple and double en-suite cabins, panoramic saloon and next-generation satellite navigation equipment.',
       '52.5 pies de pura navegación a vela con casco oceánico reforzado, 3 cabinas dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.':
-        '52.5 feet of pure ocean sailing with reinforced hull, 3 double en-suite cabins, panoramic saloon and next-generation satellite navigation equipment.',
+        '52.5 feet of pure ocean sailing with reinforced hull, 5 triple and double en-suite cabins, panoramic saloon and next-generation satellite navigation equipment.',
       'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.':
         'French Dufour 52.5 ft offshore sailboat for austral expeditions with 24/7 Starlink and full self-sufficiency.',
+      'Velero de altamar de astillero francés Dufour 52.5 ft con equipamiento oceánico de última generación y autonomía total.':
+        '52.5 ft French Dufour offshore sailboat equipped with state-of-the-art oceanic navigation gear and complete autonomy.',
+      'Velero de expedición de astillero francés Dufour 52.5 ft con equipamiento oceánico de última generación y autonomía total.':
+        '52.5 ft French Dufour offshore sailboat equipped with state-of-the-art oceanic navigation gear and complete autonomy.',
       'Yate Terranova': 'Terranova Yacht',
       'Yate Terranova (Yate Oceánico 60ft)': 'Terranova Yacht',
       'CRUCERO EXPLORER • 8 PASAJEROS + TRIPULACIÓN': 'EXPLORER CRUISER • 8 GUESTS + CREW',

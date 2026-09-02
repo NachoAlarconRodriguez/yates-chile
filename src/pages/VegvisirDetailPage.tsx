@@ -3,6 +3,7 @@ import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maxim
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { useLanguage } from '../context/LanguageContext';
+import { translationService } from '../services/translationService';
 
 interface VegvisirDetailPageProps {
   onNavigate: (path: string) => void;
@@ -188,7 +189,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
             {vegvisirCms.title ? vegvisirCms.title.replace(/Vegvisiri/gi, 'Vegvisir').replace(/\s*\([^)]*\)/g, '').trim() : t('Velero Vegvisir', 'Vegvisir Sailboat')}
           </h1>
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
-            {vegvisirCms.body_text || t('52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.', '52.5 ft pure ocean sailing with reinforced offshore hull, 5 triple and double en-suite cabins, panoramic salon, and next-gen satellite navigation.')}
+            {isEn && (vegvisirCms as any)?.metadata?.body_text_en
+              ? (vegvisirCms as any).metadata.body_text_en
+              : isEn && vegvisirCms?.body_text
+              ? translationService.fallbackTranslate(vegvisirCms.body_text.replace(/3 cabinas dobles con baño en suite/gi, '5 cabinas triples y dobles con baño en suite'), 'EN')
+              : (vegvisirCms?.body_text
+                  ? vegvisirCms.body_text.replace(/3 cabinas dobles con baño en suite/gi, '5 cabinas triples y dobles con baño en suite')
+                  : t('52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.', '52.5 ft pure ocean sailing with reinforced offshore hull, 5 triple and double en-suite cabins, panoramic salon, and next-gen satellite navigation.'))}
           </p>
           <div className="pt-2">
             <button
@@ -559,7 +566,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
               {t('Especificaciones Técnicas del Velero Vegvisir', 'Technical Specifications of the Vegvisir Sailboat')}
             </h2>
             <p className="text-slate-600 text-sm max-w-xl mx-auto">
-              {t('Velero de expedición de astillero francés Dufour 52.5 ft con equipamiento oceánico de última generación y autonomía total.', '52.5 ft French Dufour expedition sailboat equipped with state-of-the-art oceanic navigation gear and complete autonomy.')}
+              {t('Velero de altamar de astillero francés Dufour 52.5 ft con equipamiento oceánico de última generación y autonomía total.', '52.5 ft French Dufour offshore sailboat equipped with state-of-the-art oceanic navigation gear and complete autonomy.')}
             </p>
           </div>
 
