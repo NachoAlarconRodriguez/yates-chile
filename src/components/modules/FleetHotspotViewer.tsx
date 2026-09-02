@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useFleet } from '../../hooks/useFleet';
+import { useLanguage } from '../../context/LanguageContext';
 import { Anchor, Compass, Info, Users, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export const FleetHotspotViewer: React.FC = () => {
   const { activeVessels } = useFleet();
+  const { t } = useLanguage();
   const [selectedVesselId, setSelectedVesselId] = useState<string>('vegvisir');
   const [activeHotspotId, setActiveHotspotId] = useState<string>('veg-2');
 
@@ -50,13 +52,13 @@ export const FleetHotspotViewer: React.FC = () => {
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-4">
             <Anchor className="w-3.5 h-3.5 text-blue-600" />
-            <span>Recorrido Interactivo & Especificaciones</span>
+            <span>{t('Recorrido Interactivo & Especificaciones', 'Interactive Tour & Specifications')}</span>
           </div>
           <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
-            Exploración de la Flota
+            {t('Exploración de la Flota', 'Fleet Exploration')}
           </h2>
           <p className="mt-4 text-slate-400 text-base sm:text-lg">
-            Interactúe con los puntos clave de nuestras embarcaciones diseñadas específicamente para el confort en mares australes.
+            {t('Interactúe con los puntos clave de nuestras embarcaciones diseñadas específicamente para el confort en mares australes.', 'Interact with key vantage points of our vessels engineered specifically for comfort in austral seas.')}
           </p>
         </div>
 
@@ -96,10 +98,10 @@ export const FleetHotspotViewer: React.FC = () => {
             <div className="relative z-10 flex items-center justify-between">
               <div className="bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-full border border-blue-500/30 text-[10px] font-mono text-blue-300 flex items-center gap-2">
                 <Compass className="w-3.5 h-3.5 text-blue-400 animate-spin-slow" />
-                <span>Modelo Interactivo: {selectedVessel.name}</span>
+                <span>{t('Modelo Interactivo:', 'Interactive Model:')} {selectedVessel.name}</span>
               </div>
               <span className="bg-blue-900 text-white font-bold px-3 py-1 rounded-full text-xs">
-                3 Puntos de Interés
+                {selectedVessel.hotspots?.length || 3} {t('Puntos de Interés', 'Points of Interest')}
               </span>
             </div>
 
@@ -140,7 +142,7 @@ export const FleetHotspotViewer: React.FC = () => {
               />
               <div className="space-y-1.5 text-left w-full">
                 <div className="text-xs font-mono text-blue-400 uppercase tracking-widest">
-                  Detalle de Zona
+                  {t('Detalle de Zona', 'Zone Details')}
                 </div>
                 <h4 className="font-serif font-bold text-base text-white">
                   {activeHotspot.title}
@@ -191,14 +193,14 @@ export const FleetHotspotViewer: React.FC = () => {
               <div className="flex items-center gap-3 bg-blue-50/50 p-3.5 rounded-xl border border-blue-100 text-xs">
                 <Users className="w-4 h-4 text-blue-700 shrink-0" />
                 <div className="text-slate-655 font-light">
-                  <span className="font-bold text-slate-700">Tripulación sugerida:</span>{' '}
+                  <span className="font-bold text-slate-700">{t('Tripulación sugerida:', 'Suggested crew:')}</span>{' '}
                   <span className="text-blue-900">{selectedVessel.crew}</span>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                  Características de Confort:
+                  {t('Características de Confort:', 'Comfort Features:')}
                 </span>
                 <div className="space-y-2">
                   {selectedVessel.features.map((feat, i) => (
@@ -214,7 +216,7 @@ export const FleetHotspotViewer: React.FC = () => {
                 href="#/contacto"
                 className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3.5 rounded-xl transition text-sm shadow-md min-h-[48px] cursor-pointer"
               >
-                <span>Solicitar Reserva</span>
+                <span>{t('Solicitar Reserva', 'Request Booking')}</span>
                 <ArrowRight className="w-4 h-4 text-white" />
               </a>
             </div>

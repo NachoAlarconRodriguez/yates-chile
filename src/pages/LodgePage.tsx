@@ -3,6 +3,7 @@ import { ArrowLeft, Compass, Users, Maximize2, ChevronLeft, ChevronRight, X, Hom
 import { useLodge } from '../hooks/useLodge';
 import { useCatalogServices } from '../hooks/useCatalogServices';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useLanguage } from '../context/LanguageContext';
 import { formatPhone, formatRut } from '../lib/formatters';
 import type { CatalogService } from '../services/catalogService';
 
@@ -14,6 +15,8 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   const { rooms, createBooking } = useLodge();
   const { services: catalogExcursions } = useCatalogServices();
   const { getSection } = useSiteContent();
+  const { language, t } = useLanguage();
+  const isEn = language === 'EN';
   const lodgeInfo = getSection('lodge_info');
   const lodgeDining = getSection('lodge_dining');
   
@@ -40,12 +43,12 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   };
 
   const currentDateFormatted = React.useMemo(() => {
-    return new Intl.DateTimeFormat('es-CL', {
+    return new Intl.DateTimeFormat(isEn ? 'en-US' : 'es-CL', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     }).format(new Date()).toUpperCase();
-  }, []);
+  }, [isEn]);
 
   const [fullscreenIndex, setFullscreenIndex] = React.useState<number | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -81,47 +84,47 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
 
   const logbookEntries = {
     arquitectura: {
-      title: cmsEntries.arquitectura?.nav_title || 'Arquitectura & Aislación Térmica',
-      nav_description: cmsEntries.arquitectura?.nav_description || 'Arquitectura armónica con el entorno, altos estándares de calidad, excelente aislación térmica y materiales resistentes para un confort total.',
+      title: (isEn && cmsEntries.arquitectura?.nav_title_en) || cmsEntries.arquitectura?.nav_title || (isEn ? 'Architecture & Thermal Insulation' : 'Arquitectura & Aislación Térmica'),
+      nav_description: (isEn && cmsEntries.arquitectura?.nav_description_en) || cmsEntries.arquitectura?.nav_description || (isEn ? 'Environmentally harmonious architecture, premium thermal insulation and weather-resistant materials for total island comfort.' : 'Arquitectura armónica con el entorno, altos estándares de calidad, excelente aislación térmica y materiales resistentes para un confort total.'),
       day: cmsEntries.arquitectura?.day || 'Diseño & Calidad Constructiva',
       location: cmsEntries.arquitectura?.location || 'Uberlindo Andaur 222',
       coordinates: cmsEntries.arquitectura?.coordinates || '33°38\' S, 78°50\' W',
       wind: cmsEntries.arquitectura?.wind || 'Brisa Marina',
       temp: cmsEntries.arquitectura?.temp || '16°C Ext',
-      text: cmsEntries.arquitectura?.text || 'Rincón de Navegantes fue diseñado para integrarse de manera armónica al paisaje de Robinson Crusoe, privilegiando una arquitectura respetuosa con el entorno y preparada para las particulares condiciones de la isla. Su construcción incorpora altos estándares de calidad, excelente aislación térmica y materiales seleccionados por su resistencia y durabilidad, ofreciendo espacios confortables, eficientes y protegidos frente al viento, la humedad y las variaciones climáticas. Un diseño que combina calidad constructiva, funcionalidad y conexión con el paisaje, permitiendo disfrutar de la naturaleza de la isla con un alto nivel de confort.',
+      text: (isEn && cmsEntries.arquitectura?.text_en) || cmsEntries.arquitectura?.text || (isEn ? 'Rincón de Navegantes was designed to integrate harmoniously into the landscape of Robinson Crusoe. Built with thermal insulation and weather-resistant materials for high comfort.' : 'Rincón de Navegantes fue diseñado para integrarse de manera armónica al paisaje de Robinson Crusoe, privilegiando una arquitectura respetuosa con el entorno y preparada para las particulares condiciones de la isla. Su construcción incorpora altos estándares de calidad, excelente aislación térmica y materiales seleccionados por su resistencia y durabilidad, ofreciendo espacios confortables, eficientes y protegidos frente al viento, la humedad y las variaciones climáticas. Un diseño que combina calidad constructiva, funcionalidad y conexión con el paisaje, permitiendo disfrutar de la naturaleza de la isla con un alto nivel de confort.'),
       image: cmsEntries.arquitectura?.image || '/jf-noviembre.jpg',
     },
     quincho: {
-      title: cmsEntries.quincho?.nav_title || lodgeDining.title || 'Amplio Quincho & Encuentros',
-      nav_description: cmsEntries.quincho?.nav_description || 'Quincho acogedor para compartir, cocinar y disfrutar de comidas al calor de las brasas frente al mar.',
+      title: (isEn && cmsEntries.quincho?.nav_title_en) || cmsEntries.quincho?.nav_title || lodgeDining.title || (isEn ? 'Expansive BBQ Lounge & Gatherings' : 'Amplio Quincho & Encuentros'),
+      nav_description: (isEn && cmsEntries.quincho?.nav_description_en) || cmsEntries.quincho?.nav_description || (isEn ? 'Cozy oceanfront BBQ pavilion to gather, cook and savor grilled delicacies over embers against Cumberland Bay.' : 'Quincho acogedor para compartir, cocinar y disfrutar de comidas al calor de las brasas frente al mar.'),
       day: cmsEntries.quincho?.day || 'Momentos al Aire Libre',
       location: cmsEntries.quincho?.location || 'Quincho del Lodge',
       coordinates: cmsEntries.quincho?.coordinates || '33°38\' S, 78°50\' W',
       wind: cmsEntries.quincho?.wind || 'Calma',
       temp: cmsEntries.quincho?.temp || '18°C Ext',
-      text: cmsEntries.quincho?.text || lodgeDining.body_text || 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.',
+      text: (isEn && cmsEntries.quincho?.text_en) || cmsEntries.quincho?.text || lodgeDining.body_text || (isEn ? 'The lodge features a spacious oceanfront BBQ pavilion, ideal for cooking and gathering around the grill after an island excursion.' : 'El lodge cuenta con un amplio quincho, un espacio acogedor ideal para compartir, cocinar y disfrutar de encuentros al aire libre. Su entorno invita a reunirse después de una jornada recorriendo la isla y vivir momentos inolvidables frente al paisaje de Robinson Crusoe.'),
       image: cmsEntries.quincho?.image || lodgeDining.media_url || 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1000&q=80',
     },
     exploraciones: {
-      title: cmsEntries.exploraciones?.nav_title || 'Exploraciones Exclusivas',
-      nav_description: cmsEntries.exploraciones?.nav_description || 'Cabalgatas, senderismo en bosques endémicos, buceo y snorkel con fauna marina, y navegaciones costeras.',
+      title: (isEn && cmsEntries.exploraciones?.nav_title_en) || cmsEntries.exploraciones?.nav_title || (isEn ? 'Exclusive Island Expeditions' : 'Exploraciones Exclusivas'),
+      nav_description: (isEn && cmsEntries.exploraciones?.nav_description_en) || cmsEntries.exploraciones?.nav_description || (isEn ? 'Horseback trekking, endemic forest hiking, marine fauna scuba/snorkeling and coastal cruising guided by local masters.' : 'Cabalgatas, senderismo en bosques endémicos, buceo y snorkel con fauna marina, y navegaciones costeras.'),
       day: cmsEntries.exploraciones?.day || 'Aventura con Expertos Locales',
       location: cmsEntries.exploraciones?.location || 'Isla Robinson Crusoe',
       coordinates: cmsEntries.exploraciones?.coordinates || '33°39\' S, 78°51\' W',
       wind: cmsEntries.exploraciones?.wind || 'SW 14 Nudos',
       temp: cmsEntries.exploraciones?.temp || '15°C Ext',
-      text: cmsEntries.exploraciones?.text || 'Guiados por expertos locales, exploramos la isla Robinson Crusoe a través de experiencias únicas: cabalgatas por paisajes de gran belleza, senderismo entre bosques de helechos gigantes y especies endémicas, buceo y snorkel en aguas de extraordinaria biodiversidad, y navegaciones que revelan acantilados, bahías y rincones inaccesibles por tierra. Cada aventura permite descubrir la historia, la naturaleza y el espíritu de una de las islas más fascinantes del mundo.',
+      text: (isEn && cmsEntries.exploraciones?.text_en) || cmsEntries.exploraciones?.text || (isEn ? 'Led by local guides, we explore Robinson Crusoe Island through unique adventures: horseback treks, giant fern forest trails, and scuba diving.' : 'Guiados por expertos locales, exploramos la isla Robinson Crusoe a través de experiencias únicas: cabalgatas por paisajes de gran belleza, senderismo entre bosques de helechos gigantes y especies endémicas, buceo y snorkel en aguas de extraordinaria biodiversidad, y navegaciones que revelan acantilados, bahías y rincones inaccesibles por tierra. Cada aventura permite descubrir la historia, la naturaleza y el espíritu de una de las islas más fascinantes del mundo.'),
       image: cmsEntries.exploraciones?.image || 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1000&q=80',
     },
     atardeceres: {
-      title: cmsEntries.atardeceres?.nav_title || 'Atardeceres Frente al Mar',
-      nav_description: cmsEntries.atardeceres?.nav_description || 'Ubicación privilegiada en Bahía Cumberland para contemplar la caída del sol sobre el océano.',
+      title: (isEn && cmsEntries.atardeceres?.nav_title_en) || cmsEntries.atardeceres?.nav_title || (isEn ? 'Oceanfront Sunsets' : 'Atardeceres Frente al Mar'),
+      nav_description: (isEn && cmsEntries.atardeceres?.nav_description_en) || cmsEntries.atardeceres?.nav_description || (isEn ? 'Prime location in Cumberland Bay to witness breathtaking sunsets as twilight illuminates the Pacific ocean.' : 'Ubicación privilegiada en Bahía Cumberland para contemplar la caída del sol sobre el océano.'),
       day: cmsEntries.atardeceres?.day || 'Horizonte Infinito',
       location: cmsEntries.atardeceres?.location || 'Frente al Mar (Bahía Cumberland)',
       coordinates: cmsEntries.atardeceres?.coordinates || '33°38\' S, 78°50\' W',
       wind: cmsEntries.atardeceres?.wind || 'Calma',
       temp: cmsEntries.atardeceres?.temp || '14°C Ext',
-      text: cmsEntries.atardeceres?.text || 'Desde Rincón de Navegantes, el océano se convierte en parte del paisaje cotidiano. Su ubicación privilegiada frente al mar permite contemplar atardeceres inolvidables, mientras el cielo cambia de color y el sol se pierde en el horizonte. Un escenario único para descansar, compartir y dejarse envolver por la inmensidad de Robinson Crusoe.',
+      text: (isEn && cmsEntries.atardeceres?.text_en) || cmsEntries.atardeceres?.text || (isEn ? 'From Rincón de Navegantes, the Pacific Ocean becomes an everyday spectacle. Its prime waterfront vantage provides unforgettable sunsets.' : 'Desde Rincón de Navegantes, el océano se convierte en parte del paisaje cotidiano. Su ubicación privilegiada frente al mar permite contemplar atardeceres inolvidables, mientras el cielo cambia de color y el sol se pierde en el horizonte. Un escenario único para descansar, compartir y dejarse envolver por la inmensidad de Robinson Crusoe.'),
       image: cmsEntries.atardeceres?.image || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80',
     },
   };
@@ -197,16 +200,16 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
             className="inline-flex items-center gap-2 bg-slate-950/60 hover:bg-slate-950/80 backdrop-blur-md text-white font-semibold px-4 py-2.5 rounded-xl border border-white/10 transition shadow-lg text-xs cursor-pointer min-h-[40px]"
           >
             <ArrowLeft className="w-4 h-4 text-white" />
-            <span>Volver a Inicio</span>
+            <span>{t('Volver a Inicio', 'Back to Home')}</span>
           </button>
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
           <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
-            {lodgeInfo.title || 'Lodge Rincón de Navegantes'}
+            {lodgeInfo.title || t('Lodge Rincón de Navegantes', 'Rincón de Navegantes Lodge')}
           </h1>
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
-            {lodgeInfo.body_text || 'Ubicado justo frente al mar en la Bahía Cumberland. Diseñado en torno a 4 cabinas independientes con baño privado cada una y vista al océano para hasta 11 pasajeros, amplio quincho, terraza y expediciones exclusivas.'}
+            {lodgeInfo.body_text || t('Ubicado justo frente al mar en la Bahía Cumberland. Diseñado en torno a 4 cabinas independientes con baño privado cada una y vista al océano para hasta 11 pasajeros, amplio quincho, terraza y expediciones exclusivas.', 'Located right on the oceanfront in Cumberland Bay. Designed around 4 independent en-suite oceanview cabins for up to 11 guests, spacious quincho, terrace, and exclusive expeditions.')}
           </p>
           <div className="pt-2">
             <button
@@ -217,7 +220,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
               className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-3 rounded-xl transition-all shadow-xl text-xs sm:text-sm border border-white/90 cursor-pointer hover:scale-[1.02]"
             >
               <BedDouble className="w-4 h-4 text-slate-950" />
-              <span>Reservar Habitación en el Lodge</span>
+              <span>{t('Reservar Habitación en el Lodge', 'Book Room at the Lodge')}</span>
             </button>
           </div>
         </div>
@@ -253,11 +256,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / HABITACIONES</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{rooms.length} Habitaciones</span>
-                    <span className="text-slate-500 text-[10px] block">Baño Privado & Vista al Mar</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('NORTE / HABITACIONES', 'NORTH / ROOMS')}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{rooms.length} {t('Habitaciones', 'Rooms')}</span>
+                    <span className="text-slate-500 text-[10px] block">{t('Baño Privado & Vista al Mar', 'Private Bath & Ocean View')}</span>
                   </div>
-                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -268,7 +271,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider block">Distribución de Cabinas</span>
+                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider block">{t('Distribución de Cabinas', 'Cabin Distribution')}</span>
 
                   <ul className="text-slate-700 text-[8.5px] sm:text-[9px] leading-snug space-y-1 text-left px-1 w-full max-w-[195px]">
                     {rooms.map((r) => (
@@ -279,7 +282,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     ))}
                   </ul>
 
-                  <span className="text-[8px] text-emerald-850/60 font-mono uppercase">Volver ➔</span>
+                  <span className="text-[8px] text-emerald-850/60 font-mono uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -308,11 +311,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CAPACIDAD</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Hasta {rooms.reduce((acc, r) => acc + (r.max_pax || 2), 0)} Pasajeros</span>
-                    <span className="text-slate-500 text-[10px] block">Exclusividad total</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('OESTE / CAPACIDAD', 'WEST / CAPACITY')}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{t('Hasta', 'Up to')} {rooms.reduce((acc, r) => acc + (r.max_pax || 2), 0)} {t('Pasajeros', 'Guests')}</span>
+                    <span className="text-slate-500 text-[10px] block">{t('Exclusividad total', 'Total exclusivity')}</span>
                   </div>
-                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -323,11 +326,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Aforo Exclusivo</span>
+                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">{t('Aforo Exclusivo', 'Exclusive Capacity')}</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Capacidad máxima de {rooms.reduce((acc, r) => acc + (r.max_pax || 2), 0)} pasajeros para una estadía íntima, conectada con el entorno y en absoluta tranquilidad isleña.
+                    {t('Capacidad máxima para una estadía íntima, conectada con el entorno y en absoluta tranquilidad isleña.', 'Maximum capacity for an intimate stay in absolute island serenity.')}
                   </p>
-                  <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -356,11 +359,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / UBICACIÓN</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('SUR / UBICACIÓN', 'SOUTH / LOCATION')}</span>
                     <span className="text-base font-bold text-slate-900 block mt-0.5">Robinson Crusoe</span>
                     <span className="text-slate-500 text-[10px] block">Uberlindo Andaur 222</span>
                   </div>
-                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -371,11 +374,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Isla Robinson Crusoe</span>
+                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">{t('Isla Robinson Crusoe', 'Robinson Crusoe Island')}</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Ubicación privilegiada en primera línea de mar en Uberlindo Andaur 222, Bahía Cumberland, con vistas panorámicas al océano.
+                    {t('Ubicación privilegiada en primera línea de mar en Uberlindo Andaur 222, Bahía Cumberland, con vistas panorámicas al océano.', 'Privileged beachfront location at Uberlindo Andaur 222, Cumberland Bay, with panoramic ocean views.')}
                   </p>
-                  <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -404,11 +407,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     <Compass className="w-9 h-9 text-emerald-800/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / ESPACIOS & CONECTIVIDAD</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Quincho & Starlink</span>
-                    <span className="text-slate-500 text-[10px] block">Terraza • Internet Satelital</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('ESTE / ESPACIOS & CONECTIVIDAD', 'EAST / SPACES & CONNECTIVITY')}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{t('Quincho & Starlink', 'Grill & Starlink')}</span>
+                    <span className="text-slate-500 text-[10px] block">{t('Terraza • Internet Satelital', 'Terrace • Satellite Internet')}</span>
                   </div>
-                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-emerald-800 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -419,11 +422,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">Espacios & Conectividad</span>
+                  <span className="text-emerald-850 text-[9px] font-bold uppercase tracking-wider">{t('Espacios & Conectividad', 'Spaces & Connectivity')}</span>
                   <p className="text-slate-600 text-[9.5px] sm:text-[10px] leading-relaxed max-w-[190px] mx-auto">
-                    Amplio quincho para cocinar y compartir, terraza con vista panorámica, jardines con naturaleza endémica e Internet Satelital Starlink 24/7.
+                    {t('Amplio quincho para cocinar y compartir, terraza con vista panorámica, jardines con naturaleza endémica e Internet Satelital Starlink 24/7.', 'Spacious quincho grill, oceanview terrace, endemic gardens, and 24/7 Starlink satellite internet.')}
                   </p>
-                  <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <span className="text-[8px] text-emerald-850/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -437,13 +440,13 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
             <span className="text-emerald-850 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-800/15 inline-flex items-center gap-2">
               <FileText className="w-3.5 h-3.5 text-emerald-800" />
-              <span>Ficha Técnica Oficial • Isla Robinson Crusoe</span>
+              <span>{t('Ficha Técnica Oficial • Isla Robinson Crusoe', 'Official Technical Sheet • Robinson Crusoe Island')}</span>
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
-              Detalle y Especificaciones del Lodge Rincón de Navegantes
+              {t('Detalle y Especificaciones del Lodge Rincón de Navegantes', 'Details & Specifications of Rincón de Navegantes Lodge')}
             </h2>
             <p className="text-slate-600 text-sm max-w-xl mx-auto">
-              Refugio boutique frente al mar de 4 cabinas independientes con baño privado, amplio quincho, terraza y exploraciones exclusivas.
+              {t('Refugio boutique frente al mar de 4 cabinas independientes con baño privado, amplio quincho, terraza y exploraciones exclusivas.', 'Boutique oceanfront retreat with 4 independent en-suite cabins, expansive quincho, terrace, and bespoke adventures.')}
             </p>
           </div>
 
@@ -454,24 +457,24 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 <MapPin className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Ubicación & Entorno</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Emplazamiento privilegiado</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Ubicación & Entorno', 'Location & Environment')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Emplazamiento privilegiado', 'Privileged location')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Dirección:</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Dirección:', 'Address:')}</span>
                   <span className="font-bold text-slate-900 text-right whitespace-nowrap">Uberlindo Andaur 222</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Posición:</span>
-                  <span className="font-bold text-emerald-700 text-right whitespace-nowrap">Frente al mar</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Posición:', 'Position:')}</span>
+                  <span className="font-bold text-emerald-700 text-right whitespace-nowrap">{t('Frente al mar', 'Beachfront')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Destino:</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Destino:', 'Destination:')}</span>
                   <span className="font-bold text-slate-900 text-right whitespace-nowrap">Isla Robinson Crusoe</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Archipiélago:</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Archipiélago:', 'Archipelago:')}</span>
                   <span className="font-bold text-slate-900 text-right whitespace-nowrap">Juan Fernández</span>
                 </li>
               </ul>
@@ -483,29 +486,29 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 <Home className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Cabinas & Capacidad</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Hasta 11 Pasajeros</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Cabinas & Capacidad', 'Cabins & Capacity')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Hasta 11 Pasajeros', 'Up to 11 Guests')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Total Cabinas:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">4 Independientes</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Total Cabinas:', 'Total Cabins:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('4 Independientes', '4 Independent')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">3 Cabinas:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Hasta 3 pax c/u</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('3 Cabinas:', '3 Cabins:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Hasta 3 pax c/u', 'Up to 3 pax each')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">1 Cabina:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Hasta 2 pax</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('1 Cabina:', '1 Cabin:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Hasta 2 pax', 'Up to 2 pax')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Baños:</span>
-                  <span className="font-bold text-emerald-800 text-right whitespace-nowrap">Privado en c/u</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Baños:', 'Bathrooms:')}</span>
+                  <span className="font-bold text-emerald-800 text-right whitespace-nowrap">{t('Privado en c/u', 'Private in each')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Vista:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Directa al Océano</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Vista:', 'View:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Directa al Océano', 'Direct Ocean View')}</span>
                 </li>
               </ul>
             </div>
@@ -516,24 +519,24 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 <UtensilsCrossed className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Quincho & Espacios</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Encuentros al aire libre</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Quincho & Espacios', 'Quincho & Spaces')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Encuentros al aire libre', 'Outdoor gatherings')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Amplio Quincho:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Cocina & Encuentros</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Amplio Quincho:', 'Spacious Quincho:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Cocina & Encuentros', 'Cooking & Gathering')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Terraza:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Frente al océano</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Terraza:', 'Terrace:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Frente al océano', 'Oceanfront')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Jardines:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Jardines Endémicos</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Jardines:', 'Gardens:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Jardines Endémicos', 'Endemic Gardens')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Internet Satelital:</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Internet Satelital:', 'Satellite Internet:')}</span>
                   <span className="font-bold text-emerald-700 text-right flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     Starlink 24/7
@@ -548,25 +551,25 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 <Compass className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Exploraciones Exclusivas</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Guiadas por expertos locales</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Exploraciones Exclusivas', 'Exclusive Explorations')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Guiadas por expertos locales', 'Guided by local experts')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Cabalgatas:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Rutas Panorámicas</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Cabalgatas:', 'Horseback Riding:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Rutas Panorámicas', 'Scenic Trails')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Senderismo:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Bosques & Endémicos</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Senderismo:', 'Hiking:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Bosques & Endémicos', 'Native Forests')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Buceo & Snorkel:</span>
-                  <span className="font-bold text-blue-900 text-right whitespace-nowrap">Biodiversidad Marina</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Buceo & Snorkel:', 'Diving & Snorkel:')}</span>
+                  <span className="font-bold text-blue-900 text-right whitespace-nowrap">{t('Biodiversidad Marina', 'Marine Biodiversity')}</span>
                 </li>
                 <li className="flex justify-between items-center gap-2">
-                  <span className="text-slate-500 shrink-0 whitespace-nowrap">Navegación:</span>
-                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">Acantilados & Bahías</span>
+                  <span className="text-slate-500 shrink-0 whitespace-nowrap">{t('Navegación:', 'Boat Tours:')}</span>
+                  <span className="font-bold text-slate-900 text-right whitespace-nowrap">{t('Acantilados & Bahías', 'Cliffs & Bays')}</span>
                 </li>
               </ul>
             </div>
@@ -581,13 +584,13 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           
           <div className="text-center max-w-2xl mx-auto mb-14">
             <span className="text-emerald-800 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-800/10">
-              Arquitectura & Vida en Tierra
+              {t('Arquitectura & Vida en Tierra', 'Architecture & Life on Land')}
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight mt-3">
-              Detalles y Relatos del Refugio
+              {t('Detalles y Relatos del Refugio', 'Chronicles & Stories of the Sanctuary')}
             </h2>
             <p className="text-slate-500 text-sm mt-2">
-              Explora las particularidades de nuestro santuario insular y las vivencias de naturaleza prístina en la indómita Isla Robinson Crusoe.
+              {t('Explora las particularidades de nuestro santuario insular y las vivencias de naturaleza prístina en la indómita Isla Robinson Crusoe.', 'Explore the nuances of our island sanctuary and encounters with pristine nature on wild Robinson Crusoe Island.')}
             </p>
           </div>
 
@@ -613,19 +616,19 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   {/* Logbook Meta Tags */}
                   <div className="grid grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 font-mono text-[10px] text-slate-600">
                     <div className="space-y-1">
-                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">Zona</span>
+                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">{t('Zona', 'Zone')}</span>
                       <span className="font-bold text-slate-800 block truncate">{logbookEntries[selectedFeature].location}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">Coordenadas</span>
+                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">{t('Coordenadas', 'Coordinates')}</span>
                       <span className="font-bold text-slate-800 block truncate">{logbookEntries[selectedFeature].coordinates}</span>
                     </div>
                     <div className="space-y-1 border-t border-slate-200/60 pt-2">
-                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">Viento Promedio</span>
+                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">{t('Viento Promedio', 'Average Wind')}</span>
                       <span className="font-bold text-slate-800 block">{logbookEntries[selectedFeature].wind}</span>
                     </div>
                     <div className="space-y-1 border-t border-slate-200/60 pt-2">
-                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">Temp. Promedio</span>
+                      <span className="text-slate-400 uppercase text-[8px] tracking-wider block">{t('Temp. Promedio', 'Average Temp')}</span>
                       <span className="font-bold text-slate-800 block">{logbookEntries[selectedFeature].temp}</span>
                     </div>
                   </div>
@@ -649,7 +652,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     className="w-14 h-14 rounded-xl object-cover border border-slate-200 shadow-inner"
                   />
                   <div className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
-                    Snapshot Santuario
+                    {t('Snapshot Santuario', 'Sanctuary Snapshot')}
                   </div>
                 </div>
               </div>
@@ -763,13 +766,13 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-900/10 border border-emerald-900/20 text-emerald-800 text-xs font-semibold uppercase tracking-wider">
               <Compass className="w-3.5 h-3.5 text-emerald-950 animate-[spin_30s_linear_infinite]" />
-              <span>Galería Fotográfica del Lodge</span>
+              <span>{t('Galería Fotográfica del Lodge', 'Lodge Photo Gallery')}</span>
             </span>
             <h3 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
-              Espacios y Habitaciones
+              {t('Espacios y Habitaciones', 'Spaces and Rooms')}
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Fotografías reales del Lodge Rincón de Navegantes en la Isla Robinson Crusoe: terraza con quincho exterior, suites panorámicas, habitaciones náuticas y baños en suite frente al mar.
+              {t('Fotografías reales del Lodge Rincón de Navegantes en la Isla Robinson Crusoe: terraza con quincho exterior, suites panorámicas, habitaciones náuticas y baños en suite frente al mar.', 'Authentic photography of Rincón de Navegantes Lodge on Robinson Crusoe Island: outdoor quincho terrace, panoramic suites, nautical rooms, and oceanfront en-suite bathrooms.')}
             </p>
           </div>
 
@@ -790,7 +793,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
             <div className="relative z-20 w-full p-5 sm:p-6 flex justify-between items-center pointer-events-none">
               <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-white/95 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Lodge Cumberland • Foto 0{currentPhotoIndex + 1} de 0{images.length}</span>
+                <span>{t('Lodge Cumberland • Foto', 'Cumberland Lodge • Photo')} 0{currentPhotoIndex + 1} {t('de', 'of')} 0{images.length}</span>
               </div>
               <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-emerald-300 font-mono text-[10px] sm:text-xs tracking-wider select-none shadow-md hidden sm:flex items-center gap-1.5">
                 <Compass className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -860,13 +863,13 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           
           <div className="text-center space-y-2">
             <span className="text-emerald-800 font-bold text-xs uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full border border-emerald-800/10">
-              Galería Fotográfica Exclusiva
+              {t('Galería Fotográfica Exclusiva', 'Exclusive Photo Gallery')}
             </span>
             <h3 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
-              Espacios y Momentos en el Refugio
+              {t('Espacios y Momentos en el Refugio', 'Spaces & Moments at the Refuge')}
             </h3>
             <p className="text-slate-500 text-xs sm:text-sm max-w-lg mx-auto">
-              Deslice horizontalmente para recorrer las vistas exclusivas del lodge. Haga clic en cualquier imagen para abrir el visualizador interactivo en pantalla completa.
+              {t('Deslice horizontalmente para recorrer las vistas exclusivas del lodge. Haga clic en cualquier imagen para abrir el visualizador interactivo en pantalla completa.', 'Slide horizontally to browse exclusive views of the lodge. Click any image to open full-screen interactive viewer.')}
             </p>
           </div>
 

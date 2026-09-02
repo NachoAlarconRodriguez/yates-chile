@@ -3,12 +3,14 @@ import confetti from 'canvas-confetti';
 import { Compass, Ship, Home, Sparkles, Check, ArrowRight, ArrowLeft, Send, CheckCircle } from 'lucide-react';
 import type { JourneyConfigState } from '../../types';
 import { leadService } from '../../services/leadService';
+import { useLanguage } from '../../context/LanguageContext';
 import { formatPhone } from '../../lib/formatters';
 
 export const BuildYourJourney: React.FC = () => {
   const [step, setStep] = useState<number>(1);
   const [submitted, setSubmitted] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const { t } = useLanguage();
 
   const [formData, setFormData] = useState<JourneyConfigState>({
     experienceType: 'lodgenavigation',
@@ -106,13 +108,13 @@ export const BuildYourJourney: React.FC = () => {
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-4">
             <Compass className="w-3.5 h-3.5 text-blue-400" />
-            <span>Configurador Interactivo</span>
+            <span>{t('Configurador Interactivo', 'Interactive Configurator')}</span>
           </div>
           <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white">
-            Build Your Journey
+            {t('Diseña tu Travesía', 'Build Your Journey')}
           </h2>
           <p className="mt-3 text-slate-450 text-base sm:text-lg">
-            Diseña tu travesía a medida por los canales del Cabo de Hornos en 3 simples pasos.
+            {t('Diseña tu travesía a medida por los canales del Cabo de Hornos en 3 simples pasos.', 'Craft your custom voyage through Cape Horn channels in 3 simple steps.')}
           </p>
         </div>
 
@@ -136,7 +138,7 @@ export const BuildYourJourney: React.FC = () => {
                   {isCompleted ? <Check className="w-5 h-5 stroke-[3]" /> : num}
                 </div>
                 <span className={isActive ? 'text-blue-300 font-bold' : 'text-slate-400'}>
-                  {num === 1 ? 'Base' : num === 2 ? 'Experiencia' : 'Huéspedes & Datos'}
+                  {num === 1 ? t('Base', 'Base') : num === 2 ? t('Experiencia', 'Experience') : t('Huéspedes & Datos', 'Guests & Details')}
                 </span>
                 {num < 3 && <div className="w-12 sm:w-20 h-0.5 bg-slate-800 mx-1"></div>}
               </div>
@@ -153,7 +155,7 @@ export const BuildYourJourney: React.FC = () => {
               {step === 1 && (
                 <div className="space-y-6">
                   <h3 className="font-serif text-xl sm:text-2xl font-bold text-blue-300 text-center">
-                    Paso 1: Elige la Base de tu Experiencia
+                    {t('Paso 1: Elige la Base de tu Experiencia', 'Step 1: Choose Your Experience Base')}
                   </h3>
                   <div className="grid sm:grid-cols-3 gap-4">
                     
@@ -174,9 +176,9 @@ export const BuildYourJourney: React.FC = () => {
                         {formData.experienceType === 'lodgenavigation' && <Check className="w-5 h-5 text-blue-400" />}
                       </div>
                       <div>
-                        <h4 className="font-serif font-bold text-lg text-white">Experiencia Combinada</h4>
+                        <h4 className="font-serif font-bold text-lg text-white">{t('Experiencia Combinada', 'Combined Experience')}</h4>
                         <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                          Días a bordo navegando fiordos + estadía exclusiva en Lodge en tierra.
+                          {t('Días a bordo navegando fiordos + estadía exclusiva en Lodge en tierra.', 'Days sailing remote fjords + exclusive island lodge stay on land.')}
                         </p>
                       </div>
                     </button>
@@ -198,9 +200,9 @@ export const BuildYourJourney: React.FC = () => {
                         {formData.experienceType === 'navigation' && <Check className="w-5 h-5 text-blue-400" />}
                       </div>
                       <div>
-                        <h4 className="font-serif font-bold text-lg text-white">Solo Expedición en Barco</h4>
+                        <h4 className="font-serif font-bold text-lg text-white">{t('Solo Expedición en Barco', 'Boat Expedition Only')}</h4>
                         <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                          Navegación inmersiva 100% a bordo del Velero Vegvisir o Yate Terranova.
+                          {t('Navegación inmersiva 100% a bordo del Velero Vegvisir o Yate Terranova.', '100% immersive sailing aboard Vegvisir Sailboat or Terranova Yacht.')}
                         </p>
                       </div>
                     </button>
@@ -222,9 +224,9 @@ export const BuildYourJourney: React.FC = () => {
                         {formData.experienceType === 'lodge' && <Check className="w-5 h-5 text-blue-400" />}
                       </div>
                       <div>
-                        <h4 className="font-serif font-bold text-lg text-white">Estadía en Lodge & Excursiones</h4>
+                        <h4 className="font-serif font-bold text-lg text-white">{t('Estadía en Lodge & Excursiones', 'Lodge Stay & Excursions')}</h4>
                         <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                          Refugio frente al mar en Bahía Cumberland con excursiones opcionales de buceo, cabalgatas y gastronomía.
+                          {t('Refugio frente al mar en Bahía Cumberland con excursiones opcionales de buceo, cabalgatas y gastronomía.', 'Oceanfront refuge in Cumberland Bay with excursions for diving, horseback riding, and dining.')}
                         </p>
                       </div>
                     </button>
@@ -237,7 +239,7 @@ export const BuildYourJourney: React.FC = () => {
               {step === 2 && (
                 <div className="space-y-6">
                   <h3 className="font-serif text-xl sm:text-2xl font-bold text-blue-300 text-center">
-                    Paso 2: Elige el Enfoque Principal de tu Viaje
+                    {t('Paso 2: Elige el Enfoque Principal de tu Viaje', 'Step 2: Choose Your Primary Voyage Focus')}
                   </h3>
                   <div className="grid sm:grid-cols-3 gap-4">
                     
@@ -251,10 +253,10 @@ export const BuildYourJourney: React.FC = () => {
                       }`}
                     >
                       <h4 className="font-serif font-bold text-lg text-blue-300 mb-2">
-                        Fiordos & Glaciares
+                        {t('Fiordos & Glaciares', 'Fjords & Glaciers')}
                       </h4>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Exploración profunda de ventisqueros milenarios y aguas glaciales inaccesibles por tierra.
+                        {t('Exploración profunda de ventisqueros milenarios y aguas glaciales inaccesibles por tierra.', 'Deep exploration of ancient glaciers and pristine waters inaccessible by land.')}
                       </p>
                     </button>
 
@@ -268,10 +270,10 @@ export const BuildYourJourney: React.FC = () => {
                       }`}
                     >
                       <h4 className="font-serif font-bold text-lg text-blue-300 mb-2">
-                        Avistamiento de Fauna
+                        {t('Avistamiento de Fauna', 'Wildlife Watching')}
                       </h4>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Rutas especializadas en avistamiento de ballenas jorobadas, orcas, pingüinos y toninas.
+                        {t('Rutas especializadas en avistamiento de ballenas jorobadas, orcas, pingüinos y toninas.', 'Dedicated routes to spot humpback whales, orcas, penguins, and dolphins.')}
                       </p>
                     </button>
 
@@ -285,10 +287,10 @@ export const BuildYourJourney: React.FC = () => {
                       }`}
                     >
                       <h4 className="font-serif font-bold text-lg text-blue-300 mb-2">
-                        Relax & Gastronomía
+                        {t('Relax & Gastronomía', 'Relaxation & Gastronomy')}
                       </h4>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Desconexión total, maridajes de autor, termas naturales y confort exclusivo a bordo.
+                        {t('Desconexión total, maridajes de autor, termas naturales y confort exclusivo a bordo.', 'Complete disconnect, wine pairing dinners, hot springs, and comfort aboard.')}
                       </p>
                     </button>
 
@@ -300,13 +302,13 @@ export const BuildYourJourney: React.FC = () => {
               {step === 3 && (
                 <div className="space-y-6">
                   <h3 className="font-serif text-xl sm:text-2xl font-bold text-blue-300 text-center">
-                    Paso 3: Detalle de Huéspedes & Datos de Contacto
+                    {t('Paso 3: Detalle de Huéspedes & Datos de Contacto', 'Step 3: Guests & Contact Details')}
                   </h3>
 
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                        Cantidad de Huéspedes:
+                        {t('Cantidad de Huéspedes:', 'Number of Guests:')}
                       </label>
                       <select
                         value={formData.guestsCount}
@@ -315,7 +317,7 @@ export const BuildYourJourney: React.FC = () => {
                       >
                         {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
                           <option key={n} value={n}>
-                            {n} {n === 1 ? 'Huésped' : 'Huéspedes'}
+                            {n} {n === 1 ? t('Huésped', 'Guest') : t('Huéspedes', 'Guests')}
                           </option>
                         ))}
                       </select>
@@ -323,7 +325,7 @@ export const BuildYourJourney: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                        Mes Tentativo de Viaje:
+                        {t('Mes Tentativo de Viaje:', 'Tentative Month:')}
                       </label>
                       <select
                         value={formData.tentativeMonth}
@@ -342,12 +344,12 @@ export const BuildYourJourney: React.FC = () => {
                   <div className="grid sm:grid-cols-3 gap-4 pt-2">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                        Nombre Completo *
+                        {t('Nombre Completo *', 'Full Name *')}
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="Ej. Roberto Silva"
+                        placeholder={t('Ej. Roberto Silva', 'e.g. John Doe')}
                         value={formData.fullName}
                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:border-blue-400 focus:outline-none min-h-[48px]"
@@ -356,7 +358,7 @@ export const BuildYourJourney: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                        Correo Electrónico *
+                        {t('Correo Electrónico *', 'Email Address *')}
                       </label>
                       <input
                         type="email"
@@ -370,7 +372,7 @@ export const BuildYourJourney: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                        Teléfono / WhatsApp *
+                        {t('Teléfono / WhatsApp *', 'Phone / WhatsApp *')}
                       </label>
                       <input
                         type="tel"
@@ -394,7 +396,7 @@ export const BuildYourJourney: React.FC = () => {
                     className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-900 transition min-h-[48px] text-sm cursor-pointer"
                   >
                     <ArrowLeft className="w-4 h-4" />
-                    <span>Anterior</span>
+                    <span>{t('Anterior', 'Previous')}</span>
                   </button>
                 ) : <div />}
 
@@ -404,7 +406,7 @@ export const BuildYourJourney: React.FC = () => {
                     onClick={handleNextStep}
                     className="inline-flex items-center gap-2 bg-blue-900 hover:bg-blue-800 text-white font-bold px-8 py-3.5 rounded-xl transition shadow-lg min-h-[48px] text-sm cursor-pointer"
                   >
-                    <span>Siguiente Paso</span>
+                    <span>{t('Siguiente Paso', 'Next Step')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
@@ -414,11 +416,11 @@ export const BuildYourJourney: React.FC = () => {
                     className="inline-flex items-center gap-2 bg-emerald-650 hover:bg-emerald-550 text-white font-bold px-8 py-3.5 rounded-xl transition shadow-xl min-h-[48px] text-sm cursor-pointer"
                   >
                     {loading ? (
-                      <span>Procesando solicitud...</span>
+                      <span>{t('Procesando solicitud...', 'Processing request...')}</span>
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
-                        <span>Solicitar Brochure PDF & Abrir WhatsApp Concierge</span>
+                        <span>{t('Solicitar Brochure PDF & Abrir WhatsApp Concierge', 'Request PDF Brochure & Open WhatsApp Concierge')}</span>
                       </>
                     )}
                   </button>
@@ -433,13 +435,17 @@ export const BuildYourJourney: React.FC = () => {
                 <CheckCircle className="w-10 h-10" />
               </div>
               <h3 className="font-serif text-2xl sm:text-3xl font-bold text-blue-300">
-                ¡Postulación Registrada Exitosamente!
+                {t('¡Postulación Registrada Exitosamente!', 'Application Registered Successfully!')}
               </h3>
               <p className="text-slate-300 text-sm max-w-lg mx-auto leading-relaxed">
-                Tu solicitud ha sido recibida y el correo automático de Brevo con el **Brochure PDF de Yates Chile** ha sido despachado a <span className="text-blue-300 font-semibold">{formData.email}</span>.
+                {t(
+                  `Tu solicitud ha sido recibida y el correo automático de Brevo con el Brochure PDF de Yates Chile ha sido despachado a `,
+                  `Your request has been received and the automated email with Yates Chile PDF Brochure was sent to `
+                )}
+                <span className="text-blue-300 font-semibold">{formData.email}</span>.
               </p>
               <p className="text-xs text-slate-400 italic">
-                Redirigiendo automáticamente a WhatsApp Concierge...
+                {t('Redirigiendo automáticamente a WhatsApp Concierge...', 'Redirecting automatically to WhatsApp Concierge...')}
               </p>
             </div>
           )}

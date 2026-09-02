@@ -449,10 +449,13 @@ export const cmsService = {
       }
     });
 
-    // Sanitize all media_urls
+    // Sanitize all media_urls and titles
     Object.keys(merged).forEach((k) => {
       if (merged[k]?.media_url) {
         merged[k].media_url = cleanMediaUrl(k, merged[k].media_url);
+      }
+      if (k === 'flota_vegvisir' && merged[k]?.title) {
+        merged[k].title = merged[k].title.replace(/Vegvisiri/gi, 'Vegvisir');
       }
     });
 

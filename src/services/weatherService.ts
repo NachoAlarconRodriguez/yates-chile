@@ -169,13 +169,34 @@ export const getTideEstimate = (date = new Date(), lat: number, lang: 'ES' | 'EN
   return { state, height };
 };
 
-// Global memory cache for weather by location ID
+// Global memory cache for weather by location ID and language
 const weatherCache: Record<string, { data: WeatherData; timestamp: number }> = {};
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+export const getFallbackForLocation = (loc: WeatherLocationOption, lang: 'ES' | 'EN' = 'ES'): WeatherData => {
+  const isEn = lang === 'EN';
+  const moon = getAstronomicalMoonPhase(new Date(), lang);
+  const tide = getTideEstimate(new Date(), loc.lat, lang);
+
+  return {
+    ...loc.fallback,
+    condition: isEn
+      ? (loc.id === 'cabo-de-hornos' ? 'Oceanic Showers' : loc.id === 'robinson-crusoe' ? 'Partly Cloudy' : 'Austral Overcast')
+      : loc.fallback.condition,
+    windDirection: isEn
+      ? (loc.id === 'alejandro-selkirk' ? 'S (South)' : 'SW (SouthWest)')
+      : loc.fallback.windDirection,
+    tideState: tide.state,
+    moonPhase: moon.name,
+    moonIcon: moon.icon,
+    location: isEn ? loc.subtitleEn : loc.subtitle,
+  };
+};
+
 export const weatherService = {
   async fetchLiveWeather(loc: WeatherLocationOption, lang: 'ES' | 'EN' = 'ES'): Promise<WeatherData> {
-    const cached = weatherCache[loc.id];
+    const cacheKey = `${loc.id}_${lang}`;
+    const cached = weatherCache[cacheKey];
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       return cached.data;
     }
@@ -217,10 +238,10 @@ export const weatherService = {
         isFallback: false,
       };
 
-      weatherCache[loc.id] = { data: liveData, timestamp: Date.now() };
+      weatherCache[cacheKey] = { data: liveData, timestamp: Date.now() };
       return liveData;
     } catch {
-      return loc.fallback;
+      return getFallbackForLocation(loc, lang);
     }
   },
 };

@@ -3,6 +3,7 @@ import { FleetHotspotViewer } from '../components/modules/FleetHotspotViewer';
 import { Anchor, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useFleet } from '../hooks/useFleet';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useLanguage } from '../context/LanguageContext';
 
 interface FlotaPageProps {
   onNavigate: (path: string) => void;
@@ -11,6 +12,7 @@ interface FlotaPageProps {
 export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
   const { activeVessels } = useFleet();
   const { getSection } = useSiteContent();
+  const { t } = useLanguage();
   const flotaHero = getSection('flota_hero');
   const vegvisirSec = getSection('flota_vegvisir');
   const terranovaSec = getSection('flota_terranova');
@@ -33,13 +35,13 @@ export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider">
             <Anchor className="w-4 h-4 text-blue-400" />
-            <span>{flotaHero.subtitle || 'Navegación de Alta Mar'}</span>
+            <span>{flotaHero.subtitle || t('Navegación de Alta Mar', 'Offshore Navigation')}</span>
           </div>
           <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white">
-            {flotaHero.title || 'La Flota: Vegvisir & Terranova'}
+            {flotaHero.title || t('La Flota: Vegvisir & Terranova', 'The Fleet: Vegvisir & Terranova')}
           </h1>
           <p className="max-w-2xl mx-auto text-slate-300 text-base sm:text-lg">
-            {flotaHero.body_text || 'Conoce en detalle las especificaciones técnicas y visores 3D de nuestras embarcaciones diseñadas para el Cabo de Hornos.'}
+            {flotaHero.body_text || t('Conoce en detalle las especificaciones técnicas y visores 3D de nuestras embarcaciones diseñadas para el Cabo de Hornos.', 'Explore in detail the technical specifications and interactive views of our vessels designed for Cape Horn.')}
           </p>
         </div>
       </section>
@@ -52,10 +54,10 @@ export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
-              Comparativa de Embarcaciones
+              {t('Comparativa de Embarcaciones', 'Vessel Comparison')}
             </h2>
             <p className="text-slate-600 text-base">
-              Elige la embarcación ideal para el estilo de expedición que buscas vivir.
+              {t('Elige la embarcación ideal para el estilo de expedición que buscas vivir.', 'Choose the ideal vessel for your expedition experience.')}
             </p>
           </div>
 
@@ -74,7 +76,7 @@ export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
                   </div>
 
                   <h3 className="font-serif text-2xl sm:text-3xl font-bold text-slate-900">
-                    {vessel.id === 'vegvisir' && vegvisirSec.title ? vegvisirSec.title : vessel.id === 'terranova' && terranovaSec.title ? terranovaSec.title : vessel.name}
+                    {vessel.id === 'vegvisir' && vegvisirSec.title ? vegvisirSec.title.replace(/Vegvisiri/gi, 'Vegvisir') : vessel.id === 'terranova' && terranovaSec.title ? terranovaSec.title : vessel.name}
                   </h3>
 
                   <p className="text-slate-600 text-sm leading-relaxed">
@@ -95,7 +97,7 @@ export const FlotaPage: React.FC<FlotaPageProps> = ({ onNavigate }) => {
                   onClick={() => onNavigate('/contacto')}
                   className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-6 py-3.5 rounded-xl transition shadow-md min-h-[48px] text-sm cursor-pointer"
                 >
-                  <span>Reservar Charter Privado en {vessel.name}</span>
+                  <span>{t('Reservar Charter Privado en', 'Book Private Charter on')} {vessel.name}</span>
                   <ArrowRight className="w-4 h-4 text-white" />
                 </button>
               </div>

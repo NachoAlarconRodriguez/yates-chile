@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Anchor, Compass, Sparkles, Calendar, ArrowRight } from 'lucide-react';
 import { useExpeditions } from '../../hooks/useExpeditions';
 import { useLanguage } from '../../context/LanguageContext';
+import { translationService } from '../../services/translationService';
 import type { PublicExpedition } from '../../services/expeditionService';
 import { ExpeditionBookingModal } from './ExpeditionBookingModal';
 
@@ -30,7 +31,8 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
   const [selectedExpedition, setSelectedExpedition] = useState<PublicExpedition | null>(null);
   const { expeditions } = useExpeditions();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const isEn = language === 'EN';
 
   const slides: Slide[] = useMemo(() => {
     // 1. Prioritize expeditions marked with star (isFeatured: true)
@@ -55,10 +57,10 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
       const spots = typeof exp.spotsLeft === 'number' ? exp.spotsLeft : (exp.availableSlots ?? 0);
       const spotsText =
         spots === 1
-          ? '1 CUPO DISPONIBLE'
+          ? (isEn ? '1 SPOT AVAILABLE' : '1 CUPO DISPONIBLE')
           : spots === 0 || exp.spotsLeft === 'completo'
-          ? 'CUPOS AGOTADOS'
-          : `${spots} CUPOS DISPONIBLES`;
+          ? (isEn ? 'SOLD OUT' : 'CUPOS AGOTADOS')
+          : `${spots} ${isEn ? 'SPOTS AVAILABLE' : 'CUPOS DISPONIBLES'}`;
 
       let icon = <Compass className="w-3.5 h-3.5 text-amber-400" />;
       if (exp.vessel.toLowerCase().includes('velero') || exp.vesselId === 'vegvisir') {
@@ -67,18 +69,23 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
         icon = <Sparkles className="w-3.5 h-3.5 text-emerald-400" />;
       }
 
+      const vesselName = isEn ? translationService.fallbackTranslate(exp.vessel, 'EN') : exp.vessel;
+      const expName = isEn ? translationService.fallbackTranslate(exp.name, 'EN') : exp.name;
+      const expLocation = isEn ? translationService.fallbackTranslate(exp.location, 'EN') : exp.location;
+      const expDesc = isEn ? translationService.fallbackTranslate(exp.description, 'EN') : exp.description;
+
       return {
         id: exp.id || `slide-${idx}`,
-        badge: `${exp.vessel.toUpperCase()} • ${spotsText}`,
+        badge: `${vesselName.toUpperCase()} • ${spotsText}`,
         badgeIcon: icon,
-        title: exp.name,
-        subtitle: `${exp.location} • ${exp.startDate} al ${exp.endDate}`,
-        description: exp.description,
+        title: expName,
+        subtitle: `${expLocation} • ${exp.startDate} ${isEn ? 'to' : 'al'} ${exp.endDate}`,
+        description: expDesc,
         bgImage: exp.image || '/travesia-robinson.jpg',
         expedition: exp,
       };
     });
-  }, [expeditions]);
+  }, [expeditions, isEn]);
 
   // Reset currentSlide if out of bounds
   useEffect(() => {

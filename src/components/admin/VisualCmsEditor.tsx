@@ -30,7 +30,9 @@ import {
   Gauge,
   Layers,
   UtensilsCrossed,
-  Sun
+  Sun,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { DEFAULT_CMS_CONTENT, type SiteContent } from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
@@ -170,9 +172,28 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   // Language Mode: 'ES' (Spanish base) or 'EN' (English AI review/edit)
   const [editorLanguage, setEditorLanguage] = useState<'ES' | 'EN'>('ES');
   const [isTranslatingWithAi, setIsTranslatingWithAi] = useState<boolean>(false);
+  const [translationProgress, setTranslationProgress] = useState<{
+    current: number;
+    total: number;
+    label: string;
+  } | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [apiKeyInput, setApiKeyInput] = useState<string>(() => translationService.getGeminiApiKey());
   const [apiKeySavedMsg, setApiKeySavedMsg] = useState<boolean>(false);
+
+  // Fullscreen Preview State
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // ESC key listener to exit Fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Drafts State
   const [drafts, setDrafts] = useState<Record<string, Partial<SiteContent>>>({});
@@ -398,56 +419,91 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     }
   };
 
-  // Auto-translate all sections of the active page on demand
-  const handleTranslateCurrentPageWithAi = async () => {
+  // Auto-translate ALL sections of the ENTIRE website on demand
+  const handleTranslateAllSiteWithAi = async () => {
     setIsTranslatingWithAi(true);
 
-    const pageSectionsMap: Record<string, string[]> = {
-      home: ['home_hero', 'home_intro'],
-      vegvisir: ['flota_vegvisir'],
-      terranova: ['flota_terranova'],
-      lodge: ['lodge_info', 'lodge_dining'],
-      expeditions: ['expeditions_hero', 'expeditions_selkirk'],
-      contact: ['contact_info', 'bank_details'],
-    };
+    const allSections: Array<{ key: string; label: string; isLogbook?: boolean }> = [
+      { key: 'home_hero', label: 'Portada: Portada Principal Hero' },
+      { key: 'home_intro', label: 'Portada: Introducción a la Experiencia' },
+      { key: 'flota_vegvisir', label: 'Flota: Velero Vegvisir' },
+      { key: 'flota_terranova', label: 'Flota: Yate Terranova' },
+      { key: 'lodge_info', label: 'Lodge: Información & Estadía' },
+      { key: 'lodge_dining', label: 'Lodge: Gastronomía & Quincho' },
+      { key: 'expeditions_hero', label: 'Expediciones: Travesías Australes' },
+      { key: 'expeditions_selkirk', label: 'Expediciones: Isla Selkirk' },
+      { key: 'contact_info', label: 'Contacto: Concierge & Asesoría' },
+      { key: 'bank_details', label: 'Contacto: Datos Bancarios' },
+      { key: 'vegvisir_logbook', label: 'Bitácora Náutica: Velero Vegvisir', isLogbook: true },
+      { key: 'terranova_logbook', label: 'Bitácora Náutica: Yate Terranova', isLogbook: true },
+      { key: 'lodge_logbook', label: 'Bitácora & Diseño: Lodge Rincón', isLogbook: true },
+    ];
 
-    const targetSections = pageSectionsMap[activePage] || [];
+    const total = allSections.length;
+    let newDrafts = { ...drafts };
 
-    for (const secKey of targetSections) {
-      const titleEs = (content[secKey]?.title || DEFAULT_CMS_CONTENT[secKey]?.title || '') as string;
-      const subtitleEs = (content[secKey]?.subtitle || DEFAULT_CMS_CONTENT[secKey]?.subtitle || '') as string;
-      const bodyEs = (content[secKey]?.body_text || DEFAULT_CMS_CONTENT[secKey]?.body_text || '') as string;
+    try {
+      for (let i = 0; i < total; i++) {
+        const { key, label, isLogbook } = allSections[i];
+        setTranslationProgress({ current: i + 1, total, label });
 
-      const trans = await translationService.translateSection({
-        title: titleEs,
-        subtitle: subtitleEs,
-        body_text: bodyEs,
-      });
+        const currentSec = content[key] || DEFAULT_CMS_CONTENT[key] || {};
+        const currentMeta =
+          (newDrafts[key]?.metadata as Record<string, any>) ||
+          (currentSec.metadata as Record<string, any>) ||
+          (DEFAULT_CMS_CONTENT[key]?.metadata as Record<string, any>) ||
+          {};
 
-      const currentMeta =
-        (drafts[secKey]?.metadata as Record<string, any>) ||
-        (content[secKey]?.metadata as Record<string, any>) ||
-        (DEFAULT_CMS_CONTENT[secKey]?.metadata as Record<string, any>) ||
-        {};
+        if (isLogbook) {
+          const entriesToTranslate = currentMeta.entries || {};
+          const translatedEntries = await translationService.translateLogbookEntries(entriesToTranslate);
+          newDrafts[key] = {
+            ...currentSec,
+            ...newDrafts[key],
+            section_key: key,
+            metadata: {
+              ...currentMeta,
+              ...((newDrafts[key]?.metadata as any) || {}),
+              entries: translatedEntries,
+            },
+          };
+        } else {
+          const titleEs = (newDrafts[key]?.title ?? currentSec.title ?? '') as string;
+          const subtitleEs = (newDrafts[key]?.subtitle ?? currentSec.subtitle ?? '') as string;
+          const bodyEs = (newDrafts[key]?.body_text ?? currentSec.body_text ?? '') as string;
 
-      setDrafts((prev) => ({
-        ...prev,
-        [secKey]: {
-          ...prev[secKey],
-          metadata: {
-            ...currentMeta,
-            title_en: trans.title_en,
-            subtitle_en: trans.subtitle_en,
-            body_text_en: trans.body_text_en,
-          },
-        },
-      }));
+          const trans = await translationService.translateSection({
+            title: titleEs,
+            subtitle: subtitleEs,
+            body_text: bodyEs,
+          });
+
+          newDrafts[key] = {
+            ...currentSec,
+            ...newDrafts[key],
+            section_key: key,
+            metadata: {
+              ...currentMeta,
+              ...((newDrafts[key]?.metadata as any) || {}),
+              title_en: trans.title_en,
+              subtitle_en: trans.subtitle_en,
+              body_text_en: trans.body_text_en,
+            },
+          };
+        }
+      }
+
+      setDrafts(newDrafts);
+      setIsTranslatingWithAi(false);
+      setTranslationProgress(null);
+      setEditorLanguage('EN');
+      setSaveSuccessMsg('✨ ¡Todo el sitio web fue traducido al inglés con IA! Estás en modo de revisión en inglés.');
+      setTimeout(() => setSaveSuccessMsg(null), 5500);
+    } catch (err) {
+      console.error('Error in translate all:', err);
+      setIsTranslatingWithAi(false);
+      setTranslationProgress(null);
     }
-
-    setIsTranslatingWithAi(false);
-    setEditorLanguage('EN');
-    setSaveSuccessMsg('✨ ¡Sección traducida con IA! Ahora estás en modo de revisión en inglés.');
-    setTimeout(() => setSaveSuccessMsg(null), 4500);
   };
 
   const handleSaveApiKey = () => {
@@ -579,40 +635,42 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs & Bilingual / AI Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-          {/* Capsule Sub-Tabs */}
-          <div className="p-1.5 bg-slate-100/80 border border-slate-200/80 rounded-full flex flex-wrap items-center gap-1 shadow-inner">
-            {[
-              { id: 'home', label: 'Inicio (Home)', icon: Home },
-              { id: 'vegvisir', label: 'Velero Vegvisir', icon: Sailboat },
-              { id: 'terranova', label: 'Yate Terranova', icon: Ship },
-              { id: 'lodge', label: 'Lodge Rincón', icon: BedDouble },
-              { id: 'expeditions', label: 'Expediciones', icon: Compass },
-              { id: 'contact', label: 'Contacto & Concierge', icon: Phone },
-              { id: 'logbook', label: 'Bitácoras & Book', icon: BookOpen },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activePage === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActivePage(tab.id as any)}
-                  className={`px-4 py-2 rounded-full text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                    isActive
-                      ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/25 font-bold scale-[1.02]'
-                      : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/90 font-medium'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-sky-300' : 'text-slate-400'}`} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+        {/* Navigation Tabs (Single Line Horizontal Capsule Row) & Bilingual / AI Controls */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Capsule Sub-Tabs (Single Line with Horizontal Scroll) */}
+          <div className="overflow-x-auto select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-1 max-w-full">
+            <div className="p-1 bg-slate-100/90 border border-slate-200/80 rounded-full inline-flex items-center gap-1 shadow-inner min-w-max">
+              {[
+                { id: 'home', label: 'Inicio (Home)', icon: Home },
+                { id: 'vegvisir', label: 'Velero Vegvisir', icon: Sailboat },
+                { id: 'terranova', label: 'Yate Terranova', icon: Ship },
+                { id: 'lodge', label: 'Lodge Rincón', icon: BedDouble },
+                { id: 'expeditions', label: 'Expediciones', icon: Compass },
+                { id: 'contact', label: 'Contacto & Concierge', icon: Phone },
+                { id: 'logbook', label: 'Bitácoras & Book', icon: BookOpen },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activePage === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActivePage(tab.id as any)}
+                    className={`px-4 py-2 rounded-full text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap select-none ${
+                      isActive
+                        ? 'bg-[#0f2b48] text-white shadow-md shadow-[#0f2b48]/25 font-bold scale-[1.02]'
+                        : 'text-slate-600 hover:text-[#0f2b48] hover:bg-white/90 font-medium'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-sky-300' : 'text-slate-400'}`} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Bilingual Language Switcher & AI Actions (Capsule Style) */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 self-end lg:self-auto">
             {/* Language Switcher in Public Site Style: ES · EN */}
             <div className="inline-flex items-center bg-slate-100/90 border border-slate-300/80 rounded-full p-1 shadow-2xs">
               <button
@@ -642,36 +700,20 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               </button>
             </div>
 
-            {/* Translate with AI on demand Capsule */}
+            {/* Translate Entire Website with AI (Compact Icon-Only Button) */}
             <button
               type="button"
-              onClick={handleTranslateCurrentPageWithAi}
+              onClick={handleTranslateAllSiteWithAi}
               disabled={isTranslatingWithAi}
-              className="px-4 py-2 rounded-full bg-purple-50 hover:bg-purple-100/90 text-purple-700 border border-purple-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs hover:scale-105 duration-200"
-              title="Traducir automáticamente esta sección con Inteligencia Artificial"
+              className="w-8 h-8 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center transition cursor-pointer shadow-2xs hover:scale-105 duration-200 disabled:opacity-50 shrink-0"
+              title="Traducir automáticamente TODO el sitio web al inglés con Inteligencia Artificial"
+              aria-label="Traducir Todo con IA"
             >
               {isTranslatingWithAi ? (
-                <>
-                  <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                  <span>Traduciendo...</span>
-                </>
+                <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
               ) : (
-                <>
-                  <Wand2 className="w-3.5 h-3.5 text-purple-600" />
-                  <span className="hidden sm:inline">Traducir con IA</span>
-                </>
+                <Wand2 className="w-4 h-4 text-purple-600" />
               )}
-            </button>
-
-            {/* AI API Key Modal Trigger Capsule */}
-            <button
-              type="button"
-              onClick={() => setShowApiKeyModal(true)}
-              className="px-3.5 py-2 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer hover:scale-105 duration-200"
-              title="Configuración de API de Inteligencia Artificial (Gemini)"
-            >
-              <Bot className="w-4 h-4 text-purple-600" />
-              <span className="hidden md:inline font-bold">API IA</span>
             </button>
           </div>
         </div>
@@ -708,13 +750,13 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* VISUAL CANVAS VIEWPORT (EXACT PUBLIC SITE REPLICA) */}
+      {/* VISUAL CANVAS VIEWPORT (EXACT PUBLIC SITE REPLICA / PANTALLA COMPLETA) */}
       {/* ========================================================================= */}
-      <div className="flex justify-center bg-slate-200/60 p-2 sm:p-4 rounded-3xl border border-slate-300/80 min-h-[700px] overflow-hidden">
-        <div className="w-full max-w-7xl bg-white transition-all duration-300 rounded-2xl overflow-hidden shadow-2xl border border-slate-300 relative">
+      <div className={`${isFullscreen ? 'fixed inset-0 z-50 overflow-y-auto bg-slate-950 p-0' : 'flex justify-center bg-slate-200/60 p-2 sm:p-4 rounded-3xl border border-slate-300/80 min-h-[700px] overflow-hidden'}`}>
+        <div className={`w-full bg-white transition-all duration-300 relative ${isFullscreen ? 'min-h-screen rounded-none shadow-none border-none' : 'max-w-7xl rounded-2xl overflow-hidden shadow-2xl border border-slate-300'}`}>
           
           {/* SIMULATED PUBLIC BROWSER HEADER */}
-          <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+          <header className={`bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-xs ${isFullscreen ? 'bg-white/95 backdrop-blur-md' : ''}`}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full border border-slate-300 flex items-center justify-center">
                 <Compass className="w-5 h-5 text-slate-800 animate-spin-slow" />
@@ -748,9 +790,41 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             </nav>
 
             <div className="flex items-center gap-2">
+              {/* If in Fullscreen and has drafts, quick save button */}
+              {isFullscreen && hasUnsavedChanges && (
+                <button
+                  type="button"
+                  onClick={handleSaveAll}
+                  disabled={isSaving}
+                  className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Guardar ({Object.keys(drafts).length})</span>
+                </button>
+              )}
+
               <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-full border border-slate-200 text-slate-600 bg-slate-50">
                 ES · EN
               </span>
+
+              {/* Fullscreen Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setIsFullscreen((prev) => !prev)}
+                className={`p-2 rounded-full border transition-all flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 ${
+                  isFullscreen
+                    ? 'bg-[#0f2b48] text-white border-[#0f2b48] shadow-md ring-2 ring-sky-400'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                }`}
+                title={isFullscreen ? 'Salir de Pantalla Completa (ESC)' : 'Ver en Pantalla Completa'}
+                aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Ver en pantalla completa'}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-4 h-4 text-sky-300" />
+                ) : (
+                  <Maximize2 className="w-4 h-4 text-slate-700" />
+                )}
+              </button>
             </div>
           </header>
 
@@ -2205,6 +2279,38 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global AI Translation Progress Modal */}
+      {translationProgress && (
+        <div className="fixed inset-0 z-80 bg-[#0a1e34]/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-7 max-w-md w-full shadow-2xl space-y-5 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center mx-auto shadow-xs">
+              <Sparkles className="w-7 h-7 text-purple-600 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-serif font-bold text-lg text-slate-900">
+                Traduciendo Todo el Sitio Web con IA
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Generando versión en inglés ({translationProgress.current} de {translationProgress.total})
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200">
+                <div
+                  className="bg-gradient-to-r from-purple-600 to-sky-500 h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${(translationProgress.current / translationProgress.total) * 100}%` }}
+                />
+              </div>
+              <span className="text-[11px] font-mono text-purple-700 font-semibold block truncate">
+                {translationProgress.label}
+              </span>
             </div>
           </div>
         </div>

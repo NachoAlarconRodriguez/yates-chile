@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Check, Send, Sparkles } from 'lucide-react';
 import { leadService } from '../../services/leadService';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const NewsletterSection: React.FC = () => {
+  const { t } = useLanguage();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -42,13 +44,16 @@ export const NewsletterSection: React.FC = () => {
         <div className="space-y-2.5">
           <span className="text-[11px] font-mono uppercase tracking-widest text-sky-400 font-bold bg-sky-950/70 px-4 py-1.5 rounded-full border border-sky-800/60 inline-flex items-center gap-1.5 shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Boletín Oficial & Novedades Exclusivas</span>
+            <span>{t('Boletín Oficial & Novedades Exclusivas', 'Official Newsletter & Exclusive Updates')}</span>
           </span>
           <h3 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight">
-            Suscríbete a Nuestro Newsletter
+            {t('Suscríbete a Nuestro Newsletter', 'Subscribe to Our Newsletter')}
           </h3>
           <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto font-light leading-relaxed">
-            Recibe en primicia aperturas de zarpe, itinerarios privados hacia el Archipiélago Juan Fernández y noticias náuticas exclusivas de Yates Chile.
+            {t(
+              'Recibe en primicia aperturas de zarpe, itinerarios privados hacia el Archipiélago Juan Fernández y noticias náuticas exclusivas de Yates Chile.',
+              'Be the first to receive departure openings, private itineraries to the Juan Fernández Archipelago, and exclusive maritime news from Yates Chile.'
+            )}
           </p>
         </div>
 
@@ -58,9 +63,9 @@ export const NewsletterSection: React.FC = () => {
               <Check className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <span className="text-xs font-bold block text-white">¡Suscripción confirmada!</span>
+              <span className="text-xs font-bold block text-white">{t('¡Suscripción confirmada!', 'Subscription confirmed!')}</span>
               <span className="text-[11px] text-emerald-300/90 font-light block">
-                Te has registrado exitosamente en nuestro boletín oficial.
+                {t('Te has registrado exitosamente en nuestro boletín oficial.', 'You have successfully subscribed to our official newsletter.')}
               </span>
             </div>
           </div>
@@ -70,7 +75,7 @@ export const NewsletterSection: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="Nombre y Apellido"
+                placeholder={t('Nombre y Apellido', 'Full Name')}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-[#0b192c] placeholder:text-slate-400 border border-white/15 focus:border-sky-400 rounded-full px-5 py-3 text-xs outline-none transition shadow-2xs font-medium"
@@ -80,7 +85,7 @@ export const NewsletterSection: React.FC = () => {
               <input
                 type="email"
                 required
-                placeholder="correo@ejemplo.com"
+                placeholder={t('correo@ejemplo.com', 'email@example.com')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-[#0b192c] placeholder:text-slate-400 border border-white/15 focus:border-sky-400 rounded-full px-5 py-3 text-xs outline-none transition shadow-2xs font-medium"
@@ -93,11 +98,11 @@ export const NewsletterSection: React.FC = () => {
                 className="w-full h-full bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white font-semibold rounded-full px-5 py-3 text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               >
                 {loading ? (
-                  <span>Enviando...</span>
+                  <span>{t('Enviando...', 'Sending...')}</span>
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    <span>Suscribirme</span>
+                    <span>{t('Suscribirme', 'Subscribe')}</span>
                   </>
                 )}
               </button>

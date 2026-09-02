@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useExpeditions } from '../hooks/useExpeditions';
 import type { PublicExpedition as Expedition } from '../services/expeditionService';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useLanguage } from '../context/LanguageContext';
 import { leadService } from '../services/leadService';
 import { ExpeditionBookingModal } from '../components/modules/ExpeditionBookingModal';
 import { 
@@ -39,122 +40,132 @@ interface ExpeditionOverview {
   weatherPolicy: string;
 }
 
-const getExpeditionOverview = (exp: Expedition): ExpeditionOverview => {
+const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => string): ExpeditionOverview => {
   const v = exp.vessel.toLowerCase();
 
   if (v.includes('lodge')) {
     return {
-      headline: 'Estadía Boutique & Exploraciones en Robinson Crusoe',
-      summary: `${exp.description} Tu experiencia combina el descanso en nuestro refugio frente al mar en Bahía Cumberland (Uberlindo Andaur 222) con salidas guiadas por expertos locales, contemplando atardeceres únicos en el océano y explorando la naturaleza prístina de la isla.`,
+      headline: t('Estadía Boutique & Exploraciones en Robinson Crusoe', 'Boutique Stay & Explorations in Robinson Crusoe'),
+      summary: t(
+        `${exp.description} Tu experiencia combina el descanso en nuestro refugio frente al mar en Bahía Cumberland (Uberlindo Andaur 222) con salidas guiadas por expertos locales, contemplando atardeceres únicos en el océano y explorando la naturaleza prístina de la isla.`,
+        `${exp.description} Your experience combines relaxation at our oceanfront refuge in Cumberland Bay (Uberlindo Andaur 222) with excursions guided by local experts, watching unique oceanic sunsets and discovering pristine island nature.`
+      ),
       pillars: [
         {
           icon: <Anchor className="w-5 h-5 text-blue-900" />,
-          title: 'Refugio Náutico Frente al Mar',
-          desc: 'Alojamiento en cabinas independientes con baño privado y vista panorámica al océano, terraza y amplio quincho para compartir.'
+          title: t('Refugio Náutico Frente al Mar', 'Oceanfront Nautical Refuge'),
+          desc: t('Alojamiento en cabinas independientes con baño privado y vista panorámica al océano, terraza y amplio quincho para compartir.', 'Accommodation in private en-suite cabins with panoramic ocean views, terrace, and spacious gathering quincho.')
         },
         {
           icon: <Footprints className="w-5 h-5 text-blue-900" />,
-          title: 'Senderismo & Ecosistemas Endémicos',
-          desc: 'Caminatas guiadas por bosques de helechos gigantes, senderos históricos hacia el Mirador Alexander Selkirk y avistamiento del picaflor rojo.'
+          title: t('Senderismo & Ecosistemas Endémicos', 'Trekking & Endemic Ecosystems'),
+          desc: t('Caminatas guiadas por bosques de helechos gigantes, senderos históricos hacia el Mirador Alexander Selkirk y avistamiento del picaflor rojo.', 'Guided hikes through giant fern forests, historical trails to Alexander Selkirk Lookout, and hummingbird watching.')
         },
         {
           icon: <Utensils className="w-5 h-5 text-blue-900" />,
-          title: 'Gastronomía de Isla & Quincho',
-          desc: 'Degustación de langosta fresca de Juan Fernández cocida en agua de mar, pescados locales de roca (vidriola) y asados en el quincho.'
+          title: t('Gastronomía de Isla & Quincho', 'Island Gastronomy & Quincho'),
+          desc: t('Degustación de langosta fresca de Juan Fernández cocida en agua de mar, pescados locales de roca (vidriola) y asados en el quincho.', 'Juan Fernández fresh lobster boiled in sea water, local yellowtail rockfish, and outdoor grilled feasts.')
         },
         {
           icon: <Waves className="w-5 h-5 text-blue-900" />,
-          title: 'Santuarios Marinos & Snorkel',
-          desc: 'Navegaciones costeras hacia farellones y loberías protegidas con sesiones de snorkel junto a los amigables lobos marinos de dos pelos.'
+          title: t('Santuarios Marinos & Snorkel', 'Marine Sanctuaries & Snorkeling'),
+          desc: t('Navegaciones costeras hacia farellones y loberías protegidas con sesiones de snorkel junto a los amigables lobos marinos de dos pelos.', 'Coastal boat tours to sea lion colonies and protected reefs with snorkeling sessions alongside fur seals.')
         }
       ],
       included: [
-        'Hospedaje boutique en cabina privada con baño en suite',
-        'Pensión completa con gastronomía local y cenas en quincho',
-        'Excursiones guiadas por expertos locales en tierra y mar',
-        'Embarcación auxiliar para traslados y navegaciones costeras',
-        'Equipos de snorkel y bastones de senderismo'
+        t('Hospedaje boutique en cabina privada con baño en suite', 'Boutique lodging in private en-suite cabin'),
+        t('Pensión completa con gastronomía local y cenas en quincho', 'Full board with local gastronomy and quincho dinners'),
+        t('Excursiones guiadas por expertos locales en tierra y mar', 'Guided excursions by local experts on land and sea'),
+        t('Embarcación auxiliar para traslados y navegaciones costeras', 'Tender vessel for transfers and coastal navigation'),
+        t('Equipos de snorkel y bastones de senderismo', 'Snorkeling equipment and trekking poles')
       ],
-      weatherPolicy: 'La programación diaria de excursiones, caminatas de altura y salidas marítimas se coordina en terreno según las condiciones de viento, mar y visibilidad, asegurando siempre el mayor bienestar, seguridad y confort durante tu estadía.'
+      weatherPolicy: t('La programación diaria de excursiones, caminatas de altura y salidas marítimas se coordina en terreno según las condiciones de viento, mar y visibilidad, asegurando siempre el mayor bienestar, seguridad y confort durante tu estadía.', 'Daily schedule of hikes, summits, and sea tours is coordinated on-site according to wind, wave, and visibility conditions, always ensuring top comfort and safety.')
     };
   }
 
   if (v.includes('velero') || v.includes('sailing') || exp.name.toLowerCase().includes('travesía')) {
     return {
-      headline: 'Expedición a Vela & Navegación Oceánica Austral',
-      summary: `${exp.description} Una experiencia náutica genuina a bordo del velero de expedición Vegvisir (Dufour 52.5 ft francés), donde vivirás la auténtica pasión del mar abierto, el trabajo en equipo de guardia y la llegada a caletas insulares remotas.`,
+      headline: t('Expedición a Vela & Navegación Oceánica Austral', 'Sailing Expedition & Austral Offshore Navigation'),
+      summary: t(
+        `${exp.description} Una experiencia náutica genuina a bordo del velero de expedición Vegvisir (Dufour 52.5 ft francés), donde vivirás la auténtica pasión del mar abierto, el trabajo en equipo de guardia y la llegada a caletas insulares remotas.`,
+        `${exp.description} A genuine nautical experience aboard the Vegvisir expedition sailboat (French Dufour 52.5 ft), where you will experience open ocean passion, watch shifts, and landfalls at remote island coves.`
+      ),
       pillars: [
         {
           icon: <Anchor className="w-5 h-5 text-blue-900" />,
-          title: 'Velerismo Oceánico de Altura',
-          desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.'
+          title: t('Velerismo Oceánico de Altura', 'Oceanic Offshore Sailing'),
+          desc: t('Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.', 'Offshore sailing with certified master, night watches, sail trimming, and nautical charting.')
         },
         {
           icon: <Utensils className="w-5 h-5 text-blue-900" />,
-          title: 'Pesca de Altura (Trolling) & Menú a Bordo',
-          desc: 'Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.'
+          title: t('Pesca de Altura (Trolling) & Menú a Bordo', 'Offshore Trolling & Gourmet Menu'),
+          desc: t('Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.', 'Trolling lines for yellowtail and tuna, fresh sashimi preparations, and hot gourmet meals.')
         },
         {
           icon: <Compass className="w-5 h-5 text-blue-900" />,
-          title: 'Recaladas en Bahías Míticas',
-          desc: 'Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.'
+          title: t('Recaladas en Bahías Míticas', 'Landfalls at Mythic Coves'),
+          desc: t('Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.', 'Protected anchorages at Cumberland Bay and Puerto Español with Zodiac landings.')
         },
         {
           icon: <Waves className="w-5 h-5 text-blue-900" />,
-          title: 'Autonomía Total & Starlink 24/7',
-          desc: '5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.'
+          title: t('Autonomía Total & Starlink 24/7', 'Total Autonomy & 24/7 Starlink'),
+          desc: t('5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.', '5 cabins with 5 en-suite heads, hydronic heating, 140 l/h watermaker, and continuous satellite link.')
         }
       ],
       included: [
-        'Pensión completa gourmet preparada por tripulación / chef',
-        'Instrucción náutica, bitácora y participación en maniobras',
-        'Bote auxiliar Zodiac con motor Mercury 15 HP para desembarcos',
-        'Conexión satelital Starlink 24/7 en alta mar',
-        'Combustible, tasas de puerto, seguros y fondeo'
+        t('Pensión completa gourmet preparada por tripulación / chef', 'Full gourmet board prepared by crew / chef'),
+        t('Instrucción náutica, bitácora y participación en maniobras', 'Nautical instruction, logbook logging, and maneuvers participation'),
+        t('Bote auxiliar Zodiac con motor Mercury 15 HP para desembarcos', 'Zodiac tender with 15 HP Mercury engine for shore landings'),
+        t('Conexión satelital Starlink 24/7 en alta mar', '24/7 Starlink satellite connection in open ocean'),
+        t('Combustible, tasas de puerto, seguros y fondeo', 'Fuel, port fees, insurance, and anchorage dues')
       ],
-      weatherPolicy: 'La derrota náutica, los tiempos de navegación a vela y los puntos de fondeo se ajustan de manera dinámica según la evolución meteorológica de los vientos y corrientes oceánicas, bajo el mando experto del Capitán para garantizar una travesía segura y placentera.'
+      weatherPolicy: t('La derrota náutica, los tiempos de navegación a vela y los puntos de fondeo se ajustan de manera dinámica según la evolución meteorológica de los vientos y corrientes oceánicas, bajo el mando experto del Capitán para garantizar una travesía segura y placentera.', 'Nautical course, sailing hours, and anchoring spots are dynamically adjusted according to meteorological evolution under the Master Captain command to guarantee safety.')
     };
   }
 
   // Yate Terranova or default
   return {
-    headline: 'Crucero de Alta Gama & Exploración de Gran Autonomía',
-    summary: `${exp.description} A bordo del Yate Terranova (Hatteras 65ft LRC de 3 cubiertas), experimentarás una navegación rápida, potente y confortable, accediendo a los rincones más inaccesibles con la máxima sofisticación y servicio a bordo.`,
+    headline: t('Crucero de Alta Gama & Exploración de Gran Autonomía', 'Luxury Cruising & Extended Range Exploration'),
+    summary: t(
+      `${exp.description} A bordo del Yate Terranova (Hatteras 65ft LRC de 3 cubiertas), experimentarás una navegación rápida, potente y confortable, accediendo a los rincones más inaccesibles con la máxima sofisticación y servicio a bordo.`,
+      `${exp.description} Aboard the Terranova Yacht (3-deck Hatteras 65ft LRC), experience fast, powerful, and comfortable cruising to remote corners with sophisticated service.`
+    ),
     pillars: [
       {
         icon: <Anchor className="w-5 h-5 text-blue-900" />,
-        title: 'Navegación Rápida & 3 Cubiertas',
-        desc: 'Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.'
+        title: t('Navegación Rápida & 3 Cubiertas', 'Fast Cruising & 3 Decks'),
+        desc: t('Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.', 'Hydraulic roll stabilizers, twin helm bridges, 5 en-suite cabins, and expansive panoramic decks.')
       },
       {
         icon: <Utensils className="w-5 h-5 text-blue-900" />,
-        title: 'Deck Superior & Gastronomía de Autor',
-        desc: 'Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.'
+        title: t('Deck Superior & Gastronomía de Autor', 'Upper Deck & Signature Dining'),
+        desc: t('Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.', 'Open-air top deck grill, fresh seafood paired with select fine wines by our executive chef.')
       },
       {
         icon: <Waves className="w-5 h-5 text-blue-900" />,
-        title: 'Desembarcos Asistidos con Zodiac 70 HP',
-        desc: 'Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.'
+        title: t('Desembarcos Asistidos con Zodiac 70 HP', 'Assisted Landings with 70 HP Zodiac'),
+        desc: t('Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.', '1-ton crane and powerful tender to explore remote fjords, sea caves, and volcanic beaches.')
       },
       {
         icon: <Compass className="w-5 h-5 text-blue-900" />,
-        title: 'Pesca Deportiva de Altura & Fauna Pelágica',
-        desc: 'Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.'
+        title: t('Pesca Deportiva de Altura & Fauna Pelágica', 'Sportfishing & Pelagic Wildlife'),
+        desc: t('Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.', 'Top-tier trolling gear and marine radar for spotting cetaceans, seals, and pelagic seabirds.')
       }
     ],
     included: [
-      'Tripulación profesional completa y chef ejecutivo a bordo',
-      'Todas las comidas gourmet, tablas y barra de autor',
-      'Uso de lancha auxiliar Zodiac con motor Yamaha 70 HP',
-      'Conexión satelital Starlink 24/7 e instrumental doble',
-      'Seguro de navegación marítima y equipamiento de seguridad de alta mar'
+      t('Tripulación profesional completa y chef ejecutivo a bordo', 'Full professional crew and executive chef on board'),
+      t('Todas las comidas gourmet, tablas y barra de autor', 'All gourmet meals, tasting boards, and open signature bar'),
+      t('Uso de lancha auxiliar Zodiac con motor Yamaha 70 HP', 'Use of Zodiac tender with 70 HP Yamaha outboard'),
+      t('Conexión satelital Starlink 24/7 e instrumental doble', '24/7 Starlink satellite connection and dual navigation electronics'),
+      t('Seguro de navegación marítima y equipamiento de seguridad de alta mar', 'Maritime navigation insurance and offshore SOLAS safety gear')
     ],
-    weatherPolicy: 'Las derrotas de navegación, bahías de fondeo y desembarcos se planifican con total flexibilidad atendiendo a las condiciones meteorológicas y marítimas de cada día, eligiendo siempre las zonas más protegidas y escénicas para tu máxima comodidad.'
+    weatherPolicy: t('Las derrotas de navegación, bahías de fondeo y desembarcos se planifican con total flexibilidad atendiendo a las condiciones meteorológicas y marítimas de cada día, eligiendo siempre las zonas más protegidas y escénicas para tu máxima comodidad.', 'Cruising routes, anchorages, and landings are planned with flexibility according to daily weather, always selecting the most sheltered and scenic bays.')
   };
 };
 
 export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate }) => {
   const { expeditions } = useExpeditions();
+  const { t } = useLanguage();
   const [downloadEmail, setDownloadEmail] = useState('');
   const [downloadSent, setDownloadSent] = useState(false);
   const [selectedExpedition, setSelectedExpedition] = useState<Expedition | null>(null);
@@ -165,7 +176,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
   const { getSection } = useSiteContent();
   const expHero = getSection('expeditions_hero');
 
-  const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition) : null;
+  const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition, t) : null;
 
   const handleBrochureDownload = (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,15 +229,15 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-3.5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/60 border border-white/20 text-white text-[10px] font-semibold uppercase tracking-widest backdrop-blur-md shadow-md">
             <Compass className="w-3.5 h-3.5 text-blue-300" />
-            <span>{expHero.subtitle || 'Travesías de Altamar & Reservas de la Biosfera'}</span>
+            <span>{expHero.subtitle || t('Travesías de Altamar & Reservas de la Biosfera', 'Offshore Voyages & Biosphere Reserves')}</span>
           </div>
           
           <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight leading-snug drop-shadow-md">
-            {expHero.title || 'Rutas & Expediciones Australes'}
+            {expHero.title || t('Rutas & Expediciones Australes', 'Austral Routes & Expeditions')}
           </h1>
           
           <p className="max-w-xl mx-auto text-slate-200 text-xs sm:text-sm leading-relaxed font-light drop-shadow-sm opacity-90">
-            {expHero.body_text || 'Expediciones científicas y de aventura guiadas por capitanes expertos en Juan Fernández, Alejandro Selkirk y los canales patagónicos.'}
+            {expHero.body_text || t('Expediciones científicas y de aventura guiadas por capitanes expertos en Juan Fernández, Alejandro Selkirk y los canales patagónicos.', 'Scientific and adventure expeditions guided by expert captains in Juan Fernández, Alejandro Selkirk, and Patagonian channels.')}
           </p>
 
           <div className="pt-2 flex items-center justify-center gap-3">
@@ -235,7 +246,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
               className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-xl text-xs border border-white/90 cursor-pointer hover:scale-[1.02]"
             >
               <Compass className="w-4 h-4 text-slate-950" />
-              <span>Reservar Expedición</span>
+              <span>{t('Reservar Expedición', 'Book Expedition')}</span>
             </button>
           </div>
         </div>
@@ -246,13 +257,13 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-2">
             <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 font-mono">
-              Salidas Programadas 2026/2027
+              {t('Salidas Programadas 2026/2027', 'Scheduled Departures 2026/2027')}
             </span>
             <h2 className="font-serif text-3xl font-bold text-slate-900">
-              Elige tu Travesía
+              {t('Elige tu Travesía', 'Choose Your Expedition')}
             </h2>
             <p className="text-slate-500 text-sm max-w-lg mx-auto">
-              Haz clic en cualquier tarjeta para conocer la descripción general de la expedición y coordinar tu reserva con nuestro concierge.
+              {t('Haz clic en cualquier tarjeta para conocer la descripción general de la expedición y coordinar tu reserva con nuestro concierge.', 'Click on any card to view the expedition overview and coordinate your booking with our concierge.')}
             </p>
           </div>
 
@@ -278,22 +289,22 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                   <div className="absolute top-4 right-4">
                     {exp.spotsLeft === 'completo' && (
                       <span className="bg-red-500/90 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-400/20 backdrop-blur-sm">
-                        Completo
+                        {t('Completo', 'Sold Out')}
                       </span>
                     )}
                     {exp.spotsLeft === 'bloqueado' && (
                       <span className="bg-slate-700/90 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-500/20 backdrop-blur-sm">
-                        Bloqueado
+                        {t('Bloqueado', 'Reserved')}
                       </span>
                     )}
                     {typeof exp.spotsLeft === 'number' && exp.spotsLeft === 1 && (
                       <span className="bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-400/20 animate-pulse shadow-sm">
-                        ¡Último cupo!
+                        {t('¡Último cupo!', 'Last spot!')}
                       </span>
                     )}
                     {typeof exp.spotsLeft === 'number' && exp.spotsLeft > 1 && (
                       <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20">
-                        {exp.spotsLeft} cupos
+                        {exp.spotsLeft} {t('cupos', 'spots')}
                       </span>
                     )}
                   </div>
@@ -304,7 +315,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                   <div className="space-y-2">
                     <div className="flex items-center gap-1.5 text-blue-900 font-mono text-[10px] font-bold tracking-wider uppercase">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>{exp.startDate} al {exp.endDate}</span>
+                      <span>{exp.startDate} {t('al', 'to')} {exp.endDate}</span>
                     </div>
 
                     <h3 className="font-serif text-lg font-bold text-slate-900 leading-snug group-hover:text-blue-950 transition-colors">
@@ -323,7 +334,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                     </div>
                     
                     <span className="text-blue-900 font-bold text-xs uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                      Ver Descripción ➔
+                      {t('Ver Descripción ➔', 'View Details ➔')}
                     </span>
                   </div>
                 </div>
@@ -358,7 +369,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
 
               <div className="relative z-10 space-y-4">
                 <span className="text-[10px] uppercase tracking-widest text-slate-350 font-mono block font-bold">
-                  Expedición Yates Chile
+                  {t('Expedición Yates Chile', 'Yates Chile Expedition')}
                 </span>
                 <div className="space-y-2">
                   <h2 className="font-serif font-bold text-2xl sm:text-3xl text-white leading-tight">
@@ -372,20 +383,20 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
 
                 <div className="border-t border-white/10 pt-3.5 space-y-2.5 font-mono text-[11px] text-slate-300">
                   <div className="flex justify-between">
-                    <span>Zarpe / Estadía:</span>
+                    <span>{t('Zarpe / Estadía:', 'Departure / Stay:')}</span>
                     <span className="font-bold text-white">{selectedExpedition.startDate}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Retorno:</span>
+                    <span>{t('Retorno:', 'Return:')}</span>
                     <span className="font-bold text-white">{selectedExpedition.endDate}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Embarcación / Base:</span>
+                    <span>{t('Embarcación / Base:', 'Vessel / Base:')}</span>
                     <span className="font-bold text-white truncate max-w-[140px] text-right">{selectedExpedition.vessel}</span>
                   </div>
                   {selectedExpedition.tempEstimate && (
                     <div className="flex justify-between">
-                      <span>Temp. Estimada:</span>
+                      <span>{t('Temp. Estimada:', 'Est. Temp:')}</span>
                       <span className="font-bold text-white">{selectedExpedition.tempEstimate}</span>
                     </div>
                   )}
@@ -398,14 +409,14 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                     disabled
                     className="w-full bg-slate-850 text-slate-500 font-bold py-3 rounded-xl text-xs cursor-not-allowed border border-white/5"
                   >
-                    Reserva Completada
+                    {t('Reserva Completada', 'Fully Booked')}
                   </button>
                 ) : selectedExpedition.spotsLeft === 'bloqueado' ? (
                   <button
                     disabled
                     className="w-full bg-slate-850 text-slate-500 font-bold py-3 rounded-xl text-xs cursor-not-allowed border border-white/5"
                   >
-                    Bloqueado por Misión
+                    {t('Bloqueado por Misión', 'Reserved for Mission')}
                   </button>
                 ) : (
                   <>
@@ -424,7 +435,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                       className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
                     >
                       <Download className="w-4 h-4 text-blue-300" />
-                      <span>Descargar Brochure en PDF</span>
+                      <span>{t('Descargar Brochure en PDF', 'Download PDF Brochure')}</span>
                     </button>
 
                     {/* Botón 2: Reservar Cupo con Concierge */}
@@ -433,7 +444,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                       onClick={() => handleOpenBookingModal(selectedExpedition)}
                       className="w-full bg-white hover:bg-slate-100 text-slate-950 font-bold py-3.5 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
                     >
-                      <span>Reservar Cupo de Expedición</span>
+                      <span>{t('Reservar Cupo de Expedición', 'Book Expedition Spot')}</span>
                       <ArrowRight className="w-4 h-4 text-slate-900" />
                     </button>
                   </>
@@ -449,7 +460,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 <div className="border-b border-slate-100 pb-4 space-y-1.5">
                   <div className="flex items-center gap-2 text-blue-900 font-semibold text-xs uppercase tracking-wider">
                     <Sparkles className="w-4 h-4 text-blue-800 animate-pulse" />
-                    <span>Descripción General de la Expedición</span>
+                    <span>{t('Descripción General de la Expedición', 'Expedition Overview')}</span>
                   </div>
                   <h3 className="font-serif font-bold text-xl sm:text-2xl text-slate-900 leading-tight">
                     {overview.headline}
@@ -462,7 +473,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 {/* Core Experience Pillars (2x2 Grid) */}
                 <div className="space-y-3">
                   <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
-                    Pilares & Experiencias de la Expedición
+                    {t('Pilares & Experiencias de la Expedición', 'Expedition Pillars & Experiences')}
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     {overview.pillars.map((pillar, idx) => (
@@ -490,7 +501,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                   </div>
                   <div className="space-y-1">
                     <h5 className="font-bold text-xs text-blue-950 uppercase tracking-wide">
-                      Itinerario Flexible & Navegación Adaptativa al Clima
+                      {t('Itinerario Flexible & Navegación Adaptativa al Clima', 'Flexible Itinerary & Adaptive Weather Navigation')}
                     </h5>
                     <p className="text-slate-700 text-xs leading-relaxed font-light">
                       {overview.weatherPolicy}
@@ -501,7 +512,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 {/* Included Services Checklist */}
                 <div className="space-y-2.5 pt-1">
                   <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
-                    Servicios & Equipamiento Incluido
+                    {t('Servicios & Equipamiento Incluido', 'Included Services & Equipment')}
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {overview.included.map((item, idx) => (
@@ -528,10 +539,10 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
           </div>
 
           <h3 className="font-serif text-3xl font-bold text-white">
-            Descarga el Brochure Oficial de Expediciones 2026/2027
+            {t('Descarga el Brochure Oficial de Expediciones 2026/2027', 'Download Official 2026/2027 Expeditions Brochure')}
           </h3>
           <p className="text-slate-350 text-sm max-w-xl mx-auto leading-relaxed">
-            Obtén en formato PDF el detalle completo de expediciones, especificaciones técnicas, gastronomía y equipamiento de seguridad de la flota.
+            {t('Obtén en formato PDF el detalle completo de expediciones, especificaciones técnicas, gastronomía y equipamiento de seguridad de la flota.', 'Get complete expedition details, technical specifications, gastronomy, and safety fleet equipment in PDF format.')}
           </p>
 
           {!downloadSent ? (
@@ -539,7 +550,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
               <input
                 type="email"
                 required
-                placeholder="Ingresa tu correo electrónico"
+                placeholder={t('Ingresa tu correo electrónico', 'Enter your email address')}
                 value={downloadEmail}
                 onChange={(e) => setDownloadEmail(e.target.value)}
                 className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:border-blue-400 focus:outline-none min-h-[48px]"
@@ -548,13 +559,13 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 type="submit"
                 className="bg-blue-900 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl transition text-sm min-h-[48px] shrink-0 cursor-pointer"
               >
-                Descargar Brochure PDF
+                {t('Descargar Brochure PDF', 'Download PDF Brochure')}
               </button>
             </form>
           ) : (
             <div className="bg-emerald-500/20 text-emerald-300 p-4 rounded-xl border border-emerald-400/40 inline-flex items-center gap-2 text-sm font-semibold">
               <Check className="w-5 h-5 text-emerald-400" />
-              <span>Brochure despachado con éxito a tu correo. ¡Descarga iniciada!</span>
+              <span>{t('Brochure despachado con éxito a tu correo. ¡Descarga iniciada!', 'Brochure dispatched successfully to your email. Download initiated!')}</span>
             </div>
           )}
         </div>

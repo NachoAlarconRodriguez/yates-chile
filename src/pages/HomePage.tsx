@@ -3,6 +3,8 @@ import { HeroCarousel } from '../components/modules/HeroCarousel';
 import { ExpeditionCalendar } from '../components/modules/ExpeditionCalendar';
 import { ArrowRight } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useLanguage } from '../context/LanguageContext';
+import { translationService } from '../services/translationService';
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
@@ -10,10 +12,26 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { getSection } = useSiteContent();
+  const { language, t } = useLanguage();
+  const isEn = language === 'EN';
+
   const introSection = getSection('home_intro');
   const vegvisirSec = getSection('flota_vegvisir');
   const terranovaSec = getSection('flota_terranova');
   const lodgeSec = getSection('lodge_info');
+
+  const introSubtitle = isEn && (introSection as any)?.subtitle_en ? (introSection as any).subtitle_en : (isEn && introSection?.subtitle ? translationService.fallbackTranslate(introSection.subtitle, 'EN') : (introSection?.subtitle || 'AVENTURA EN TERRITORIOS INEXPLORADOS & PRÍSTINOS'));
+  const introTitle = isEn && (introSection as any)?.title_en ? (introSection as any).title_en : (isEn && introSection?.title ? translationService.fallbackTranslate(introSection.title, 'EN') : (introSection?.title || 'Tres Formas de Vivir la Aventura Austral'));
+  const introBody = isEn && (introSection as any)?.body_text_en ? (introSection as any).body_text_en : (isEn && introSection?.body_text ? translationService.fallbackTranslate(introSection.body_text, 'EN') : (introSection?.body_text || 'Explora el Archipiélago Juan Fernández, Isla Alejandro Selkirk y los fiordos del Cabo de Hornos a través de nuestras tres experiencias exclusivas.'));
+
+  const vegvisirTitle = isEn && (vegvisirSec as any)?.title_en ? (vegvisirSec as any).title_en : (isEn && vegvisirSec?.title ? translationService.fallbackTranslate(vegvisirSec.title, 'EN') : (vegvisirSec?.title ? vegvisirSec.title.replace(/Vegvisiri/gi, 'Vegvisir').split('(')[0].trim() : 'Velero Vegvisir'));
+  const vegvisirBody = isEn && (vegvisirSec as any)?.body_text_en ? (vegvisirSec as any).body_text_en : (isEn && vegvisirSec?.body_text ? translationService.fallbackTranslate(vegvisirSec.body_text, 'EN') : (vegvisirSec?.body_text || 'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.'));
+
+  const terranovaTitle = isEn && (terranovaSec as any)?.title_en ? (terranovaSec as any).title_en : (isEn && terranovaSec?.title ? translationService.fallbackTranslate(terranovaSec.title, 'EN') : (terranovaSec?.title ? terranovaSec.title.split('(')[0].trim() : 'Yate Terranova'));
+  const terranovaBody = isEn && (terranovaSec as any)?.body_text_en ? (terranovaSec as any).body_text_en : (isEn && terranovaSec?.body_text ? translationService.fallbackTranslate(terranovaSec.body_text, 'EN') : (terranovaSec?.body_text || 'Yate Hatteras 65ft LRC americano de 3 cubiertas (20 PAX • 5 cabinas • 5 baños) con 3.000 MN de autonomía y Starlink 24/7.'));
+
+  const lodgeTitle = isEn && (lodgeSec as any)?.title_en ? (lodgeSec as any).title_en : (isEn && lodgeSec?.title ? translationService.fallbackTranslate(lodgeSec.title, 'EN') : (lodgeSec?.title || 'Lodge Rincón de Navegantes'));
+  const lodgeBody = isEn && (lodgeSec as any)?.body_text_en ? (lodgeSec as any).body_text_en : (isEn && lodgeSec?.body_text ? translationService.fallbackTranslate(lodgeSec.body_text, 'EN') : (lodgeSec?.body_text || 'Lodge frente al mar en Uberlindo Andaur 222 (11 PAX • 4 cabinas con baño privado), amplio quincho, terraza y exploraciones en Robinson Crusoe.'));
 
   return (
     <div className="space-y-0">
@@ -27,13 +45,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
             <span className="text-slate-600 font-bold text-xs uppercase tracking-widest bg-slate-200/80 px-3 py-1 rounded-full border border-slate-300">
-              {introSection.subtitle || 'AVENTURA EN TERRITORIOS INEXPLORADOS & PRÍSTINOS'}
+              {introSubtitle}
             </span>
             <h2 className="font-serif text-3xl sm:text-5xl font-bold text-slate-900">
-              {introSection.title || 'Tres Formas de Vivir la Aventura Austral'}
+              {introTitle}
             </h2>
             <p className="text-slate-600 text-base sm:text-lg">
-              {introSection.body_text || 'Explora el Archipiélago Juan Fernández, Isla Alejandro Selkirk y los fiordos del Cabo de Hornos a través de nuestras tres experiencias exclusivas.'}
+              {introBody}
             </p>
           </div>
 
@@ -55,15 +73,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <h3 className="font-serif text-xl font-bold text-white group-hover:text-stone-200 transition-colors w-fit">
                     <span className="relative pb-1 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-stone-200 after:transition-all after:duration-500 group-hover:after:w-full">
-                      {vegvisirSec.title ? vegvisirSec.title.split('(')[0].trim() : 'Velero Vegvisir'}
+                      {vegvisirTitle}
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
-                    {vegvisirSec.body_text || 'Velero de Altamar Dufour 52.5 ft francés de expedición austral con Starlink 24/7 y autonomía total.'}
+                    {vegvisirBody}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
-                  <span>Explorar Velero</span>
+                  <span>{t('Explorar Velero', 'Explore Sailboat')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform text-white" />
                 </div>
               </div>
@@ -85,15 +103,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <h3 className="font-serif text-xl font-bold text-white group-hover:text-stone-200 transition-colors w-fit">
                     <span className="relative pb-1 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-stone-200 after:transition-all after:duration-500 group-hover:after:w-full">
-                      {terranovaSec.title ? terranovaSec.title.split('(')[0].trim() : 'Yate Terranova'}
+                      {terranovaTitle}
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
-                    {terranovaSec.body_text || 'Yate Hatteras 65ft LRC americano de 3 cubiertas (20 PAX • 5 cabinas • 5 baños) con 3.000 MN de autonomía y Starlink 24/7.'}
+                    {terranovaBody}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
-                  <span>Explorar Yate</span>
+                  <span>{t('Explorar Yate', 'Explore Yacht')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform text-white" />
                 </div>
               </div>
@@ -115,15 +133,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <div className="space-y-1.5">
                   <h3 className="font-serif text-xl font-bold text-white group-hover:text-stone-200 transition-colors w-fit">
                     <span className="relative pb-1 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-stone-200 after:transition-all after:duration-500 group-hover:after:w-full">
-                      {lodgeSec.title || 'Lodge Rincón de Navegantes'}
+                      {lodgeTitle}
                     </span>
                   </h3>
                   <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
-                    {lodgeSec.body_text || 'Lodge frente al mar en Uberlindo Andaur 222 (11 PAX • 4 cabinas con baño privado), amplio quincho, terraza y exploraciones en Robinson Crusoe.'}
+                    {lodgeBody}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
-                  <span>Conocer el Lodge</span>
+                  <span>{t('Conocer el Lodge', 'Explore the Lodge')}</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform text-white" />
                 </div>
               </div>

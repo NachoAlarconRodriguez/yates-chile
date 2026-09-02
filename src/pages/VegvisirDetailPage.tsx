@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X, Radio, Droplets, FileText, Download, ArrowRight } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
+import { useLanguage } from '../context/LanguageContext';
 
 interface VegvisirDetailPageProps {
   onNavigate: (path: string) => void;
@@ -10,6 +11,8 @@ interface VegvisirDetailPageProps {
 export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNavigate }) => {
   const { expeditions } = useExpeditions();
   const { getSection } = useSiteContent();
+  const { language, t } = useLanguage();
+  const isEn = language === 'EN';
   const vegvisirCms = getSection('flota_vegvisir');
 
   const [showExpeditionsModal, setShowExpeditionsModal] = React.useState(false);
@@ -19,12 +22,12 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
   };
 
   const currentDateFormatted = React.useMemo(() => {
-    return new Intl.DateTimeFormat('es-CL', {
+    return new Intl.DateTimeFormat(isEn ? 'en-US' : 'es-CL', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     }).format(new Date()).toUpperCase();
-  }, []);
+  }, [isEn]);
 
   const [fullscreenIndex, setFullscreenIndex] = React.useState<number | null>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -53,8 +56,6 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fullscreenIndex]);
 
-
-
   const [selectedFeature, setSelectedFeature] = React.useState<'climatizacion' | 'gastronomia' | 'casco' | 'desembarcos'>('climatizacion');
 
   const vegvisirLogbookSec = getSection('vegvisir_logbook');
@@ -62,47 +63,47 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
   const logbookEntries = {
     climatizacion: {
-      title: cmsEntries.climatizacion?.nav_title || 'Climatización Sistema Webasto',
-      nav_description: cmsEntries.climatizacion?.nav_description || 'Sistema de calefacción por radiadores de agua caliente controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.',
+      title: (isEn && cmsEntries.climatizacion?.nav_title_en) || cmsEntries.climatizacion?.nav_title || (isEn ? 'Webasto Heating System & Climate Control' : 'Climatización Sistema Webasto'),
+      nav_description: (isEn && cmsEntries.climatizacion?.nav_description_en) || cmsEntries.climatizacion?.nav_description || (isEn ? 'Hot-water radiator heating system individually controllable in every cabin, guaranteeing optimal thermal comfort in glacial waters.' : 'Sistema de calefacción por radiadores de agua caliente controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.'),
       day: cmsEntries.climatizacion?.day || 'Día 12 de Travesía',
       location: cmsEntries.climatizacion?.location || 'Canal Sarmiento',
       coordinates: cmsEntries.climatizacion?.coordinates || '51°52\' S, 73°40\' W',
       wind: cmsEntries.climatizacion?.wind || 'W 32 Nudos',
       temp: cmsEntries.climatizacion?.temp || '2°C Ext',
-      text: cmsEntries.climatizacion?.text || 'El frío antártico cala hondo en cubierta, pero el Vegvisir nos abraza en su interior. La climatización con sistema Webasto mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa de roble mientras contemplamos la ventisca desde el ventanal templado.',
+      text: (isEn && cmsEntries.climatizacion?.text_en) || cmsEntries.climatizacion?.text || (isEn ? 'The Antarctic cold penetrates deep on deck, but Vegvisir embraces us inside. The Webasto heating keeps the salon at a steady 21°C as we watch the squall from the heated windows.' : 'El frío antártico cala hondo en cubierta, pero el Vegvisir nos abraza en su interior. La climatización con sistema Webasto mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa de roble mientras contemplamos la ventisca desde el ventanal templado.'),
       image: cmsEntries.climatizacion?.image || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
     },
     gastronomia: {
-      title: cmsEntries.gastronomia?.nav_title || 'Gastronomía',
-      nav_description: cmsEntries.gastronomia?.nav_description || 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+      title: (isEn && cmsEntries.gastronomia?.nav_title_en) || cmsEntries.gastronomia?.nav_title || (isEn ? 'Oceanic Gastronomy' : 'Gastronomía'),
+      nav_description: (isEn && cmsEntries.gastronomia?.nav_description_en) || cmsEntries.gastronomia?.nav_description || (isEn ? 'Catering throughout our voyages is tailored for life at sea: hearty, wholesome, nourishing meals adapted to oceanic sailing rhythms.' : 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.'),
       day: cmsEntries.gastronomia?.day || 'Día 15 de Travesía',
       location: cmsEntries.gastronomia?.location || 'Seno Ventisquero',
       coordinates: cmsEntries.gastronomia?.coordinates || '54°30\' S, 69°12\' W',
       wind: cmsEntries.gastronomia?.wind || 'Calma',
       temp: cmsEntries.gastronomia?.temp || '4°C Ext',
-      text: cmsEntries.gastronomia?.text || 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+      text: (isEn && cmsEntries.gastronomia?.text_en) || cmsEntries.gastronomia?.text || (isEn ? 'Catering throughout our voyages is tailored for life at sea: hearty, wholesome, nourishing meals adapted to oceanic sailing rhythms.' : 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.'),
       image: cmsEntries.gastronomia?.image || '/flota/vegvisir/vegvisir-gastronomia.jpg',
     },
     casco: {
-      title: cmsEntries.casco?.nav_title || 'Casco Reforzado',
-      nav_description: cmsEntries.casco?.nav_description || 'Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hacia el Archipiélago Juan Fernández y Robinson Crusoe, hasta la geografía extrema de los fiordos, canales e islas del extremo sur de Chile.',
+      title: (isEn && cmsEntries.casco?.nav_title_en) || cmsEntries.casco?.nav_title || (isEn ? 'Reinforced Heavy-Duty Hull' : 'Casco Reforzado'),
+      nav_description: (isEn && cmsEntries.casco?.nav_description_en) || cmsEntries.casco?.nav_description || (isEn ? 'Robust hull engineering prepared for oceanic routes and remote frontiers, from open Pacific crossings to extreme Patagonian fiord navigation.' : 'Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hacia el Archipiélago Juan Fernández y Robinson Crusoe, hasta la geografía extrema de los fiordos, canales e islas del extremo sur de Chile.'),
       day: cmsEntries.casco?.day || 'Día 18 de Travesía',
       location: cmsEntries.casco?.location || 'Paso del Indio',
       coordinates: cmsEntries.casco?.coordinates || '49°02\' S, 74°24\' W',
       wind: cmsEntries.casco?.wind || 'NW 45 Nudos',
       temp: cmsEntries.casco?.temp || '1°C Ext',
-      text: cmsEntries.casco?.text || 'Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado y la quilla de plomo del Vegvisir infunden total confianza cuando el hielo roza suavemente la estructura. La embarcación corta el mar embravecido con firmeza impecable.',
+      text: (isEn && cmsEntries.casco?.text_en) || cmsEntries.casco?.text || (isEn ? 'Sailing among drifting ice floes under an austral storm. The solidity of Vegvisir’s reinforced hull and lead keel inspires total confidence.' : 'Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado y la quilla de plomo del Vegvisir infunden total confianza cuando el hielo roza suavemente la estructura. La embarcación corta el mar embravecido con firmeza impecable.'),
       image: cmsEntries.casco?.image || '/velero-vegvisir.jpg',
     },
     desembarcos: {
-      title: cmsEntries.desembarcos?.nav_title || 'Desembarcos Seguros',
-      nav_description: cmsEntries.desembarcos?.nav_description || 'Equipado con bote Zodiac auxiliar de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores donde no existen muelles o infraestructura portuaria, facilitando el acceso desde el velero a playas, caletas y otros puntos de interés.',
+      title: (isEn && cmsEntries.desembarcos?.nav_title_en) || cmsEntries.desembarcos?.nav_title || (isEn ? 'Safe Coastal Landings' : 'Desembarcos Seguros'),
+      nav_description: (isEn && cmsEntries.desembarcos?.nav_description_en) || cmsEntries.desembarcos?.nav_description || (isEn ? 'Equipped with high-buoyancy Zodiac auxiliary tender for safe landings and close approaches in remote bays without port infrastructure.' : 'Equipado con bote Zodiac auxiliar de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores donde no existen muelles o infraestructura portuaria, facilitando el acceso desde el velero a playas, caletas y otros puntos de interés.'),
       day: cmsEntries.desembarcos?.day || 'Día 20 de Travesía',
       location: cmsEntries.desembarcos?.location || 'Bahía Ainsworth',
       coordinates: cmsEntries.desembarcos?.coordinates || '54°22\' S, 69°38\' W',
       wind: cmsEntries.desembarcos?.wind || 'SW 15 Nudos',
       temp: cmsEntries.desembarcos?.temp || '5°C Ext',
-      text: cmsEntries.desembarcos?.text || 'Alistamos el bote Zodiac auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos. Una maniobra segura en un paraje de belleza salvaje.',
+      text: (isEn && cmsEntries.desembarcos?.text_en) || cmsEntries.desembarcos?.text || (isEn ? 'We ready the high-buoyancy rigid-inflatable Zodiac auxiliary tender. Approaching the glacial front and landing on moraine beaches proceeds smoothly.' : 'Alistamos el bote Zodiac auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos. Una maniobra segura en un paraje de belleza salvaje.'),
       image: cmsEntries.desembarcos?.image || '/flota/vegvisir/vegvisir-desembarcos.jpg',
     },
   };
@@ -178,16 +179,16 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
             className="inline-flex items-center gap-2 bg-slate-950/60 hover:bg-slate-950/80 backdrop-blur-md text-white font-semibold px-4 py-2.5 rounded-xl border border-white/10 transition shadow-lg text-xs cursor-pointer min-h-[40px]"
           >
             <ArrowLeft className="w-4 h-4 text-white" />
-            <span>Volver a Inicio</span>
+            <span>{t('Volver a Inicio', 'Back to Home')}</span>
           </button>
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-3.5">
           <h1 className="font-serif text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight drop-shadow-md">
-            {vegvisirCms.title ? vegvisirCms.title.replace(/Vegvisiri/gi, 'Vegvisir').replace(/\s*\([^)]*\)/g, '').trim() : 'Velero Vegvisir'}
+            {vegvisirCms.title ? vegvisirCms.title.replace(/Vegvisiri/gi, 'Vegvisir').replace(/\s*\([^)]*\)/g, '').trim() : t('Velero Vegvisir', 'Vegvisir Sailboat')}
           </h1>
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl opacity-90 drop-shadow-sm">
-            {vegvisirCms.body_text || '52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.'}
+            {vegvisirCms.body_text || t('52.5 pies de pura navegación a vela con casco oceánico reforzado, 5 cabinas triples y dobles con baño en suite, salón panorámico y equipamiento de navegación satelital de última generación.', '52.5 ft pure ocean sailing with reinforced offshore hull, 5 triple and double en-suite cabins, panoramic salon, and next-gen satellite navigation.')}
           </p>
           <div className="pt-2">
             <button
@@ -195,7 +196,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
               className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-6 py-3 rounded-xl transition-all shadow-xl text-xs sm:text-sm border border-white/90 cursor-pointer hover:scale-[1.02]"
             >
               <Compass className="w-4 h-4 text-slate-950" />
-              <span>Reservar Expediciones en Velero Vegvisir</span>
+              <span>{t('Reservar Expediciones en Velero Vegvisir', 'Book Expeditions on Vegvisir Sailboat')}</span>
             </button>
           </div>
         </div>
@@ -208,7 +209,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
             {/* Header */}
             <div className="bg-[#0f2b48] text-white p-5 sm:p-6 flex items-center justify-between shrink-0">
               <h3 className="font-serif text-xl sm:text-2xl font-bold text-white pr-4">
-                Expediciones Programadas en Velero Vegvisir
+                {t('Expediciones Programadas en Velero Vegvisir', 'Scheduled Expeditions on Vegvisir Sailboat')}
               </h3>
               <button
                 onClick={() => setShowExpeditionsModal(false)}
@@ -238,11 +239,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-mono font-bold uppercase text-sky-900 bg-sky-100 px-2 py-0.5 rounded-md">
-                          {exp.startDate} al {exp.endDate}
+                          {exp.startDate} {t('al', 'to')} {exp.endDate}
                         </span>
                         {typeof exp.spotsLeft === 'number' && (
                           <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                            {exp.spotsLeft} cupos disponibles
+                            {exp.spotsLeft} {t('cupos disponibles', 'spots available')}
                           </span>
                         )}
                       </div>
@@ -268,7 +269,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                       className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Brochure PDF</span>
+                      <span>{t('Brochure PDF', 'PDF Brochure')}</span>
                     </button>
 
                     <button
@@ -285,7 +286,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                       }}
                       className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
                     >
-                      <span>Reservar Cupo</span>
+                      <span>{t('Reservar Cupo', 'Book Spot')}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -326,11 +327,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">NORTE / ASTILLERO</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
                     <span className="text-base font-bold text-slate-900 block mt-0.5">Dufour 52.5 ft</span>
-                    <span className="text-slate-500 text-[10px] block">Francés • QUI 2718</span>
+                    <span className="text-slate-500 text-[10px] block">{t('Francés • QUI 2718', 'French • QUI 2718')}</span>
                   </div>
-                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -341,11 +342,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Identificación</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">{t('Identificación', 'Identification')}</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[190px] mx-auto">
-                    Diseñado para navegar las aguas del Pacífico Sur, Archipiélago Juan Fernández, Canal Beagle y el Cabo de Hornos con total serenidad.
+                    {t('Diseñado para navegar las aguas del Pacífico Sur, Archipiélago Juan Fernández, Canal Beagle y el Cabo de Hornos con total serenidad.', 'Engineered to sail the waters of the South Pacific, Juan Fernández Archipelago, Beagle Channel and Cape Horn with absolute serenity.')}
                   </p>
-                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -374,11 +375,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">OESTE / CAPACIDAD</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('OESTE / CAPACIDAD', 'WEST / CAPACITY')}</span>
                     <span className="text-base font-bold text-slate-900 block mt-0.5">12 PAX</span>
-                    <span className="text-slate-500 text-[10px] block">5 Cabinas / 5 Baños</span>
+                    <span className="text-slate-500 text-[10px] block">{t('5 Cabinas / 5 Baños', '5 Cabins / 5 Baths')}</span>
                   </div>
-                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -389,11 +390,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">Habitabilidad</span>
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">{t('Habitabilidad', 'Habitability')}</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    Capacidad para 12 pasajeros con 5 cabinas y 5 baños completos. Amplio salón central y cocina completa.
+                    {t('Capacidad para 12 pasajeros con 5 cabinas y 5 baños completos. Amplio salón central y cocina completa.', 'Capacity for 12 guests with 5 cabins and 5 full en-suite bathrooms. Spacious central salon and full galley.')}
                   </p>
-                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">Volver ➔</span>
+                  <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -422,13 +423,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">SUR / NAVEGACIÓN</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION')}</span>
                     <span className="text-xs sm:text-[13px] font-bold text-slate-900 block mt-0.5 leading-tight max-w-[160px] mx-auto">
-                      Sistema de Navegación de Última Generación
+                      {t('Sistema de Navegación de Última Generación', 'Next-Generation Navigation System')}
                     </span>
                     <span className="text-slate-500 text-[10px] block mt-0.5">Starlink 24/7</span>
                   </div>
-                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -440,7 +441,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   }}
                 >
                   <div>
-                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">Electrónica</span>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">{t('Electrónica', 'Electronics')}</span>
                     <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block mt-0.5">RAYMARINE</span>
                   </div>
 
@@ -451,15 +452,15 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>Piloto Automático Raymarine</span>
+                      <span>{t('Piloto Automático Raymarine', 'Raymarine Autopilot')}</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>Conexión satelital Starlink 24/7 de alta velocidad</span>
+                      <span>{t('Conexión satelital Starlink 24/7 de alta velocidad', '24/7 High-speed Starlink Satellite Internet')}</span>
                     </li>
                   </ul>
 
-                  <span className="text-[8px] text-blue-900/60 font-mono uppercase">Volver ➔</span>
+                  <span className="text-[8px] text-blue-900/60 font-mono uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -488,11 +489,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">ESTE / AUTONOMÍA</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('ESTE / AUTONOMÍA', 'EAST / AUTONOMY')}</span>
                     <span className="text-base font-bold text-slate-900 block mt-0.5">140 Ltrs/hr</span>
                     <span className="text-slate-500 text-[10px] block">Zodiac 4.3m / 15hp</span>
                   </div>
-                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">Click para detalle</span>
+                  <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
 
                 {/* Back */}
@@ -504,41 +505,41 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   }}
                 >
                   <div>
-                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">Autonomía & Energía</span>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">{t('Autonomía & Energía', 'Autonomy & Power')}</span>
                   </div>
 
                   <ul className="text-slate-700 text-[8px] sm:text-[8.5px] leading-tight space-y-0.5 sm:space-y-1 text-left px-0.5 w-full max-w-[205px]">
                     <li className="flex items-start gap-1">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span><strong>Combustible:</strong> 500 L en 2 estanques independientes</span>
+                      <span><strong>{t('Combustible:', 'Fuel:')}</strong> {t('500 L en 2 estanques independientes', '500 L across 2 independent tanks')}</span>
                     </li>
                     <li className="flex items-start gap-1">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span><strong>Agua:</strong> 1.000 L divididos en 4 estanques independientes</span>
+                      <span><strong>{t('Agua:', 'Freshwater:')}</strong> {t('1.000 L divididos en 4 estanques independientes', '1,000 L in 4 independent tanks')}</span>
                     </li>
                     <li className="flex items-start gap-1">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span><strong>Motor:</strong> Perkins 90 HP</span>
+                      <span><strong>{t('Motor:', 'Engine:')}</strong> Perkins 90 HP</span>
                     </li>
                     <li className="flex items-start gap-1">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>Planta Desalinizadora</span>
+                      <span>{t('Planta Desalinizadora', 'Watermaker System')}</span>
                     </li>
                     <li className="flex items-start gap-1">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>Panel Solar 600 Wts</span>
+                      <span>{t('Panel Solar 600 Wts', '600W Solar Panel')}</span>
                     </li>
                     <li className="flex items-start gap-1">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>2 Baterías de Litio</span>
+                      <span>{t('2 Baterías de Litio', '2 Lithium Batteries')}</span>
                     </li>
                     <li className="flex items-start gap-1">
                       <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>2 Calefacciones tipo Webasto</span>
+                      <span>{t('2 Calefacciones tipo Webasto', '2 Webasto Marine Heaters')}</span>
                     </li>
                   </ul>
 
-                  <span className="text-[7.5px] text-blue-900/60 font-mono uppercase">Volver ➔</span>
+                  <span className="text-[7.5px] text-blue-900/60 font-mono uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
               </div>
             </div>
@@ -552,13 +553,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           <div className="text-center max-w-3xl mx-auto mb-12 space-y-3">
             <span className="text-blue-900 font-bold text-xs uppercase tracking-widest bg-blue-50 px-3.5 py-1.5 rounded-full border border-blue-900/15 inline-flex items-center gap-2">
               <FileText className="w-3.5 h-3.5 text-blue-900" />
-              <span>Ficha Técnica Oficial • Matrícula QUI 2718</span>
+              <span>{t('Ficha Técnica Oficial • Matrícula QUI 2718', 'Official Technical Sheet • Registration QUI 2718')}</span>
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight">
-              Especificaciones Técnicas del Velero Vegvisir
+              {t('Especificaciones Técnicas del Velero Vegvisir', 'Technical Specifications of the Vegvisir Sailboat')}
             </h2>
             <p className="text-slate-600 text-sm max-w-xl mx-auto">
-              Velero de expedición de astillero francés Dufour 52.5 ft con equipamiento oceánico de última generación y autonomía total.
+              {t('Velero de expedición de astillero francés Dufour 52.5 ft con equipamiento oceánico de última generación y autonomía total.', '52.5 ft French Dufour expedition sailboat equipped with state-of-the-art oceanic navigation gear and complete autonomy.')}
             </p>
           </div>
 
@@ -569,25 +570,25 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <Anchor className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Embarcación & Registro</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Identificación y dimensiones</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Embarcación & Registro', 'Vessel & Registration')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Identificación y dimensiones', 'Identification & dimensions')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Astillero / Modelo:</span>
+                  <span className="text-slate-500">{t('Astillero / Modelo:', 'Shipyard / Model:')}</span>
                   <span className="font-bold text-slate-900">Dufour 52.5 ft</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Origen:</span>
-                  <span className="font-bold text-slate-900">Francés</span>
+                  <span className="text-slate-500">{t('Origen:', 'Origin:')}</span>
+                  <span className="font-bold text-slate-900">{t('Francés', 'French')}</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Matrícula:</span>
+                  <span className="text-slate-500">{t('Matrícula:', 'Registration:')}</span>
                   <span className="font-mono font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">QUI 2718</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Tipo:</span>
-                  <span className="font-bold text-slate-900">Velero de Expedición</span>
+                  <span className="text-slate-500">{t('Tipo:', 'Type:')}</span>
+                  <span className="font-bold text-slate-900">{t('Velero de Expedición', 'Expedition Sailboat')}</span>
                 </li>
               </ul>
             </div>
@@ -598,25 +599,25 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <Users className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Habitabilidad & Confort</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Alojamiento y distribución</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Habitabilidad & Confort', 'Habitability & Comfort')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Alojamiento y distribución', 'Accommodation & layout')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Capacidad Total:</span>
-                  <span className="font-bold text-slate-900">12 PAX (Pasajeros)</span>
+                  <span className="text-slate-500">{t('Capacidad Total:', 'Total Capacity:')}</span>
+                  <span className="font-bold text-slate-900">{t('12 PAX (Pasajeros)', '12 Guests')}</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Cabinas:</span>
-                  <span className="font-bold text-slate-900">5 Cabinas privadas</span>
+                  <span className="text-slate-500">{t('Cabinas:', 'Cabins:')}</span>
+                  <span className="font-bold text-slate-900">{t('5 Cabinas privadas', '5 Private cabins')}</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Baños:</span>
-                  <span className="font-bold text-slate-900">5 Baños completos</span>
+                  <span className="text-slate-500">{t('Baños:', 'Bathrooms:')}</span>
+                  <span className="font-bold text-slate-900">{t('5 Baños completos', '5 Full bathrooms')}</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Espacios Comunes:</span>
-                  <span className="font-bold text-slate-900">Amplio salón & Cocina</span>
+                  <span className="text-slate-500">{t('Espacios Comunes:', 'Common Areas:')}</span>
+                  <span className="font-bold text-slate-900">{t('Amplio salón & Cocina', 'Spacious salon & galley')}</span>
                 </li>
               </ul>
             </div>
@@ -627,23 +628,23 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <Radio className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Electrónica & Satelital</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Instrumental de alta precisión</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Electrónica & Satelital', 'Electronics & Satellite')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Instrumental de alta precisión', 'High-precision instrumentation')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Internet Satelital:</span>
+                  <span className="text-slate-500">{t('Internet Satelital:', 'Satellite Internet:')}</span>
                   <span className="font-bold text-emerald-700 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     Starlink 24/7
                   </span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Plotter Náutico:</span>
+                  <span className="text-slate-500">{t('Plotter Náutico:', 'Chartplotter:')}</span>
                   <span className="font-bold text-slate-900">Raymarine</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Piloto Automático:</span>
+                  <span className="text-slate-500">{t('Piloto Automático:', 'Autopilot:')}</span>
                   <span className="font-bold text-slate-900">Raymarine</span>
                 </li>
               </ul>
@@ -655,20 +656,20 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                 <Droplets className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif font-bold text-lg text-slate-900">Autonomía & Desembarco</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Equipamiento expedicionario</p>
+                <h4 className="font-serif font-bold text-lg text-slate-900">{t('Autonomía & Desembarco', 'Autonomy & Landings')}</h4>
+                <p className="text-xs text-slate-500 mt-0.5">{t('Equipamiento expedicionario', 'Expedition equipment')}</p>
               </div>
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Desalinizador:</span>
+                  <span className="text-slate-500">{t('Desalinizador:', 'Watermaker:')}</span>
                   <span className="font-bold text-blue-900">140 ltrs/hr</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Zodiac Auxiliar:</span>
-                  <span className="font-bold text-slate-900">4.3 metros</span>
+                  <span className="text-slate-500">{t('Zodiac Auxiliar:', 'Auxiliary Zodiac:')}</span>
+                  <span className="font-bold text-slate-900">{t('4.3 metros', '4.3 meters')}</span>
                 </li>
                 <li className="flex justify-between items-center">
-                  <span className="text-slate-500">Motor Fuera de Borda:</span>
+                  <span className="text-slate-500">{t('Motor Fuera de Borda:', 'Outboard Engine:')}</span>
                   <span className="font-bold text-slate-900">Mercury 4T / 15 HP</span>
                 </li>
               </ul>
@@ -684,13 +685,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           
           <div className="text-center max-w-2xl mx-auto mb-14">
             <span className="text-blue-900 font-bold text-xs uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full border border-blue-900/10">
-              Ingeniería & Vida a Bordo
+              {t('Ingeniería & Vida a Bordo', 'Engineering & Life on Board')}
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 leading-tight mt-3">
-              Cuaderno de Bitácora y Características
+              {t('Cuaderno de Bitácora y Características', 'Captain\'s Logbook & Features')}
             </h2>
             <p className="text-slate-500 text-sm mt-2">
-              Explora las vivencias de navegación austral y los detalles técnicos que hacen del Vegvisir una embarcación de travesía insuperable.
+              {t('Explora las vivencias de navegación austral y los detalles técnicos que hacen del Vegvisir una embarcación de travesía insuperable.', 'Explore austral sailing chronicles and technical engineering that make Vegvisir an unmatched expedition vessel.')}
             </p>
           </div>
 
@@ -716,26 +717,26 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   {/* Navigation Metadata Grid */}
                   <div className="grid grid-cols-2 gap-y-4 gap-x-2 bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50">
                     <div>
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">Ubicación</span>
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">{t('Ubicación', 'Location')}</span>
                       <span className="text-[11px] font-sans font-extrabold text-slate-800">{logbookEntries[selectedFeature].location}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">Coordenadas</span>
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">{t('Coordenadas', 'Coordinates')}</span>
                       <span className="text-[11px] font-mono font-bold text-blue-900">{logbookEntries[selectedFeature].coordinates}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">Viento</span>
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">{t('Viento', 'Wind')}</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700">{logbookEntries[selectedFeature].wind}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">Clima</span>
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">{t('Clima', 'Weather')}</span>
                       <span className="text-[11px] font-sans font-bold text-slate-700">{logbookEntries[selectedFeature].temp}</span>
                     </div>
                   </div>
 
                   {/* Captain's Narrative entry */}
                   <div className="space-y-2">
-                    <span className="font-serif italic text-[11px] font-semibold text-blue-900/60 block">Relato del Capitán:</span>
+                    <span className="font-serif italic text-[11px] font-semibold text-blue-900/60 block">{t('Relato del Capitán:', 'Captain\'s Narrative:')}</span>
                     <p className="font-serif italic text-slate-600 text-sm leading-relaxed border-l-2 border-blue-900/10 pl-3">
                       "{logbookEntries[selectedFeature].text}"
                     </p>
@@ -752,7 +753,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                   {/* Subtle vignette shade */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
                   <div className="absolute bottom-3 left-3 text-[10px] font-mono text-white/90 bg-slate-900/40 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 uppercase">
-                    Snapshot Travesía
+                    {t('Snapshot Travesía', 'Voyage Snapshot')}
                   </div>
                 </div>
               </div>
@@ -866,13 +867,13 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-900/10 border border-blue-900/20 text-blue-900 text-xs font-semibold uppercase tracking-wider">
               <Compass className="w-3.5 h-3.5 text-blue-950 animate-[spin_30s_linear_infinite]" />
-              <span>Galería Fotográfica de Navegación</span>
+              <span>{t('Galería Fotográfica de Navegación', 'Navigation Photo Gallery')}</span>
             </span>
             <h3 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
-              Momentos y Vistas del Velero Vegvisir
+              {t('Momentos y Vistas del Velero Vegvisir', 'Moments & Views of Vegvisir Sailboat')}
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Fotografías reales a vela abierta, fondeos frente a glaciares patagónicos y caletas protegidas en el Archipiélago Juan Fernández y el Extremo Sur.
+              {t('Fotografías reales a vela abierta, fondeos frente a glaciares patagónicos y caletas protegidas en el Archipiélago Juan Fernández y el Extremo Sur.', 'Authentic sailing photography under open sails, glacial anchorages and protected coves in Juan Fernández and the Deep South.')}
             </p>
           </div>
 
@@ -893,11 +894,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
             <div className="relative z-20 w-full p-5 sm:p-6 flex justify-between items-center pointer-events-none">
               <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-white/95 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
                 <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                <span>Velero Vegvisir • Foto 0{currentPhotoIndex + 1} de 0{images.length}</span>
+                <span>{t('Velero Vegvisir • Foto', 'Vegvisir Sailboat • Photo')} 0{currentPhotoIndex + 1} {t('de', 'of')} 0{images.length}</span>
               </div>
               <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-sky-300 font-mono text-[10px] sm:text-xs tracking-wider select-none shadow-md hidden sm:flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span>{images[currentPhotoIndex].location || 'Navegación Austral'}</span>
+                <span>{images[currentPhotoIndex].location || t('Navegación Austral', 'Austral Sailing')}</span>
               </div>
             </div>
 
