@@ -27,6 +27,8 @@ import {
   ChevronRight,
   ChevronLeft,
   ChevronDown,
+  ArrowUp,
+  ArrowDown,
   Check,
   LayoutDashboard,
   LayoutGrid,
@@ -141,6 +143,42 @@ const formatDateDDMMYYYY = (d?: any): string => {
     return `${day}/${month}/${year}`;
   }
   return str;
+};
+
+const getDepartureTimestamp = (d?: any): number => {
+  if (!d) return 0;
+  if (d instanceof Date) return isNaN(d.getTime()) ? 0 : d.getTime();
+  const str = String(d).trim();
+  if (!str || str === 'undefined' || str === 'null') return 0;
+  const clean = str.split('T')[0].trim();
+  const p = clean.split('-');
+  if (p.length === 3 && p[0].length === 4) {
+    const t = new Date(`${p[0]}-${p[1]}-${p[2]}T00:00:00`).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const slashParts = clean.split('/');
+  if (slashParts.length === 3 && slashParts[2].length === 4) {
+    const t = new Date(`${slashParts[2]}-${slashParts[1]}-${slashParts[0]}T00:00:00`).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const monthNames: Record<string, string> = {
+    ene: '01', feb: '02', mar: '03', abr: '04', may: '05', jun: '06',
+    jul: '07', ago: '08', sep: '09', sept: '09', oct: '10', nov: '11', dic: '12',
+    jan: '01', apr: '04', aug: '08', dec: '12'
+  };
+  const parts = clean.split(/\s+/);
+  if (parts.length === 3) {
+    const day = parts[0].padStart(2, '0');
+    const monthKey = parts[1].toLowerCase().replace('.', '');
+    const month = monthNames[monthKey];
+    const year = parts[2];
+    if (month && /^\d{4}$/.test(year) && /^\d{1,2}$/.test(day)) {
+      const t = new Date(`${year}-${month}-${day}T00:00:00`).getTime();
+      if (!isNaN(t)) return t;
+    }
+  }
+  const dateObj = new Date(str);
+  return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
 };
 
 const calculateDurationDays = (start?: any, end?: any): number => {
@@ -664,6 +702,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [isUpcomingExpeditionsOpen, setIsUpcomingExpeditionsOpen] = useState(true);
   const [expeditionsViewMode, setExpeditionsViewMode] = useState<'grid' | 'list'>('grid');
   const [expeditionsAssetFilter, setExpeditionsAssetFilter] = useState<'all' | 'vegvisir' | 'terranova' | 'lodge'>('all');
+  const [expeditionsDateSortOrder, setExpeditionsDateSortOrder] = useState<'asc' | 'desc'>('asc');
   const [kpiTimeframe, setKpiTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('month');
 
   // Estados de la pestaña dedicada de Reservas
@@ -2214,7 +2253,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   }, [upcomingExpeditions]);
 
   const filteredDepartures = useMemo(() => {
-    return departures.filter((dep) => {
+    const list = departures.filter((dep) => {
       if (expeditionsAssetFilter === 'all') return true;
       const vessel = vessels.find((v) => v.id === dep.vessel_id);
       const vName = (vessel?.name || dep.vessel_id || '').toLowerCase();
@@ -2222,17 +2261,29 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       if (expeditionsAssetFilter === 'terranova') return dep.vessel_id === 'terranova' || vName.includes('terranova');
       return true;
     });
-  }, [departures, vessels, expeditionsAssetFilter]);
+
+    return [...list].sort((a, b) => {
+      const timeA = getDepartureTimestamp(a.departure_date || (a as any).startDate);
+      const timeB = getDepartureTimestamp(b.departure_date || (b as any).startDate);
+      return expeditionsDateSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+    });
+  }, [departures, vessels, expeditionsAssetFilter, expeditionsDateSortOrder]);
 
   const filteredUpcomingExpeditions = useMemo(() => {
-    return upcomingExpeditions.filter((exp) => {
+    const list = upcomingExpeditions.filter((exp) => {
       if (expeditionsAssetFilter === 'all') return true;
       const vName = exp.vesselName.toLowerCase();
       if (expeditionsAssetFilter === 'vegvisir') return vName.includes('vegvisir');
       if (expeditionsAssetFilter === 'terranova') return vName.includes('terranova');
       return true;
     });
-  }, [upcomingExpeditions, expeditionsAssetFilter]);
+
+    return [...list].sort((a, b) => {
+      const timeA = getDepartureTimestamp(a.rawDepartureDate || a.departureDates || a.departureDateFormatted);
+      const timeB = getDepartureTimestamp(b.rawDepartureDate || b.departureDates || b.departureDateFormatted);
+      return expeditionsDateSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+    });
+  }, [upcomingExpeditions, expeditionsAssetFilter, expeditionsDateSortOrder]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -8093,7 +8144,36 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         <tr>
                           <th className="px-6 py-4">Ruta & Expedición</th>
                           <th className="px-6 py-4">Embarcación</th>
-                          <th className="px-6 py-4">Fechas de Salida</th>
+                          <th className="px-6 py-4">
+                            <button
+                              type="button"
+                              onClick={() => setExpeditionsDateSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                              className="group inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider font-bold text-slate-500 hover:text-[#0b192c] transition-colors cursor-pointer select-none"
+                              title={
+                                expeditionsDateSortOrder === 'asc'
+                                  ? 'Orden actual: Menor a Mayor (fechas más próximas primero). Clic para ordenar de Mayor a Menor.'
+                                  : 'Orden actual: Mayor a Menor (fechas más lejanas primero). Clic para ordenar de Menor a Mayor.'
+                              }
+                            >
+                              <span>Fechas de Salida</span>
+                              <span
+                                className={`inline-flex items-center justify-center w-5 h-5 rounded-md transition-all shadow-2xs ${
+                                  expeditionsDateSortOrder === 'asc'
+                                    ? 'bg-sky-100 text-sky-800 border border-sky-300/80'
+                                    : 'bg-indigo-100 text-indigo-800 border border-indigo-300/80'
+                                }`}
+                              >
+                                {expeditionsDateSortOrder === 'asc' ? (
+                                  <ArrowUp className="w-3.5 h-3.5 transition-transform group-hover:-translate-y-0.5" />
+                                ) : (
+                                  <ArrowDown className="w-3.5 h-3.5 transition-transform group-hover:translate-y-0.5" />
+                                )}
+                              </span>
+                              <span className="text-[9px] font-sans font-semibold tracking-normal px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/60 lowercase">
+                                {expeditionsDateSortOrder === 'asc' ? 'menor a mayor' : 'mayor a menor'}
+                              </span>
+                            </button>
+                          </th>
                           <th className="px-6 py-4">Ocupación / Cupos</th>
                           <th className="px-6 py-4">Tarifa p/Pax</th>
                           <th className="px-6 py-4">Estado de Zarpe</th>
