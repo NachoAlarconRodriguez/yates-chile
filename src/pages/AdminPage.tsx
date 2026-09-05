@@ -4,6 +4,7 @@ import {
   LogOut,
   Calendar,
   CheckCircle2,
+  Anchor,
   XCircle,
   Plus,
   Search,
@@ -98,6 +99,7 @@ import {
 import { formatRut, formatPhone } from '../lib/formatters';
 import { LuxuryDatePicker } from '../components/admin/LuxuryDatePicker';
 import { CountryPhoneInput } from '../components/admin/CountryPhoneInput';
+import { LuxurySelect } from '../components/admin/LuxurySelect';
 import { exportBookingsToExcel, exportExpeditionManifestToExcel, type ExpeditionManifestExportRow } from '../lib/excelExport';
 import { supabase } from '../lib/supabase';
 
@@ -13242,34 +13244,90 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* Embarcación / Activo */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+                <div className="relative z-30">
                   <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Embarcación de Expedición
                   </label>
-                  <select
-                    value={editingDeparture.vessel_id}
-                    onChange={(e) => setEditingDeparture({ ...editingDeparture, vessel_id: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-semibold text-[#0b192c] focus:outline-none focus:border-[#0b192c] cursor-pointer"
-                  >
-                    <option value="vegvisir">Velero Vegvisir (Dufour 52.5 ft)</option>
-                    <option value="terranova">Yate Terranova (Hatteras 65ft LRC)</option>
-                  </select>
+                  <LuxurySelect
+                    value={editingDeparture.vessel_id || 'vegvisir'}
+                    onChange={(val) => setEditingDeparture({ ...editingDeparture, vessel_id: val })}
+                    options={[
+                      {
+                        value: 'vegvisir',
+                        label: 'Velero Vegvisir',
+                        subtitle: 'Dufour 52.5 ft • Velero de Altura',
+                        icon: Sailboat,
+                        badge: { text: 'Velero', className: 'bg-sky-50 text-sky-800 border-sky-200' },
+                      },
+                      {
+                        value: 'terranova',
+                        label: 'Yate Terranova',
+                        subtitle: 'Hatteras 65ft LRC • Yate Oceánico',
+                        icon: Ship,
+                        badge: { text: 'Yate Motor', className: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+                      },
+                      ...vessels
+                        .filter((v) => v.id !== 'vegvisir' && v.id !== 'terranova' && v.name)
+                        .map((v) => ({
+                          value: v.id,
+                          label: v.name,
+                          subtitle: v.tagline || (v.capacity_pax ? `${v.type || 'Embarcación'} • Hasta ${v.capacity_pax} pax` : v.type || 'Embarcación'),
+                          icon: (v.type || '').toLowerCase().includes('velero') ? Sailboat : Ship,
+                          badge: {
+                            text: (v.type || '').toLowerCase().includes('velero') ? 'Velero' : 'Yate',
+                            className: (v.type || '').toLowerCase().includes('velero')
+                              ? 'bg-sky-50 text-sky-800 border-sky-200'
+                              : 'bg-indigo-50 text-indigo-800 border-indigo-200',
+                          },
+                        })),
+                    ]}
+                    placeholder="Seleccionar Embarcación..."
+                  />
                 </div>
 
-                <div>
+                <div className="relative z-20">
                   <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
                     Estado de Zarpe
                   </label>
-                  <select
+                  <LuxurySelect
                     value={editingDeparture.status}
-                    onChange={(e) => setEditingDeparture({ ...editingDeparture, status: e.target.value as any })}
-                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-semibold text-[#0b192c] focus:outline-none focus:border-[#0b192c] cursor-pointer"
-                  >
-                    <option value="scheduled">Programada</option>
-                    <option value="guaranteed">Zarpe Garantizado</option>
-                    <option value="completed">Completada</option>
-                    <option value="cancelled">Cancelada</option>
-                  </select>
+                    onChange={(val) => setEditingDeparture({ ...editingDeparture, status: val as any })}
+                    options={[
+                      {
+                        value: 'scheduled',
+                        label: 'Programada',
+                        subtitle: 'Abierta a reservas',
+                        icon: Calendar,
+                        badge: { text: 'En Agenda', className: 'bg-sky-50 text-sky-800 border-sky-200' },
+                        dotColor: 'bg-sky-500',
+                      },
+                      {
+                        value: 'guaranteed',
+                        label: 'Zarpe Garantizado',
+                        subtitle: 'Cupos mínimos confirmados',
+                        icon: CheckCircle2,
+                        badge: { text: 'Confirmado', className: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+                        dotColor: 'bg-emerald-500',
+                      },
+                      {
+                        value: 'completed',
+                        label: 'Completada',
+                        subtitle: 'Expedición realizada',
+                        icon: Anchor,
+                        badge: { text: 'Finalizada', className: 'bg-slate-100 text-slate-700 border-slate-200' },
+                        dotColor: 'bg-slate-500',
+                      },
+                      {
+                        value: 'cancelled',
+                        label: 'Cancelada',
+                        subtitle: 'Expedición suspendida',
+                        icon: AlertTriangle,
+                        badge: { text: 'Cancelada', className: 'bg-rose-50 text-rose-800 border-rose-200' },
+                        dotColor: 'bg-rose-500',
+                      },
+                    ]}
+                    placeholder="Seleccionar Estado..."
+                  />
                 </div>
               </div>
 
