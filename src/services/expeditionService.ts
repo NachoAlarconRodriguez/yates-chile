@@ -58,9 +58,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2026-11-19',
     monthsActive: [11],
     year: 2026,
-    spotsLeft: 3,
+    spotsLeft: 6,
     totalSlots: 6,
-    availableSlots: 3,
+    availableSlots: 6,
     pricePerPaxClp: 2850000,
     priceCharterFullClp: 17100000,
     vessel: 'Velero Vegvisir',
@@ -82,9 +82,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2026-12-14',
     monthsActive: [12],
     year: 2026,
-    spotsLeft: 2,
+    spotsLeft: 6,
     totalSlots: 6,
-    availableSlots: 2,
+    availableSlots: 6,
     pricePerPaxClp: 2950000,
     priceCharterFullClp: 17700000,
     vessel: 'Velero Vegvisir',
@@ -106,9 +106,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2027-01-21',
     monthsActive: [1],
     year: 2027,
-    spotsLeft: 4,
+    spotsLeft: 6,
     totalSlots: 6,
-    availableSlots: 4,
+    availableSlots: 6,
     pricePerPaxClp: 2950000,
     priceCharterFullClp: 17700000,
     vessel: 'Velero Vegvisir',
@@ -132,9 +132,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2026-10-22',
     monthsActive: [10],
     year: 2026,
-    spotsLeft: 4,
+    spotsLeft: 6,
     totalSlots: 6,
-    availableSlots: 4,
+    availableSlots: 6,
     pricePerPaxClp: 1950000,
     priceCharterFullClp: 11700000,
     vessel: 'Velero Vegvisir',
@@ -156,9 +156,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2026-11-15',
     monthsActive: [11],
     year: 2026,
-    spotsLeft: 3,
+    spotsLeft: 8,
     totalSlots: 8,
-    availableSlots: 3,
+    availableSlots: 8,
     pricePerPaxClp: 2350000,
     priceCharterFullClp: 18800000,
     vessel: 'Yate Terranova',
@@ -180,9 +180,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2027-01-12',
     monthsActive: [1],
     year: 2027,
-    spotsLeft: 2,
+    spotsLeft: 6,
     totalSlots: 6,
-    availableSlots: 2,
+    availableSlots: 6,
     pricePerPaxClp: 2150000,
     priceCharterFullClp: 12900000,
     vessel: 'Velero Vegvisir',
@@ -206,9 +206,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2026-12-10',
     monthsActive: [12],
     year: 2026,
-    spotsLeft: 4,
+    spotsLeft: 8,
     totalSlots: 8,
-    availableSlots: 4,
+    availableSlots: 8,
     pricePerPaxClp: 2650000,
     priceCharterFullClp: 21200000,
     vessel: 'Yate Terranova',
@@ -230,9 +230,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2027-02-17',
     monthsActive: [2],
     year: 2027,
-    spotsLeft: 5,
+    spotsLeft: 6,
     totalSlots: 6,
-    availableSlots: 5,
+    availableSlots: 6,
     pricePerPaxClp: 2450000,
     priceCharterFullClp: 14700000,
     vessel: 'Velero Vegvisir',
@@ -256,9 +256,9 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     returnDate: '2027-03-09',
     monthsActive: [3],
     year: 2027,
-    spotsLeft: 6,
+    spotsLeft: 8,
     totalSlots: 8,
-    availableSlots: 6,
+    availableSlots: 8,
     pricePerPaxClp: 2200000,
     priceCharterFullClp: 17600000,
     vessel: 'Yate Terranova',
@@ -1078,6 +1078,116 @@ export const expeditionService = {
           localStorage.setItem('yates_bookings', JSON.stringify(updated));
         }
       } catch (_) {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
+        window.dispatchEvent(new CustomEvent('yates_bookings_updated'));
+        window.dispatchEvent(new CustomEvent('storage'));
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  async deleteBooking(bookingId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      let targetDepartureId: string | null = null;
+      let paxCountToRestore = 1;
+
+      // 1. Try finding booking details from Supabase or localStorage
+      try {
+        const { data: bData } = await supabase
+          .from('expedition_bookings')
+          .select('departure_id, pax_count')
+          .eq('id', bookingId)
+          .maybeSingle();
+
+        if (bData) {
+          targetDepartureId = bData.departure_id;
+          paxCountToRestore = bData.pax_count || 1;
+        }
+      } catch {}
+
+      if (!targetDepartureId) {
+        try {
+          const stored = localStorage.getItem('yates_bookings');
+          if (stored) {
+            const list = JSON.parse(stored);
+            const found = list.find(
+              (b: any) => b.id === bookingId || b.booking_code === bookingId || b.code === bookingId
+            );
+            if (found) {
+              targetDepartureId = found.departure_id || found.departureId;
+              paxCountToRestore = found.pax_count || found.paxCount || 1;
+            }
+          }
+        } catch {}
+      }
+
+      // 2. Delete from Supabase
+      try {
+        await supabase.from('expedition_passengers').delete().eq('booking_id', bookingId);
+        await supabase.from('payment_installments').delete().eq('booking_id', bookingId);
+        const { error } = await supabase.from('expedition_bookings').delete().eq('id', bookingId);
+        if (error) {
+          console.warn('Supabase booking delete notice:', error.message);
+        }
+      } catch (sbErr) {
+        console.warn('Supabase deleteBooking exception:', sbErr);
+      }
+
+      // 3. Remove from localStorage yates_bookings
+      try {
+        const stored = localStorage.getItem('yates_bookings');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const updated = list.filter(
+            (b: any) => b.id !== bookingId && b.booking_code !== bookingId && b.code !== bookingId
+          );
+          localStorage.setItem('yates_bookings', JSON.stringify(updated));
+        }
+      } catch (_) {}
+
+      // 4. Restore available slots on departure
+      if (targetDepartureId) {
+        try {
+          const storedDeps = getStoredDepartures();
+          const updatedDeps = storedDeps.map((d) => {
+            if (d.id === targetDepartureId) {
+              const maxSlots = d.totalSlots || 6;
+              const currentAvail = typeof d.availableSlots === 'number' ? d.availableSlots : 0;
+              const nextAvail = Math.min(maxSlots, currentAvail + paxCountToRestore);
+              return {
+                ...d,
+                availableSlots: nextAvail,
+                spotsLeft: nextAvail === 0 ? ('completo' as const) : nextAvail,
+              };
+            }
+            return d;
+          });
+          saveStoredDepartures(updatedDeps);
+
+          const { data: depData } = await supabase
+            .from('expedition_departures')
+            .select('available_slots, total_slots')
+            .eq('id', targetDepartureId)
+            .maybeSingle();
+
+          if (depData) {
+            const currentAvail = depData.available_slots ?? 0;
+            const maxSlots = depData.total_slots ?? 6;
+            const restored = Math.min(maxSlots, currentAvail + paxCountToRestore);
+            await supabase
+              .from('expedition_departures')
+              .update({ available_slots: restored })
+              .eq('id', targetDepartureId);
+          }
+        } catch (depErr) {
+          console.warn('Error restoring departure slots:', depErr);
+        }
+      }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));

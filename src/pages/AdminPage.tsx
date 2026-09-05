@@ -300,6 +300,7 @@ export interface UpcomingExpeditionItem {
 
 export interface ExpeditionPassengerManifestItem {
   id: string;
+  bookingId?: string;
   code: string;
   fullName: string;
   rutPassport: string;
@@ -322,177 +323,65 @@ export const getPassengersForExpedition = (exp: any, bookings: ExpeditionBooking
   const expDate = exp.rawDepartureDate || exp.departureDate || exp.startDate;
 
   const directBookings = bookings.filter((b: any) => {
-    if (b.departure_id && b.departure_id === expId) return true;
-    if (b.expedition_name && expTitle.includes(String(b.expedition_name).toLowerCase())) return true;
+    if (b.departure_id && (b.departure_id === expId || String(b.departure_id) === String(expId))) return true;
+    if (b.expedition_name && expTitle && (expTitle.includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(expTitle))) return true;
     if (b.departure_date && expDate && b.departure_date === expDate) return true;
     return false;
   });
 
-  const bookedCount = exp.bookedPax !== undefined ? exp.bookedPax : (exp.totalSlots ? exp.totalSlots - (typeof exp.spotsLeft === 'number' ? exp.spotsLeft : 0) : 6);
   const defaultUnitPrice = exp.pricePerPaxClp || (typeof exp.pricePerPax === 'string' ? parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 2200000 : 2200000);
 
-  const formattedDirect: ExpeditionPassengerManifestItem[] = directBookings.map((b: any, idx) => {
+  const formattedDirect: ExpeditionPassengerManifestItem[] = [];
+
+  directBookings.forEach((b: any, bIdx) => {
     const total = Number(b.total_amount) || defaultUnitPrice * (b.pax_count || 1);
     const isPaid = b.status === 'approved' || b.status === 'paid' || b.status === 'completed';
     const isPending = b.status === 'pending_transfer' || b.status === 'pending';
     const amountPaid = isPaid ? total : isPending ? 0 : total * 0.5;
+    const baseCode = b.booking_code || `EXP-${(b.id || String(bIdx)).slice(0, 6).toUpperCase()}`;
 
-    return {
-      id: b.id || `booking-${idx}`,
-      code: b.booking_code || `EXP-${(b.id || String(idx)).slice(0, 6).toUpperCase()}`,
-      fullName: b.guest_name,
-      rutPassport: b.guest_rut_passport || '18.432.190-K',
-      email: b.guest_email || 'contacto@yateschile.cl',
-      phone: b.guest_phone || '+56 9 5333 2492',
-      paxCount: b.pax_count || 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: total,
-      amountPaid: amountPaid,
-      paymentStatus: isPaid ? 'paid' : isPending ? 'pending' : 'partial',
-      dietaryNotes: b.dietary_medical_notes || 'Sin restricciones informadas',
-      emergencyContact: 'Camila Alarcón (+56 9 8765 4321)',
-      registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '20/08/2026',
-    };
+    if (Array.isArray(b.passengers) && b.passengers.length > 0) {
+      b.passengers.forEach((pax: any, pIdx: number) => {
+        formattedDirect.push({
+          id: b.id ? `${b.id}-${pIdx}` : `booking-${bIdx}-${pIdx}`,
+          bookingId: b.id,
+          code: b.passengers.length > 1 ? `${baseCode}-${pIdx + 1}` : baseCode,
+          fullName: pax.fullName || pax.name || (pIdx === 0 ? b.guest_name : `Pasajero ${pIdx + 1}`),
+          rutPassport: pax.docId || pax.rut || (pIdx === 0 ? (b.guest_rut_passport || '-') : '-'),
+          email: pIdx === 0 ? (b.guest_email || '-') : (pax.email || b.guest_email || '-'),
+          phone: pIdx === 0 ? (b.guest_phone || '-') : (pax.phone || b.guest_phone || '-'),
+          paxCount: 1,
+          unitPrice: defaultUnitPrice,
+          totalAmount: Math.round(total / (b.pax_count || b.passengers.length || 1)),
+          amountPaid: Math.round(amountPaid / (b.pax_count || b.passengers.length || 1)),
+          paymentStatus: isPaid ? 'paid' : isPending ? 'pending' : 'partial',
+          dietaryNotes: pax.medicalNotes || b.dietary_medical_notes || 'Sin restricciones informadas',
+          emergencyContact: pax.emergencyContact || b.emergency_contact || b.emergency_phone || 'Sin contacto informado',
+          registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '-',
+        });
+      });
+    } else {
+      formattedDirect.push({
+        id: b.id || `booking-${bIdx}`,
+        bookingId: b.id,
+        code: baseCode,
+        fullName: b.guest_name,
+        rutPassport: b.guest_rut_passport || '-',
+        email: b.guest_email || '-',
+        phone: b.guest_phone || '-',
+        paxCount: b.pax_count || 1,
+        unitPrice: defaultUnitPrice,
+        totalAmount: total,
+        amountPaid: amountPaid,
+        paymentStatus: isPaid ? 'paid' : isPending ? 'pending' : 'partial',
+        dietaryNotes: b.dietary_medical_notes || 'Sin restricciones informadas',
+        emergencyContact: b.emergency_contact || b.emergency_phone || 'Sin contacto informado',
+        registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '-',
+      });
+    }
   });
 
-  if (formattedDirect.length >= bookedCount) {
-    return formattedDirect;
-  }
-
-  const sampleManifestBase: ExpeditionPassengerManifestItem[] = [
-    {
-      id: 'sample-pax-1',
-      code: 'EXP-7357',
-      fullName: 'Ignacio Alarcón Rodríguez',
-      rutPassport: '18.432.190-K',
-      email: 'ignacio@yateschile.cl',
-      phone: '+56 9 5333 2492',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: defaultUnitPrice,
-      paymentStatus: 'paid',
-      dietaryNotes: 'Sin restricciones. Al día con examen médico de embarque.',
-      emergencyContact: 'Camila Alarcón (+56 9 8765 4321)',
-      registeredAt: '12/08/2026',
-    },
-    {
-      id: 'sample-pax-2',
-      code: 'EXP-8842',
-      fullName: 'Valentina Matte Vial',
-      rutPassport: '17.892.341-3',
-      email: 'vmatte@vial.cl',
-      phone: '+56 9 9123 4567',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: defaultUnitPrice,
-      paymentStatus: 'paid',
-      dietaryNotes: 'Celíaca (Régimen 100% Sin Gluten). Talla chaleco M.',
-      emergencyContact: 'Felipe Matte (+56 9 8812 3456)',
-      registeredAt: '15/08/2026',
-    },
-    {
-      id: 'sample-pax-3',
-      code: 'EXP-9104',
-      fullName: 'Rodrigo Errázuriz Larraín',
-      rutPassport: '15.674.209-8',
-      email: 'r.errazuriz@larrain.cl',
-      phone: '+56 9 7654 3210',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: defaultUnitPrice,
-      paymentStatus: 'paid',
-      dietaryNotes: 'Sin restricciones. Patrón de Bahía con experiencia de navegación.',
-      emergencyContact: 'María Paz Vial (+56 9 6543 2109)',
-      registeredAt: '17/08/2026',
-    },
-    {
-      id: 'sample-pax-4',
-      code: 'EXP-9231',
-      fullName: 'Camila Edwards Sanfuentes',
-      rutPassport: '19.123.876-2',
-      email: 'camila.edwards@sanfuentes.cl',
-      phone: '+56 9 8765 1234',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: Math.round(defaultUnitPrice * 0.5),
-      paymentStatus: 'partial',
-      dietaryNotes: 'Vegetariana (consume pescado/pescetariana).',
-      emergencyContact: 'Tomás Edwards (+56 9 7788 9900)',
-      registeredAt: '19/08/2026',
-    },
-    {
-      id: 'sample-pax-5',
-      code: 'EXP-9450',
-      fullName: 'Sebastián Cox Undurraga',
-      rutPassport: '16.543.890-1',
-      email: 'scox@undurraga.cl',
-      phone: '+56 9 6543 8901',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: defaultUnitPrice,
-      paymentStatus: 'paid',
-      dietaryNotes: 'Sin restricciones. Buzo PADI Advanced Open Water.',
-      emergencyContact: 'Andrea Cox (+56 9 5544 3322)',
-      registeredAt: '21/08/2026',
-    },
-    {
-      id: 'sample-pax-6',
-      code: 'EXP-9612',
-      fullName: 'Florencia Lira Cousiño',
-      rutPassport: '18.765.432-5',
-      email: 'flor.lira@cousino.cl',
-      phone: '+56 9 9876 5432',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: defaultUnitPrice,
-      paymentStatus: 'paid',
-      dietaryNotes: 'Alergia a mariscos crudos. Lleva antihistamínicos.',
-      emergencyContact: 'Cristián Lira (+56 9 4433 2211)',
-      registeredAt: '23/08/2026',
-    },
-    {
-      id: 'sample-pax-7',
-      code: 'EXP-9781',
-      fullName: 'Andrés Swett Lyon',
-      rutPassport: '14.234.567-8',
-      email: 'aswett@swett.cl',
-      phone: '+56 9 7890 1234',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: 0,
-      paymentStatus: 'pending',
-      dietaryNotes: 'Sin restricciones.',
-      emergencyContact: 'Paula Lyon (+56 9 6789 0123)',
-      registeredAt: '24/08/2026',
-    },
-    {
-      id: 'sample-pax-8',
-      code: 'EXP-9890',
-      fullName: 'Constanza Chadwick Vial',
-      rutPassport: '17.345.678-9',
-      email: 'cchadwick@chadwick.cl',
-      phone: '+56 9 8901 2345',
-      paxCount: 1,
-      unitPrice: defaultUnitPrice,
-      totalAmount: defaultUnitPrice,
-      amountPaid: defaultUnitPrice,
-      paymentStatus: 'paid',
-      dietaryNotes: 'Vegetariana estricta.',
-      emergencyContact: 'Jorge Chadwick (+56 9 5678 9012)',
-      registeredAt: '25/08/2026',
-    },
-  ];
-
-  const needed = Math.max(0, bookedCount - formattedDirect.length);
-  const pickedSamples = sampleManifestBase.slice(0, needed);
-  return [...formattedDirect, ...pickedSamples];
+  return formattedDirect;
 };
 
 export interface CustomerTimelineItem {
@@ -2468,7 +2357,6 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       return departures.map((dep) => {
         const route = expRoutes.find((r) => r.id === dep.route_id);
         const vessel = vessels.find((v) => v.id === dep.vessel_id);
-        const bookedPax = (dep.total_slots || 10) - (dep.available_slots || 0);
 
         // Strictly Velero Vegvisir or Yate Terranova
         const rawVName = (vessel?.name || dep.vessel_id || dep.name || '').toLowerCase();
@@ -2481,6 +2369,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         if (routeTitle.startsWith('JF ')) {
           routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
         }
+
+        const depBookings = expBookings.filter((b: any) => {
+          if (b.departure_id && (b.departure_id === dep.id || String(b.departure_id) === String(dep.id))) return true;
+          if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
+          if (b.departure_date && dep.departure_date && b.departure_date === dep.departure_date) return true;
+          return false;
+        });
+        const realPaxCount = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+        const maxPax = dep.total_slots || (isTerranova ? 8 : 6);
+        const bookedPax = realPaxCount;
+        const availablePax = Math.max(0, maxPax - bookedPax);
 
         const depDateFormatted = formatDateDDMMYYYY(dep.departure_date);
         const retDateFormatted = formatDateDDMMYYYY(dep.return_date);
@@ -2501,9 +2400,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           returnDateFormatted: retDateFormatted,
           rawDepartureDate: dep.departure_date,
           daysUntilDeparture: daysUntil,
-          maxPax: dep.total_slots || (isTerranova ? 8 : 6),
+          maxPax,
           bookedPax,
-          availablePax: dep.available_slots || 0,
+          availablePax,
           pricePerPaxClp: numericPrice,
           priceFormatted,
           pricePerPax: `${priceFormatted} CLP`,
@@ -2514,8 +2413,6 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     }
 
     return INITIAL_EXPEDITIONS.map((exp) => {
-      const bookedPax = exp.totalSlots - (typeof exp.spotsLeft === 'number' ? exp.spotsLeft : 0);
-      const daysUntil = calcDaysUntil(exp.startDate);
       const isTerranova = exp.vessel.toLowerCase().includes('terranova') || exp.vesselId === 'terranova';
       const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
       const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
@@ -2523,6 +2420,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       if (routeTitle.startsWith('JF ')) {
         routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
       }
+
+      const expBookingsList = expBookings.filter((b: any) => {
+        if (b.departure_id && (b.departure_id === exp.id || String(b.departure_id) === String(exp.id))) return true;
+        if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
+        if (b.departure_date && exp.departureDate && b.departure_date === exp.departureDate) return true;
+        return false;
+      });
+      const realPaxCount = expBookingsList.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+      const maxPax = exp.totalSlots || 6;
+      const bookedPax = realPaxCount;
+      const availablePax = Math.max(0, maxPax - bookedPax);
+      const daysUntil = calcDaysUntil(exp.startDate);
 
       const depDateFormatted = formatDateDDMMYYYY(exp.departureDate || exp.startDate);
       const retDateFormatted = formatDateDDMMYYYY(exp.returnDate || exp.endDate);
@@ -2540,9 +2449,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         returnDateFormatted: retDateFormatted,
         rawDepartureDate: exp.startDate,
         daysUntilDeparture: daysUntil,
-        maxPax: exp.totalSlots,
+        maxPax,
         bookedPax,
-        availablePax: typeof exp.spotsLeft === 'number' ? exp.spotsLeft : 0,
+        availablePax,
         pricePerPaxClp: numericPrice,
         priceFormatted,
         pricePerPax: `${priceFormatted} CLP`,
@@ -2550,7 +2459,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         statusColor: exp.status === 'guaranteed' ? 'emerald' : 'sky',
       };
     });
-  }, [departures, expRoutes, vessels]);
+  }, [departures, expRoutes, vessels, expBookings]);
 
   // Top 3 upcoming expeditions for the Dashboard overview section
   const dashboardUpcomingExpeditions = useMemo(() => {
@@ -3243,6 +3152,79 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setActionMessage('Estado actualizado.');
       setTimeout(() => setActionMessage(null), 3000);
     }
+  };
+
+  const handleDeleteManifestPassenger = (
+    paxId: string,
+    bookingId: string | undefined,
+    paxCode: string,
+    paxFullName: string
+  ) => {
+    const targetBookingId = bookingId || paxId;
+    triggerConfirm(
+      `¿Estás seguro de que deseas eliminar al pasajero "${paxFullName}" (${paxCode}) de esta expedición? Esta acción eliminará la reserva asociada y liberará el cupo.`,
+      async () => {
+        try {
+          const res = await expeditionService.deleteBooking(targetBookingId);
+
+          if (!res.success) {
+            triggerAlert('No se pudo eliminar la reserva: ' + (res.error || 'Error desconocido'), 'error');
+            return;
+          }
+
+          // Limpiar de expBookings localmente
+          setExpBookings((prev) =>
+            prev.filter(
+              (b) => b.id !== targetBookingId && b.booking_code !== targetBookingId && b.booking_code !== paxCode
+            )
+          );
+
+          // Actualizar / sincronizar CRM de Clientes
+          setCrmClients((prevCrm) => {
+            const updated = prevCrm.map((c) => {
+              const isMatch =
+                c.fullName.trim().toLowerCase() === paxFullName.trim().toLowerCase() ||
+                (paxCode && c.timeline.some((t) => t.title.includes(paxCode)));
+
+              if (!isMatch) return c;
+
+              const newCount = Math.max(0, c.bookingsCount - 1);
+              return {
+                ...c,
+                bookingsCount: newCount,
+                timeline: [
+                  {
+                    id: `t-del-${Date.now()}`,
+                    date: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
+                    type: 'note' as const,
+                    title: `Reserva Eliminada (${paxCode})`,
+                    description: `Se eliminó al pasajero del manifiesto oficial y se liberó el cupo en la expedición.`,
+                  },
+                  ...c.timeline,
+                ],
+              };
+            });
+
+            try {
+              localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updated));
+            } catch {}
+
+            return updated;
+          });
+
+          await fetchAllData();
+          setActionMessage(`✓ Pasajero "${paxFullName}" eliminado del manifiesto y cupo liberado exitosamente.`);
+          setTimeout(() => setActionMessage(null), 3500);
+        } catch (err: any) {
+          triggerAlert('Error al eliminar pasajero: ' + (err?.message || err), 'error');
+        }
+      },
+      {
+        title: 'Eliminar Pasajero del Manifiesto',
+        confirmText: 'Eliminar Pasajero',
+        type: 'danger',
+      }
+    );
   };
 
   const handleOpenPassengerProfileFromBooking = (booking: ExpeditionBookingRow) => {
@@ -8335,14 +8317,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       filteredDepartures.map((dep) => {
                         const route = expRoutes.find(r => r.id === dep.route_id);
                         const vessel = vessels.find(v => v.id === dep.vessel_id);
-                        const bookedPax = (dep.total_slots || 10) - (dep.available_slots || 0);
-                        const percent = Math.round((bookedPax / (dep.total_slots || 10)) * 100);
                         const isTerranova = dep.vessel_id === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
                         const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
                         let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
                         if (routeTitle.startsWith('JF ')) {
                           routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
                         }
+                        const depBookings = expBookings.filter((b: any) => {
+                          if (b.departure_id && (b.departure_id === dep.id || String(b.departure_id) === String(dep.id))) return true;
+                          if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
+                          if (b.departure_date && dep.departure_date && b.departure_date === dep.departure_date) return true;
+                          return false;
+                        });
+                        const bookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                        const percent = Math.round((bookedPax / (dep.total_slots || 10)) * 100);
                         const VesselIcon = isTerranova ? Ship : Sailboat;
 
                         const isClosedOrCompleted = dep.status === 'completed' || dep.status === 'cancelled' || (dep as any).is_closed === true;
@@ -8505,7 +8493,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   {/* Botón Ver Pasajeros */}
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: dep.available_slots || 0, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                    onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: Math.max(0, (dep.total_slots || 10) - bookedPax), departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
                                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer shadow-2xs group/mbtn ${
                                       isAgotado
                                         ? 'bg-emerald-100/90 hover:bg-emerald-800 text-emerald-900 hover:text-white border border-emerald-300/80'
@@ -8521,7 +8509,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   {!isAgotado && (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: dep.available_slots || 0, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                      onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: Math.max(0, (dep.total_slots || 10) - bookedPax), departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
                                       className="w-7 h-7 rounded-full bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95 group/plus"
                                       title="Sumar pasajero a esta expedición"
                                       aria-label="Sumar pasajero"
@@ -8681,14 +8669,22 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           filteredDepartures.map((dep) => {
                             const route = expRoutes.find(r => r.id === dep.route_id);
                             const vessel = vessels.find(v => v.id === dep.vessel_id);
-                            const bookedPax = (dep.total_slots || 10) - (dep.available_slots || 0);
-                            const percent = Math.round((bookedPax / (dep.total_slots || 10)) * 100);
                             const isTerranova = dep.vessel_id === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
                             const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
                             let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
                             if (routeTitle.startsWith('JF ')) {
                               routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
                             }
+                            const depBookings = expBookings.filter((b: any) => {
+                              if (b.departure_id && (b.departure_id === dep.id || String(b.departure_id) === String(dep.id))) return true;
+                              if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
+                              if (b.departure_date && dep.departure_date && b.departure_date === dep.departure_date) return true;
+                              return false;
+                            });
+                            const bookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                            const maxSlots = dep.total_slots || 10;
+                            const availablePax = Math.max(0, maxSlots - bookedPax);
+                            const percent = Math.round((bookedPax / maxSlots) * 100);
                             const VesselIcon = isTerranova ? Ship : Sailboat;
 
                             return (
@@ -8724,9 +8720,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 <td className="px-6 py-4">
                                   <div className="w-36 space-y-1.5">
                                     <div className="flex justify-between text-[10px] font-mono text-slate-500">
-                                      <span>{bookedPax} / {dep.total_slots} pax</span>
-                                      <strong className={isTerranova ? 'text-[#0b192c]' : bookedPax >= (dep.total_slots || 10) ? 'text-emerald-700 font-bold' : 'text-[#0b192c]'}>
-                                        {bookedPax >= (dep.total_slots || 10) ? 'Completo' : `${dep.available_slots} libres`}
+                                      <span>{bookedPax} / {maxSlots} pax</span>
+                                      <strong className={isTerranova ? 'text-[#0b192c]' : bookedPax >= maxSlots ? 'text-emerald-700 font-bold' : 'text-[#0b192c]'}>
+                                        {bookedPax >= maxSlots ? 'Completo' : `${availablePax} libres`}
                                       </strong>
                                     </div>
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -8788,7 +8784,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: dep.available_slots || 0, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                      onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: maxSlots, availablePax, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
                                       className="w-7 h-7 rounded-full text-emerald-700 hover:text-white hover:bg-emerald-600 flex items-center justify-center transition cursor-pointer"
                                       title="Sumar Pasajero"
                                     >
@@ -8796,7 +8792,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: dep.available_slots || 0, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                      onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: maxSlots, availablePax, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
                                       className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
                                       title="Ver Manifiesto de Pasajeros"
                                     >
@@ -12112,17 +12108,27 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               </td>
 
                               <td className="py-3.5 px-4 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nextStatus = isFullyPaid ? 'partial' : isPartial ? 'pending' : 'paid';
-                                    handleUpdatePassengerPaymentStatus(pax.id, nextStatus);
-                                  }}
-                                  className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#0b192c] text-slate-600 hover:text-white transition shadow-2xs cursor-pointer whitespace-nowrap"
-                                  title="Cambiar estado de pago"
-                                >
-                                  {isFullyPaid ? 'Marcar Abono' : isPartial ? 'Marcar Pend.' : 'Marcar Pagado'}
-                                </button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextStatus = isFullyPaid ? 'partial' : isPartial ? 'pending' : 'paid';
+                                      handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
+                                    }}
+                                    className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#0b192c] text-slate-600 hover:text-white transition shadow-2xs cursor-pointer whitespace-nowrap"
+                                    title="Cambiar estado de pago"
+                                  >
+                                    {isFullyPaid ? 'Marcar Abono' : isPartial ? 'Marcar Pend.' : 'Marcar Pagado'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteManifestPassenger(pax.id, pax.bookingId, pax.code, pax.fullName)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                                    title="Eliminar pasajero de la expedición"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -12133,8 +12139,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 ) : (
                   <div className="py-12 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                     <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm font-semibold text-slate-600">No se encontraron pasajeros registrados con este filtro</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Prueba con otro término de búsqueda o suma un pasajero a esta expedición.</p>
+                    <p className="text-sm font-semibold text-slate-600">
+                      {manifestSearchQuery || manifestPaymentFilter !== 'all'
+                        ? 'No se encontraron pasajeros con los filtros seleccionados'
+                        : 'No hay pasajeros registrados en esta expedición'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {manifestSearchQuery || manifestPaymentFilter !== 'all'
+                        ? 'Prueba con otro término de búsqueda o limpia los filtros.'
+                        : 'Puedes agregar un nuevo pasajero con el botón "+ Agregar Pasajero".'}
+                    </p>
                   </div>
                 )}
               </div>
