@@ -99,6 +99,34 @@ import { formatRut, formatPhone } from '../lib/formatters';
 import { LuxuryDatePicker } from '../components/admin/LuxuryDatePicker';
 import { CountryPhoneInput } from '../components/admin/CountryPhoneInput';
 import { exportBookingsToExcel, exportExpeditionManifestToExcel, type ExpeditionManifestExportRow } from '../lib/excelExport';
+import { supabase } from '../lib/supabase';
+
+const DELETED_CLIENTS_KEY = 'yates_chile_deleted_crm_clients';
+
+export const getDeletedClientsSet = (): Set<string> => {
+  try {
+    const stored = localStorage.getItem(DELETED_CLIENTS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return new Set(parsed.map((item: string) => String(item).toLowerCase().trim()));
+      }
+    }
+  } catch {}
+  return new Set();
+};
+
+export const addDeletedClientIdentifier = (identifiers: (string | undefined | null)[]) => {
+  try {
+    const set = getDeletedClientsSet();
+    identifiers.forEach((id) => {
+      if (id && String(id).trim()) {
+        set.add(String(id).toLowerCase().trim());
+      }
+    });
+    localStorage.setItem(DELETED_CLIENTS_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+};
 
 const AirbnbIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <img src="/airbnb-logo.png" alt="Airbnb" className={`${className} object-contain`} />
@@ -745,14 +773,29 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   // CRM & Gestión de Clientes (Fichas de Cliente)
   const [crmActiveSubTab, setCrmActiveSubTab] = useState<'clients' | 'leads'>('clients');
   const [crmClients, setCrmClients] = useState<CustomerProfile[]>(() => {
+    const deletedSet = getDeletedClientsSet();
     try {
       const stored = localStorage.getItem('yates_chile_crm_clients');
-      if (stored) {
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (c) =>
+              !deletedSet.has(c.id.toLowerCase()) &&
+              !deletedSet.has(c.fullName.toLowerCase().trim()) &&
+              (!c.email || !deletedSet.has(c.email.toLowerCase().trim())) &&
+              (!c.rutOrPassport || !deletedSet.has(c.rutOrPassport.toLowerCase().trim()))
+          );
+        }
       }
     } catch {}
-    return INITIAL_CRM_CLIENTS;
+    return INITIAL_CRM_CLIENTS.filter(
+      (c) =>
+        !deletedSet.has(c.id.toLowerCase()) &&
+        !deletedSet.has(c.fullName.toLowerCase().trim()) &&
+        (!c.email || !deletedSet.has(c.email.toLowerCase().trim())) &&
+        (!c.rutOrPassport || !deletedSet.has(c.rutOrPassport.toLowerCase().trim()))
+    );
   });
 
   useEffect(() => {
@@ -1450,6 +1493,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     setCrmClients((prevCrm) => {
       let changed = false;
       const updated = [...prevCrm];
+      const deletedSet = getDeletedClientsSet();
 
       expBookings.forEach((b) => {
         const guestName = (b.guest_name || '').trim();
@@ -1458,6 +1502,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         const pEmail = (b.guest_email || '').trim().toLowerCase();
         const pRut = (b.guest_rut_passport || '').trim().toLowerCase();
         const pPhone = (b.guest_phone || '').replace(/[^0-9]/g, '');
+
+        // Si el cliente fue eliminado de la base de datos, NO volver a crearlo jamás
+        if (
+          deletedSet.has(guestName.toLowerCase()) ||
+          (pEmail && deletedSet.has(pEmail)) ||
+          (pRut && deletedSet.has(pRut)) ||
+          (pPhone && deletedSet.has(pPhone)) ||
+          (b.id && deletedSet.has(b.id.toLowerCase()))
+        ) {
+          return;
+        }
 
         const existingIdx = updated.findIndex((c) => {
           if (pEmail && c.email && c.email.toLowerCase() === pEmail) return true;
@@ -1966,9 +2021,23 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   };
 
   const handleDeleteCustomer = (id: string, name: string) => {
+    const custToDelete = crmClients.find((c) => c.id === id);
+
     triggerConfirm(
-      `¿Estás seguro de que deseas eliminar al cliente "${name}"? Esta acción no se puede deshacer.`,
-      () => {
+      `¿Estás seguro de que deseas eliminar definitivamente al cliente "${name}"? Se borrará su ficha del CRM y sus registros asociados de la base de datos para que no vuelva a aparecer.`,
+      async () => {
+        // 1. Blacklist permanente (ID, nombre, email, RUT, teléfono)
+        const idsToBlacklist: (string | undefined | null)[] = [id, name];
+        if (custToDelete) {
+          if (custToDelete.email) idsToBlacklist.push(custToDelete.email);
+          if (custToDelete.rutOrPassport && custToDelete.rutOrPassport !== 'Sin documento') {
+            idsToBlacklist.push(custToDelete.rutOrPassport);
+          }
+          if (custToDelete.phone) idsToBlacklist.push(custToDelete.phone.replace(/[^0-9]/g, ''));
+        }
+        addDeletedClientIdentifier(idsToBlacklist);
+
+        // 2. Eliminar del estado local del CRM y persistir
         const updatedClients = crmClients.filter((c) => c.id !== id);
         setCrmClients(updatedClients);
         try {
@@ -1979,12 +2048,91 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           setSelectedCustomer(null);
         }
 
-        setActionMessage(`✓ Cliente "${name}" eliminado del directorio.`);
+        // 3. Eliminar de la base de datos (Supabase) y localStorage de reservas
+        if (custToDelete) {
+          const custEmail = custToDelete.email?.toLowerCase().trim();
+          const custRut = custToDelete.rutOrPassport?.toLowerCase().trim();
+          const custPhone = custToDelete.phone?.replace(/[^0-9]/g, '');
+          const custName = custToDelete.fullName.toLowerCase().trim();
+
+          // A. Reservas de Expediciones vinculadas
+          const expToRemove = expBookings.filter((b) => {
+            if (custEmail && b.guest_email?.toLowerCase().trim() === custEmail) return true;
+            if (custRut && b.guest_rut_passport && b.guest_rut_passport.toLowerCase().trim() === custRut) return true;
+            if (custPhone && b.guest_phone && b.guest_phone.replace(/[^0-9]/g, '') === custPhone && custPhone.length >= 8) return true;
+            if (b.guest_name && b.guest_name.toLowerCase().trim() === custName) return true;
+            return false;
+          });
+
+          for (const b of expToRemove) {
+            try {
+              await supabase.from('expedition_passengers').delete().eq('booking_id', b.id);
+              await supabase.from('payment_installments').delete().eq('booking_id', b.id);
+              await supabase.from('expedition_bookings').delete().eq('id', b.id);
+            } catch (err) {
+              console.warn('Supabase booking delete notice:', err);
+            }
+          }
+
+          if (expToRemove.length > 0) {
+            const removedIds = new Set(expToRemove.map((b) => b.id));
+            setExpBookings((prev) => prev.filter((b) => !removedIds.has(b.id)));
+            try {
+              const stored = localStorage.getItem('yates_bookings');
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                  const filtered = parsed.filter((b: any) => !removedIds.has(b.id) && !removedIds.has(b.booking_code));
+                  localStorage.setItem('yates_bookings', JSON.stringify(filtered));
+                }
+              }
+            } catch {}
+          }
+
+          // B. Reservas de Lodge vinculadas
+          const lodgeToRemove = lodgeBookings.filter((b) => {
+            if (custEmail && b.guest_email?.toLowerCase().trim() === custEmail) return true;
+            if (custPhone && b.guest_phone && b.guest_phone.replace(/[^0-9]/g, '') === custPhone && custPhone.length >= 8) return true;
+            if (b.guest_name && b.guest_name.toLowerCase().trim() === custName) return true;
+            return false;
+          });
+
+          for (const b of lodgeToRemove) {
+            try {
+              await deleteBookingOrBlock(b.id);
+            } catch (err) {
+              console.warn('Lodge booking delete notice:', err);
+            }
+          }
+
+          if (lodgeToRemove.length > 0) {
+            await refreshLodge();
+          }
+
+          // C. Leads vinculados
+          const leadsToRemove = leads.filter(
+            (l) =>
+              (custEmail && l.email?.toLowerCase().trim() === custEmail) ||
+              (custName && l.fullName?.toLowerCase().trim() === custName)
+          );
+          for (const l of leadsToRemove) {
+            try {
+              await deleteLead(l.id);
+            } catch (err) {
+              console.warn('Lead delete notice:', err);
+            }
+          }
+        }
+
+        // 4. Refrescar datos del sistema
+        await fetchAllData();
+
+        setActionMessage(`✓ Cliente "${name}" eliminado permanentemente de la base de datos.`);
         setTimeout(() => setActionMessage(null), 3500);
       },
       {
-        title: 'Eliminar Cliente',
-        confirmText: 'Aceptar',
+        title: 'Eliminar Cliente Definitivamente',
+        confirmText: 'Sí, Eliminar de la Base de Datos',
         cancelText: 'Cancelar',
         type: 'danger',
       }
