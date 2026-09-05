@@ -12220,16 +12220,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 $
                               </span>
                               <input
-                                type="number"
-                                step={10000}
-                                min={0}
-                                value={expPassengerForm.customPricePerPax}
-                                onChange={(e) =>
+                                type="text"
+                                inputMode="numeric"
+                                value={formatClpInput(expPassengerForm.customPricePerPax)}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, '');
                                   setExpPassengerForm({
                                     ...expPassengerForm,
-                                    customPricePerPax: parseInt(e.target.value) || 0,
-                                  })
-                                }
+                                    customPricePerPax: raw ? parseInt(raw, 10) : 0,
+                                  });
+                                }}
+                                placeholder="Ej: 3.000.000"
                                 className="w-full bg-white hover:bg-slate-50 focus:bg-white border-2 border-[#0b192c] rounded-2xl pl-8 pr-14 py-3 text-base font-mono font-bold text-[#0b192c] focus:outline-none transition shadow-xs"
                               />
                               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-bold text-slate-400">
