@@ -1307,6 +1307,41 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     });
   };
 
+  // Cuadro de confirmación personalizado (reemplaza confirm() nativo del navegador)
+  const [customConfirm, setCustomConfirm] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+    onCancel?: () => void;
+  } | null>(null);
+
+  const triggerConfirm = (
+    message: string,
+    onConfirm: () => void,
+    options?: {
+      title?: string;
+      confirmText?: string;
+      cancelText?: string;
+      type?: 'danger' | 'warning' | 'info';
+      onCancel?: () => void;
+    }
+  ) => {
+    setCustomConfirm({
+      isOpen: true,
+      message,
+      onConfirm,
+      title: options?.title || '¿Confirmar Acción?',
+      confirmText: options?.confirmText || 'Aceptar',
+      cancelText: options?.cancelText || 'Cancelar',
+      type: options?.type || 'danger',
+      onCancel: options?.onCancel,
+    });
+  };
+
   // Modal: Manifiesto de Pasajeros & Control de Pagos de Expedición
   const [selectedExpeditionForManifest, setSelectedExpeditionForManifest] = useState<any | null>(null);
   const [manifestSearchQuery, setManifestSearchQuery] = useState('');
@@ -1794,51 +1829,68 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   const handleDeleteAdminNote = (noteId: string) => {
     if (!selectedCustomer) return;
-    if (!window.confirm('¿Deseas eliminar esta nota del administrador?')) return;
+    triggerConfirm(
+      '¿Deseas eliminar esta nota del administrador?',
+      () => {
+        const existingNotes: CustomerAdminNote[] = selectedCustomer.adminNotes || [];
+        const updatedNotesList = existingNotes.filter((n) => n.id !== noteId);
 
-    const existingNotes: CustomerAdminNote[] = selectedCustomer.adminNotes || [];
-    const updatedNotesList = existingNotes.filter((n) => n.id !== noteId);
+        const updatedClients = crmClients.map((c) => {
+          if (c.id === selectedCustomer.id) {
+            return {
+              ...c,
+              notes: updatedNotesList.length > 0 ? updatedNotesList[0].content : '',
+              adminNotes: updatedNotesList,
+            };
+          }
+          return c;
+        });
 
-    const updatedClients = crmClients.map((c) => {
-      if (c.id === selectedCustomer.id) {
-        return {
-          ...c,
-          notes: updatedNotesList.length > 0 ? updatedNotesList[0].content : '',
-          adminNotes: updatedNotesList,
-        };
+        setCrmClients(updatedClients);
+        try {
+          localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updatedClients));
+        } catch {}
+
+        const updatedCustomer = updatedClients.find((c) => c.id === selectedCustomer.id);
+        if (updatedCustomer) {
+          setSelectedCustomer(updatedCustomer);
+        }
+
+        setActionMessage('✓ Nota eliminada.');
+        setTimeout(() => setActionMessage(null), 3000);
+      },
+      {
+        title: 'Eliminar Nota',
+        confirmText: 'Eliminar',
+        type: 'danger',
       }
-      return c;
-    });
-
-    setCrmClients(updatedClients);
-    try {
-      localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updatedClients));
-    } catch {}
-
-    const updatedCustomer = updatedClients.find((c) => c.id === selectedCustomer.id);
-    if (updatedCustomer) {
-      setSelectedCustomer(updatedCustomer);
-    }
-
-    setActionMessage('✓ Nota eliminada.');
-    setTimeout(() => setActionMessage(null), 3000);
+    );
   };
 
   const handleDeleteCustomer = (id: string, name: string) => {
-    if (window.confirm(`¿Estás seguro de que deseas eliminar al cliente "${name}"? Esta acción no se puede deshacer.`)) {
-      const updatedClients = crmClients.filter((c) => c.id !== id);
-      setCrmClients(updatedClients);
-      try {
-        localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updatedClients));
-      } catch {}
+    triggerConfirm(
+      `¿Estás seguro de que deseas eliminar al cliente "${name}"? Esta acción no se puede deshacer.`,
+      () => {
+        const updatedClients = crmClients.filter((c) => c.id !== id);
+        setCrmClients(updatedClients);
+        try {
+          localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updatedClients));
+        } catch {}
 
-      if (selectedCustomer?.id === id) {
-        setSelectedCustomer(null);
+        if (selectedCustomer?.id === id) {
+          setSelectedCustomer(null);
+        }
+
+        setActionMessage(`✓ Cliente "${name}" eliminado del directorio.`);
+        setTimeout(() => setActionMessage(null), 3500);
+      },
+      {
+        title: 'Eliminar Cliente',
+        confirmText: 'Aceptar',
+        cancelText: 'Cancelar',
+        type: 'danger',
       }
-
-      setActionMessage(`✓ Cliente "${name}" eliminado del directorio.`);
-      setTimeout(() => setActionMessage(null), 3500);
-    }
+    );
   };
 
   // Leads Filtering & Stats
@@ -6276,9 +6328,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   {b.type === 'lodge' && (
                                     <button
                                       onClick={() => {
-                                        if (window.confirm(`¿Deseas cancelar/liberar la reserva ${b.booking_code}?`)) {
-                                          deleteBookingOrBlock(b.id);
-                                        }
+                                        triggerConfirm(
+                                          `¿Deseas cancelar/liberar la reserva ${b.booking_code}?`,
+                                          () => deleteBookingOrBlock(b.id),
+                                          {
+                                            title: 'Liberar / Cancelar Reserva',
+                                            confirmText: 'Liberar Reserva',
+                                            type: 'danger',
+                                          }
+                                        );
                                       }}
                                       title="Liberar / Cancelar Reserva"
                                       className="w-7.5 h-7.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition border border-rose-200/80 cursor-pointer shadow-2xs"
@@ -6579,10 +6637,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         {selectedBookingForDetail.type === 'lodge' && (
                           <button
                             onClick={() => {
-                              if (window.confirm(`¿Confirmas la cancelación y liberación de la reserva ${selectedBookingForDetail.booking_code}?`)) {
-                                deleteBookingOrBlock(selectedBookingForDetail.id);
-                                setSelectedBookingForDetail(null);
-                              }
+                              triggerConfirm(
+                                `¿Confirmas la cancelación y liberación de la reserva ${selectedBookingForDetail.booking_code}?`,
+                                () => {
+                                  deleteBookingOrBlock(selectedBookingForDetail.id);
+                                  setSelectedBookingForDetail(null);
+                                },
+                                {
+                                  title: 'Cancelar y Liberar Reserva',
+                                  confirmText: 'Liberar Reserva',
+                                  type: 'danger',
+                                }
+                              );
                             }}
                             className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs py-2.5 px-4 rounded-full border border-rose-200 transition cursor-pointer active:scale-95"
                           >
@@ -7513,13 +7579,21 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                             {/* Eliminar / Desbloquear */}
                                             <button
                                               type="button"
-                                              onClick={async (e) => {
+                                              onClick={(e) => {
                                                 e.stopPropagation();
                                                 setActiveLodgeResMenuId(null);
-                                                if (confirm(`¿Eliminar la reserva/bloqueo ${b.booking_code} de ${b.guest_name || 'Airbnb'}?`)) {
-                                                  await deleteBookingOrBlock(b.id);
-                                                  refreshLodge();
-                                                }
+                                                triggerConfirm(
+                                                  `¿Eliminar la reserva/bloqueo ${b.booking_code} de ${b.guest_name || 'Airbnb'}?`,
+                                                  async () => {
+                                                    await deleteBookingOrBlock(b.id);
+                                                    refreshLodge();
+                                                  },
+                                                  {
+                                                    title: 'Eliminar / Liberar Noche',
+                                                    confirmText: 'Eliminar',
+                                                    type: 'danger',
+                                                  }
+                                                );
                                               }}
                                               className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs border border-rose-200 transition cursor-pointer"
                                             >
@@ -7644,11 +7718,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </td>
                                 <td className="px-6 py-4 text-right whitespace-nowrap">
                                   <button
-                                    onClick={async () => {
-                                      if (confirm(`¿Desea eliminar la reserva/bloqueo ${booking.booking_code}?`)) {
-                                        await deleteBookingOrBlock(booking.id);
-                                        refreshLodge();
-                                      }
+                                    onClick={() => {
+                                      triggerConfirm(
+                                        `¿Desea eliminar la reserva/bloqueo ${booking.booking_code}?`,
+                                        async () => {
+                                          await deleteBookingOrBlock(booking.id);
+                                          refreshLodge();
+                                        },
+                                        {
+                                          title: 'Eliminar Reserva / Bloqueo',
+                                          confirmText: 'Eliminar',
+                                          type: 'danger',
+                                        }
+                                      );
                                     }}
                                     className="w-8 h-8 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer border border-transparent hover:border-rose-200"
                                     title="Eliminar / Desbloquear"
@@ -9895,9 +9977,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                                   <button
                                     onClick={() => {
-                                      if (confirm(`¿Eliminar al prospecto ${lead.fullName}?`)) {
-                                        deleteLead(lead.id);
-                                      }
+                                      triggerConfirm(
+                                        `¿Eliminar al prospecto ${lead.fullName}?`,
+                                        () => deleteLead(lead.id),
+                                        {
+                                          title: 'Eliminar Prospecto',
+                                          confirmText: 'Eliminar',
+                                          type: 'danger',
+                                        }
+                                      );
                                     }}
                                     className="w-8 h-8 rounded-full text-slate-300 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
                                     title="Eliminar"
@@ -10027,9 +10115,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       )}
                                       <button
                                         onClick={() => {
-                                          if (confirm(`¿Eliminar al prospecto ${lead.fullName}?`)) {
-                                            deleteLead(lead.id);
-                                          }
+                                          triggerConfirm(
+                                            `¿Eliminar al prospecto ${lead.fullName}?`,
+                                            () => deleteLead(lead.id),
+                                            {
+                                              title: 'Eliminar Prospecto',
+                                              confirmText: 'Eliminar',
+                                              type: 'danger',
+                                            }
+                                          );
                                         }}
                                         className="w-7 h-7 rounded-full text-slate-300 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
                                         title="Eliminar"
@@ -10129,11 +10223,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             {svc.is_active ? 'Pausar' : 'Activar'}
                           </button>
                           <button
-                            onClick={async () => {
-                              if (confirm(`¿Eliminar ${svc.name}?`)) {
-                                await deleteService(svc.id);
-                                refreshServices();
-                              }
+                            onClick={() => {
+                              triggerConfirm(
+                                `¿Eliminar ${svc.name}?`,
+                                async () => {
+                                  await deleteService(svc.id);
+                                  refreshServices();
+                                },
+                                {
+                                  title: 'Eliminar Servicio',
+                                  confirmText: 'Eliminar',
+                                  type: 'danger',
+                                }
+                              );
                             }}
                             className="text-slate-300 hover:text-rose-600 w-7 h-7 rounded-full flex items-center justify-center hover:bg-rose-50 transition cursor-pointer"
                             title="Eliminar"
@@ -14300,6 +14402,84 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 className="w-full py-3 px-5 rounded-2xl bg-[#0b192c] hover:bg-[#182a44] active:bg-[#061424] text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-md hover:shadow-lg cursor-pointer active:scale-98 text-center"
               >
                 Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CONFIRMACIÓN PERSONALIZADA (REEMPLAZA CONFIRM NATIVO)               */}
+      {/* ========================================================================= */}
+      {customConfirm?.isOpen && (
+        <div className="fixed inset-0 z-[110] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative">
+            <button
+              type="button"
+              onClick={() => {
+                customConfirm.onCancel?.();
+                setCustomConfirm(null);
+              }}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-[#0b192c] flex items-center justify-center transition cursor-pointer"
+              title="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-start gap-4">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+                  customConfirm.type === 'danger'
+                    ? 'bg-rose-50 border-rose-200 text-rose-600'
+                    : customConfirm.type === 'warning'
+                    ? 'bg-amber-50 border-amber-200 text-amber-600'
+                    : 'bg-sky-50 border-sky-200 text-sky-600'
+                }`}
+              >
+                {customConfirm.type === 'danger' ? (
+                  <Trash2 className="w-6 h-6" />
+                ) : customConfirm.type === 'warning' ? (
+                  <AlertTriangle className="w-6 h-6" />
+                ) : (
+                  <Info className="w-6 h-6" />
+                )}
+              </div>
+
+              <div className="space-y-1.5 pr-6">
+                <h4 className="font-serif font-bold text-lg text-[#0b192c] tracking-tight">
+                  {customConfirm.title}
+                </h4>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+                  {customConfirm.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  customConfirm.onCancel?.();
+                  setCustomConfirm(null);
+                }}
+                className="flex-1 py-3 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold uppercase font-mono tracking-wider transition cursor-pointer active:scale-98 text-center"
+              >
+                {customConfirm.cancelText || 'Cancelar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cb = customConfirm.onConfirm;
+                  setCustomConfirm(null);
+                  cb();
+                }}
+                className={`flex-1 py-3 px-5 rounded-2xl text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-md hover:shadow-lg cursor-pointer active:scale-98 text-center ${
+                  customConfirm.type === 'danger'
+                    ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800'
+                    : 'bg-[#0b192c] hover:bg-[#182a44]'
+                }`}
+              >
+                {customConfirm.confirmText || 'Aceptar'}
               </button>
             </div>
           </div>
