@@ -11608,12 +11608,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* Scrollable Table Area */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                 {filteredPassengers.length > 0 ? (
-                  <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-200/80 rounded-2xl overflow-x-auto shadow-2xs">
+                    <table className="w-full min-w-[900px] text-left text-xs border-collapse">
                       <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                         <tr>
                           <th className="py-3.5 px-4">#</th>
-                          <th className="py-3.5 px-4">Pasajero & RUT / ID</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Pasajero & RUT / ID</th>
                           <th className="py-3.5 px-4">Contacto</th>
                           <th className="py-3.5 px-4">Tarifa & Total</th>
                           <th className="py-3.5 px-4">Monto Pagado / Estado</th>
@@ -11632,17 +11632,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 {String(idx + 1).padStart(2, '0')}
                               </td>
                               
-                              <td className="py-3.5 px-4">
+                              <td className="py-3.5 px-4 whitespace-nowrap">
                                 <div className="flex items-center gap-2.5">
                                   <div className="w-8 h-8 rounded-full bg-[#0b192c] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                                     {pax.fullName.split(' ').map(n => n[0]).slice(0, 2).join('')}
                                   </div>
-                                  <div>
-                                    <strong className="text-[#0b192c] font-semibold text-xs block">
+                                  <div className="min-w-0">
+                                    <strong className="text-[#0b192c] font-semibold text-xs block whitespace-nowrap">
                                       {pax.fullName}
                                     </strong>
-                                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                                      <span>RUT: {pax.rutPassport}</span>
+                                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono whitespace-nowrap">
+                                      <span>{pax.rutPassport}</span>
                                       <span>•</span>
                                       <span className="text-sky-700">{pax.code}</span>
                                     </div>
