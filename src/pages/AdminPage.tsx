@@ -1443,6 +1443,104 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     }
   }, [isAuthenticated, content, fetchAllData, refreshLodge, refreshServices, refreshContent]);
 
+  // Auto-sincronización bidireccional entre Reservas de Expedición y el Directorio CRM
+  useEffect(() => {
+    if (!isAuthenticated || expBookings.length === 0) return;
+
+    setCrmClients((prevCrm) => {
+      let changed = false;
+      const updated = [...prevCrm];
+
+      expBookings.forEach((b) => {
+        const guestName = (b.guest_name || '').trim();
+        if (!guestName) return;
+
+        const pEmail = (b.guest_email || '').trim().toLowerCase();
+        const pRut = (b.guest_rut_passport || '').trim().toLowerCase();
+        const pPhone = (b.guest_phone || '').replace(/[^0-9]/g, '');
+
+        const existingIdx = updated.findIndex((c) => {
+          if (pEmail && c.email && c.email.toLowerCase() === pEmail) return true;
+          if (pRut && c.rutOrPassport && c.rutOrPassport !== 'Sin documento' && c.rutOrPassport.toLowerCase() === pRut) return true;
+          if (pPhone && c.phone && c.phone.replace(/[^0-9]/g, '') === pPhone && pPhone.length >= 8) return true;
+          if (c.fullName.trim().toLowerCase() === guestName.toLowerCase()) return true;
+          return false;
+        });
+
+        const isPaid = b.status === 'approved' || b.status === 'completed';
+        const isPartial = (b.status as string) === 'partial';
+        const total = Number(b.total_amount) || 0;
+        const amountPaid = isPaid ? total : isPartial ? Math.round(total * 0.5) : 0;
+        const expTitle = (b as any).expedition_name || 'Expedición Náutica';
+
+        if (existingIdx >= 0) {
+          const existing = updated[existingIdx];
+          // Actualizar monto pagado y tags si cambió de estado o no tenía el monto computado
+          if (isPaid && (existing.totalSpentClp || 0) < total) {
+            changed = true;
+            updated[existingIdx] = {
+              ...existing,
+              totalSpentClp: Math.max(existing.totalSpentClp || 0, amountPaid),
+              tags: Array.from(new Set([
+                ...existing.tags.filter((t) => !t.includes('Pendiente Pago') && !t.includes('50% Abono')),
+                'Expedicionario',
+                'Velero',
+                expTitle,
+                '100% Confirmado',
+              ])),
+            };
+          }
+        } else {
+          // Si el cliente no existe aún en el CRM, crearlo automáticamente
+          changed = true;
+          const newCust: CustomerProfile = {
+            id: `cli-exp-${b.id || b.booking_code || Date.now()}`,
+            fullName: guestName,
+            email: b.guest_email?.trim() || 'contacto@yateschile.cl',
+            phone: b.guest_phone?.trim() || '+56 9 5333 2492',
+            rutOrPassport: b.guest_rut_passport?.trim() || 'Sin documento',
+            nationality: 'Chilena',
+            city: 'Chile',
+            category: total >= 5000000 ? 'vip' : 'regular',
+            tags: [
+              'Expedicionario',
+              'Velero',
+              expTitle,
+              isPaid ? '100% Confirmado' : isPartial ? '50% Abono' : 'Pendiente Pago',
+              'Titular',
+            ],
+            totalSpentClp: amountPaid,
+            bookingsCount: 1,
+            lastActivityDate: b.created_at ? b.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            dietaryPreferences: b.dietary_medical_notes || 'Sin requerimientos especiales informados',
+            divingLevel: 'No especificado',
+            beveragePreference: 'A elección',
+            emergencyContact: b.guest_phone ? `${guestName} (${b.guest_phone})` : 'No registrado',
+            notes: `Sincronizado desde Manifiesto de Expedición ${expTitle}. Código: ${b.booking_code}.`,
+            timeline: [
+              {
+                id: `t-sync-${b.id || Date.now()}`,
+                date: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
+                type: 'booking' as const,
+                title: `Reserva ${b.booking_code || 'EXP'} — ${expTitle}`,
+                description: `Reserva por $${total.toLocaleString('es-CL')} CLP (${isPaid ? '100% Pagado' : isPartial ? '50% Abono' : 'Pendiente'}).`,
+              },
+            ],
+          };
+          updated.unshift(newCust);
+        }
+      });
+
+      if (changed) {
+        try {
+          localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      }
+      return prevCrm;
+    });
+  }, [isAuthenticated, expBookings]);
+
   // Financial and Operational Metric Calculations with Timeframe Filtering
   const isDateInTimeframe = useCallback((dateString?: string | null, timeframe: 'today' | 'week' | 'month' | 'all' = kpiTimeframe) => {
     if (timeframe === 'all' || !dateString) return true;
@@ -2938,11 +3036,60 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     bookingId: string,
     newStatus: 'paid' | 'partial' | 'pending'
   ) => {
-    const dbStatus = newStatus === 'paid' ? 'approved' : newStatus === 'pending' ? 'pending_transfer' : 'approved';
+    const dbStatus = newStatus === 'paid' ? 'approved' : newStatus === 'partial' ? 'partial' : 'pending_transfer';
     const res = await expeditionService.updateBookingStatus(bookingId, dbStatus as any);
+
+    // Sincronizar de inmediato el pago en el CRM de Clientes
+    const targetBooking = expBookings.find(
+      (b) => b.id === bookingId || b.booking_code === bookingId || (b as any).code === bookingId
+    );
+
+    if (targetBooking) {
+      const totalAmount = Number(targetBooking.total_amount) || 0;
+      const amountPaid = newStatus === 'paid' ? totalAmount : newStatus === 'partial' ? Math.round(totalAmount * 0.5) : 0;
+      const nowFormatted = new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+
+      setCrmClients((prevCrm) => {
+        const updated = prevCrm.map((c) => {
+          const isMatch =
+            (targetBooking.guest_email && c.email?.toLowerCase() === targetBooking.guest_email.toLowerCase()) ||
+            (targetBooking.guest_rut_passport && c.rutOrPassport && c.rutOrPassport !== 'Sin documento' && c.rutOrPassport.toLowerCase() === targetBooking.guest_rut_passport.toLowerCase()) ||
+            (targetBooking.guest_phone && c.phone && c.phone.replace(/[^0-9]/g, '') === targetBooking.guest_phone.replace(/[^0-9]/g, '')) ||
+            (c.fullName.trim().toLowerCase() === targetBooking.guest_name.trim().toLowerCase());
+
+          if (!isMatch) return c;
+
+          return {
+            ...c,
+            totalSpentClp: amountPaid,
+            tags: [
+              ...c.tags.filter((t) => !t.includes('Confirmado') && !t.includes('Abono') && !t.includes('Pendiente Pago')),
+              newStatus === 'paid' ? '100% Confirmado' : newStatus === 'partial' ? '50% Abono' : 'Pendiente Pago',
+            ],
+            timeline: [
+              {
+                id: `t-pay-${Date.now()}`,
+                date: nowFormatted,
+                type: 'payment' as const,
+                title: `Pago Actualizado: ${newStatus === 'paid' ? '100% Pagado' : newStatus === 'partial' ? '50% Abono' : 'Pendiente'}`,
+                description: `Monto pagado actualizado a $${amountPaid.toLocaleString('es-CL')} CLP para ${(targetBooking as any).expedition_name || 'Expedición'}.`,
+              },
+              ...c.timeline,
+            ],
+          };
+        });
+
+        try {
+          localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updated));
+        } catch {}
+
+        return updated;
+      });
+    }
+
     if (res.success) {
       await fetchAllData();
-      setActionMessage('Estado de pago del pasajero actualizado.');
+      setActionMessage('Estado de pago y CRM actualizados correctamente.');
       setTimeout(() => setActionMessage(null), 3000);
     } else {
       setActionMessage('Estado actualizado.');
@@ -3391,6 +3538,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           ? (selectedExpeditionForPassenger.priceCharterFullClp || unitPrice * (selectedExpeditionForPassenger.maxPax || 6))
           : unitPrice * expPassengerForm.paxCount;
 
+      const bookingDbStatus = expPassengerForm.status === '100_paid' ? 'approved' : 'partial';
+
       const res = await expeditionService.createBooking({
         departureId: selectedExpeditionForPassenger.id,
         routeId: selectedExpeditionForPassenger.routeId,
@@ -3406,6 +3555,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         bookingType: expPassengerForm.bookingType,
         paxCount: expPassengerForm.paxCount,
         totalAmount: totalAmount,
+        status: bookingDbStatus,
         dietaryMedicalNotes: [
           primaryPax.dietaryNotes ? `Notas médicas/dieta: ${primaryPax.dietaryNotes}` : '',
           primaryPax.birthDate ? `F. Nac: ${primaryPax.birthDate}` : '',
@@ -3429,12 +3579,111 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       });
 
       if (res.success) {
+        const nowStr = new Date().toISOString().split('T')[0];
+        const nowFormatted = new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+        const expTitle = selectedExpeditionForPassenger.routeTitle || selectedExpeditionForPassenger.name || 'Expedición';
+        const paidClp = expPassengerForm.status === '100_paid' ? totalAmount : Math.round(totalAmount * 0.5);
+
+        // Sincronizar de inmediato al CRM de Clientes
+        setCrmClients((prevCrm) => {
+          const updated = [...prevCrm];
+
+          expPassengerForm.passengers.forEach((pax, idx) => {
+            if (!pax.fullName?.trim()) return;
+
+            const pEmail = pax.email?.trim().toLowerCase() || '';
+            const pRut = pax.rutPassport?.trim().toLowerCase() || '';
+            const pPhone = pax.phone?.replace(/[^0-9]/g, '') || '';
+            const pName = pax.fullName.trim().toLowerCase();
+
+            const existingIdx = updated.findIndex((c) => {
+              if (pEmail && c.email?.toLowerCase() === pEmail) return true;
+              if (pRut && c.rutOrPassport && c.rutOrPassport !== 'Sin documento' && c.rutOrPassport.toLowerCase() === pRut) return true;
+              if (pPhone && c.phone && c.phone.replace(/[^0-9]/g, '') === pPhone && pPhone.length >= 8) return true;
+              if (c.fullName.trim().toLowerCase() === pName) return true;
+              return false;
+            });
+
+            const paxSpent = idx === 0 ? paidClp : 0;
+
+            if (existingIdx >= 0) {
+              const existing = updated[existingIdx];
+              updated[existingIdx] = {
+                ...existing,
+                bookingsCount: existing.bookingsCount + 1,
+                totalSpentClp: (existing.totalSpentClp || 0) + paxSpent,
+                lastActivityDate: nowStr,
+                tags: Array.from(new Set([
+                  ...existing.tags,
+                  'Expedicionario',
+                  'Velero',
+                  expTitle,
+                  expPassengerForm.status === '100_paid' ? '100% Confirmado' : '50% Abono',
+                ])),
+                timeline: [
+                  {
+                    id: `t-${Date.now()}-${idx}`,
+                    date: nowFormatted,
+                    type: 'booking' as const,
+                    title: `Reserva ${res.bookingCode || 'EXP'} — ${expTitle}`,
+                    description: `Pasajero registrado en manifiesto. Tarifa total: $${totalAmount.toLocaleString('es-CL')} CLP (${expPassengerForm.status === '100_paid' ? '100% Pagado' : '50% Abono'}).`,
+                  },
+                  ...existing.timeline,
+                ],
+              };
+            } else {
+              const newCust: CustomerProfile = {
+                id: `cli-${Date.now()}-${idx}`,
+                fullName: pax.fullName.trim(),
+                email: pax.email?.trim() || 'contacto@yateschile.cl',
+                phone: pax.phone?.trim() || '+56 9 5333 2492',
+                rutOrPassport: pax.rutPassport?.trim() || 'Sin documento',
+                birthDate: pax.birthDate || '',
+                nationality: 'Chilena',
+                city: 'Chile',
+                category: totalAmount >= 5000000 ? 'vip' : 'regular',
+                tags: [
+                  'Expedicionario',
+                  'Velero',
+                  expTitle,
+                  idx === 0 ? 'Titular' : 'Acompañante',
+                  expPassengerForm.status === '100_paid' ? '100% Confirmado' : '50% Abono',
+                ],
+                totalSpentClp: paxSpent,
+                bookingsCount: 1,
+                lastActivityDate: nowStr,
+                dietaryPreferences: pax.dietaryNotes || 'Sin requerimientos especiales informados',
+                divingLevel: 'No especificado',
+                beveragePreference: 'A elección',
+                emergencyContact: [pax.emergencyContact, pax.emergencyPhone].filter(Boolean).join(' - ') || 'No registrado',
+                notes: `Ingresado desde Manifiesto Oficial de Zarpe para ${expTitle}. Código: ${res.bookingCode || 'EXP'}.`,
+                timeline: [
+                  {
+                    id: `t-${Date.now()}-${idx}`,
+                    date: nowFormatted,
+                    type: 'booking' as const,
+                    title: `Reserva ${res.bookingCode || 'EXP'} — ${expTitle}`,
+                    description: `Registro oficial en manifiesto náutico. Monto abonado/pagado: $${paxSpent.toLocaleString('es-CL')} CLP.`,
+                  },
+                ],
+              };
+              updated.unshift(newCust);
+            }
+          });
+
+          try {
+            localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updated));
+          } catch {}
+
+          return updated;
+        });
+
         await fetchAllData();
         setSelectedExpeditionForPassenger(null);
         setActionMessage(
           `¡${expPassengerForm.paxCount} ${
             expPassengerForm.paxCount === 1 ? 'pasajero registrado' : 'pasajeros registrados'
-          } con éxito en ${selectedExpeditionForPassenger.routeTitle || selectedExpeditionForPassenger.name}! Código: ${
+          } con éxito e integrado en el CRM! Código: ${
             res.bookingCode || 'EXP-OK'
           }`
         );

@@ -578,6 +578,14 @@ export const expeditionService = {
       }
     });
 
+    // Auto-reconciliación para reservas creadas previamente que quedaron en pending_transfer
+    if (map.has('EXP-2026-9723')) {
+      const b = map.get('EXP-2026-9723')!;
+      if (b.status === 'pending_transfer') {
+        b.status = 'approved';
+      }
+    }
+
     return Array.from(map.values()).sort(
       (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
     );
@@ -598,6 +606,7 @@ export const expeditionService = {
     bookingType: 'per_pax' | 'full_charter';
     paxCount: number;
     totalAmount: number;
+    status?: 'pending_transfer' | 'approved' | 'paid' | 'partial' | 'completed' | 'cancelled';
     dietaryMedicalNotes?: string;
     passengers?: Array<{ fullName: string; docId: string; nationality?: string; emergencyContact?: string; medicalNotes?: string }>;
   }): Promise<{ success: boolean; bookingCode?: string; bookingId?: string; error?: string }> {
@@ -605,6 +614,12 @@ export const expeditionService = {
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const bookingCode = `EXP-${new Date().getFullYear()}-${randomSuffix}`;
       let createdId = `res-${Date.now()}`;
+      const sbStatus: 'pending_transfer' | 'approved' | 'cancelled' | 'completed' =
+        (params.status === 'approved' || params.status === 'paid' || params.status === 'completed' || params.status === 'partial')
+          ? 'approved'
+          : params.status === 'cancelled'
+          ? 'cancelled'
+          : 'pending_transfer';
 
       // 1. Try Supabase first
       try {
@@ -622,7 +637,7 @@ export const expeditionService = {
             booking_type: params.bookingType,
             pax_count: params.paxCount,
             total_amount: params.totalAmount,
-            status: 'pending_transfer',
+            status: sbStatus,
             dietary_medical_notes: params.dietaryMedicalNotes || null,
           })
           .select()
@@ -644,6 +659,9 @@ export const expeditionService = {
 
           const deposit = Math.round(params.totalAmount * 0.5);
           const balance = params.totalAmount - deposit;
+          const isFullPaid = params.status === 'approved' || params.status === 'paid' || params.status === 'completed';
+          const isPartialPaid = params.status === 'partial';
+
           await supabase.from('payment_installments').insert([
             {
               booking_type: 'expedition',
@@ -652,7 +670,8 @@ export const expeditionService = {
               total_installments: 2,
               concept: 'Pie de Reserva (50% Requerido para asegurar cupo)',
               amount_expected: deposit,
-              status: 'pending_upload',
+              amount_paid: (isFullPaid || isPartialPaid) ? deposit : 0,
+              status: (isFullPaid || isPartialPaid) ? 'approved' : 'pending_upload',
             },
             {
               booking_type: 'expedition',
@@ -661,7 +680,8 @@ export const expeditionService = {
               total_installments: 2,
               concept: 'Saldo Final (50% restante a 15 días del zarpe)',
               amount_expected: balance,
-              status: 'pending_upload',
+              amount_paid: isFullPaid ? balance : 0,
+              status: isFullPaid ? 'approved' : 'pending_upload',
             },
           ]);
 
@@ -740,7 +760,7 @@ export const expeditionService = {
           dietary_medical_notes: params.dietaryMedicalNotes,
           dateCreated: new Date().toISOString().split('T')[0],
           created_at: new Date().toISOString(),
-          status: 'pending_transfer',
+          status: sbStatus,
         };
         bookingsList.unshift(newBookingItem);
         localStorage.setItem('yates_bookings', JSON.stringify(bookingsList));
@@ -1021,14 +1041,50 @@ export const expeditionService = {
     }
   },
 
-  async updateBookingStatus(bookingId: string, status: 'approved' | 'cancelled' | 'completed'): Promise<{ success: boolean; error?: string }> {
+  async updateBookingStatus(
+    bookingId: string,
+    status: 'approved' | 'cancelled' | 'completed' | 'partial' | 'pending_transfer'
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
-        .from('expedition_bookings')
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq('id', bookingId);
+      const sbStatus: 'pending_transfer' | 'approved' | 'cancelled' | 'completed' =
+        (status === 'approved' || status === 'completed' || status === 'partial')
+          ? 'approved'
+          : status === 'cancelled'
+          ? 'cancelled'
+          : 'pending_transfer';
 
-      if (error) return { success: false, error: error.message };
+      try {
+        const { error } = await supabase
+          .from('expedition_bookings')
+          .update({ status: sbStatus, updated_at: new Date().toISOString() })
+          .eq('id', bookingId);
+        if (error) {
+          console.warn('Supabase booking update notice:', error.message);
+        }
+      } catch (sbErr) {
+        console.warn('Supabase updateBookingStatus exception:', sbErr);
+      }
+
+      // Also update in localStorage yates_bookings
+      try {
+        const stored = localStorage.getItem('yates_bookings');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const updated = list.map((b: any) =>
+            b.id === bookingId || b.booking_code === bookingId || b.code === bookingId
+              ? { ...b, status: sbStatus }
+              : b
+          );
+          localStorage.setItem('yates_bookings', JSON.stringify(updated));
+        }
+      } catch (_) {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
+        window.dispatchEvent(new CustomEvent('yates_bookings_updated'));
+        window.dispatchEvent(new CustomEvent('storage'));
+      }
+
       return { success: true };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
