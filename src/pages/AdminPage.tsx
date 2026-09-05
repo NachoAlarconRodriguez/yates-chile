@@ -5136,11 +5136,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                             const daysUntilDeparture = getDaysUntilDate(b.raw_check_in);
                             const isUrgent60Days = daysUntilDeparture < 60;
+                            const isSecond50Alert = isUrgent60Days && !isSecond50Paid;
                             const amount50 = Math.round(b.amount / 2);
 
                             return (
-                              <tr key={b.id} className="hover:bg-slate-50/80 transition">
-                                <td className="px-7 py-4 whitespace-nowrap">
+                              <tr
+                                key={b.id}
+                                className={`transition-all duration-300 ${
+                                  isSecond50Alert
+                                    ? 'bg-rose-100/75 hover:bg-rose-100 text-rose-950 animate-pulse border-y border-rose-300/80 shadow-[inset_0_0_12px_rgba(225,29,72,0.06)]'
+                                    : 'hover:bg-slate-50/80'
+                                }`}
+                              >
+                                <td className={`px-7 py-4 whitespace-nowrap ${isSecond50Alert ? 'border-l-4 border-l-rose-600' : ''}`}>
                                   <span
                                     className={`text-[10px] px-2.5 py-1 rounded-full font-mono font-bold uppercase inline-flex items-center gap-1 ${
                                       b.type === 'lodge'
