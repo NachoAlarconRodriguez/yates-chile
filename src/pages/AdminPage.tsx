@@ -181,6 +181,13 @@ const getDepartureTimestamp = (d?: any): number => {
   return isNaN(dateObj.getTime()) ? 0 : dateObj.getTime();
 };
 
+const formatClpInput = (val: number | string | undefined | null): string => {
+  if (val === undefined || val === null || val === '' || val === 0) return '';
+  const digits = String(val).replace(/\D/g, '');
+  if (!digits || digits === '0') return '';
+  return Number(digits).toLocaleString('es-CL');
+};
+
 const calculateDurationDays = (start?: any, end?: any): number => {
   if (!start || !end) return 1;
   const s = new Date(start);
@@ -12690,12 +12697,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     Tarifa p/Pax (CLP)
                   </label>
                   <input
-                    type="number"
-                    min="100000"
-                    step="10000"
+                    type="text"
+                    inputMode="numeric"
                     required
-                    value={editingDeparture.price_per_pax_clp}
-                    onChange={(e) => setEditingDeparture({ ...editingDeparture, price_per_pax_clp: Number(e.target.value) })}
+                    value={formatClpInput(editingDeparture.price_per_pax_clp)}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '');
+                      setEditingDeparture({
+                        ...editingDeparture,
+                        price_per_pax_clp: raw ? parseInt(raw, 10) : 0,
+                      });
+                    }}
+                    placeholder="Ej: 3.000.000"
                     className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                   />
                 </div>

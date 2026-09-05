@@ -1304,14 +1304,16 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       <div className="relative">
                         <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                         <input
-                          type="number"
-                          step="50000"
-                          value={pricePerPaxClp}
+                          type="text"
+                          inputMode="numeric"
+                          value={pricePerPaxClp ? Number(pricePerPaxClp).toLocaleString('es-CL') : ''}
                           onChange={(e) => {
-                            const val = Number(e.target.value);
+                            const raw = e.target.value.replace(/\D/g, '');
+                            const val = raw ? parseInt(raw, 10) : 0;
                             setPricePerPaxClp(val);
                             setPriceCharterFullClp(Math.round(val * totalSlots * 0.88));
                           }}
+                          placeholder="Ej: 1.850.000"
                           className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-sm text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
                         />
                       </div>
@@ -1327,10 +1329,15 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       <div className="relative">
                         <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                         <input
-                          type="number"
-                          step="100000"
-                          value={priceCharterFullClp}
-                          onChange={(e) => setPriceCharterFullClp(Number(e.target.value))}
+                          type="text"
+                          inputMode="numeric"
+                          value={priceCharterFullClp ? Number(priceCharterFullClp).toLocaleString('es-CL') : ''}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/\D/g, '');
+                            const val = raw ? parseInt(raw, 10) : 0;
+                            setPriceCharterFullClp(val);
+                          }}
+                          placeholder="Ej: 14.800.000"
                           className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-sm text-[#0f2b48] focus:border-[#0f2b48] focus:outline-none"
                         />
                       </div>
