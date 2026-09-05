@@ -8144,35 +8144,45 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         <tr>
                           <th className="px-6 py-4">Ruta & Expedición</th>
                           <th className="px-6 py-4">Embarcación</th>
-                          <th className="px-6 py-4">
-                            <button
-                              type="button"
-                              onClick={() => setExpeditionsDateSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-                              className="group inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider font-bold text-slate-500 hover:text-[#0b192c] transition-colors cursor-pointer select-none"
-                              title={
-                                expeditionsDateSortOrder === 'asc'
-                                  ? 'Orden actual: Menor a Mayor (fechas más próximas primero). Clic para ordenar de Mayor a Menor.'
-                                  : 'Orden actual: Mayor a Menor (fechas más lejanas primero). Clic para ordenar de Menor a Mayor.'
-                              }
-                            >
-                              <span>Fechas de Salida</span>
-                              <span
-                                className={`inline-flex items-center justify-center w-5 h-5 rounded-md transition-all shadow-2xs ${
-                                  expeditionsDateSortOrder === 'asc'
-                                    ? 'bg-sky-100 text-sky-800 border border-sky-300/80'
-                                    : 'bg-indigo-100 text-indigo-800 border border-indigo-300/80'
-                                }`}
+                          <th className="px-6 py-4 whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setExpeditionsDateSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                                className="font-mono text-[10px] uppercase tracking-wider font-bold text-slate-400 hover:text-[#0b192c] transition-colors cursor-pointer select-none whitespace-nowrap"
+                                title="Ordenar por Fechas de Salida"
                               >
-                                {expeditionsDateSortOrder === 'asc' ? (
-                                  <ArrowUp className="w-3.5 h-3.5 transition-transform group-hover:-translate-y-0.5" />
-                                ) : (
-                                  <ArrowDown className="w-3.5 h-3.5 transition-transform group-hover:translate-y-0.5" />
-                                )}
-                              </span>
-                              <span className="text-[9px] font-sans font-semibold tracking-normal px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200/60 lowercase">
-                                {expeditionsDateSortOrder === 'asc' ? 'menor a mayor' : 'mayor a menor'}
-                              </span>
-                            </button>
+                                Fechas de Salida
+                              </button>
+                              <div className="inline-flex items-center gap-0.5 bg-slate-100/90 p-0.5 rounded-md border border-slate-200/60 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpeditionsDateSortOrder('asc')}
+                                  className={`p-1 rounded transition-colors cursor-pointer ${
+                                    expeditionsDateSortOrder === 'asc'
+                                      ? 'bg-white text-sky-700 shadow-2xs font-bold'
+                                      : 'text-slate-400 hover:text-slate-600'
+                                  }`}
+                                  title="Ordenar de menor a mayor (más próximas primero)"
+                                  aria-label="Ordenar de menor a mayor"
+                                >
+                                  <ArrowUp className={`w-3 h-3 ${expeditionsDateSortOrder === 'asc' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpeditionsDateSortOrder('desc')}
+                                  className={`p-1 rounded transition-colors cursor-pointer ${
+                                    expeditionsDateSortOrder === 'desc'
+                                      ? 'bg-white text-sky-700 shadow-2xs font-bold'
+                                      : 'text-slate-400 hover:text-slate-600'
+                                  }`}
+                                  title="Ordenar de mayor a menor (más lejanas primero)"
+                                  aria-label="Ordenar de mayor a menor"
+                                >
+                                  <ArrowDown className={`w-3 h-3 ${expeditionsDateSortOrder === 'desc' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                                </button>
+                              </div>
+                            </div>
                           </th>
                           <th className="px-6 py-4">Ocupación / Cupos</th>
                           <th className="px-6 py-4">Tarifa p/Pax</th>
