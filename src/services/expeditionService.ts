@@ -556,7 +556,8 @@ export const expeditionService = {
             booking_type: b.booking_type || 'per_pax',
             pax_count: b.guestsCount || b.pax_count || 1,
             total_amount: b.totalAmount || b.total_amount || 0,
-            status: b.status === 'pendiente_transferencia' ? 'pending_transfer' : (b.status || 'pending_transfer'),
+            status: b.payment_status === 'partial' || b.status === 'partial' ? 'partial' : b.status === 'pendiente_transferencia' ? 'pending_transfer' : (b.status || 'pending_transfer'),
+            payment_status: b.payment_status || (b.status === 'partial' ? 'partial' : undefined),
             dietary_medical_notes: b.dietaryMedicalNotes || b.dietary_medical_notes,
             created_at: b.created_at || (b.dateCreated ? `${b.dateCreated}T12:00:00.000Z` : new Date().toISOString()),
             expedition_name: b.expeditionName || b.expedition_name,
@@ -569,11 +570,18 @@ export const expeditionService = {
       }
     } catch {}
 
-    // Merge and deduplicate by booking_code / id
+    // Merge and deduplicate by booking_code / id, preserving local enrichment
     const map = new Map<string, ExpeditionBookingRow>();
-    [...supabaseRows, ...localRows].forEach((item) => {
+    supabaseRows.forEach((item) => {
       const key = item.booking_code || item.id;
-      if (!map.has(key)) {
+      map.set(key, item);
+    });
+    localRows.forEach((item) => {
+      const key = item.booking_code || item.id;
+      const existing = map.get(key);
+      if (existing) {
+        map.set(key, { ...existing, ...item, status: item.status || existing.status });
+      } else {
         map.set(key, item);
       }
     });
@@ -760,10 +768,49 @@ export const expeditionService = {
           dietary_medical_notes: params.dietaryMedicalNotes,
           dateCreated: new Date().toISOString().split('T')[0],
           created_at: new Date().toISOString(),
-          status: sbStatus,
+          status: params.status === 'partial' ? 'partial' : sbStatus,
+          payment_status: params.status === 'partial' ? 'partial' : ((params.status === 'approved' || params.status === 'paid' || params.status === 'completed') ? 'paid' : 'pending'),
         };
         bookingsList.unshift(newBookingItem);
         localStorage.setItem('yates_bookings', JSON.stringify(bookingsList));
+      } catch (_) {}
+
+      // Save installments into localStorage as well
+      try {
+        const storedInst = localStorage.getItem('yates_installments');
+        const instList = storedInst ? JSON.parse(storedInst) : [];
+        const deposit = Math.round(params.totalAmount * 0.5);
+        const balance = params.totalAmount - deposit;
+        const isFullPaid = params.status === 'approved' || params.status === 'paid' || params.status === 'completed';
+        const isPartialPaid = params.status === 'partial';
+        const newInsts = [
+          {
+            id: `inst-${createdId}-1`,
+            booking_id: createdId,
+            booking_type: 'expedition',
+            installment_number: 1,
+            total_installments: 2,
+            concept: 'Pie de Reserva (50% Requerido)',
+            amount_expected: deposit,
+            amount_paid: (isFullPaid || isPartialPaid) ? deposit : 0,
+            status: (isFullPaid || isPartialPaid) ? 'approved' : 'pending_upload',
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: `inst-${createdId}-2`,
+            booking_id: createdId,
+            booking_type: 'expedition',
+            installment_number: 2,
+            total_installments: 2,
+            concept: 'Saldo Final (50% antes del embarque)',
+            amount_expected: balance,
+            amount_paid: isFullPaid ? balance : 0,
+            status: isFullPaid ? 'approved' : 'pending_upload',
+            created_at: new Date().toISOString(),
+          },
+        ];
+        localStorage.setItem('yates_installments', JSON.stringify([...newInsts, ...instList]));
+        window.dispatchEvent(new CustomEvent('yates_installments_updated'));
       } catch (_) {}
 
       // 4. Dispatch events for real-time reactive UI updates
@@ -1072,16 +1119,67 @@ export const expeditionService = {
           const list = JSON.parse(stored);
           const updated = list.map((b: any) =>
             b.id === bookingId || b.booking_code === bookingId || b.code === bookingId
-              ? { ...b, status: sbStatus }
+              ? { ...b, status: status === 'partial' ? 'partial' : sbStatus, payment_status: status }
               : b
           );
           localStorage.setItem('yates_bookings', JSON.stringify(updated));
         }
       } catch (_) {}
 
+      // Synchronize installments in Supabase and localStorage
+      try {
+        if (status === 'approved' || status === 'completed') {
+          await supabase
+            .from('payment_installments')
+            .update({ status: 'approved' })
+            .eq('booking_id', bookingId);
+        } else if (status === 'partial') {
+          await supabase
+            .from('payment_installments')
+            .update({ status: 'approved' })
+            .eq('booking_id', bookingId)
+            .eq('installment_number', 1);
+          await supabase
+            .from('payment_installments')
+            .update({ status: 'pending_upload', amount_paid: 0 })
+            .eq('booking_id', bookingId)
+            .eq('installment_number', 2);
+        } else if (status === 'cancelled') {
+          await supabase
+            .from('payment_installments')
+            .update({ status: 'rejected' })
+            .eq('booking_id', bookingId);
+        }
+      } catch (_) {}
+
+      try {
+        const storedInst = localStorage.getItem('yates_installments');
+        if (storedInst) {
+          const instList = JSON.parse(storedInst);
+          const updatedInstList = instList.map((inst: any) => {
+            if (inst.booking_id === bookingId) {
+              if (status === 'approved' || status === 'completed') {
+                return { ...inst, status: 'approved', amount_paid: inst.amount_expected || 0 };
+              } else if (status === 'partial') {
+                if (inst.installment_number === 1) {
+                  return { ...inst, status: 'approved', amount_paid: inst.amount_expected || 0 };
+                } else {
+                  return { ...inst, status: 'pending_upload', amount_paid: 0 };
+                }
+              } else if (status === 'cancelled') {
+                return { ...inst, status: 'rejected' };
+              }
+            }
+            return inst;
+          });
+          localStorage.setItem('yates_installments', JSON.stringify(updatedInstList));
+        }
+      } catch (_) {}
+
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
         window.dispatchEvent(new CustomEvent('yates_bookings_updated'));
+        window.dispatchEvent(new CustomEvent('yates_installments_updated'));
         window.dispatchEvent(new CustomEvent('storage'));
       }
 

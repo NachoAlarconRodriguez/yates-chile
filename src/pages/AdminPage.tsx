@@ -316,7 +316,12 @@ export interface ExpeditionPassengerManifestItem {
   registeredAt: string;
 }
 
-export const getPassengersForExpedition = (exp: any, bookings: ExpeditionBookingRow[]): ExpeditionPassengerManifestItem[] => {
+export const getPassengersForExpedition = (
+  exp: any,
+  bookings: ExpeditionBookingRow[],
+  installments: PaymentInstallment[] = [],
+  crmClients: CustomerProfile[] = []
+): ExpeditionPassengerManifestItem[] => {
   if (!exp) return [];
   const expId = exp.id;
   const expTitle = (exp.routeTitle || exp.name || '').toLowerCase();
@@ -331,14 +336,95 @@ export const getPassengersForExpedition = (exp: any, bookings: ExpeditionBooking
 
   const defaultUnitPrice = exp.pricePerPaxClp || (typeof exp.pricePerPax === 'string' ? parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 2200000 : 2200000);
 
+  const cleanDietaryNotes = (str?: string | null) => {
+    if (!str) return 'Sin restricciones informadas';
+    const cleaned = str.replace(/Pago:\s*(100% Pagado|Abono 50%)\s*(\|)?\s*/gi, '').trim();
+    return cleaned || 'Sin restricciones informadas';
+  };
+
   const formattedDirect: ExpeditionPassengerManifestItem[] = [];
 
   directBookings.forEach((b: any, bIdx) => {
     const total = Number(b.total_amount) || defaultUnitPrice * (b.pax_count || 1);
-    const isPaid = b.status === 'approved' || b.status === 'paid' || b.status === 'completed';
-    const isPending = b.status === 'pending_transfer' || b.status === 'pending';
-    const amountPaid = isPaid ? total : isPending ? 0 : total * 0.5;
     const baseCode = b.booking_code || `EXP-${(b.id || String(bIdx)).slice(0, 6).toUpperCase()}`;
+
+    // 1. Check if installments exist for this booking
+    const bInst = installments.filter(
+      (i: any) => i.booking_id === b.id || (b.booking_code && i.booking_id === b.booking_code)
+    );
+
+    // 2. Check notes, tags, CRM profile for Abono or 50% hints
+    const notes = (
+      (b.dietary_medical_notes || '') + ' ' +
+      (b.medical_notes || '') + ' ' +
+      (b.notes || '')
+    ).toLowerCase();
+    const hasAbonoHintInNotes = notes.includes('abono') || notes.includes('50%');
+
+    // 3. Match with CRM client
+    const bGuestEmail = (b.guest_email || '').toLowerCase().trim();
+    const bGuestName = (b.guest_name || '').toLowerCase().trim();
+    const bGuestRut = (b.guest_rut_passport || '').toLowerCase().trim();
+    const matchingCrm = crmClients.find((c) => {
+      if (bGuestEmail && c.email?.toLowerCase().trim() === bGuestEmail) return true;
+      if (bGuestRut && c.rutOrPassport && c.rutOrPassport !== 'sin documento' && c.rutOrPassport.toLowerCase().trim() === bGuestRut) return true;
+      if (bGuestName && c.fullName.toLowerCase().trim() === bGuestName) return true;
+      return false;
+    });
+
+    const hasAbonoInCrm = matchingCrm?.tags?.some((t) => t.toLowerCase().includes('abono')) ||
+      (matchingCrm && matchingCrm.totalSpentClp > 0 && matchingCrm.totalSpentClp < total * 0.9);
+
+    let paymentStatus: 'paid' | 'partial' | 'pending' = 'pending';
+    let amountPaid = 0;
+
+    if (bInst.length > 0) {
+      const approvedInst = bInst.filter((i: any) => i.status === 'approved');
+      const approvedAmount = approvedInst.reduce(
+        (sum: number, i: any) => sum + (Number(i.amount_paid) || Number(i.amount_expected) || 0),
+        0
+      );
+      if (approvedInst.length === bInst.length && bInst.length > 0) {
+        paymentStatus = 'paid';
+        amountPaid = total;
+      } else if (approvedInst.length > 0 || approvedAmount > 0) {
+        paymentStatus = 'partial';
+        amountPaid = approvedAmount > 0 ? approvedAmount : Math.round(total * 0.5);
+      } else {
+        paymentStatus = 'pending';
+        amountPaid = 0;
+      }
+    } else {
+      // No installments found: inspect booking and CRM properties
+      if (
+        b.status === 'partial' ||
+        b.payment_status === 'partial' ||
+        hasAbonoHintInNotes ||
+        hasAbonoInCrm
+      ) {
+        paymentStatus = 'partial';
+        amountPaid = Math.round(total * 0.5);
+      } else if (
+        b.status === 'approved' ||
+        b.status === 'paid' ||
+        b.status === 'completed' ||
+        b.payment_status === 'paid' ||
+        b.payment_status === 'approved'
+      ) {
+        paymentStatus = 'paid';
+        amountPaid = total;
+      } else if (b.status === 'cancelled') {
+        paymentStatus = 'pending';
+        amountPaid = 0;
+      } else {
+        paymentStatus = 'pending';
+        amountPaid = 0;
+      }
+    }
+
+    const paxCountInBooking = b.passengers && b.passengers.length > 0 ? b.passengers.length : (b.pax_count || 1);
+    const unitTotal = Math.round(total / paxCountInBooking);
+    const unitPaid = Math.round(amountPaid / paxCountInBooking);
 
     if (Array.isArray(b.passengers) && b.passengers.length > 0) {
       b.passengers.forEach((pax: any, pIdx: number) => {
@@ -352,10 +438,10 @@ export const getPassengersForExpedition = (exp: any, bookings: ExpeditionBooking
           phone: pIdx === 0 ? (b.guest_phone || '-') : (pax.phone || b.guest_phone || '-'),
           paxCount: 1,
           unitPrice: defaultUnitPrice,
-          totalAmount: Math.round(total / (b.pax_count || b.passengers.length || 1)),
-          amountPaid: Math.round(amountPaid / (b.pax_count || b.passengers.length || 1)),
-          paymentStatus: isPaid ? 'paid' : isPending ? 'pending' : 'partial',
-          dietaryNotes: pax.medicalNotes || b.dietary_medical_notes || 'Sin restricciones informadas',
+          totalAmount: unitTotal,
+          amountPaid: unitPaid,
+          paymentStatus: paymentStatus,
+          dietaryNotes: cleanDietaryNotes(pax.medicalNotes || b.dietary_medical_notes),
           emergencyContact: pax.emergencyContact || b.emergency_contact || b.emergency_phone || 'Sin contacto informado',
           registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '-',
         });
@@ -373,8 +459,8 @@ export const getPassengersForExpedition = (exp: any, bookings: ExpeditionBooking
         unitPrice: defaultUnitPrice,
         totalAmount: total,
         amountPaid: amountPaid,
-        paymentStatus: isPaid ? 'paid' : isPending ? 'pending' : 'partial',
-        dietaryNotes: b.dietary_medical_notes || 'Sin restricciones informadas',
+        paymentStatus: paymentStatus,
+        dietaryNotes: cleanDietaryNotes(b.dietary_medical_notes),
         emergencyContact: b.emergency_contact || b.emergency_phone || 'Sin contacto informado',
         registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '-',
       });
@@ -3094,6 +3180,36 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     newStatus: 'paid' | 'partial' | 'pending'
   ) => {
     const dbStatus = newStatus === 'paid' ? 'approved' : newStatus === 'partial' ? 'partial' : 'pending_transfer';
+
+    // Optimistically update expBookings in local state
+    setExpBookings((prev) =>
+      prev.map((b) =>
+        b.id === bookingId || b.booking_code === bookingId || (b as any).code === bookingId
+          ? { ...b, status: dbStatus as any, payment_status: newStatus }
+          : b
+      )
+    );
+
+    // Optimistically update installments in local state
+    setInstallments((prev) =>
+      prev.map((inst) => {
+        if (inst.booking_id === bookingId) {
+          if (newStatus === 'paid') {
+            return { ...inst, status: 'approved', amount_paid: inst.amount_expected || 0 };
+          } else if (newStatus === 'partial') {
+            if (inst.installment_number === 1) {
+              return { ...inst, status: 'approved', amount_paid: inst.amount_expected || 0 };
+            } else {
+              return { ...inst, status: 'pending_upload', amount_paid: 0 };
+            }
+          } else {
+            return { ...inst, status: 'pending_upload', amount_paid: 0 };
+          }
+        }
+        return inst;
+      })
+    );
+
     const res = await expeditionService.updateBookingStatus(bookingId, dbStatus as any);
 
     // Sincronizar de inmediato el pago en el CRM de Clientes
@@ -3687,6 +3803,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         totalAmount: totalAmount,
         status: bookingDbStatus,
         dietaryMedicalNotes: [
+          expPassengerForm.status === '100_paid' ? 'Pago: 100% Pagado' : 'Pago: Abono 50%',
           primaryPax.dietaryNotes ? `Notas médicas/dieta: ${primaryPax.dietaryNotes}` : '',
           primaryPax.birthDate ? `F. Nac: ${primaryPax.birthDate}` : '',
           primaryPax.emergencyContact || primaryPax.emergencyPhone
@@ -11811,7 +11928,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* ========================================================================= */}
       {selectedExpeditionForManifest && (() => {
         const exp = selectedExpeditionForManifest;
-        const allExpPassengers = getPassengersForExpedition(exp, expBookings);
+        const allExpPassengers = getPassengersForExpedition(exp, expBookings, installments, crmClients);
         
         // Filter by search query and payment status
         const filteredPassengers = allExpPassengers.filter((pax) => {
@@ -12112,13 +12229,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const nextStatus = isFullyPaid ? 'partial' : isPartial ? 'pending' : 'paid';
+                                      const nextStatus = isFullyPaid ? 'partial' : 'paid';
                                       handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
                                     }}
                                     className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#0b192c] text-slate-600 hover:text-white transition shadow-2xs cursor-pointer whitespace-nowrap"
                                     title="Cambiar estado de pago"
                                   >
-                                    {isFullyPaid ? 'Marcar Abono' : isPartial ? 'Marcar Pend.' : 'Marcar Pagado'}
+                                    {isFullyPaid ? 'Cambiar a Abono' : isPartial ? 'Marcar Pagado (100%)' : 'Marcar Abono'}
                                   </button>
                                   <button
                                     type="button"

@@ -21,13 +21,37 @@ export const paymentService = {
 
   async getAllPendingInstallments(): Promise<PaymentInstallment[]> {
     try {
-      const { data, error } = await supabase
-        .from('payment_installments')
-        .select('*')
-        .order('created_at', { ascending: false });
+      let supabaseData: PaymentInstallment[] = [];
+      try {
+        const { data, error } = await supabase
+          .from('payment_installments')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error || !data) return [];
-      return data;
+        if (!error && data) {
+          supabaseData = data;
+        }
+      } catch {}
+
+      let localData: PaymentInstallment[] = [];
+      try {
+        const stored = localStorage.getItem('yates_installments');
+        if (stored) {
+          localData = JSON.parse(stored);
+        }
+      } catch {}
+
+      if (localData.length === 0) return supabaseData;
+      if (supabaseData.length === 0) return localData;
+
+      // Merge: localData might have updated status or recent items
+      const mergedMap = new Map<string, PaymentInstallment>();
+      supabaseData.forEach((i) => mergedMap.set(i.id, i));
+      localData.forEach((i) => {
+        mergedMap.set(i.id, { ...(mergedMap.get(i.id) || {}), ...i });
+      });
+
+      return Array.from(mergedMap.values());
     } catch {
       return [];
     }
@@ -60,6 +84,20 @@ export const paymentService = {
         .eq('id', installmentId);
 
       if (updateErr) return { success: false, error: updateErr.message };
+
+      try {
+        const stored = localStorage.getItem('yates_installments');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const updated = list.map((i: any) =>
+            i.id === installmentId
+              ? { ...i, receipt_url: receiptUrl, bank_reference: bankRef || null, status: 'pending_approval' }
+              : i
+          );
+          localStorage.setItem('yates_installments', JSON.stringify(updated));
+        }
+      } catch {}
+
       return { success: true, url: receiptUrl };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -72,52 +110,94 @@ export const paymentService = {
     adminName: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const { data: installment, error: fetchErr } = await supabase
-        .from('payment_installments')
-        .select('*')
-        .eq('id', installmentId)
-        .single();
+      let installment: any = null;
+      try {
+        const { data, error: fetchErr } = await supabase
+          .from('payment_installments')
+          .select('*')
+          .eq('id', installmentId)
+          .single();
+        if (!fetchErr && data) {
+          installment = data;
+        }
+      } catch {}
 
-      if (fetchErr || !installment) return { success: false, error: 'Cuota no encontrada' };
+      if (!installment) {
+        try {
+          const stored = localStorage.getItem('yates_installments');
+          if (stored) {
+            const list = JSON.parse(stored);
+            installment = list.find((i: any) => i.id === installmentId);
+          }
+        } catch {}
+      }
 
-      // Update installment to approved
-      const { error: appErr } = await supabase
-        .from('payment_installments')
-        .update({
-          status: 'approved',
-          amount_paid: amountPaid,
-          approved_by: adminName,
-          approved_at: new Date().toISOString(),
-        })
-        .eq('id', installmentId);
-
-      if (appErr) return { success: false, error: appErr.message };
-
-      // Check if all installments for this booking are approved
-      const { data: allInst } = await supabase
-        .from('payment_installments')
-        .select('status')
-        .eq('booking_id', installment.booking_id);
-
-      const allApproved = allInst && allInst.length > 0 && allInst.every((i) => i.status === 'approved');
-
-      // Update corresponding booking status to approved if first/all installment approved
-      if (installment.booking_type === 'lodge') {
+      // Update installment in Supabase
+      try {
         await supabase
-          .from('lodge_bookings')
+          .from('payment_installments')
           .update({
-            status: allApproved ? 'approved' : 'approved',
-            updated_at: new Date().toISOString(),
+            status: 'approved',
+            amount_paid: amountPaid,
+            approved_by: adminName,
+            approved_at: new Date().toISOString(),
           })
-          .eq('id', installment.booking_id);
-      } else if (installment.booking_type === 'expedition') {
-        await supabase
-          .from('expedition_bookings')
-          .update({
-            status: allApproved ? 'approved' : 'approved',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', installment.booking_id);
+          .eq('id', installmentId);
+      } catch {}
+
+      // Update installment in localStorage
+      try {
+        const stored = localStorage.getItem('yates_installments');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const updated = list.map((i: any) =>
+            i.id === installmentId
+              ? {
+                  ...i,
+                  status: 'approved',
+                  amount_paid: amountPaid,
+                  approved_by: adminName,
+                  approved_at: new Date().toISOString(),
+                }
+              : i
+          );
+          localStorage.setItem('yates_installments', JSON.stringify(updated));
+        }
+      } catch {}
+
+      if (installment) {
+        // Check if all installments for this booking are approved
+        const bookingId = installment.booking_id;
+        try {
+          const { data: allInst } = await supabase
+            .from('payment_installments')
+            .select('status')
+            .eq('booking_id', bookingId);
+
+          const allApproved = allInst && allInst.length > 0 && allInst.every((i) => i.status === 'approved');
+
+          if (installment.booking_type === 'lodge') {
+            await supabase
+              .from('lodge_bookings')
+              .update({
+                status: allApproved ? 'approved' : 'approved',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', bookingId);
+          } else if (installment.booking_type === 'expedition') {
+            await supabase
+              .from('expedition_bookings')
+              .update({
+                status: allApproved ? 'approved' : 'approved',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', bookingId);
+          }
+        } catch {}
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yates_installments_updated'));
       }
 
       return { success: true };
