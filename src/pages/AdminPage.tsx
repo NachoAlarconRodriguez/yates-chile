@@ -144,12 +144,25 @@ const formatDateDDMMYYYY = (d?: any): string => {
     return `${day}/${month}/${year}`;
   }
   const str = String(d).trim();
-  if (!str || str === 'undefined' || str === 'null') return '-';
+  if (!str || str === 'undefined' || str === 'null' || str === '-') return '-';
+  
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+    return str;
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) {
+    const [dPart, mPart, yPart] = str.split('/');
+    return `${dPart.padStart(2, '0')}/${mPart.padStart(2, '0')}/${yPart}`;
+  }
+
   const clean = str.split('T')[0].trim();
   const p = clean.split('-');
   if (p.length === 3 && p[0].length === 4) {
-    return `${p[2]}/${p[1]}/${p[0]}`;
+    return `${p[2].padStart(2, '0')}/${p[1].padStart(2, '0')}/${p[0]}`;
   }
+  if (p.length === 3 && p[2].length === 4) {
+    return `${p[0].padStart(2, '0')}/${p[1].padStart(2, '0')}/${p[2]}`;
+  }
+
   const monthNames: Record<string, string> = {
     ene: '01', feb: '02', mar: '03', abr: '04', may: '05', jun: '06',
     jul: '07', ago: '08', sep: '09', sept: '09', oct: '10', nov: '11', dic: '12',
@@ -330,9 +343,18 @@ export const getPassengersForExpedition = (
   const expDate = exp.rawDepartureDate || exp.departureDate || exp.startDate;
 
   const directBookings = bookings.filter((b: any) => {
-    if (b.departure_id && (b.departure_id === expId || String(b.departure_id) === String(expId))) return true;
-    if (b.expedition_name && expTitle && (expTitle.includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(expTitle))) return true;
-    if (b.departure_date && expDate && b.departure_date === expDate) return true;
+    if (b.departure_id) {
+      return b.departure_id === expId || String(b.departure_id) === String(expId);
+    }
+    if (b.departure_date && expDate && b.expedition_name && expTitle) {
+      const bDate = String(b.departure_date).split('T')[0].trim();
+      const eDate = String(expDate).split('T')[0].trim();
+      const bName = String(b.expedition_name).toLowerCase().trim();
+      const eTitle = String(expTitle).toLowerCase().trim();
+      if (bDate === eDate && (eTitle.includes(bName) || bName.includes(eTitle))) {
+        return true;
+      }
+    }
     return false;
   });
 
@@ -340,7 +362,8 @@ export const getPassengersForExpedition = (
 
   const cleanDietaryNotes = (str?: string | null) => {
     if (!str) return 'Sin restricciones informadas';
-    const cleaned = str.replace(/Pago:\s*(100% Pagado|Abono 50%)\s*(\|)?\s*/gi, '').trim();
+    let cleaned = str.replace(/Pago:\s*(100% Pagado|Abono 50%)\s*(\|)?\s*/gi, '').trim();
+    cleaned = cleaned.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, '$3/$2/$1');
     return cleaned || 'Sin restricciones informadas';
   };
 
@@ -1877,7 +1900,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           email: editCustomerForm.email.trim(),
           phone: editCustomerForm.phone.trim(),
           rutOrPassport: editCustomerForm.rutOrPassport.trim(),
-          birthDate: editCustomerForm.birthDate.trim(),
+          birthDate: editCustomerForm.birthDate.trim() ? formatDateDDMMYYYY(editCustomerForm.birthDate.trim()) : '',
           nationality: editCustomerForm.nationality.trim(),
           city: editCustomerForm.city.trim(),
           emergencyContact: editCustomerForm.emergencyContact.trim(),
@@ -2459,9 +2482,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         }
 
         const depBookings = expBookings.filter((b: any) => {
-          if (b.departure_id && (b.departure_id === dep.id || String(b.departure_id) === String(dep.id))) return true;
-          if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
-          if (b.departure_date && dep.departure_date && b.departure_date === dep.departure_date) return true;
+          if (b.departure_id) {
+            return b.departure_id === dep.id || String(b.departure_id) === String(dep.id);
+          }
+          if (b.departure_date && dep.departure_date && b.expedition_name && routeTitle) {
+            const bDate = String(b.departure_date).split('T')[0].trim();
+            const dDate = String(dep.departure_date).split('T')[0].trim();
+            const bName = String(b.expedition_name).toLowerCase().trim();
+            const rTitle = String(routeTitle).toLowerCase().trim();
+            if (bDate === dDate && (rTitle.includes(bName) || bName.includes(rTitle))) {
+              return true;
+            }
+          }
           return false;
         });
         const realPaxCount = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
@@ -2510,9 +2542,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       }
 
       const expBookingsList = expBookings.filter((b: any) => {
-        if (b.departure_id && (b.departure_id === exp.id || String(b.departure_id) === String(exp.id))) return true;
-        if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
-        if (b.departure_date && exp.departureDate && b.departure_date === exp.departureDate) return true;
+        if (b.departure_id) {
+          return b.departure_id === exp.id || String(b.departure_id) === String(exp.id);
+        }
+        if (b.departure_date && (exp.departureDate || exp.startDate) && b.expedition_name && routeTitle) {
+          const bDate = String(b.departure_date).split('T')[0].trim();
+          const eDate = String(exp.departureDate || exp.startDate).split('T')[0].trim();
+          const bName = String(b.expedition_name).toLowerCase().trim();
+          const rTitle = String(routeTitle).toLowerCase().trim();
+          if (bDate === eDate && (rTitle.includes(bName) || bName.includes(rTitle))) {
+            return true;
+          }
+        }
         return false;
       });
       const realPaxCount = expBookingsList.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
@@ -3807,7 +3848,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         dietaryMedicalNotes: [
           expPassengerForm.status === '100_paid' ? 'Pago: 100% Pagado' : 'Pago: Abono 50%',
           primaryPax.dietaryNotes ? `Notas médicas/dieta: ${primaryPax.dietaryNotes}` : '',
-          primaryPax.birthDate ? `F. Nac: ${primaryPax.birthDate}` : '',
+          primaryPax.birthDate ? `F. Nac: ${formatDateDDMMYYYY(primaryPax.birthDate)}` : '',
           primaryPax.emergencyContact || primaryPax.emergencyPhone
             ? `Emergencia: ${[primaryPax.emergencyContact, primaryPax.emergencyPhone].filter(Boolean).join(' - ')}`
             : '',
@@ -3823,7 +3864,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           docId: p.rutPassport.trim(),
           nationality: 'Chilena',
           emergencyContact: [p.emergencyContact?.trim(), p.emergencyPhone?.trim()].filter(Boolean).join(' - ') || undefined,
-          medicalNotes: [p.dietaryNotes.trim(), p.birthDate ? `Nacimiento: ${p.birthDate}` : ''].filter(Boolean).join(' | ') || undefined,
+          medicalNotes: [p.dietaryNotes.trim(), p.birthDate ? `Nacimiento: ${formatDateDDMMYYYY(p.birthDate)}` : ''].filter(Boolean).join(' | ') || undefined,
         })),
       });
 
@@ -3887,7 +3928,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 email: pax.email?.trim() || 'contacto@yateschile.cl',
                 phone: pax.phone?.trim() || '+56 9 5333 2492',
                 rutOrPassport: pax.rutPassport?.trim() || 'Sin documento',
-                birthDate: pax.birthDate || '',
+                birthDate: pax.birthDate ? formatDateDDMMYYYY(pax.birthDate) : '',
                 nationality: 'Chilena',
                 city: 'Chile',
                 category: totalAmount >= 5000000 ? 'vip' : 'regular',
@@ -4943,23 +4984,28 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <div className="p-7">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {/* KPI 1: INGRESOS CONFIRMADOS */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Ingresos Confirmados
                         </span>
-                        <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-700 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
-                          <TrendingUp className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-700 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <TrendingUp className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                          ${kpiConfirmedRevenue.toLocaleString('es-CL')}
-                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">CLP</span>
+                      <div className="min-w-0">
+                        <div
+                          className="flex items-baseline gap-1.5 min-w-0"
+                          title={`$${kpiConfirmedRevenue.toLocaleString('es-CL')} CLP`}
+                        >
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                            ${kpiConfirmedRevenue.toLocaleString('es-CL')}
+                          </span>
+                          <span className="text-xs font-normal text-slate-400 font-sans shrink-0">CLP</span>
                         </div>
-                        <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                          <span>
+                          <span className="truncate">
                             {kpiTimeframe === 'today'
                               ? 'Transferencias de hoy'
                               : kpiTimeframe === 'week'
@@ -4973,67 +5019,76 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </div>
 
                     {/* KPI 2: POR RECAUDAR / CUOTAS */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Por Recaudar / Cuotas
                         </span>
-                        <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-700 border border-amber-100 shadow-2xs group-hover:scale-105 transition-transform">
-                          <DollarSign className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-700 border border-amber-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <DollarSign className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                          ${kpiPendingRevenue.toLocaleString('es-CL')}
-                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">CLP</span>
+                      <div className="min-w-0">
+                        <div
+                          className="flex items-baseline gap-1.5 min-w-0"
+                          title={`$${kpiPendingRevenue.toLocaleString('es-CL')} CLP`}
+                        >
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                            ${kpiPendingRevenue.toLocaleString('es-CL')}
+                          </span>
+                          <span className="text-xs font-normal text-slate-400 font-sans shrink-0">CLP</span>
                         </div>
-                        <p className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                          <span>{kpiPendingApprovalsCount} comprobantes por revisar</span>
+                          <span className="truncate">{kpiPendingApprovalsCount} comprobantes por revisar</span>
                         </p>
                       </div>
                     </div>
 
                     {/* KPI 3: RESERVAS TOTALES */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Reservas Totales
                         </span>
-                        <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-700 border border-sky-100 shadow-2xs group-hover:scale-105 transition-transform">
-                          <Calendar className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-700 border border-sky-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                          {kpiTotalBookingsCount}
-                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">totales</span>
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-1.5 min-w-0">
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                            {kpiTotalBookingsCount}
+                          </span>
+                          <span className="text-xs font-normal text-slate-400 font-sans shrink-0">totales</span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
-                          <span>{kpiFilteredLodgeBookings.length} Lodge • {kpiFilteredExpBookings.length} Expediciones</span>
+                          <span className="truncate">{kpiFilteredLodgeBookings.length} Lodge • {kpiFilteredExpBookings.length} Expediciones</span>
                         </p>
                       </div>
                     </div>
 
                     {/* KPI 4: CAPACIDAD LODGE */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Capacidad Lodge
                         </span>
-                        <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-700 border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
-                          <BedDouble className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-700 border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <BedDouble className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                          4
-                          <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">Habitaciones</span>
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-1.5 min-w-0">
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                            4
+                          </span>
+                          <span className="text-xs font-normal text-slate-400 font-sans shrink-0">Habitaciones</span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                          <span>Hasta 11 pax • {kpiBlockedDatesCount} bloqueos</span>
+                          <span className="truncate">Hasta 11 pax • {kpiBlockedDatesCount} bloqueos</span>
                         </p>
                       </div>
                     </div>
@@ -6093,89 +6148,100 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* 1. 4 TOP BOOKING KPIS (BANKDASH STYLE) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* KPI 1 */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                       Total Reservas
                     </span>
-                    <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-700 border border-blue-100 shadow-2xs group-hover:scale-105 transition-transform">
-                      <CalendarCheck className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-700 border border-blue-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <CalendarCheck className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                      {allUnifiedBookings.length}
-                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">totales</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                        {allUnifiedBookings.length}
+                      </span>
+                      <span className="text-xs font-normal text-slate-400 font-sans shrink-0">totales</span>
                     </div>
-                    <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                      <span>{allUnifiedBookings.filter(b => b.status === 'approved').length} confirmadas • {allUnifiedBookings.filter(b => b.status === 'pending_transfer').length} pendientes</span>
+                      <span className="truncate">{allUnifiedBookings.filter(b => b.status === 'approved').length} confirmadas • {allUnifiedBookings.filter(b => b.status === 'pending_transfer').length} pendientes</span>
                     </p>
                   </div>
                 </div>
 
                 {/* KPI 2 */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                       Lodge Rincón
                     </span>
-                    <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-700 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
-                      <BedDouble className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-700 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <BedDouble className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                      {lodgeBookings.length}
-                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">reservas</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                        {lodgeBookings.length}
+                      </span>
+                      <span className="text-xs font-normal text-slate-400 font-sans shrink-0">reservas</span>
                     </div>
-                    <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span>{blockedDatesCount} bloqueos de mantención</span>
+                      <span className="truncate">{blockedDatesCount} bloqueos de mantención</span>
                     </p>
                   </div>
                 </div>
 
                 {/* KPI 3 */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                       Expediciones Náuticas
                     </span>
-                    <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-700 border border-sky-100 shadow-2xs group-hover:scale-105 transition-transform">
-                      <Ship className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-700 border border-sky-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <Ship className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                      {expBookings.length}
-                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">zarpes</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                        {expBookings.length}
+                      </span>
+                      <span className="text-xs font-normal text-slate-400 font-sans shrink-0">zarpes</span>
                     </div>
-                    <p className="text-xs text-sky-700 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-sky-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
-                      <span>Velero Vegvisir & Terranova</span>
+                      <span className="truncate">Velero Vegvisir & Terranova</span>
                     </p>
                   </div>
                 </div>
 
                 {/* KPI 4 */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                       Volumen Total
                     </span>
-                    <div className="w-10 h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-700 border border-amber-100 shadow-2xs group-hover:scale-105 transition-transform">
-                      <DollarSign className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-700 border border-amber-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <DollarSign className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
-                      ${(confirmedRevenue + pendingRevenue).toLocaleString('es-CL')}
-                      <span className="text-xs font-normal text-slate-400 ml-1.5 font-sans">CLP</span>
+                  <div className="min-w-0">
+                    <div
+                      className="flex items-baseline gap-1.5 min-w-0"
+                      title={`$${(confirmedRevenue + pendingRevenue).toLocaleString('es-CL')} CLP`}
+                    >
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                        ${(confirmedRevenue + pendingRevenue).toLocaleString('es-CL')}
+                      </span>
+                      <span className="text-xs font-normal text-slate-400 font-sans shrink-0">CLP</span>
                     </div>
-                    <p className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                      <span>Ingresos brutos comprometidos</span>
+                      <span className="truncate">Ingresos brutos comprometidos</span>
                     </p>
                   </div>
                 </div>
@@ -7228,23 +7294,25 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* 4 TOP ANALYTICS KPI CARDS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* KPI 1: TOTAL PÁGINAS VISTAS */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-3 sm:space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors truncate">
                       Total Páginas Vistas
                     </span>
-                    <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <Activity className="w-4.5 h-4.5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100/80 shadow-2xs transition-transform group-hover:scale-105 shrink-0">
+                      <Activity className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
-                      {analyticsSummary?.totalViews || 0}
-                      <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">vistas</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-mono font-bold text-[#0f2b48] tracking-tight truncate">
+                        {analyticsSummary?.totalViews || 0}
+                      </span>
+                      <span className="text-xs font-sans font-normal text-slate-400 shrink-0">vistas</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                      <span>
+                      <span className="truncate">
                         {analyticsTimeframe === 'today'
                           ? 'Páginas navegadas hoy'
                           : analyticsTimeframe === 'this_week'
@@ -7262,69 +7330,73 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {/* KPI 2: VISITANTES ÚNICOS */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-3 sm:space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors truncate">
                       Visitantes Únicos
                     </span>
-                    <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <Users className="w-4.5 h-4.5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100/80 shadow-2xs transition-transform group-hover:scale-105 shrink-0">
+                      <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
-                      {analyticsSummary?.uniqueVisitors || 0}
-                      <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">sesiones</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-mono font-bold text-[#0f2b48] tracking-tight truncate">
+                        {analyticsSummary?.uniqueVisitors || 0}
+                      </span>
+                      <span className="text-xs font-sans font-normal text-slate-400 shrink-0">sesiones</span>
                     </div>
-                    <p className="text-[11px] text-emerald-700 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-[11px] text-emerald-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span>Sesiones únicas verificadas</span>
+                      <span className="truncate">Sesiones únicas verificadas</span>
                     </p>
                   </div>
                 </div>
 
                 {/* KPI 3: PRINCIPAL PAÍS */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-3 sm:space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors truncate">
                       Principal País
                     </span>
-                    <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-600 border border-sky-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <Globe className="w-4.5 h-4.5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-600 border border-sky-100/80 shadow-2xs transition-transform group-hover:scale-105 shrink-0">
+                      <Globe className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight flex items-center gap-2">
-                      <span>{analyticsSummary?.topCountries[0]?.flag || '🇨🇱'}</span>
-                      <span className="truncate text-2xl">
+                  <div className="min-w-0">
+                    <div className="text-xl sm:text-2xl 2xl:text-3xl font-mono font-bold text-[#0f2b48] tracking-tight flex items-center gap-2 min-w-0">
+                      <span className="shrink-0">{analyticsSummary?.topCountries[0]?.flag || '🇨🇱'}</span>
+                      <span className="truncate text-lg sm:text-xl 2xl:text-2xl">
                         {analyticsSummary?.topCountries[0]?.country_name || 'Chile'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
-                      <span>{analyticsSummary?.topCountries[0]?.percentage || 0}% del volumen en el período</span>
+                      <span className="truncate">{analyticsSummary?.topCountries[0]?.percentage || 0}% del volumen en el período</span>
                     </p>
                   </div>
                 </div>
 
                 {/* KPI 4: PREFERENCIA DISPOSITIVO */}
-                <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors">
+                <div className="min-w-0 overflow-hidden bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 shadow-[0_4px_25px_rgba(15,43,72,0.02)] space-y-3 sm:space-y-4 hover:border-[#0f2b48]/30 hover:shadow-[0_10px_30px_rgba(15,43,72,0.05)] hover:-translate-y-0.5 transition-all duration-300 group">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase font-mono tracking-widest font-bold text-slate-400 group-hover:text-[#0f2b48] transition-colors truncate">
                       Preferencia Dispositivo
                     </span>
-                    <div className="w-10 h-10 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 border border-purple-100/80 shadow-2xs transition-transform group-hover:scale-105">
-                      <Monitor className="w-4.5 h-4.5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-50 rounded-2xl flex items-center justify-center text-purple-600 border border-purple-100/80 shadow-2xs transition-transform group-hover:scale-105 shrink-0">
+                      <Monitor className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div>
-                    <div className="text-3xl font-mono font-bold text-[#0f2b48] tracking-tight">
-                      {analyticsSummary?.deviceBreakdown.desktop || 65}%
-                      <span className="text-xs font-sans font-normal text-slate-400 ml-1.5">PC / Mac</span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-mono font-bold text-[#0f2b48] tracking-tight truncate">
+                        {analyticsSummary?.deviceBreakdown.desktop || 65}%
+                      </span>
+                      <span className="text-xs font-sans font-normal text-slate-400 shrink-0">PC / Mac</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5">
+                    <p className="text-[11px] text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                       <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
-                      <span>{analyticsSummary?.deviceBreakdown.mobile || 35}% desde smartphones</span>
+                      <span className="truncate">{analyticsSummary?.deviceBreakdown.mobile || 35}% desde smartphones</span>
                     </p>
                   </div>
                 </div>
@@ -7565,43 +7637,52 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <div className="space-y-7">
                 {/* 1. BOUTIQUE STATS PILLS STRIP (CARDS SUPERIORES) */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
-                    <div>
-                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Ocupación Mensual</span>
-                      <span className="font-sans font-extrabold text-2xl text-[#0b192c] mt-1.5 block tracking-tight">{occupancyRate}%</span>
+                  <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 flex items-center justify-between gap-2 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block truncate">Ocupación Mensual</span>
+                      <span className="font-sans font-extrabold text-xl sm:text-2xl text-[#0b192c] mt-1.5 block tracking-tight truncate">{occupancyRate}%</span>
                     </div>
-                    <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shadow-2xs group-hover:scale-105 transition-transform">
-                      <TrendingUp className="w-5 h-5" />
-                    </div>
-                  </div>
-
-                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
-                    <div>
-                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Noches Reservadas</span>
-                      <span className="font-sans font-extrabold text-2xl text-emerald-700 mt-1.5 block tracking-tight">{bookedNightsCount} <span className="text-xs font-normal text-slate-400">noches</span></span>
-                    </div>
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform">
-                      <CheckCircle2 className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <TrendingUp className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
 
-                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
-                    <div>
-                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Noches Disponibles</span>
-                      <span className="font-sans font-extrabold text-2xl text-slate-700 mt-1.5 block tracking-tight">{freeNightsCount} <span className="text-xs font-normal text-slate-400">noches</span></span>
+                  <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 flex items-center justify-between gap-2 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block truncate">Noches Reservadas</span>
+                      <div className="flex items-baseline gap-1 mt-1.5 min-w-0">
+                        <span className="font-sans font-extrabold text-xl sm:text-2xl text-emerald-700 tracking-tight truncate">{bookedNightsCount}</span>
+                        <span className="text-xs font-normal text-slate-400 shrink-0">noches</span>
+                      </div>
                     </div>
-                    <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
-                      <Calendar className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <CheckCircle2 className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
 
-                  <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 flex items-center justify-between shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
-                    <div>
-                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block">Aforo Total</span>
-                      <span className="font-sans font-extrabold text-2xl text-purple-700 mt-1.5 block tracking-tight">11 <span className="text-xs font-normal text-slate-400">Huéspedes</span></span>
+                  <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 flex items-center justify-between gap-2 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block truncate">Noches Disponibles</span>
+                      <div className="flex items-baseline gap-1 mt-1.5 min-w-0">
+                        <span className="font-sans font-extrabold text-xl sm:text-2xl text-slate-700 tracking-tight truncate">{freeNightsCount}</span>
+                        <span className="text-xs font-normal text-slate-400 shrink-0">noches</span>
+                      </div>
                     </div>
-                    <div className="w-10 h-10 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100 shadow-2xs group-hover:scale-105 transition-transform">
-                      <Users className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 flex items-center justify-between gap-2 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer">
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors block truncate">Aforo Total</span>
+                      <div className="flex items-baseline gap-1 mt-1.5 min-w-0">
+                        <span className="font-sans font-extrabold text-xl sm:text-2xl text-purple-700 tracking-tight truncate">11</span>
+                        <span className="text-xs font-normal text-slate-400 shrink-0">Huéspedes</span>
+                      </div>
+                    </div>
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
                 </div>
@@ -8263,17 +8344,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {/* 1. 4 TOP EXPEDITION KPIS (BANKDASH STYLE) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* KPI 1: SALIDAS PROGRAMADAS */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer flex flex-col justify-between">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer flex flex-col justify-between">
                   <div className="flex items-center justify-between gap-2 h-10">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight truncate">
                       Salidas Programadas
                     </span>
-                    <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-                      <Ship className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <Ship className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight leading-none">
+                  <div className="space-y-2 min-w-0">
+                    <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight leading-none truncate">
                       {departures.length > 0 ? departures.length : upcomingExpeditions.length}
                     </div>
                     <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
@@ -8284,17 +8365,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {/* KPI 2: PASAJEROS Y OCUPACIÓN */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer flex flex-col justify-between">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer flex flex-col justify-between">
                   <div className="flex items-center justify-between gap-2 h-10">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight truncate">
                       Pasajeros a Bordo
                     </span>
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-                      <Users className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-3xl font-extrabold font-sans text-emerald-700 tracking-tight leading-none">
+                  <div className="space-y-2 min-w-0">
+                    <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-emerald-700 tracking-tight leading-none truncate">
                       {expBookings.reduce((acc, b) => acc + (b.status !== 'cancelled' ? b.pax_count : 0), 0) || 12}
                     </div>
                     <div className="text-xs text-emerald-700 font-medium flex items-center gap-1.5 truncate">
@@ -8305,27 +8386,27 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {/* KPI 3: INGRESOS EXPEDICIONES */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer flex flex-col justify-between">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer flex flex-col justify-between">
                   <div className="flex items-center justify-between gap-2 h-10">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight truncate">
                       Ingresos Expediciones
                     </span>
-                    <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-                      <DollarSign className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <DollarSign className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     {(() => {
                       const totalExpRevenue = expBookings.reduce((acc, b) => acc + (b.status !== 'cancelled' ? Number(b.total_amount) : 0), 0) || 22200000;
                       return (
                         <div
                           title={`$${totalExpRevenue.toLocaleString('es-CL')} CLP`}
-                          className="flex items-baseline gap-1.5 leading-none"
+                          className="flex items-baseline gap-1.5 leading-none min-w-0"
                         >
-                          <span className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight">
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight truncate">
                             {formatCompactMoney(totalExpRevenue)}
                           </span>
-                          <span className="text-xs font-semibold text-slate-400 font-sans">CLP</span>
+                          <span className="text-xs font-semibold text-slate-400 font-sans shrink-0">CLP</span>
                         </div>
                       );
                     })()}
@@ -8337,17 +8418,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {/* KPI 4: FLOTA EN OPERACIÓN */}
-                <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer flex flex-col justify-between">
+                <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer flex flex-col justify-between">
                   <div className="flex items-center justify-between gap-2 h-10">
-                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight">
+                    <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors leading-tight truncate">
                       Embarcaciones Activas
                     </span>
-                    <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
-                      <Sailboat className="w-5 h-5" />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                      <Sailboat className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-3xl font-extrabold font-sans text-purple-700 tracking-tight leading-none">
+                  <div className="space-y-2 min-w-0">
+                    <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-purple-700 tracking-tight leading-none truncate">
                       {vessels.length > 0 ? vessels.length : 2}
                     </div>
                     <div className="text-xs text-purple-800 font-medium flex items-center gap-1.5 truncate">
@@ -8451,9 +8532,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
                         }
                         const depBookings = expBookings.filter((b: any) => {
-                          if (b.departure_id && (b.departure_id === dep.id || String(b.departure_id) === String(dep.id))) return true;
-                          if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
-                          if (b.departure_date && dep.departure_date && b.departure_date === dep.departure_date) return true;
+                          if (b.departure_id) {
+                            return b.departure_id === dep.id || String(b.departure_id) === String(dep.id);
+                          }
+                          if (b.departure_date && dep.departure_date && b.expedition_name && routeTitle) {
+                            const bDate = String(b.departure_date).split('T')[0].trim();
+                            const dDate = String(dep.departure_date).split('T')[0].trim();
+                            const bName = String(b.expedition_name).toLowerCase().trim();
+                            const rTitle = String(routeTitle).toLowerCase().trim();
+                            if (bDate === dDate && (rTitle.includes(bName) || bName.includes(rTitle))) {
+                              return true;
+                            }
+                          }
                           return false;
                         });
                         const bookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
@@ -8803,9 +8893,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
                             }
                             const depBookings = expBookings.filter((b: any) => {
-                              if (b.departure_id && (b.departure_id === dep.id || String(b.departure_id) === String(dep.id))) return true;
-                              if (b.expedition_name && routeTitle && (routeTitle.toLowerCase().includes(String(b.expedition_name).toLowerCase()) || String(b.expedition_name).toLowerCase().includes(routeTitle.toLowerCase()))) return true;
-                              if (b.departure_date && dep.departure_date && b.departure_date === dep.departure_date) return true;
+                              if (b.departure_id) {
+                                return b.departure_id === dep.id || String(b.departure_id) === String(dep.id);
+                              }
+                              if (b.departure_date && dep.departure_date && b.expedition_name && routeTitle) {
+                                const bDate = String(b.departure_date).split('T')[0].trim();
+                                const dDate = String(dep.departure_date).split('T')[0].trim();
+                                const bName = String(b.expedition_name).toLowerCase().trim();
+                                const rTitle = String(routeTitle).toLowerCase().trim();
+                                if (bDate === dDate && (rTitle.includes(bName) || bName.includes(rTitle))) {
+                                  return true;
+                                }
+                              }
                               return false;
                             });
                             const bookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
@@ -9130,7 +9229,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 if (routeTitle.startsWith('JF ')) routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
                                 const isTerranova = dep.vessel_id === 'terranova' || (dep.name && dep.name.toLowerCase().includes('terranova'));
                                 const vesselName = isTerranova ? 'Yate Terranova' : dep.vessel_id === 'lodge' ? 'Lodge Bahía Cumberland' : 'Velero Vegvisir';
-                                const paxCount = expBookings.filter((b) => b.departure_id === dep.id).length;
+                                const paxCount = expBookings.filter((b) => {
+                                  if (b.departure_id) return b.departure_id === dep.id || String(b.departure_id) === String(dep.id);
+                                  const bDate = String((b as any).departure_date || '').split('T')[0].trim();
+                                  const dDate = String(dep.departure_date || '').split('T')[0].trim();
+                                  return Boolean(bDate && dDate && bDate === dDate);
+                                }).length;
                                 const isSelected = manifestExpeditionFilter === dep.id;
 
                                 return (
@@ -9230,7 +9334,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               b.guest_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
                               b.guest_email.toLowerCase().includes(searchFilter.toLowerCase());
                             const matchesExp =
-                              manifestExpeditionFilter === 'all' || b.departure_id === manifestExpeditionFilter;
+                              manifestExpeditionFilter === 'all' ||
+                              (b.departure_id
+                                ? (b.departure_id === manifestExpeditionFilter || String(b.departure_id) === String(manifestExpeditionFilter))
+                                : (() => {
+                                    const selectedDep = departures.find((d) => d.id === manifestExpeditionFilter);
+                                    if (!selectedDep) return false;
+                                    const bDate = String((b as any).departure_date || '').split('T')[0].trim();
+                                    const dDate = String(selectedDep.departure_date || '').split('T')[0].trim();
+                                    return Boolean(bDate && dDate && bDate === dDate);
+                                  })());
                             return matchesSearch && matchesExp;
                           })
                           .map((booking) => {
@@ -9594,89 +9707,89 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   {/* 1. TOP CRM & REVENUE KPIS */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {/* Total Clientes */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Total Clientes CRM
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-[#0b192c] border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
-                          <Users className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-[#0b192c] border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight">
+                      <div className="min-w-0">
+                        <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight truncate">
                           {crmClients.length}
                         </div>
-                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 truncate">
+                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                          <span>Base unificada Lodge & Yates</span>
+                          <span className="truncate">Base unificada Lodge & Yates</span>
                         </span>
                       </div>
                     </div>
 
                     {/* Clientes Activos */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Clientes Activos
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform">
-                          <UserCheck className="w-5 h-5 text-sky-700" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <UserCheck className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-sky-700" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight">
+                      <div className="min-w-0">
+                        <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight truncate">
                           {crmClients.length}
                         </div>
-                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 truncate">
+                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                          <span>Directorio activo</span>
+                          <span className="truncate">Directorio activo</span>
                         </span>
                       </div>
                     </div>
 
                     {/* Valor Total Facturado (LTV) */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           LTV Facturado CRM
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform">
-                          <DollarSign className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <DollarSign className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         {(() => {
                           const totalLtv = crmClients.reduce((acc, c) => acc + c.totalSpentClp, 0);
                           return (
                             <div
                               title={`$${totalLtv.toLocaleString('es-CL')} CLP`}
-                              className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight"
+                              className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight truncate"
                             >
                               {formatCompactMoney(totalLtv)}{' '}
                               <span className="text-xs font-normal text-slate-400 font-sans">CLP</span>
                             </div>
                           );
                         })()}
-                        <span className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 truncate">
+                        <span className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                          <span>CLP Facturado histórico</span>
+                          <span className="truncate">CLP Facturado histórico</span>
                         </span>
                       </div>
                     </div>
 
                     {/* Conciliaciones / Transferencias Pendientes */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Transferencias Pendientes
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform">
-                          <CreditCard className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <CreditCard className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold font-sans text-sky-800 tracking-tight">
+                      <div className="min-w-0">
+                        <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-sky-800 tracking-tight truncate">
                           {pendingApprovalsCount}
                         </div>
                         <button
@@ -10098,85 +10211,85 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   {/* KPI Cards de Leads */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {/* Total Leads */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Total Leads Captados
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-[#0b192c] border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform">
-                          <Users className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-[#0b192c] border border-slate-200/80 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <Users className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight">
+                      <div className="min-w-0">
+                        <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-[#0b192c] tracking-tight truncate">
                           {leads.length}
                         </div>
-                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 truncate">
+                        <span className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                          <span>Brochure, Web & WhatsApp</span>
+                          <span className="truncate">Brochure, Web & WhatsApp</span>
                         </span>
                       </div>
                     </div>
 
                     {/* Nuevos por Atender */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-amber-700 group-hover:text-amber-800 transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-amber-700 group-hover:text-amber-800 transition-colors truncate">
                           Nuevos por Atender
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shadow-2xs group-hover:scale-105 transition-transform">
-                          <Flame className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <Flame className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold font-sans text-amber-700 tracking-tight">
+                      <div className="min-w-0">
+                        <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-amber-700 tracking-tight truncate">
                           {newLeadsCount}
                         </div>
-                        <span className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5 truncate">
+                        <span className="text-xs text-amber-800 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                          <span>Atención requerida</span>
+                          <span className="truncate">Atención requerida</span>
                         </span>
                       </div>
                     </div>
 
                     {/* En Cotización Activa */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           En Cotización Activa
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform">
-                          <DollarSign className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <DollarSign className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold font-sans text-sky-800 tracking-tight">
+                      <div className="min-w-0">
+                        <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-sky-800 tracking-tight truncate">
                           {quotingLeadsCount}
                         </div>
-                        <span className="text-xs text-sky-700 font-medium mt-2 flex items-center gap-1.5 truncate">
+                        <span className="text-xs text-sky-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
-                          <span>Propuestas enviadas</span>
+                          <span className="truncate">Propuestas enviadas</span>
                         </span>
                       </div>
                     </div>
 
                     {/* Tasa de Conversión */}
-                    <div className="bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-4 group cursor-pointer">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors">
+                    <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-[#0b192c] transition-colors truncate">
                           Tasa de Conversión
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform">
-                          <TrendingUp className="w-5 h-5" />
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <TrendingUp className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
                         </div>
                       </div>
-                      <div>
-                        <div className="text-3xl font-extrabold font-sans text-emerald-700 tracking-tight">
+                      <div className="min-w-0">
+                        <div className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold font-sans text-emerald-700 tracking-tight truncate">
                           {conversionRate}%
                         </div>
-                        <span className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 truncate">
+                        <span className="text-xs text-emerald-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                          <span>{convertedLeadsCount} convertidos a clientes</span>
+                          <span className="truncate">{convertedLeadsCount} convertidos a clientes</span>
                         </span>
                       </div>
                     </div>
@@ -12194,31 +12307,62 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </div>
                               </td>
 
-                              <td className="py-3.5 px-4">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-1.5">
+                              <td className="py-3.5 px-4 min-w-[220px]">
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between gap-1">
                                     <span className="font-mono font-bold text-xs text-[#0b192c]">
                                       ${pax.amountPaid.toLocaleString('es-CL')} CLP
                                     </span>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      {isFullyPaid ? '100% Pagado' : isPartial ? '50% Abono' : '0% Pendiente'}
+                                    </span>
                                   </div>
 
-                                  <div className="inline-flex items-center">
-                                    {isFullyPaid ? (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                        <span>Pagado 100%</span>
-                                      </span>
-                                    ) : isPartial ? (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
-                                        <Clock className="w-3 h-3 text-sky-600" />
-                                        <span>Abono 50%</span>
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                                        <AlertCircle className="w-3 h-3 text-amber-600" />
-                                        <span>Pendiente</span>
-                                      </span>
-                                    )}
+                                  {/* Dos botones / pastillas interactivas (Opción 1) */}
+                                  <div className="flex items-center gap-1.5">
+                                    {/* Botón Cuota 1: Abono 50% */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nextStatus = isPartial ? 'pending' : 'partial';
+                                        handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
+                                      }}
+                                      className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border transition cursor-pointer shadow-2xs ${
+                                        isFullyPaid || isPartial
+                                          ? 'bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100'
+                                          : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
+                                      }`}
+                                      title={isFullyPaid || isPartial ? '1° Abono (50%) Pagado. Clic para desmarcar.' : '1° Abono (50%) Pendiente. Clic para marcar.'}
+                                    >
+                                      {isFullyPaid || isPartial ? (
+                                        <CheckCircle2 className="w-3 h-3 text-sky-600 shrink-0" />
+                                      ) : (
+                                        <div className="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" />
+                                      )}
+                                      <span>Abono 50%</span>
+                                    </button>
+
+                                    {/* Botón Cuota 2: Saldo 50% */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nextStatus = isFullyPaid ? 'partial' : 'paid';
+                                        handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
+                                      }}
+                                      className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border transition cursor-pointer shadow-2xs ${
+                                        isFullyPaid
+                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                                          : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
+                                      }`}
+                                      title={isFullyPaid ? 'Saldo Final (50%) Pagado. Clic para volver a Abono.' : 'Saldo Final (50%) Pendiente. Clic para marcar Pagado 100%.'}
+                                    >
+                                      {isFullyPaid ? (
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                      ) : (
+                                        <div className="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" />
+                                      )}
+                                      <span>Saldo 50%</span>
+                                    </button>
                                   </div>
                                 </div>
                               </td>
@@ -12245,7 +12389,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#0b192c] text-slate-600 hover:text-white transition shadow-2xs cursor-pointer whitespace-nowrap"
                                     title="Cambiar estado de pago"
                                   >
-                                    {isFullyPaid ? 'Cambiar a Abono' : isPartial ? 'Marcar Pagado (100%)' : 'Marcar Abono'}
+                                    {isFullyPaid ? 'Volver a Abono' : isPartial ? 'Marcar Pagado (100%)' : 'Marcar Abono'}
                                   </button>
                                   <button
                                     type="button"
@@ -13062,7 +13206,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
                                     <span>RUT: {pax.rutPassport || 'No informado'}</span>
                                     <span>•</span>
-                                    <span>F. Nacimiento: {pax.birthDate || 'No informada'}</span>
+                                    <span>F. Nacimiento: {pax.birthDate ? formatDateDDMMYYYY(pax.birthDate) : 'No informada'}</span>
                                   </div>
                                 </div>
 
@@ -13630,7 +13774,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Fecha de Nacimiento</span>
-                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.birthDate || 'No registrada'}</span>
+                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.birthDate ? formatDateDDMMYYYY(selectedCustomer.birthDate) : 'No registrada'}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Nacionalidad</span>
