@@ -361,10 +361,35 @@ export const getPassengersForExpedition = (
   const defaultUnitPrice = exp.pricePerPaxClp || (typeof exp.pricePerPax === 'string' ? parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 2200000 : 2200000);
 
   const cleanDietaryNotes = (str?: string | null) => {
-    if (!str) return 'Sin restricciones informadas';
-    let cleaned = str.replace(/Pago:\s*(100% Pagado|Abono 50%)\s*(\|)?\s*/gi, '').trim();
+    if (!str) return 'Sin requerimientos especiales';
+    let cleaned = str
+      .replace(/Pago:\s*(100% Pagado|Abono 50%)\s*(\|)?\s*/gi, '')
+      .replace(/Emergencia:\s*[^|]+/gi, '')
+      .replace(/Facturación:\s*[^|]+/gi, '')
+      .replace(/Total\s*\d+\s*pasajeros\s*registrados/gi, '')
+      .replace(/\|\s*\|/g, '|')
+      .replace(/^\|\s*|\s*\|$/g, '')
+      .trim();
     cleaned = cleaned.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, '$3/$2/$1');
-    return cleaned || 'Sin restricciones informadas';
+    return cleaned || 'Sin requerimientos especiales';
+  };
+
+  const extractEmergencyContact = (paxObj?: any, bookingObj?: any) => {
+    if (paxObj?.emergencyContact && paxObj.emergencyContact !== 'Sin contacto informado' && paxObj.emergencyContact.trim()) {
+      return paxObj.emergencyContact.trim();
+    }
+    if (bookingObj?.emergency_contact && bookingObj.emergency_contact !== 'Sin contacto informado' && bookingObj.emergency_contact.trim()) {
+      return bookingObj.emergency_contact.trim();
+    }
+    if (bookingObj?.emergency_phone && bookingObj.emergency_phone.trim()) {
+      return bookingObj.emergency_phone.trim();
+    }
+    const combinedNotes = (paxObj?.medicalNotes || '') + ' ' + (bookingObj?.dietary_medical_notes || '') + ' ' + (bookingObj?.notes || '');
+    const match = combinedNotes.match(/Emergencia:\s*([^|]+)/i);
+    if (match && match[1]?.trim()) {
+      return match[1].trim();
+    }
+    return 'Sin contacto informado';
   };
 
   const formattedDirect: ExpeditionPassengerManifestItem[] = [];
@@ -403,7 +428,16 @@ export const getPassengersForExpedition = (
     let paymentStatus: 'paid' | 'partial' | 'pending' = 'pending';
     let amountPaid = 0;
 
-    if (bInst.length > 0) {
+    if (b.payment_status === 'paid' || b.payment_status === 'approved') {
+      paymentStatus = 'paid';
+      amountPaid = total;
+    } else if (b.payment_status === 'partial') {
+      paymentStatus = 'partial';
+      amountPaid = Math.round(total * 0.5);
+    } else if (b.payment_status === 'pending' || b.payment_status === 'pending_transfer') {
+      paymentStatus = 'pending';
+      amountPaid = 0;
+    } else if (bInst.length > 0) {
       const approvedInst = bInst.filter((i: any) => i.status === 'approved');
       const approvedAmount = approvedInst.reduce(
         (sum: number, i: any) => sum + (Number(i.amount_paid) || Number(i.amount_expected) || 0),
@@ -420,24 +454,15 @@ export const getPassengersForExpedition = (
         amountPaid = 0;
       }
     } else {
-      // No installments found: inspect booking and CRM properties
-      if (
-        b.status === 'partial' ||
-        b.payment_status === 'partial' ||
-        hasAbonoHintInNotes ||
-        hasAbonoInCrm
-      ) {
-        paymentStatus = 'partial';
-        amountPaid = Math.round(total * 0.5);
-      } else if (
-        b.status === 'approved' ||
-        b.status === 'paid' ||
-        b.status === 'completed' ||
-        b.payment_status === 'paid' ||
-        b.payment_status === 'approved'
-      ) {
+      if (b.status === 'approved' || b.status === 'paid' || b.status === 'completed') {
         paymentStatus = 'paid';
         amountPaid = total;
+      } else if (b.status === 'partial') {
+        paymentStatus = 'partial';
+        amountPaid = Math.round(total * 0.5);
+      } else if (hasAbonoHintInNotes || hasAbonoInCrm) {
+        paymentStatus = 'partial';
+        amountPaid = Math.round(total * 0.5);
       } else if (b.status === 'cancelled') {
         paymentStatus = 'pending';
         amountPaid = 0;
@@ -467,7 +492,7 @@ export const getPassengersForExpedition = (
           amountPaid: unitPaid,
           paymentStatus: paymentStatus,
           dietaryNotes: cleanDietaryNotes(pax.medicalNotes || b.dietary_medical_notes),
-          emergencyContact: pax.emergencyContact || b.emergency_contact || b.emergency_phone || 'Sin contacto informado',
+          emergencyContact: extractEmergencyContact(pax, b),
           registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '-',
         });
       });
@@ -486,7 +511,7 @@ export const getPassengersForExpedition = (
         amountPaid: amountPaid,
         paymentStatus: paymentStatus,
         dietaryNotes: cleanDietaryNotes(b.dietary_medical_notes),
-        emergencyContact: b.emergency_contact || b.emergency_phone || 'Sin contacto informado',
+        emergencyContact: extractEmergencyContact(null, b),
         registeredAt: b.created_at ? formatDateDDMMYYYY(b.created_at) : '-',
       });
     }
@@ -12242,7 +12267,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                 {filteredPassengers.length > 0 ? (
                   <div className="border border-slate-200/80 rounded-2xl overflow-x-auto shadow-2xs">
-                    <table className="w-full min-w-[900px] text-left text-xs border-collapse">
+                    <table className="w-full min-w-[950px] text-left text-xs border-collapse">
                       <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                         <tr>
                           <th className="py-3.5 px-4">#</th>
@@ -12250,7 +12275,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           <th className="py-3.5 px-4">Contacto</th>
                           <th className="py-3.5 px-4">Tarifa & Total</th>
                           <th className="py-3.5 px-4">Monto Pagado / Estado</th>
-                          <th className="py-3.5 px-4">Ficha Médica & Emergencia</th>
+                          <th className="py-3.5 px-4">Ficha Médica</th>
+                          <th className="py-3.5 px-4">Contacto de Emergencia</th>
                           <th className="py-3.5 px-4 text-right">Acción</th>
                         </tr>
                       </thead>
@@ -12324,7 +12350,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const nextStatus = isPartial ? 'pending' : 'partial';
+                                        const nextStatus = isFullyPaid ? 'partial' : isPartial ? 'pending' : 'partial';
                                         handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
                                       }}
                                       className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border transition cursor-pointer shadow-2xs ${
@@ -12332,7 +12358,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                           ? 'bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100'
                                           : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
                                       }`}
-                                      title={isFullyPaid || isPartial ? '1° Abono (50%) Pagado. Clic para desmarcar.' : '1° Abono (50%) Pendiente. Clic para marcar.'}
+                                      title={isFullyPaid || isPartial ? '1° Abono (50%) Pagado. Clic para cambiar estado.' : '1° Abono (50%) Pendiente. Clic para marcar.'}
                                     >
                                       {isFullyPaid || isPartial ? (
                                         <CheckCircle2 className="w-3 h-3 text-sky-600 shrink-0" />
@@ -12354,7 +12380,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                           ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
                                           : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
                                       }`}
-                                      title={isFullyPaid ? 'Saldo Final (50%) Pagado. Clic para volver a Abono.' : 'Saldo Final (50%) Pendiente. Clic para marcar Pagado 100%.'}
+                                      title={isFullyPaid ? 'Saldo Final (50%) Pagado. Clic para volver a Abono.' : 'Saldo Final (50%) Pendiente. Clic para marcar 100% Pagado & Confirmado.'}
                                     >
                                       {isFullyPaid ? (
                                         <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
@@ -12367,34 +12393,25 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </div>
                               </td>
 
-                              <td className="py-3.5 px-4 max-w-xs">
-                                <div className="space-y-1">
-                                  <div className="text-[11px] text-slate-600 leading-tight">
-                                    {pax.dietaryNotes}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 font-mono">
-                                    <span className="font-semibold text-slate-500">Emergencia:</span> {pax.emergencyContact}
-                                  </div>
+                              <td className="py-3.5 px-4 max-w-[200px]">
+                                <div className="text-[11px] text-slate-600 leading-tight">
+                                  {pax.dietaryNotes}
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 min-w-[170px]">
+                                <div className="text-[11px] text-slate-700 leading-tight font-medium flex items-center gap-1.5">
+                                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                  <span>{pax.emergencyContact || 'Sin contacto informado'}</span>
                                 </div>
                               </td>
 
                               <td className="py-3.5 px-4 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const nextStatus = isFullyPaid ? 'partial' : 'paid';
-                                      handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
-                                    }}
-                                    className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#0b192c] text-slate-600 hover:text-white transition shadow-2xs cursor-pointer whitespace-nowrap"
-                                    title="Cambiar estado de pago"
-                                  >
-                                    {isFullyPaid ? 'Volver a Abono' : isPartial ? 'Marcar Pagado (100%)' : 'Marcar Abono'}
-                                  </button>
+                                <div className="flex items-center justify-end">
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteManifestPassenger(pax.id, pax.bookingId, pax.code, pax.fullName)}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer shadow-2xs"
                                     title="Eliminar pasajero de la expedición"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
