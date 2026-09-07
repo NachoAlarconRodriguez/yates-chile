@@ -1942,30 +1942,19 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                           <input
                             type="text"
                             value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.image || ''}
-                            onChange={(e) =>
-                              setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'image', e.target.value)
-                            }
-                            placeholder="https://... o sube una imagen"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const driveMatch = val.trim().match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
+                              const formattedVal = driveMatch ? `https://lh3.googleusercontent.com/d/${driveMatch[1]}` : val;
+                              setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'image', formattedVal);
+                            }}
+                            placeholder="https://drive.google.com/... o URL de imagen"
                             className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-mono focus:outline-none shadow-2xs"
                           />
+                          <p className="text-[10.5px] text-slate-500 mt-1.5 leading-normal">
+                            Ingresa la URL pública de la imagen (Google Drive, Dropbox u otro repositorio externo).
+                          </p>
                         </div>
-
-                        {/* Button in Single Line */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setMediaModal({
-                              sectionKey: activeLogbookVessel,
-                              entryId: activeLogbookEntry,
-                              label: `Fotografía de Bitácora (${activeLogbookEntry})`,
-                              currentValue: getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.image || '',
-                            })
-                          }
-                          className="w-full py-2.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-sm whitespace-nowrap"
-                        >
-                          <Upload className="w-4 h-4 text-sky-300" />
-                          <span>Subir o Cambiar Fotografía</span>
-                        </button>
                       </div>
                     </div>
 
