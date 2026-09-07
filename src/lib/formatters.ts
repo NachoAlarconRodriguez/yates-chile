@@ -66,3 +66,43 @@ export const formatPhone = (raw: string): string => {
   }
   return `+${limited.slice(0, 2)} ${limited.slice(2, 3)} ${limited.slice(3, 7)} ${limited.slice(7)}`;
 };
+
+/**
+ * Formats large amounts compactly with Chilean financial abbreviations:
+ * >= 1.000.000.000: $XB (e.g. $1,2B)
+ * >= 1.000.000: $XM (e.g. $51,05M, $15M)
+ * >= 10.000: $Xk (e.g. $500k, $45k)
+ * < 10.000: $X.XXX (e.g. $8.500)
+ */
+export const formatCompactClp = (amount: number | string | undefined | null): string => {
+  const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount || 0);
+  if (!num || isNaN(num)) return '$0';
+  const abs = Math.abs(num);
+  const sign = num < 0 ? '-' : '';
+
+  if (abs >= 1_000_000_000) {
+    const val = abs / 1_000_000_000;
+    const formatted = val.toLocaleString('es-CL', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: val % 1 === 0 ? 0 : 2,
+    });
+    return `${sign}$${formatted}B`;
+  }
+  if (abs >= 1_000_000) {
+    const val = abs / 1_000_000;
+    const formatted = val.toLocaleString('es-CL', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: val % 1 === 0 ? 0 : (Math.round(val * 10) % 10 === 0 ? 1 : 2),
+    });
+    return `${sign}$${formatted}M`;
+  }
+  if (abs >= 10_000) {
+    const val = abs / 1_000;
+    const formatted = val.toLocaleString('es-CL', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: val % 1 === 0 ? 0 : 1,
+    });
+    return `${sign}$${formatted}k`;
+  }
+  return `${sign}$${abs.toLocaleString('es-CL')}`;
+};

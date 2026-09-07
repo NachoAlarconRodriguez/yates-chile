@@ -96,7 +96,7 @@ import {
   type AnalyticsTimeframe,
   type AnalyticsPageView,
 } from '../services/analyticsService';
-import { formatRut, formatPhone } from '../lib/formatters';
+import { formatRut, formatPhone, formatCompactClp } from '../lib/formatters';
 import { LuxuryDatePicker } from '../components/admin/LuxuryDatePicker';
 import { CountryPhoneInput } from '../components/admin/CountryPhoneInput';
 import { LuxurySelect } from '../components/admin/LuxurySelect';
@@ -242,22 +242,7 @@ const calculateDurationDays = (start?: any, end?: any): number => {
 };
 
 const formatCompactMoney = (amount: number | string | undefined | null): string => {
-  const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount || 0);
-  if (!num || isNaN(num)) return '$0';
-  const abs = Math.abs(num);
-  if (abs >= 1_000_000_000) {
-    const val = num / 1_000_000_000;
-    return `$${val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)}B`;
-  }
-  if (abs >= 1_000_000) {
-    const val = num / 1_000_000;
-    return `$${val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)}M`;
-  }
-  if (abs >= 100_000) {
-    const val = num / 1_000;
-    return `$${val % 1 === 0 ? val.toFixed(0) : val.toFixed(0)}K`;
-  }
-  return `$${num.toLocaleString('es-CL')}`;
+  return formatCompactClp(amount);
 };
 
 const getUnifiedBookingStatus = (b: any): 'confirmed' | 'reserved' | 'scheduled' | 'blocked' => {
@@ -5076,10 +5061,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <div className="min-w-0">
                         <div
                           className="flex items-baseline gap-1.5 min-w-0"
-                          title={`$${kpiConfirmedRevenue.toLocaleString('es-CL')} CLP`}
+                          title={`Monto exacto: $${kpiConfirmedRevenue.toLocaleString('es-CL')} CLP`}
                         >
-                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
-                            ${kpiConfirmedRevenue.toLocaleString('es-CL')}
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
+                            {formatCompactMoney(kpiConfirmedRevenue)}
                           </span>
                           <span className="text-xs font-normal text-slate-400 font-sans shrink-0">CLP</span>
                         </div>
@@ -5111,10 +5096,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <div className="min-w-0">
                         <div
                           className="flex items-baseline gap-1.5 min-w-0"
-                          title={`$${kpiPendingRevenue.toLocaleString('es-CL')} CLP`}
+                          title={`Monto exacto: $${kpiPendingRevenue.toLocaleString('es-CL')} CLP`}
                         >
-                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
-                            ${kpiPendingRevenue.toLocaleString('es-CL')}
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
+                            {formatCompactMoney(kpiPendingRevenue)}
                           </span>
                           <span className="text-xs font-normal text-slate-400 font-sans shrink-0">CLP</span>
                         </div>
@@ -6312,10 +6297,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   <div className="min-w-0">
                     <div
                       className="flex items-baseline gap-1.5 min-w-0"
-                      title={`$${(confirmedRevenue + pendingRevenue).toLocaleString('es-CL')} CLP`}
+                      title={`Monto exacto: $${(confirmedRevenue + pendingRevenue).toLocaleString('es-CL')} CLP`}
                     >
-                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
-                        ${(confirmedRevenue + pendingRevenue).toLocaleString('es-CL')}
+                      <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans">
+                        {formatCompactMoney(confirmedRevenue + pendingRevenue)}
                       </span>
                       <span className="text-xs font-normal text-slate-400 font-sans shrink-0">CLP</span>
                     </div>
@@ -8627,11 +8612,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           return false;
                         });
                         const bookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
-                        const percent = Math.round((bookedPax / (dep.total_slots || 10)) * 100);
+                        const maxSlots = dep.total_slots || 10;
+                        const percent = Math.min(100, Math.round((bookedPax / maxSlots) * 100));
                         const VesselIcon = isTerranova ? Ship : Sailboat;
 
                         const isClosedOrCompleted = dep.status === 'completed' || dep.status === 'cancelled' || (dep as any).is_closed === true;
-                        const isAgotado = isClosedOrCompleted || (dep.available_slots || 0) <= 0 || bookedPax >= (dep.total_slots || 10);
+                        const calculatedAvailable = Math.max(0, maxSlots - bookedPax);
+                        const remainingSlots = typeof dep.available_slots === 'number' && dep.available_slots >= 0 && bookedPax > 0
+                          ? Math.min(dep.available_slots, calculatedAvailable)
+                          : calculatedAvailable;
+                        const isAgotado = isClosedOrCompleted || (bookedPax >= maxSlots && maxSlots > 0) || (bookedPax > 0 && remainingSlots <= 0);
                         const calcDaysUntil = (dateStr?: string) => {
                           if (!dateStr) return 999;
                           const target = new Date(dateStr);
@@ -8771,7 +8761,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   </span>
                                 ) : (
                                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase">
-                                    {dep.available_slots} libres
+                                    {remainingSlots} libres
                                   </span>
                                 )}
                               </div>
@@ -9709,13 +9699,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                               type="button"
                                               onClick={() => {
                                                 setOpenPassengerMenuId(null);
+                                                const dMax = dep.total_slots || 10;
+                                                const dBooked = expBookings
+                                                  .filter((b) => b.departure_id === dep.id && b.status !== 'cancelled')
+                                                  .reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                                                const dAvail = Math.max(0, dMax - dBooked);
                                                 handleOpenPassengerManifestModal({
                                                   ...dep,
                                                   routeTitle,
                                                   vesselName,
-                                                  bookedPax: (dep.total_slots || 10) - (dep.available_slots || 0),
-                                                  maxPax: dep.total_slots || 10,
-                                                  availablePax: dep.available_slots || 0,
+                                                  bookedPax: dBooked,
+                                                  maxPax: dMax,
+                                                  availablePax: dAvail,
                                                   departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`,
                                                   rawDepartureDate: dep.departure_date,
                                                   pricePerPaxClp: dep.price_per_pax_clp,
