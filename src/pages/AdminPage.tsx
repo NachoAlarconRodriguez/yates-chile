@@ -102,6 +102,7 @@ import { CountryPhoneInput } from '../components/admin/CountryPhoneInput';
 import { LuxurySelect } from '../components/admin/LuxurySelect';
 import { exportBookingsToExcel, exportExpeditionManifestToExcel, type ExpeditionManifestExportRow } from '../lib/excelExport';
 import { supabase } from '../lib/supabase';
+import { crmService } from '../services/crmService';
 
 const DELETED_CLIENTS_KEY = 'yates_chile_deleted_crm_clients';
 
@@ -264,6 +265,16 @@ const getUnifiedBookingStatus = (b: any): 'confirmed' | 'reserved' | 'scheduled'
   const notes = (b.notes || '').toLowerCase();
   const statusStr = String(b.status || '').toLowerCase();
   
+  if (
+    statusStr === '0_pending' ||
+    statusStr === 'pending_transfer' ||
+    notes.includes('0%') ||
+    notes.includes('$0') ||
+    notes.includes('sin abono') ||
+    notes.includes('por pagar')
+  ) {
+    return 'scheduled';
+  }
   if (statusStr === '50_reserved' || statusStr === 'partial' || notes.includes('50%') || notes.includes('reservado')) {
     return 'reserved';
   }
@@ -1319,7 +1330,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     paxCount: number;
     bookingType: 'per_pax' | 'full_charter';
     customPricePerPax: number;
-    status: '100_paid' | '50_reserved';
+    status: '100_paid' | '50_reserved' | '0_pending';
     billingNotes: string;
     passengers: Array<{
       fullName: string;
@@ -1445,13 +1456,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const fetchAllData = useCallback(async () => {
     setLoadingPayments(true);
     try {
-      const [instData, expData, rawViews, departuresData, routesData, vesselsData] = await Promise.all([
+      const [instData, expData, rawViews, departuresData, routesData, vesselsData, clientsData] = await Promise.all([
         paymentService.getAllPendingInstallments(),
         expeditionService.getAllBookings(),
         analyticsService.getAllRawViews(),
         expeditionService.getDepartures(),
         expeditionService.getRoutes(),
         expeditionService.getVessels(),
+        crmService.getAllClients(),
       ]);
       setInstallments(instData);
       setExpBookings(expData);
@@ -1460,6 +1472,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       setDepartures(departuresData);
       setExpRoutes(routesData as ExpeditionRouteRow[]);
       setVessels(vesselsData as VesselRow[]);
+      if (clientsData && clientsData.length > 0) {
+        setCrmClients(clientsData);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -1877,6 +1892,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     };
 
     setCrmClients([newCust, ...crmClients]);
+    crmService.createClient(newCust).catch(console.error);
     setShowNewCustomerModal(false);
     setSelectedCustomer(newCust);
     setNewCustomerForm({
@@ -1943,9 +1959,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updatedClients));
     } catch {}
 
-    if (selectedCustomer?.id === editingCustomer.id) {
-      const updated = updatedClients.find((c) => c.id === editingCustomer.id);
-      if (updated) setSelectedCustomer(updated);
+    const updatedRecord = updatedClients.find((c) => c.id === editingCustomer.id);
+    if (selectedCustomer?.id === editingCustomer.id && updatedRecord) {
+      setSelectedCustomer(updatedRecord);
+    }
+    if (updatedRecord) {
+      crmService.updateClient(editingCustomer.id, updatedRecord).catch(console.error);
     }
 
     setEditingCustomer(null);
@@ -2073,7 +2092,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           setSelectedCustomer(null);
         }
 
-        // 3. Eliminar de la base de datos (Supabase) y localStorage de reservas
+        // 3. Eliminar de la base de datos Supabase (crm_clients)
+        try {
+          await crmService.deleteClient(id);
+        } catch (err) {
+          console.warn('Supabase crm client delete error:', err);
+        }
+
+        // 4. Eliminar de la base de datos (Supabase) y localStorage de reservas
         if (custToDelete) {
           const custEmail = custToDelete.email?.toLowerCase().trim();
           const custRut = custToDelete.rutOrPassport?.toLowerCase().trim();
@@ -2193,6 +2219,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const handleConvertLeadToClient = async (lead: LeadItem) => {
     const newCust = convertLeadToCustomer(lead);
     setCrmClients((prev) => [newCust, ...prev]);
+    crmService.createClient(newCust).catch(console.error);
     await updateLeadStatus(lead.id, 'convertido');
     setSelectedCustomer(newCust);
     setCustomerDossierTab('profile');
@@ -3852,7 +3879,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           ? (selectedExpeditionForPassenger.priceCharterFullClp || unitPrice * (selectedExpeditionForPassenger.maxPax || 6))
           : unitPrice * expPassengerForm.paxCount;
 
-      const bookingDbStatus = expPassengerForm.status === '100_paid' ? 'approved' : 'partial';
+      const bookingDbStatus =
+        expPassengerForm.status === '100_paid'
+          ? 'approved'
+          : expPassengerForm.status === '50_reserved'
+          ? 'partial'
+          : 'pending_transfer';
 
       const res = await expeditionService.createBooking({
         departureId: selectedExpeditionForPassenger.id,
@@ -3871,7 +3903,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         totalAmount: totalAmount,
         status: bookingDbStatus,
         dietaryMedicalNotes: [
-          expPassengerForm.status === '100_paid' ? 'Pago: 100% Pagado' : 'Pago: Abono 50%',
+          expPassengerForm.status === '100_paid'
+            ? 'Pago: 100% Pagado'
+            : expPassengerForm.status === '50_reserved'
+            ? 'Pago: Abono 50%'
+            : 'Pago: $0 (Sin abono inicial / Pendiente de transferencia)',
           primaryPax.dietaryNotes ? `Notas médicas/dieta: ${primaryPax.dietaryNotes}` : '',
           primaryPax.birthDate ? `F. Nac: ${formatDateDDMMYYYY(primaryPax.birthDate)}` : '',
           primaryPax.emergencyContact || primaryPax.emergencyPhone
@@ -3897,7 +3933,26 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         const nowStr = new Date().toISOString().split('T')[0];
         const nowFormatted = new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
         const expTitle = selectedExpeditionForPassenger.routeTitle || selectedExpeditionForPassenger.name || 'Expedición';
-        const paidClp = expPassengerForm.status === '100_paid' ? totalAmount : Math.round(totalAmount * 0.5);
+        const paidClp =
+          expPassengerForm.status === '100_paid'
+            ? totalAmount
+            : expPassengerForm.status === '50_reserved'
+            ? Math.round(totalAmount * 0.5)
+            : 0;
+
+        const paymentLabel =
+          expPassengerForm.status === '100_paid'
+            ? '100% Confirmado'
+            : expPassengerForm.status === '50_reserved'
+            ? '50% Abono'
+            : 'Pendiente $0';
+
+        const paymentDesc =
+          expPassengerForm.status === '100_paid'
+            ? '100% Pagado'
+            : expPassengerForm.status === '50_reserved'
+            ? '50% Abono'
+            : '$0 Abonado / Pendiente';
 
         // Sincronizar de inmediato al CRM de Clientes
         setCrmClients((prevCrm) => {
@@ -3933,7 +3988,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   'Expedicionario',
                   'Velero',
                   expTitle,
-                  expPassengerForm.status === '100_paid' ? '100% Confirmado' : '50% Abono',
+                  paymentLabel,
                 ])),
                 timeline: [
                   {
@@ -3941,7 +3996,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     date: nowFormatted,
                     type: 'booking' as const,
                     title: `Reserva ${res.bookingCode || 'EXP'} — ${expTitle}`,
-                    description: `Pasajero registrado en manifiesto. Tarifa total: $${totalAmount.toLocaleString('es-CL')} CLP (${expPassengerForm.status === '100_paid' ? '100% Pagado' : '50% Abono'}).`,
+                    description: `Pasajero registrado en manifiesto. Tarifa total: $${totalAmount.toLocaleString('es-CL')} CLP (${paymentDesc}).`,
                   },
                   ...existing.timeline,
                 ],
@@ -3962,7 +4017,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   'Velero',
                   expTitle,
                   idx === 0 ? 'Titular' : 'Acompañante',
-                  expPassengerForm.status === '100_paid' ? '100% Confirmado' : '50% Abono',
+                  paymentLabel,
                 ],
                 totalSpentClp: paxSpent,
                 bookingsCount: 1,
@@ -12559,6 +12614,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       ${totalToCharge.toLocaleString('es-CL')}{' '}
                       <span className="text-xs text-sky-300 font-normal">CLP</span>
                     </span>
+                    {expPassengerForm.status === '50_reserved' && (
+                      <div className="mt-2 pt-2 border-t border-white/10 text-[10px] font-mono text-amber-300 flex items-center justify-between">
+                        <span>Abono 50%:</span>
+                        <span className="font-bold">${Math.round(totalToCharge * 0.5).toLocaleString('es-CL')} CLP</span>
+                      </div>
+                    )}
+                    {expPassengerForm.status === '0_pending' && (
+                      <div className="mt-2 pt-2 border-t border-white/10 text-[10px] font-mono text-rose-300 flex items-center justify-between">
+                        <span>Abonado hoy:</span>
+                        <span className="font-bold">$0 CLP (Pendiente)</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -13079,7 +13146,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         </label>
 
                         {/* Opciones Interactivas de Selección (Cards) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           {/* Opción 1: 100% Pagado */}
                           <button
                             type="button"
@@ -13183,6 +13250,58 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               </p>
                             </div>
                           </button>
+
+                          {/* Opción 3: 0% Pagado ($0) */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpPassengerForm({
+                                ...expPassengerForm,
+                                status: '0_pending',
+                              })
+                            }
+                            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 relative ${
+                              expPassengerForm.status === '0_pending'
+                                ? 'bg-[#0b192c] text-white border-[#0b192c] shadow-md ring-2 ring-sky-300/30'
+                                : 'bg-[#f8fafc] text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border transition-all ${
+                                expPassengerForm.status === '0_pending'
+                                  ? 'bg-rose-500 border-rose-400 text-white'
+                                  : 'border-slate-300 bg-white text-transparent'
+                              }`}
+                            >
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-serif text-sm font-bold block leading-tight">
+                                  $0 Pagado
+                                </span>
+                                <span
+                                  className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                    expPassengerForm.status === '0_pending'
+                                      ? 'bg-rose-500/30 text-rose-200 border border-rose-400/40'
+                                      : 'bg-rose-100 text-rose-800'
+                                  }`}
+                                >
+                                  Sin abono
+                                </span>
+                              </div>
+                              <p
+                                className={`text-[11px] leading-relaxed ${
+                                  expPassengerForm.status === '0_pending'
+                                    ? 'text-slate-300'
+                                    : 'text-slate-500'
+                                }`}
+                              >
+                                Inscripción con pago pendiente (saldo 100% por transferir).
+                              </p>
+                            </div>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -13251,10 +13370,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${
                                   expPassengerForm.status === '50_reserved'
                                     ? 'bg-amber-500/20 text-amber-300 border-amber-400/30'
+                                    : expPassengerForm.status === '0_pending'
+                                    ? 'bg-rose-500/20 text-rose-300 border-rose-400/30'
                                     : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30'
                                 }`}
                               >
-                                {expPassengerForm.status === '50_reserved' ? '50% RESERVADO' : '100% PAGADO'}
+                                {expPassengerForm.status === '50_reserved'
+                                  ? '50% RESERVADO'
+                                  : expPassengerForm.status === '0_pending'
+                                  ? '0% SIN ABONO ($0)'
+                                  : '100% PAGADO'}
                               </span>
                             </div>
                             <span className="text-xs text-slate-300 block">
@@ -13266,6 +13391,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 <div className="text-slate-400">Saldo pendiente 50%: <strong>${Math.round(totalToCharge * 0.5).toLocaleString('es-CL')} CLP</strong> (antes del zarpe)</div>
                               </div>
                             )}
+                            {expPassengerForm.status === '0_pending' && (
+                              <div className="text-[11px] text-rose-200 font-mono pt-1 space-y-0.5">
+                                <div>Abonado al registrar: <strong>$0 CLP</strong></div>
+                                <div className="text-slate-400">Saldo total pendiente: <strong>${totalToCharge.toLocaleString('es-CL')} CLP</strong> (por transferir)</div>
+                              </div>
+                            )}
                           </div>
 
                           <div className="text-left sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/10">
@@ -13274,7 +13405,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             </div>
                             {expPassengerForm.status === '50_reserved' && (
                               <span className="text-[11px] font-mono text-amber-300 block">
-                                A pagar hoy: ${Math.round(totalToCharge * 0.5).toLocaleString('es-CL')} CLP
+                                Abono hoy: ${Math.round(totalToCharge * 0.5).toLocaleString('es-CL')} CLP
+                              </span>
+                            )}
+                            {expPassengerForm.status === '0_pending' && (
+                              <span className="text-[11px] font-mono text-rose-300 block">
+                                Pagado hoy: $0 CLP (Pendiente)
                               </span>
                             )}
                           </div>

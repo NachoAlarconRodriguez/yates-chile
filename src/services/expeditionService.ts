@@ -280,6 +280,47 @@ const MONTH_MAP: Record<string, string> = {
   '07': 'jul', '08': 'ago', '09': 'sept', '10': 'oct', '11': 'nov', '12': 'dic'
 };
 
+const ROUTE_NAMES_MAP: Record<string, string> = {
+  'ruta-juan-fernandez': 'Expedición Robinson Crusoe',
+  'ruta-cabo-hornos': 'Expedición Cabo de Hornos',
+  'ruta-fiordos-glaciares': 'Fiordos Secretos & Glaciares',
+  'ruta-selkirk': 'Desafío Alejandro Selkirk',
+};
+
+const ROUTE_LOCATION_MAP: Record<string, string> = {
+  'ruta-juan-fernandez': 'Archipiélago Juan Fernández',
+  'ruta-cabo-hornos': 'Canal Beagle & Cabo de Hornos',
+  'ruta-fiordos-glaciares': 'Canales Australes & Ventisqueros',
+  'ruta-selkirk': 'Isla Alejandro Selkirk (Más Afuera)',
+};
+
+const ROUTE_IMAGE_MAP: Record<string, string> = {
+  'ruta-juan-fernandez': '/travesia-robinson.jpg',
+  'ruta-cabo-hornos': 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+  'ruta-fiordos-glaciares': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
+  'ruta-selkirk': '/juan-fernandez-selkirk.jpg',
+};
+
+const formatRouteDepartureTitle = (d: any, matchedLocal?: any): string => {
+  if (d.name && !d.name.startsWith('Ruta ')) return d.name;
+  if (matchedLocal?.name && !matchedLocal.name.startsWith('Ruta ')) return matchedLocal.name;
+  const baseTitle =
+    ROUTE_NAMES_MAP[d.route_id] ||
+    (d.route?.title ? d.route.title.replace(/^Ruta \d+:\s*/i, '').split(' & ')[0] : 'Expedición Robinson Crusoe');
+
+  if (d.departure_date) {
+    const [year, month] = d.departure_date.split('-');
+    const mStr = MONTH_MAP[month] ? (MONTH_MAP[month].charAt(0).toUpperCase() + MONTH_MAP[month].slice(1)) : '';
+    if (mStr && year) {
+      return `${baseTitle} - ${mStr} ${year}`;
+    }
+  }
+  return baseTitle;
+};
+
+const isValidUuid = (id?: string | null): boolean =>
+  typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 const formatDateSpan = (dateStr: string): string => {
   if (!dateStr) return '';
   const [y, m, d] = dateStr.split('-');
@@ -434,15 +475,15 @@ export const expeditionService = {
           const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
           const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
           const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
-          let routeName = d.name || matchedLocal?.name || d.route?.title || 'Expedición Robinson Crusoe';
-          if (routeName.startsWith('JF ')) {
-            routeName = routeName.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
-          }
+          const routeName = formatRouteDepartureTitle(d, matchedLocal);
+          const routeLoc = matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández';
+          const routeImg = matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
+
           return {
             ...d,
             name: routeName,
-            location: matchedLocal?.location || 'Archipiélago Juan Fernández',
-            image: matchedLocal?.image || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
+            location: routeLoc,
+            image: routeImg,
             description: matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
             tempEstimate: matchedLocal?.tempEstimate || '14°C - 18°C',
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
@@ -457,7 +498,7 @@ export const expeditionService = {
         }) as DepartureRow[];
 
         const extraLocal = local
-          .filter((l) => !data.some((d: any) => d.id === l.id))
+          .filter((l) => !l.id.startsWith('exp-') && !data.some((d: any) => d.id === l.id))
           .map(mapLocalToRow);
 
         return [...mappedDb, ...extraLocal];
@@ -481,10 +522,7 @@ export const expeditionService = {
           const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
           const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
           const vesselId = isTerranova ? 'terranova' : 'vegvisir';
-          let routeTitle = d.name || matchedLocal?.name || d.route?.title || 'Expedición Austral';
-          if (routeTitle.startsWith('JF ')) {
-            routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
-          }
+          const routeTitle = formatRouteDepartureTitle(d, matchedLocal);
           const depYear = parseInt(d.departure_date?.split('-')[0] || '2026', 10);
           const months = getMonthsFromDates(d.departure_date, d.return_date);
           const spots = d.available_slots === 0 ? 'completo' : d.status === 'cancelled' ? 'bloqueado' : d.available_slots;
@@ -507,15 +545,15 @@ export const expeditionService = {
             vesselId: vesselId,
             routeId: d.route_id || 'ruta-juan-fernandez',
             description: matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
-            location: matchedLocal?.location || 'Archipiélago Juan Fernández',
-            image: matchedLocal?.image || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
+            location: matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández',
+            image: matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
             tempEstimate: matchedLocal?.tempEstimate || '14°C - 18°C',
             status: d.status || 'scheduled',
           };
         });
 
-        const extraLocal = local.filter((l) => !data.some((d: any) => d.id === l.id));
+        const extraLocal = local.filter((l) => !l.id.startsWith('exp-') && !data.some((d: any) => d.id === l.id));
         return [...mapped, ...extraLocal];
       }
     } catch {}
@@ -586,6 +624,50 @@ export const expeditionService = {
       }
     });
 
+    // Auto-sync any orphaned local bookings to Supabase in the background so they are permanently preserved
+    if (localRows.length > 0) {
+      for (const localB of localRows) {
+        const alreadyInSb = supabaseRows.some(
+          (sb) => sb.booking_code === localB.booking_code || sb.id === localB.id
+        );
+        if (!alreadyInSb && localB.guest_name) {
+          try {
+            const validDepId = isValidUuid(localB.departure_id) ? localB.departure_id : null;
+            const validVessel = (localB.vessel_id === 'terranova' || localB.vessel_id === 'vegvisir') ? localB.vessel_id : 'vegvisir';
+            const validRoute = ['ruta-juan-fernandez', 'ruta-cabo-hornos', 'ruta-fiordos-glaciares', 'ruta-selkirk'].includes(localB.route_id || '')
+              ? localB.route_id
+              : 'ruta-juan-fernandez';
+
+            const { data: insertedB } = await supabase
+              .from('expedition_bookings')
+              .insert({
+                booking_code: localB.booking_code || `EXP-${Date.now()}`,
+                departure_id: validDepId,
+                route_id: validRoute,
+                vessel_id: validVessel,
+                guest_name: localB.guest_name,
+                guest_email: localB.guest_email || 'contacto@yateschile.cl',
+                guest_phone: localB.guest_phone || '+56 9 5333 2492',
+                guest_rut_passport: localB.guest_rut_passport || null,
+                booking_type: (localB.booking_type as any) || 'per_pax',
+                pax_count: Number(localB.pax_count) || 1,
+                total_amount: Number(localB.total_amount) || 0,
+                status: (localB.status as any) || 'pending_transfer',
+                dietary_medical_notes: localB.dietary_medical_notes || null,
+              })
+              .select()
+              .single();
+
+            if (insertedB) {
+              supabaseRows.push(insertedB);
+            }
+          } catch (syncErr) {
+            console.warn('Auto-sync local booking notice:', syncErr);
+          }
+        }
+      }
+    }
+
     // Auto-reconciliación para reservas creadas previamente que quedaron en pending_transfer
     if (map.has('EXP-2026-9723')) {
       const b = map.get('EXP-2026-9723')!;
@@ -629,15 +711,39 @@ export const expeditionService = {
           ? 'cancelled'
           : 'pending_transfer';
 
+      let validDepartureId: string | null = isValidUuid(params.departureId) ? (params.departureId as string) : null;
+
+      if (!validDepartureId && (params.departureDate || params.departureId)) {
+        try {
+          const { data: matchedDep } = await supabase
+            .from('expedition_departures')
+            .select('id')
+            .eq('departure_date', params.departureDate || '')
+            .limit(1)
+            .single();
+          if (matchedDep?.id) {
+            validDepartureId = matchedDep.id;
+          }
+        } catch {}
+      }
+
+      const validRouteId = (params.routeId && ['ruta-juan-fernandez', 'ruta-cabo-hornos', 'ruta-fiordos-glaciares', 'ruta-selkirk'].includes(params.routeId))
+        ? params.routeId
+        : 'ruta-juan-fernandez';
+
+      const validVesselId = (params.vesselId === 'terranova' || params.vesselId === 'vegvisir')
+        ? params.vesselId
+        : 'vegvisir';
+
       // 1. Try Supabase first
       try {
         const { data: booking, error: bookErr } = await supabase
           .from('expedition_bookings')
           .insert({
             booking_code: bookingCode,
-            departure_id: params.departureId || null,
-            route_id: params.routeId || null,
-            vessel_id: params.vesselId || null,
+            departure_id: validDepartureId,
+            route_id: validRouteId,
+            vessel_id: validVesselId,
             guest_name: params.guestName,
             guest_email: params.guestEmail,
             guest_phone: params.guestPhone,
@@ -651,7 +757,9 @@ export const expeditionService = {
           .select()
           .single();
 
-        if (!bookErr && booking) {
+        if (bookErr) {
+          console.error('Supabase booking insert error:', bookErr);
+        } else if (booking) {
           createdId = booking.id;
           if (params.passengers && params.passengers.length > 0) {
             const passengerRows = params.passengers.map((p) => ({
@@ -694,11 +802,11 @@ export const expeditionService = {
           ]);
 
           // Deduct spots in Supabase departure row
-          if (params.departureId) {
+          if (validDepartureId) {
             const { data: depData } = await supabase
               .from('expedition_departures')
               .select('available_slots, total_slots')
-              .eq('id', params.departureId)
+              .eq('id', validDepartureId)
               .single();
             if (depData) {
               const currentAvail = depData.available_slots ?? depData.total_slots ?? 8;
@@ -706,7 +814,7 @@ export const expeditionService = {
               await supabase
                 .from('expedition_departures')
                 .update({ available_slots: nextAvail })
-                .eq('id', params.departureId);
+                .eq('id', validDepartureId);
             }
           }
         }
