@@ -908,6 +908,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   // Modal para nueva salida de expedición y edición
   const [showNewDepartureModal, setShowNewDepartureModal] = useState(false);
   const [editingDeparture, setEditingDeparture] = useState<DepartureRow | null>(null);
+  // Modal moderno de confirmación para eliminar salida de expedición
+  const [departureToDelete, setDepartureToDelete] = useState<any | null>(null);
+  const [isDeletingDeparture, setIsDeletingDeparture] = useState(false);
 
   // Horizontal Month Calendar Navigation for Lodge Capacity
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => new Date());
@@ -3219,14 +3222,32 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     }
   };
 
-  const handleDeleteDeparture = async (departureId: string) => {
-    const res = await expeditionService.deleteDeparture(departureId);
-    if (res.success) {
-      fetchAllData();
-      setActionMessage('Salida de expedición eliminada.');
-      setTimeout(() => setActionMessage(null), 3000);
+  const handleDeleteDeparture = (depOrId: string | any) => {
+    if (typeof depOrId === 'object' && depOrId !== null) {
+      setDepartureToDelete(depOrId);
     } else {
-      triggerAlert('Error al eliminar salida: ' + res.error, 'error');
+      const target = (departures || []).find((d) => d.id === depOrId) || { id: depOrId };
+      setDepartureToDelete(target);
+    }
+  };
+
+  const handleConfirmDeleteDeparture = async () => {
+    if (!departureToDelete) return;
+    setIsDeletingDeparture(true);
+    try {
+      const res = await expeditionService.deleteDeparture(departureToDelete.id);
+      if (res.success) {
+        await fetchAllData();
+        setActionMessage('✓ Salida de expedición eliminada exitosamente.');
+        setTimeout(() => setActionMessage(null), 4000);
+        setDepartureToDelete(null);
+      } else {
+        triggerAlert('Error al eliminar la expedición: ' + (res.error || 'Error desconocido'), 'error');
+      }
+    } catch (err: any) {
+      triggerAlert('Ocurrió un error inesperado al eliminar: ' + (err?.message || String(err)), 'error');
+    } finally {
+      setIsDeletingDeparture(false);
     }
   };
 
@@ -8713,7 +8734,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleDeleteDeparture(dep.id)}
+                                    onClick={() => handleDeleteDeparture({ ...dep, routeTitle, vesselName, bookedPax })}
                                     className="w-7 h-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
                                     title="Eliminar Expedición"
                                   >
@@ -9102,7 +9123,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteDeparture(dep.id)}
+                                      type="button"
+                                      onClick={() => handleDeleteDeparture({ ...dep, routeTitle, vesselName, bookedPax })}
                                       className="w-7 h-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
                                       title="Eliminar"
                                     >
@@ -9196,7 +9218,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteDeparture(exp.id)}
+                                      type="button"
+                                      onClick={() => handleDeleteDeparture(exp)}
                                       className="w-7 h-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
                                       title="Eliminar"
                                     >
@@ -15288,6 +15311,122 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 className="w-full py-3 px-5 rounded-2xl bg-[#0b192c] hover:bg-[#182a44] active:bg-[#061424] text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-md hover:shadow-lg cursor-pointer active:scale-98 text-center"
               >
                 Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL MODERNO: CONFIRMACIÓN PARA ELIMINAR SALIDA DE EXPEDICIÓN           */}
+      {/* ========================================================================= */}
+      {departureToDelete && (
+        <div className="fixed inset-0 z-[120] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative">
+            <button
+              type="button"
+              disabled={isDeletingDeparture}
+              onClick={() => setDepartureToDelete(null)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-[#0b192c] flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+              title="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header con Icono Elegante */}
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200/80 flex items-center justify-center text-rose-600 shrink-0 shadow-2xs">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 pr-6">
+                <h4 className="font-serif font-bold text-lg text-[#0b192c] tracking-tight">
+                  ¿Eliminar Salida de Expedición?
+                </h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Confirma si deseas desprogramar y remover esta salida del sistema.
+                </p>
+              </div>
+            </div>
+
+            {/* Tarjeta Resumen de la Expedición */}
+            <div className="bg-[#fbfcfd] border border-slate-200/80 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Ruta / Itinerario</span>
+                <span className="text-xs font-bold text-[#0b192c] text-right truncate max-w-[210px]" title={departureToDelete.routeTitle || departureToDelete.name}>
+                  {departureToDelete.routeTitle || departureToDelete.name || 'Expedición Náutica'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Embarcación</span>
+                <span className="font-semibold text-slate-700">
+                  {departureToDelete.vesselName || (departureToDelete.vessel_id === 'terranova' ? 'Yate Terranova' : 'Velero Vegvisir')}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-[10px] font-mono uppercase font-bold text-slate-400">Fechas</span>
+                <span className="font-mono text-slate-800 font-bold text-xs">
+                  {departureToDelete.departure_date ? formatDateDDMMYYYY(departureToDelete.departure_date) : departureToDelete.startDate || 'Fecha s/d'}
+                  {departureToDelete.return_date ? ` ➔ ${formatDateDDMMYYYY(departureToDelete.return_date)}` : departureToDelete.endDate ? ` ➔ ${departureToDelete.endDate}` : ''}
+                </span>
+              </div>
+
+              {/* Advertencia sobre Pasajeros Inscritos */}
+              <div className="pt-2 border-t border-slate-100">
+                {(() => {
+                  const paxCount = departureToDelete.bookedPax || 0;
+                  if (paxCount > 0) {
+                    return (
+                      <div className="flex items-center gap-2 text-xs text-rose-700 bg-rose-50 border border-rose-200/80 rounded-xl p-2.5">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                        <span className="leading-snug">
+                          <strong>Atención:</strong> Esta salida tiene <strong>{paxCount} pasajero(s)</strong> inscritos.
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200/60 rounded-xl p-2">
+                      <Info className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      <span>Esta salida no tiene pasajeros inscritos actualmente.</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Esta acción eliminará de forma permanente esta fecha de los itinerarios públicos y del panel administrativo.
+            </p>
+
+            {/* Botones de Acción */}
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                disabled={isDeletingDeparture}
+                onClick={() => setDepartureToDelete(null)}
+                className="flex-1 py-3 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold uppercase font-mono tracking-wider transition cursor-pointer active:scale-98 text-center disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingDeparture}
+                onClick={handleConfirmDeleteDeparture}
+                className="flex-1 py-3 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-md hover:shadow-lg cursor-pointer active:scale-98 text-center flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeletingDeparture ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Sí, Eliminar</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
