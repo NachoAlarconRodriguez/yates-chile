@@ -578,3 +578,34 @@ export const cmsService = {
     }
   },
 };
+
+/**
+ * Normalizes image and media URLs from third-party hosting services (Dropbox, Google Drive, etc.)
+ * into directly embeddable/renderable asset links for <img> and <video> tags.
+ */
+export const normalizeExternalMediaUrl = (url?: string | null): string => {
+  if (!url) return '';
+  const trimmed = url.trim();
+
+  // 1. Google Drive: transform shared preview / open links to direct render link
+  const driveMatch = trimmed.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
+  if (driveMatch && driveMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+
+  // 2. Dropbox: transform share links with dl=0 to raw=1 for direct binary stream
+  if (/dropbox\.com/.test(trimmed)) {
+    let converted = trimmed;
+    if (converted.includes('dl=0')) {
+      converted = converted.replace('dl=0', 'raw=1');
+    } else if (converted.includes('dl=1')) {
+      converted = converted.replace('dl=1', 'raw=1');
+    } else if (!converted.includes('raw=1') && (converted.includes('/scl/') || converted.includes('/s/'))) {
+      converted = converted.includes('?') ? `${converted}&raw=1` : `${converted}?raw=1`;
+    }
+    return converted;
+  }
+
+  return trimmed;
+};
+

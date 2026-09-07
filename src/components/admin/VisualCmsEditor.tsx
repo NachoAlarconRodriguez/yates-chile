@@ -34,7 +34,7 @@ import {
   Maximize2,
   Minimize2
 } from 'lucide-react';
-import { DEFAULT_CMS_CONTENT, type SiteContent } from '../../services/cmsService';
+import { DEFAULT_CMS_CONTENT, normalizeExternalMediaUrl, type SiteContent } from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
 import { ExpeditionCalendar } from '../modules/ExpeditionCalendar';
 import { BuildYourJourney } from '../modules/BuildYourJourney';
@@ -1922,7 +1922,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                         <div className="w-full h-44 sm:h-48 rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-sm relative group">
                           {getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.image ? (
                             <img
-                              src={getLogbookEntry(activeLogbookVessel, activeLogbookEntry).image}
+                              src={normalizeExternalMediaUrl(getLogbookEntry(activeLogbookVessel, activeLogbookEntry).image)}
                               alt="Preview"
                               className="w-full h-full object-cover"
                             />
@@ -1943,16 +1943,14 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                             type="text"
                             value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.image || ''}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              const driveMatch = val.trim().match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
-                              const formattedVal = driveMatch ? `https://lh3.googleusercontent.com/d/${driveMatch[1]}` : val;
+                              const formattedVal = normalizeExternalMediaUrl(e.target.value);
                               setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'image', formattedVal);
                             }}
-                            placeholder="https://drive.google.com/... o URL de imagen"
+                            placeholder="https://dropbox.com/... o https://drive.google.com/... o URL directa"
                             className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-2.5 text-xs text-slate-700 font-mono focus:outline-none shadow-2xs"
                           />
                           <p className="text-[10.5px] text-slate-500 mt-1.5 leading-normal">
-                            Ingresa la URL pública de la imagen (Google Drive, Dropbox u otro repositorio externo).
+                            Pega el enlace de <strong>Compartir</strong> de Dropbox o Google Drive. Se adapta automáticamente para visualizarse.
                           </p>
                         </div>
                       </div>
@@ -2121,9 +2119,9 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                     autoFocus
                     value={mediaModal.currentValue}
                     onChange={(e) =>
-                      setMediaModal({ ...mediaModal, currentValue: e.target.value })
+                      setMediaModal({ ...mediaModal, currentValue: normalizeExternalMediaUrl(e.target.value) })
                     }
-                    placeholder="https://..."
+                    placeholder="https://... (Google Drive, Dropbox o URL directa)"
                     className="w-full bg-[#fbfcfd] border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl px-3.5 py-2 text-xs text-[#0f2b48] font-mono focus:outline-none shadow-2xs"
                   />
                 </div>
@@ -2154,7 +2152,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   <div className="h-36 rounded-xl overflow-hidden border border-slate-200 relative bg-slate-900">
                     {isMediaVideo(mediaModal.currentValue) ? (
                       <video
-                        src={mediaModal.currentValue}
+                        src={normalizeExternalMediaUrl(mediaModal.currentValue)}
                         autoPlay
                         loop
                         muted
@@ -2163,7 +2161,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                       />
                     ) : (
                       <img
-                        src={mediaModal.currentValue}
+                        src={normalizeExternalMediaUrl(mediaModal.currentValue)}
                         alt="Preview"
                         className="w-full h-full object-cover"
                       />

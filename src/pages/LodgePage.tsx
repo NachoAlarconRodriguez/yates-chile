@@ -6,6 +6,7 @@ import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPhone, formatRut } from '../lib/formatters';
 import type { CatalogService } from '../services/catalogService';
+import { normalizeExternalMediaUrl } from '../services/cmsService';
 
 interface LodgePageProps {
   onNavigate: (path: string) => void;
@@ -658,7 +659,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 {/* Miniature Snapshot */}
                 <div className="mt-8 pt-6 border-t border-slate-100 relative z-10 flex items-center gap-3">
                   <img
-                    src={logbookEntries[selectedFeature].image}
+                    src={normalizeExternalMediaUrl(logbookEntries[selectedFeature].image)}
                     alt="Lodge preview"
                     className="w-14 h-14 rounded-xl object-cover border border-slate-200 shadow-inner"
                   />

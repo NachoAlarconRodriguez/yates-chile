@@ -3,6 +3,7 @@ import { ArrowLeft, Compass, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRi
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { useLanguage } from '../context/LanguageContext';
+import { normalizeExternalMediaUrl } from '../services/cmsService';
 
 interface TerranovaDetailPageProps {
   onNavigate: (path: string) => void;
@@ -738,7 +739,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                 {/* Logbook visual snapshot */}
                 <div className="mt-8 relative h-48 w-full rounded-2xl overflow-hidden border border-slate-100 shadow-inner group">
                   <img
-                    src={logbookEntries[selectedFeature].image}
+                    src={normalizeExternalMediaUrl(logbookEntries[selectedFeature].image)}
                     alt={logbookEntries[selectedFeature].title}
                     className="w-full h-full object-cover transition-all duration-700 ease-in-out group-hover:scale-105"
                   />
