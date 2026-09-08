@@ -1461,7 +1461,38 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       setExpRoutes(routesData as ExpeditionRouteRow[]);
       setVessels(vesselsData as VesselRow[]);
       if (clientsData && clientsData.length > 0) {
-        setCrmClients(clientsData);
+        const deletedSet = getDeletedClientsSet();
+        setCrmClients((prevCrm) => {
+          const merged = [...clientsData].filter(
+            (c) =>
+              !deletedSet.has(c.id.toLowerCase()) &&
+              !deletedSet.has(c.fullName.toLowerCase().trim()) &&
+              (!c.email || !deletedSet.has(c.email.toLowerCase().trim())) &&
+              (!c.rutOrPassport || !deletedSet.has(c.rutOrPassport.toLowerCase().trim()))
+          );
+
+          prevCrm.forEach((prevItem) => {
+            const isDeleted =
+              deletedSet.has(prevItem.id.toLowerCase()) ||
+              deletedSet.has(prevItem.fullName.toLowerCase().trim()) ||
+              (prevItem.email && deletedSet.has(prevItem.email.toLowerCase().trim())) ||
+              (prevItem.rutOrPassport && deletedSet.has(prevItem.rutOrPassport.toLowerCase().trim()));
+            if (isDeleted) return;
+
+            const alreadyInRemote = merged.some(
+              (m) =>
+                (m.id && prevItem.id && m.id === prevItem.id) ||
+                (m.email && prevItem.email && m.email.toLowerCase() === prevItem.email.toLowerCase()) ||
+                (m.rutOrPassport && prevItem.rutOrPassport && m.rutOrPassport !== 'Sin documento' && m.rutOrPassport.toLowerCase() === prevItem.rutOrPassport.toLowerCase()) ||
+                (m.fullName.trim().toLowerCase() === prevItem.fullName.trim().toLowerCase())
+            );
+            if (!alreadyInRemote) {
+              merged.push(prevItem);
+            }
+          });
+
+          return merged;
+        });
       }
     } catch (err) {
       console.error(err);
@@ -1484,14 +1515,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       refreshServices();
       refreshContent();
 
-      // Auto-refresh silencioso en segundo plano cada 15 segundos
+      // Auto-refresh silencioso en segundo plano cada 30 segundos
       const interval = setInterval(() => {
         fetchAllData();
         refreshLodge();
         refreshServices();
-      }, 15000);
+      }, 30000);
 
-      // Auto-refresh reactivo instantáneo ante cambios en reservas, expediciones o CRM
+      // Auto-refresh reactivo ante cambios en reservas, expediciones o CRM
       const handleRealtimeUpdate = () => {
         fetchAllData();
         refreshLodge();
@@ -1501,7 +1532,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       window.addEventListener('yates_bookings_updated', handleRealtimeUpdate);
       window.addEventListener('yates_crm_leads_updated', handleRealtimeUpdate);
       window.addEventListener('storage', handleRealtimeUpdate);
-      window.addEventListener('focus', handleRealtimeUpdate);
 
       return () => {
         clearInterval(interval);
@@ -1509,10 +1539,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         window.removeEventListener('yates_bookings_updated', handleRealtimeUpdate);
         window.removeEventListener('yates_crm_leads_updated', handleRealtimeUpdate);
         window.removeEventListener('storage', handleRealtimeUpdate);
-        window.removeEventListener('focus', handleRealtimeUpdate);
       };
     }
-  }, [isAuthenticated, content, fetchAllData, refreshLodge, refreshServices, refreshContent]);
+  }, [isAuthenticated, fetchAllData, refreshLodge, refreshServices, refreshContent]);
 
   // Auto-sincronización bidireccional entre Reservas de Expedición y el Directorio CRM
   useEffect(() => {
@@ -1522,6 +1551,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       let changed = false;
       const updated = [...prevCrm];
       const deletedSet = getDeletedClientsSet();
+      const newlyCreatedClientsToPersist: CustomerProfile[] = [];
 
       expBookings.forEach((b) => {
         const guestName = (b.guest_name || '').trim();
@@ -1574,10 +1604,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
             };
           }
         } else {
-          // Si el cliente no existe aún en el CRM, crearlo automáticamente
+          // Si el cliente no existe aún en el CRM, crearlo con ID determinista y persistirlo
           changed = true;
           const newCust: CustomerProfile = {
-            id: `cli-exp-${b.id || b.booking_code || Date.now()}`,
+            id: b.id || `cli-exp-${(b.booking_code || guestName).replace(/\s+/g, '-').toLowerCase()}`,
             fullName: guestName,
             email: b.guest_email?.trim() || 'contacto@yateschile.cl',
             phone: b.guest_phone?.trim() || '+56 9 5333 2492',
@@ -1602,7 +1632,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
             notes: `Sincronizado desde Manifiesto de Expedición ${expTitle}. Código: ${b.booking_code}.`,
             timeline: [
               {
-                id: `t-sync-${b.id || Date.now()}`,
+                id: `t-sync-${b.id || b.booking_code || 'EXP'}`,
                 date: new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }),
                 type: 'booking' as const,
                 title: `Reserva ${b.booking_code || 'EXP'} — ${expTitle}`,
@@ -1610,7 +1640,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
               },
             ],
           };
-          updated.unshift(newCust);
+          updated.push(newCust);
+          newlyCreatedClientsToPersist.push(newCust);
         }
       });
 
@@ -1618,6 +1649,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         try {
           localStorage.setItem('yates_chile_crm_clients', JSON.stringify(updated));
         } catch {}
+
+        if (newlyCreatedClientsToPersist.length > 0) {
+          Promise.all(
+            newlyCreatedClientsToPersist.map((nc) =>
+              crmService.createClient(nc).catch(() => null)
+            )
+          ).catch(() => null);
+        }
+
         return updated;
       }
       return prevCrm;
@@ -1835,11 +1875,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       return true;
     })
     .sort((a, b) => {
-      if (customerSortBy === 'ltv_desc') return b.totalSpentClp - a.totalSpentClp;
+      if (customerSortBy === 'ltv_desc') {
+        const diff = b.totalSpentClp - a.totalSpentClp;
+        if (diff !== 0) return diff;
+        return a.fullName.localeCompare(b.fullName);
+      }
       if (customerSortBy === 'name_asc') return a.fullName.localeCompare(b.fullName);
-      if (customerSortBy === 'date_desc')
-        return new Date(b.lastActivityDate).getTime() - new Date(a.lastActivityDate).getTime();
-      return 0;
+      if (customerSortBy === 'date_desc') {
+        const diff = new Date(b.lastActivityDate).getTime() - new Date(a.lastActivityDate).getTime();
+        if (diff !== 0) return diff;
+        return a.fullName.localeCompare(b.fullName);
+      }
+      return a.fullName.localeCompare(b.fullName);
     });
 
   const handleCreateCustomer = (e: React.FormEvent) => {
@@ -2082,7 +2129,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
         // 3. Eliminar de la base de datos Supabase (crm_clients)
         try {
-          await crmService.deleteClient(id);
+          await crmService.deleteClient(id, custToDelete?.fullName, custToDelete?.email, custToDelete?.rutOrPassport);
         } catch (err) {
           console.warn('Supabase crm client delete error:', err);
         }

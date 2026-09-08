@@ -51,9 +51,14 @@ const mapRowToProfile = (row: any): CustomerProfile => ({
   timeline: Array.isArray(row.timeline) ? row.timeline : [],
 });
 
+const isValidUuid = (str?: string | null): boolean => {
+  if (!str) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str.trim());
+};
+
 const mapProfileToRow = (p: Partial<CustomerProfile>): Record<string, any> => {
   const row: Record<string, any> = {};
-  if (p.id) row.id = p.id;
+  if (p.id && isValidUuid(p.id)) row.id = p.id;
   if (p.fullName !== undefined) row.full_name = p.fullName.trim();
   if (p.email !== undefined) row.email = p.email.trim();
   if (p.phone !== undefined) row.phone = p.phone.trim();
@@ -79,6 +84,7 @@ const mapProfileToRow = (p: Partial<CustomerProfile>): Record<string, any> => {
 
 export const crmService = {
   async getAllClients(): Promise<CustomerProfile[]> {
+    let remoteClients: CustomerProfile[] = [];
     try {
       const { data, error } = await (supabase as any)
         .from('crm_clients')
@@ -86,21 +92,46 @@ export const crmService = {
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        const mapped = data.map(mapRowToProfile);
-        try {
-          localStorage.setItem(LOCAL_CRM_CACHE_KEY, JSON.stringify(mapped));
-        } catch {}
-        return mapped;
+        remoteClients = data.map(mapRowToProfile);
       }
     } catch (err) {
       console.warn('CRM fetch Supabase error:', err);
     }
 
-    // Fallback to local cache if Supabase table is not yet created or offline
+    // Combine remote data with local cache to guarantee zero loss of unsynced items
     try {
       const raw = localStorage.getItem(LOCAL_CRM_CACHE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const localList: CustomerProfile[] = JSON.parse(raw);
+        if (Array.isArray(localList) && localList.length > 0) {
+          if (remoteClients.length === 0) return localList;
+
+          const merged = [...remoteClients];
+          localList.forEach((localCust) => {
+            const exists = merged.some(
+              (m) =>
+                (m.id && localCust.id && m.id === localCust.id) ||
+                (m.email && localCust.email && m.email.toLowerCase() === localCust.email.toLowerCase()) ||
+                (m.rutOrPassport && localCust.rutOrPassport && m.rutOrPassport !== 'Sin documento' && m.rutOrPassport.toLowerCase() === localCust.rutOrPassport.toLowerCase()) ||
+                (m.fullName.trim().toLowerCase() === localCust.fullName.trim().toLowerCase())
+            );
+            if (!exists) {
+              merged.push(localCust);
+            }
+          });
+
+          localStorage.setItem(LOCAL_CRM_CACHE_KEY, JSON.stringify(merged));
+          return merged;
+        }
+      }
     } catch {}
+
+    if (remoteClients.length > 0) {
+      try {
+        localStorage.setItem(LOCAL_CRM_CACHE_KEY, JSON.stringify(remoteClients));
+      } catch {}
+      return remoteClients;
+    }
 
     return [];
   },
@@ -137,15 +168,26 @@ export const crmService = {
     const row = mapProfileToRow(updates);
 
     try {
-      const { data, error } = await (supabase as any)
-        .from('crm_clients')
-        .update(row)
-        .eq('id', id)
-        .select()
-        .single();
+      let query = (supabase as any).from('crm_clients').update(row);
+      if (isValidUuid(id)) {
+        query = query.eq('id', id);
+      } else if (updates.email) {
+        query = query.eq('email', updates.email.trim());
+      } else if (updates.rutOrPassport && updates.rutOrPassport !== 'Sin documento') {
+        query = query.eq('rut_or_passport', updates.rutOrPassport.trim());
+      } else if (updates.fullName) {
+        query = query.eq('full_name', updates.fullName.trim());
+      } else {
+        query = query.eq('id', id);
+      }
+
+      const { data, error } = await query.select().single();
 
       if (!error && data) {
         return mapRowToProfile(data);
+      }
+      if (error) {
+        console.warn('Supabase update client error:', error);
       }
     } catch (err) {
       console.warn('Supabase update client error:', err);
@@ -154,13 +196,22 @@ export const crmService = {
     return { id, ...updates } as CustomerProfile;
   },
 
-  async deleteClient(id: string): Promise<{ success: boolean; error?: string }> {
+  async deleteClient(id: string, fullName?: string, email?: string, rut?: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await (supabase as any)
-        .from('crm_clients')
-        .delete()
-        .eq('id', id);
+      let query = (supabase as any).from('crm_clients').delete();
+      if (isValidUuid(id)) {
+        query = query.eq('id', id);
+      } else if (email && email.includes('@')) {
+        query = query.eq('email', email.trim());
+      } else if (rut && rut !== 'Sin documento') {
+        query = query.eq('rut_or_passport', rut.trim());
+      } else if (fullName) {
+        query = query.eq('full_name', fullName.trim());
+      } else {
+        query = query.eq('id', id);
+      }
 
+      const { error } = await query;
       if (error) {
         console.warn('Supabase delete client warning:', error);
         return { success: false, error: error.message };
