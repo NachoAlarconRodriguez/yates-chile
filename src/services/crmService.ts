@@ -33,17 +33,17 @@ const mapRowToProfile = (row: any): CustomerProfile => ({
   fullName: row.full_name || 'Cliente sin nombre',
   email: row.email || '',
   phone: row.phone || '',
-  rutOrPassport: row.rut_or_passport || 'Sin documento',
+  rutOrPassport: row.rut_or_passport || '',
   birthDate: row.birth_date || '',
-  nationality: row.nationality || 'Chilena',
-  city: row.city || 'Chile',
+  nationality: row.nationality || '',
+  city: row.city || '',
   category: (row.category as any) || 'regular',
   tags: Array.isArray(row.tags) ? row.tags : [],
   totalSpentClp: Number(row.total_spent_clp) || 0,
   bookingsCount: Number(row.bookings_count) || 0,
   lastActivityDate: row.last_activity_date || new Date().toISOString().split('T')[0],
-  dietaryPreferences: row.dietary_preferences || 'Sin notas adicionales.',
-  divingLevel: row.diving_level || 'Principiante',
+  dietaryPreferences: row.dietary_preferences || '',
+  divingLevel: row.diving_level || '',
   beveragePreference: row.beverage_preference || '',
   emergencyContact: row.emergency_contact || '',
   notes: row.notes || '',
@@ -64,18 +64,18 @@ const mapProfileToRow = (p: Partial<CustomerProfile>): Record<string, any> => {
   if (p.phone !== undefined) row.phone = p.phone.trim();
   if (p.rutOrPassport !== undefined) row.rut_or_passport = p.rutOrPassport.trim();
   if (p.birthDate !== undefined) row.birth_date = p.birthDate;
-  if (p.nationality !== undefined) row.nationality = p.nationality;
-  if (p.city !== undefined) row.city = p.city;
+  if (p.nationality !== undefined) row.nationality = p.nationality.trim();
+  if (p.city !== undefined) row.city = p.city.trim();
   if (p.category !== undefined) row.category = p.category;
   if (p.tags !== undefined) row.tags = p.tags;
   if (p.totalSpentClp !== undefined) row.total_spent_clp = p.totalSpentClp;
   if (p.bookingsCount !== undefined) row.bookings_count = p.bookingsCount;
   if (p.lastActivityDate !== undefined) row.last_activity_date = p.lastActivityDate;
-  if (p.dietaryPreferences !== undefined) row.dietary_preferences = p.dietaryPreferences;
-  if (p.divingLevel !== undefined) row.diving_level = p.divingLevel;
-  if (p.beveragePreference !== undefined) row.beverage_preference = p.beveragePreference;
-  if (p.emergencyContact !== undefined) row.emergency_contact = p.emergencyContact;
-  if (p.notes !== undefined) row.notes = p.notes;
+  if (p.dietaryPreferences !== undefined) row.dietary_preferences = p.dietaryPreferences.trim();
+  if (p.divingLevel !== undefined) row.diving_level = p.divingLevel.trim();
+  if (p.beveragePreference !== undefined) row.beverage_preference = p.beveragePreference.trim();
+  if (p.emergencyContact !== undefined) row.emergency_contact = p.emergencyContact.trim();
+  if (p.notes !== undefined) row.notes = p.notes.trim();
   if (p.adminNotes !== undefined) row.admin_notes = p.adminNotes;
   if (p.timeline !== undefined) row.timeline = p.timeline;
   row.updated_at = new Date().toISOString();

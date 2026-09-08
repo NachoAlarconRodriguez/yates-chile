@@ -243,11 +243,15 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                         <span className="text-[10px] font-mono font-bold uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md">
                           {exp.startDate} {t('al', 'to')} {exp.endDate}
                         </span>
-                        {typeof exp.spotsLeft === 'number' && (
+                        {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) ? (
+                          <span className="text-[10px] font-mono font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 uppercase">
+                            {t('Completo', 'Sold Out')}
+                          </span>
+                        ) : typeof exp.spotsLeft === 'number' && exp.spotsLeft > 0 ? (
                           <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                             {exp.spotsLeft} {t('cupos disponibles', 'spots available')}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <h4 className="font-serif font-bold text-base text-[#0f2b48]">{exp.name}</h4>
                       <p className="text-xs text-slate-500 font-light line-clamp-2 max-w-md">
@@ -274,23 +278,32 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                       <span>{t('Brochure PDF', 'PDF Brochure')}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const text = encodeURIComponent(
-                          `Hola Yates Chile, deseo reservar cupo para la expedición en Yate Terranova:\n\n` +
-                          `• Travesía: ${exp.name}\n` +
-                          `• Fechas: ${exp.startDate} al ${exp.endDate}\n` +
-                          `• Embarcación: Yate Terranova\n\n` +
-                          `Solicito disponibilidad y valores para confirmar mi reserva.`
-                        );
-                        window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
-                      }}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
-                    >
-                      <span>{t('Reservar Cupo', 'Book Spot')}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) ? (
+                      <button
+                        disabled
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 text-slate-400 px-4 py-2 rounded-xl text-xs font-bold cursor-not-allowed border border-slate-200 uppercase tracking-wider"
+                      >
+                        <span>{t('Agotado', 'Sold Out')}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const text = encodeURIComponent(
+                            `Hola Yates Chile, deseo reservar cupo para la expedición en Yate Terranova:\n\n` +
+                            `• Travesía: ${exp.name}\n` +
+                            `• Fechas: ${exp.startDate} al ${exp.endDate}\n` +
+                            `• Embarcación: Yate Terranova\n\n` +
+                            `Solicito disponibilidad y valores para confirmar mi reserva.`
+                          );
+                          window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
+                        }}
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
+                      >
+                        <span>{t('Reservar Cupo', 'Book Spot')}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

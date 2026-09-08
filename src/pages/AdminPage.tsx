@@ -756,7 +756,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [isRecentBookingsOpen, setIsRecentBookingsOpen] = useState(true);
   const [isLodgeCalendarOpen, setIsLodgeCalendarOpen] = useState(true);
   const [isUpcomingExpeditionsOpen, setIsUpcomingExpeditionsOpen] = useState(true);
-  const [expeditionsViewMode, setExpeditionsViewMode] = useState<'grid' | 'list'>('grid');
+  const [expeditionsViewMode, setExpeditionsViewMode] = useState<'grid' | 'list'>('list');
+  const [openDepartureStatusMenu, setOpenDepartureStatusMenu] = useState<string | null>(null);
+  const [manualStatusOverrides, setManualStatusOverrides] = useState<Record<string, 'scheduled' | 'guaranteed' | 'cancelled'>>({});
   const [expeditionsAssetFilter, setExpeditionsAssetFilter] = useState<'all' | 'vegvisir' | 'terranova' | 'lodge'>('all');
   const [expeditionsDateSortOrder, setExpeditionsDateSortOrder] = useState<'asc' | 'desc'>('asc');
   const [kpiTimeframe, setKpiTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('month');
@@ -855,8 +857,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     phone: '',
     rutOrPassport: '',
     birthDate: '',
-    nationality: 'Chilena',
-    city: 'Santiago, Chile',
+    nationality: '',
+    city: '',
     emergencyContact: '',
     dietary: '',
     beverage: '',
@@ -870,8 +872,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     email: '',
     phone: '',
     rutOrPassport: '',
-    nationality: 'Chilena',
-    city: 'Santiago, Chile',
+    nationality: '',
+    city: '',
     category: 'regular' as 'vip' | 'regular' | 'prospect',
     notes: '',
     dietary: '',
@@ -1611,9 +1613,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
             fullName: guestName,
             email: b.guest_email?.trim() || 'contacto@yateschile.cl',
             phone: b.guest_phone?.trim() || '+56 9 5333 2492',
-            rutOrPassport: b.guest_rut_passport?.trim() || 'Sin documento',
-            nationality: 'Chilena',
-            city: 'Chile',
+            rutOrPassport: b.guest_rut_passport?.trim() || '',
+            nationality: '',
+            city: '',
             category: total >= 5000000 ? 'vip' : 'regular',
             tags: [
               'Expedicionario',
@@ -1891,7 +1893,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   const handleCreateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCustomerForm.fullName.trim() || !newCustomerForm.email.trim()) return;
+    if (!newCustomerForm.fullName.trim()) return;
 
     const tagsArray = newCustomerForm.tags
       ? newCustomerForm.tags.split(',').map((t) => t.trim()).filter(Boolean)
@@ -1901,20 +1903,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       id: `cli-${Date.now()}`,
       fullName: newCustomerForm.fullName.trim(),
       email: newCustomerForm.email.trim(),
-      phone: newCustomerForm.phone.trim() || '+56 9 0000 0000',
-      rutOrPassport: newCustomerForm.rutOrPassport.trim() || 'Pendiente',
-      nationality: newCustomerForm.nationality.trim() || 'Chilena',
-      city: newCustomerForm.city.trim() || 'Chile',
+      phone: newCustomerForm.phone.trim(),
+      rutOrPassport: newCustomerForm.rutOrPassport.trim(),
+      nationality: newCustomerForm.nationality.trim(),
+      city: newCustomerForm.city.trim(),
       category: newCustomerForm.category,
       tags: tagsArray,
       totalSpentClp: 0,
       bookingsCount: 0,
       lastActivityDate: new Date().toISOString().split('T')[0],
-      dietaryPreferences: newCustomerForm.dietary || 'Sin registrar',
-      divingLevel: newCustomerForm.diving || 'No especificado',
-      beveragePreference: newCustomerForm.beverage || 'No especificado',
+      dietaryPreferences: newCustomerForm.dietary || '',
+      divingLevel: newCustomerForm.diving || '',
+      beveragePreference: newCustomerForm.beverage || '',
       emergencyContact: '',
-      notes: newCustomerForm.notes || 'Cliente registrado desde CRM.',
+      notes: newCustomerForm.notes || '',
       timeline: [
         {
           id: `t-${Date.now()}`,
@@ -1935,8 +1937,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       email: '',
       phone: '',
       rutOrPassport: '',
-      nationality: 'Chilena',
-      city: 'Santiago, Chile',
+      nationality: '',
+      city: '',
       category: 'regular',
       notes: '',
       dietary: '',
@@ -1954,8 +1956,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       phone: cust.phone || '',
       rutOrPassport: cust.rutOrPassport || '',
       birthDate: cust.birthDate || '',
-      nationality: cust.nationality || 'Chilena',
-      city: cust.city || 'Santiago, Chile',
+      nationality: cust.nationality || '',
+      city: cust.city || '',
       emergencyContact: cust.emergencyContact || '',
       dietary: cust.dietaryPreferences || '',
       beverage: cust.beveragePreference || '',
@@ -2103,7 +2105,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     const custToDelete = crmClients.find((c) => c.id === id);
 
     triggerConfirm(
-      `¿Estás seguro de que deseas eliminar definitivamente al cliente "${name}"? Se borrará su ficha del CRM y sus registros asociados de la base de datos para que no vuelva a aparecer.`,
+      `¿Eliminar a "${name}"? Se borrará su ficha del CRM y registros asociados.`,
       async () => {
         // 1. Blacklist permanente (ID, nombre, email, RUT, teléfono)
         const idsToBlacklist: (string | undefined | null)[] = [id, name];
@@ -2217,8 +2219,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         setTimeout(() => setActionMessage(null), 3500);
       },
       {
-        title: 'Eliminar Cliente Definitivamente',
-        confirmText: 'Sí, Eliminar de la Base de Datos',
+        title: 'Eliminar Cliente',
+        confirmText: 'Eliminar',
         cancelText: 'Cancelar',
         type: 'danger',
       }
@@ -2585,14 +2587,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         });
         const realPaxCount = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
         const maxPax = dep.total_slots || (isTerranova ? 8 : 6);
-        const bookedPax = realPaxCount;
-        const availablePax = Math.max(0, maxPax - bookedPax);
+        const configuredAvail = typeof dep.available_slots === 'number' ? dep.available_slots : undefined;
+        const calculatedAvail = Math.max(0, maxPax - realPaxCount);
+        const availablePax = configuredAvail !== undefined
+          ? Math.min(configuredAvail, calculatedAvail)
+          : calculatedAvail;
+        const isSoldOut = availablePax <= 0 || (configuredAvail !== undefined && configuredAvail <= 0) || realPaxCount >= maxPax;
+        const bookedPax = isSoldOut ? maxPax : realPaxCount;
 
         const depDateFormatted = formatDateDDMMYYYY(dep.departure_date);
         const retDateFormatted = formatDateDDMMYYYY(dep.return_date);
         const datesFormatted = `${depDateFormatted} ➔ ${retDateFormatted}`;
-        const statusText = dep.status === 'guaranteed' ? 'Zarpe Garantizado' : dep.status === 'scheduled' ? 'Programada' : dep.status === 'completed' ? 'Completada' : 'Cancelada';
-        const statusColor = dep.status === 'guaranteed' ? 'emerald' : dep.status === 'scheduled' ? 'sky' : 'amber';
+        const effectiveStatus = (isSoldOut && dep.status !== 'cancelled') ? 'guaranteed' : dep.status;
+        const statusText = effectiveStatus === 'guaranteed' ? 'Zarpe Garantizado' : effectiveStatus === 'scheduled' ? 'Programada' : effectiveStatus === 'completed' ? 'Completada' : 'Cancelada';
+        const statusColor = effectiveStatus === 'guaranteed' ? 'emerald' : effectiveStatus === 'scheduled' ? 'sky' : 'amber';
         const daysUntil = calcDaysUntil(dep.departure_date);
         const numericPrice = Number(dep.price_per_pax_clp || (isTerranova ? 2350000 : 1950000));
         const priceFormatted = `$${numericPrice.toLocaleString('es-CL')}`;
@@ -2954,11 +2962,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         const newCust: CustomerProfile = {
           id: `cli-${Date.now()}-${idx}`,
           fullName: pax.fullName,
-          email: pax.email || 'sin-correo@yateschile.cl',
-          phone: pax.phone || '+56 9 0000 0000',
-          rutOrPassport: pax.rutOrPassport || 'Sin documento',
-          nationality: pax.nationality || 'Chilena',
-          city: 'Chile',
+          email: pax.email || '',
+          phone: pax.phone || '',
+          rutOrPassport: pax.rutOrPassport || '',
+          nationality: pax.nationality || '',
+          city: '',
           category: idx === 0 && data.totalAmountClp >= 5000000 ? 'vip' : 'regular',
           tags: [
             data.paymentScheme === '0' ? 'Lead Cotización (Sin Cupo)' : 'Reserva Wizard',
@@ -3021,7 +3029,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           passengers: data.passengers.map((p) => ({
             fullName: p.fullName,
             docId: p.rutOrPassport,
-            nationality: p.nationality || 'Chilena',
+            nationality: p.nationality || '',
             emergencyContact: p.phone,
             medicalNotes: p.notes,
           })),
@@ -3076,7 +3084,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             passengers: data.passengers.map((p) => ({
               fullName: p.fullName,
               docId: p.rutOrPassport,
-              nationality: p.nationality || 'Chilena',
+              nationality: p.nationality || '',
               emergencyContact: p.phone,
               medicalNotes: p.notes,
             })),
@@ -3246,7 +3254,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     const res = await expeditionService.updateDepartureStatus(departureId, status);
     if (res.success) {
       fetchAllData();
-      setActionMessage('Estado de expedición actualizado.');
+      const statusLabel =
+        status === 'guaranteed'
+          ? 'Zarpe Garantizado'
+          : status === 'cancelled'
+          ? 'Cancelada'
+          : 'Abierto';
+      setActionMessage(`✓ Estado de expedición actualizado a "${statusLabel}".`);
       setTimeout(() => setActionMessage(null), 3000);
     } else {
       triggerAlert('Error al actualizar estado: ' + res.error, 'error');
@@ -3301,20 +3315,25 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   const handleSaveEditedDeparture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDeparture) return;
+    const availSlots = Number(editingDeparture.available_slots);
+    const targetStatus = (availSlots <= 0 && editingDeparture.status !== 'cancelled')
+      ? 'guaranteed'
+      : (editingDeparture.status as any);
+
     const res = await expeditionService.updateDeparture(editingDeparture.id, {
       publicName: editingDeparture.name,
       vesselId: editingDeparture.vessel_id,
       departureDate: editingDeparture.departure_date,
       returnDate: editingDeparture.return_date,
       totalSlots: Number(editingDeparture.total_slots),
-      availableSlots: Number(editingDeparture.available_slots),
+      availableSlots: availSlots,
       pricePerPaxClp: Number(editingDeparture.price_per_pax_clp),
-      status: editingDeparture.status as any,
+      status: targetStatus,
       publicLocation: editingDeparture.location,
       publicDescription: editingDeparture.description,
     });
     if (res.success) {
-      fetchAllData();
+      await fetchAllData();
       setEditingDeparture(null);
       setActionMessage('Expedición actualizada exitosamente.');
       setTimeout(() => setActionMessage(null), 3000);
@@ -3426,7 +3445,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   ) => {
     const targetBookingId = bookingId || paxId;
     triggerConfirm(
-      `¿Estás seguro de que deseas eliminar al pasajero "${paxFullName}" (${paxCode}) de esta expedición? Esta acción eliminará la reserva asociada y liberará el cupo.`,
+      `¿Eliminar al pasajero "${paxFullName}" (${paxCode})? Se liberará el cupo en la expedición.`,
       async () => {
         try {
           const res = await expeditionService.deleteBooking(targetBookingId);
@@ -3484,8 +3503,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         }
       },
       {
-        title: 'Eliminar Pasajero del Manifiesto',
-        confirmText: 'Eliminar Pasajero',
+        title: 'Eliminar Pasajero',
+        confirmText: 'Eliminar',
         type: 'danger',
       }
     );
@@ -3852,13 +3871,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     if (!expPassengerForm.passengers || expPassengerForm.passengers.length === 0) return false;
     for (let i = 0; i < expPassengerForm.passengers.length; i++) {
       const pax = expPassengerForm.passengers[i];
-      if (!pax || !pax.fullName?.trim() || !pax.rutPassport?.trim() || !pax.birthDate?.trim()) {
+      if (!pax || !pax.fullName?.trim()) {
         return false;
-      }
-      if (i === 0) {
-        if (!pax.email?.trim() || !pax.phone?.trim()) {
-          return false;
-        }
       }
     }
     return true;
@@ -3873,36 +3887,6 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         triggerAlert(msg, 'warning', 'Nombre Requerido');
         setExpPassengerActiveTab(i);
         return false;
-      }
-      if (!pax.rutPassport.trim()) {
-        const msg = `Por favor ingrese el RUT o Pasaporte del Pasajero ${i + 1}.`;
-        setExpPassengerValidationError(msg);
-        triggerAlert(msg, 'warning', 'Documento Requerido');
-        setExpPassengerActiveTab(i);
-        return false;
-      }
-      if (!pax.birthDate.trim()) {
-        const msg = `Por favor ingrese la fecha de nacimiento del Pasajero ${i + 1}.`;
-        setExpPassengerValidationError(msg);
-        triggerAlert(msg, 'warning', 'Fecha de Nacimiento');
-        setExpPassengerActiveTab(i);
-        return false;
-      }
-      if (i === 0) {
-        if (!pax.email.trim()) {
-          const msg = 'Por favor ingrese el correo electrónico del Pasajero Titular (Pasajero 1).';
-          setExpPassengerValidationError(msg);
-          triggerAlert(msg, 'warning', 'Correo Electrónico');
-          setExpPassengerActiveTab(0);
-          return false;
-        }
-        if (!pax.phone.trim()) {
-          const msg = 'Por favor ingrese el teléfono o WhatsApp del Pasajero Titular (Pasajero 1).';
-          setExpPassengerValidationError(msg);
-          triggerAlert(msg, 'warning', 'Teléfono / WhatsApp');
-          setExpPassengerActiveTab(0);
-          return false;
-        }
       }
     }
     setExpPassengerValidationError(null);
@@ -8679,17 +8663,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           }
                           return false;
                         });
-                        const bookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                        const realBookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
                         const maxSlots = dep.total_slots || 10;
-                        const percent = Math.min(100, Math.round((bookedPax / maxSlots) * 100));
-                        const VesselIcon = isTerranova ? Ship : Sailboat;
-
-                        const isClosedOrCompleted = dep.status === 'completed' || dep.status === 'cancelled' || (dep as any).is_closed === true;
-                        const calculatedAvailable = Math.max(0, maxSlots - bookedPax);
-                        const remainingSlots = typeof dep.available_slots === 'number' && dep.available_slots >= 0 && bookedPax > 0
-                          ? Math.min(dep.available_slots, calculatedAvailable)
+                        const configuredAvail = typeof dep.available_slots === 'number' ? dep.available_slots : undefined;
+                        const calculatedAvailable = Math.max(0, maxSlots - realBookedPax);
+                        const remainingSlots = configuredAvail !== undefined
+                          ? Math.min(configuredAvail, calculatedAvailable)
                           : calculatedAvailable;
-                        const isAgotado = isClosedOrCompleted || (bookedPax >= maxSlots && maxSlots > 0) || (bookedPax > 0 && remainingSlots <= 0);
+                        const isClosedOrCompleted = dep.status === 'completed' || dep.status === 'cancelled' || (dep as any).is_closed === true;
+                        const isAgotado = isClosedOrCompleted || remainingSlots <= 0 || (configuredAvail !== undefined && configuredAvail <= 0) || realBookedPax >= maxSlots;
+                        const bookedPax = isAgotado ? maxSlots : realBookedPax;
+                        const percent = isAgotado ? 100 : Math.min(100, Math.round((bookedPax / maxSlots) * 100));
+                        const VesselIcon = isTerranova ? Ship : Sailboat;
                         const calcDaysUntil = (dateStr?: string) => {
                           if (!dateStr) return 999;
                           const target = new Date(dateStr);
@@ -8848,7 +8833,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   {/* Botón Ver Pasajeros */}
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: Math.max(0, (dep.total_slots || 10) - bookedPax), departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                    onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax: realBookedPax, maxPax: dep.total_slots || 10, availablePax: isAgotado ? 0 : remainingSlots, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
                                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer shadow-2xs group/mbtn ${
                                       isAgotado
                                         ? 'bg-emerald-100/90 hover:bg-emerald-800 text-emerald-900 hover:text-white border border-emerald-300/80'
@@ -8857,14 +8842,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     title="Ver Manifiesto Oficial de Pasajeros"
                                   >
                                     <Users className={`w-3.5 h-3.5 ${isAgotado ? 'text-emerald-700 group-hover/mbtn:text-white' : 'text-slate-500 group-hover/mbtn:text-sky-300'}`} />
-                                    <span>Pasajeros ({bookedPax})</span>
+                                    <span>Pasajeros ({realBookedPax})</span>
                                   </button>
 
                                   {/* Botón Sumar Pasajero: Círculo con un + */}
                                   {!isAgotado && (
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: dep.total_slots || 10, availablePax: Math.max(0, (dep.total_slots || 10) - bookedPax), departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                      onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax: realBookedPax, maxPax: dep.total_slots || 10, availablePax: isAgotado ? 0 : remainingSlots, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
                                       className="w-7 h-7 rounded-full bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 flex items-center justify-center transition cursor-pointer shadow-2xs active:scale-95 group/plus"
                                       title="Sumar pasajero a esta expedición"
                                       aria-label="Sumar pasajero"
@@ -9021,7 +9006,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                         {filteredDepartures.length > 0 ? (
-                          filteredDepartures.map((dep) => {
+                          filteredDepartures.map((dep, depIndex) => {
                             const route = expRoutes.find(r => r.id === dep.route_id);
                             const vessel = vessels.find(v => v.id === dep.vessel_id);
                             const isTerranova = dep.vessel_id === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
@@ -9045,10 +9030,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               }
                               return false;
                             });
-                            const bookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                            const realBookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
                             const maxSlots = dep.total_slots || 10;
-                            const availablePax = Math.max(0, maxSlots - bookedPax);
-                            const percent = Math.round((bookedPax / maxSlots) * 100);
+                            const configuredAvail = typeof dep.available_slots === 'number' ? dep.available_slots : undefined;
+                            const calculatedAvailable = Math.max(0, maxSlots - realBookedPax);
+                            const availablePax = configuredAvail !== undefined
+                              ? Math.min(configuredAvail, calculatedAvailable)
+                              : calculatedAvailable;
+                            const isClosedOrCompleted = dep.status === 'completed' || dep.status === 'cancelled' || (dep as any).is_closed === true;
+                            const isSoldOut = isClosedOrCompleted || availablePax <= 0 || (configuredAvail !== undefined && configuredAvail <= 0) || realBookedPax >= maxSlots;
+                            const bookedPax = isSoldOut ? maxSlots : realBookedPax;
+                            const percent = isSoldOut ? 100 : Math.round((bookedPax / maxSlots) * 100);
                             const VesselIcon = isTerranova ? Ship : Sailboat;
 
                             return (
@@ -9085,14 +9077,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   <div className="w-36 space-y-1.5">
                                     <div className="flex justify-between text-[10px] font-mono text-slate-500">
                                       <span>{bookedPax} / {maxSlots} pax</span>
-                                      <strong className={isTerranova ? 'text-[#0b192c]' : bookedPax >= maxSlots ? 'text-emerald-700 font-bold' : 'text-[#0b192c]'}>
-                                        {bookedPax >= maxSlots ? 'Completo' : `${availablePax} libres`}
+                                      <strong className={isSoldOut ? 'text-emerald-700 font-bold' : isTerranova ? 'text-[#0b192c]' : 'text-[#0b192c]'}>
+                                        {isSoldOut ? 'Completo' : `${availablePax} libres`}
                                       </strong>
                                     </div>
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                       <div
                                         className={`h-full rounded-full transition-all duration-500 ${
-                                          bookedPax >= (dep.total_slots || 10) ? 'bg-emerald-600' : 'bg-[#0b192c]'
+                                          isSoldOut ? 'bg-emerald-600' : 'bg-[#0b192c]'
                                         }`}
                                         style={{ width: `${percent}%` }}
                                       />
@@ -9103,16 +9095,162 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   ${Number(dep.price_per_pax_clp).toLocaleString('es-CL')} <span className="text-[10px] text-slate-500 font-normal">CLP</span>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <select
-                                    value={dep.status}
-                                    onChange={(e) => handleUpdateDepartureStatus(dep.id, e.target.value as any)}
-                                    className="bg-white border border-slate-200 text-[10px] font-mono font-bold text-[#0b192c] rounded-full px-2.5 py-1 focus:outline-none focus:border-[#0b192c] cursor-pointer shadow-2xs"
-                                  >
-                                    <option value="scheduled">Programada</option>
-                                    <option value="guaranteed">Zarpe Garantizado</option>
-                                    <option value="completed">Completada</option>
-                                    <option value="cancelled">Cancelada</option>
-                                  </select>
+                                  {(() => {
+                                    const effectiveStatus: 'scheduled' | 'guaranteed' | 'cancelled' =
+                                      manualStatusOverrides[dep.id] ||
+                                      (dep.status === 'cancelled'
+                                        ? 'cancelled'
+                                        : (dep.status === 'guaranteed' || isSoldOut)
+                                        ? 'guaranteed'
+                                        : 'scheduled');
+                                    const isOpen = openDepartureStatusMenu === dep.id;
+                                    const isLastRows = depIndex >= filteredDepartures.length - 2 && filteredDepartures.length > 2;
+
+                                    return (
+                                      <div className="relative inline-block text-left">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenDepartureStatusMenu(isOpen ? null : dep.id);
+                                          }}
+                                          className="focus:outline-none cursor-pointer active:scale-95 transition-transform select-none"
+                                          title="Cambiar estado de zarpe"
+                                        >
+                                          {effectiveStatus === 'guaranteed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-300/90 hover:bg-emerald-100 hover:border-emerald-400 transition shadow-2xs">
+                                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                              <span>Zarpe Garantizado</span>
+                                              <ChevronDown className={`w-3 h-3 text-emerald-700 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                                            </span>
+                                          ) : effectiveStatus === 'cancelled' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 hover:border-rose-300 transition shadow-2xs">
+                                              <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                              <span>Cancelada</span>
+                                              <ChevronDown className={`w-3 h-3 text-rose-600 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200/90 hover:bg-sky-100 hover:border-sky-300 transition shadow-2xs">
+                                              <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse shrink-0" />
+                                              <span>Abierto</span>
+                                              <ChevronDown className={`w-3 h-3 text-sky-600 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                                            </span>
+                                          )}
+                                        </button>
+
+                                        {isOpen && (
+                                          <>
+                                            <div
+                                              className="fixed inset-0 z-40"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setOpenDepartureStatusMenu(null);
+                                              }}
+                                            />
+                                            <div
+                                              className={`absolute right-0 ${
+                                                isLastRows ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+                                              } w-56 bg-white border border-slate-200/95 rounded-2xl shadow-xl z-50 p-1.5 space-y-1 animate-fadeIn text-left text-xs`}
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <div className="px-2.5 py-1 text-[9px] font-mono uppercase font-bold text-slate-400 tracking-wider border-b border-slate-100 mb-1 flex items-center justify-between">
+                                                <span>Estado de Zarpe</span>
+                                                {isSoldOut && (
+                                                  <span className="text-emerald-700 font-bold normal-case text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                                    100% Completo
+                                                  </span>
+                                                )}
+                                              </div>
+
+                                              {/* Opción 1: Abierto */}
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setManualStatusOverrides((prev) => ({ ...prev, [dep.id]: 'scheduled' }));
+                                                  setOpenDepartureStatusMenu(null);
+                                                  handleUpdateDepartureStatus(dep.id, 'scheduled');
+                                                }}
+                                                className={`w-full px-3 py-2 rounded-xl text-left transition flex items-center justify-between cursor-pointer group ${
+                                                  effectiveStatus === 'scheduled'
+                                                    ? 'bg-sky-50 text-sky-900 font-bold border border-sky-200/80 shadow-2xs'
+                                                    : 'hover:bg-slate-50 text-slate-700'
+                                                }`}
+                                              >
+                                                <div className="flex items-center gap-2.5">
+                                                  <span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
+                                                  <div>
+                                                    <span className="block text-xs font-semibold leading-tight">Abierto</span>
+                                                    <span className="block text-[10px] text-slate-400 font-light mt-0.5 font-sans">
+                                                      Disponible para reservas
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                {effectiveStatus === 'scheduled' && (
+                                                  <Check className="w-4 h-4 text-sky-700 shrink-0" />
+                                                )}
+                                              </button>
+
+                                              {/* Opción 2: Zarpe Garantizado */}
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setManualStatusOverrides((prev) => ({ ...prev, [dep.id]: 'guaranteed' }));
+                                                  setOpenDepartureStatusMenu(null);
+                                                  handleUpdateDepartureStatus(dep.id, 'guaranteed');
+                                                }}
+                                                className={`w-full px-3 py-2 rounded-xl text-left transition flex items-center justify-between cursor-pointer group ${
+                                                  effectiveStatus === 'guaranteed'
+                                                    ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200/80 shadow-2xs'
+                                                    : 'hover:bg-slate-50 text-slate-700'
+                                                }`}
+                                              >
+                                                <div className="flex items-center gap-2.5">
+                                                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                                  <div>
+                                                    <span className="block text-xs font-semibold leading-tight">Zarpe Garantizado</span>
+                                                    <span className="block text-[10px] text-slate-400 font-light mt-0.5 font-sans">
+                                                      {isSoldOut ? 'Cupos llenos (Automático)' : 'Salida 100% confirmada'}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                {effectiveStatus === 'guaranteed' && (
+                                                  <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                                                )}
+                                              </button>
+
+                                              {/* Opción 3: Cancelada */}
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setManualStatusOverrides((prev) => ({ ...prev, [dep.id]: 'cancelled' }));
+                                                  setOpenDepartureStatusMenu(null);
+                                                  handleUpdateDepartureStatus(dep.id, 'cancelled');
+                                                }}
+                                                className={`w-full px-3 py-2 rounded-xl text-left transition flex items-center justify-between cursor-pointer group ${
+                                                  effectiveStatus === 'cancelled'
+                                                    ? 'bg-rose-50 text-rose-900 font-bold border border-rose-200/80 shadow-2xs'
+                                                    : 'hover:bg-slate-50 text-slate-700'
+                                                }`}
+                                              >
+                                                <div className="flex items-center gap-2.5">
+                                                  <XCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                                                  <div>
+                                                    <span className="block text-xs font-semibold leading-tight">Cancelada</span>
+                                                    <span className="block text-[10px] text-slate-400 font-light mt-0.5 font-sans">
+                                                      Salida deshabilitada
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                {effectiveStatus === 'cancelled' && (
+                                                  <Check className="w-4 h-4 text-rose-700 shrink-0" />
+                                                )}
+                                              </button>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
@@ -9146,17 +9284,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     >
                                       <Star className={`w-3.5 h-3.5 ${dep.isFeatured ? 'fill-amber-400 text-amber-400' : ''}`} />
                                     </button>
+                                    {!isSoldOut && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax: realBookedPax, maxPax: maxSlots, availablePax: isSoldOut ? 0 : availablePax, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                        className="w-7 h-7 rounded-full text-emerald-700 hover:text-white hover:bg-emerald-600 flex items-center justify-center transition cursor-pointer"
+                                        title="Sumar Pasajero"
+                                      >
+                                        <Plus className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenAddPassengerModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: maxSlots, availablePax, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
-                                      className="w-7 h-7 rounded-full text-emerald-700 hover:text-white hover:bg-emerald-600 flex items-center justify-center transition cursor-pointer"
-                                      title="Sumar Pasajero"
-                                    >
-                                      <Plus className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax, maxPax: maxSlots, availablePax, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
+                                      onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax: realBookedPax, maxPax: maxSlots, availablePax: isSoldOut ? 0 : availablePax, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
                                       className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
                                       title="Ver Manifiesto de Pasajeros"
                                     >
@@ -12387,14 +12527,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                 {filteredPassengers.length > 0 ? (
                   <div className="border border-slate-200/80 rounded-2xl overflow-x-auto shadow-2xs">
-                    <table className="w-full min-w-[950px] text-left text-xs border-collapse">
+                    <table className="w-full min-w-[1020px] text-left text-xs border-collapse">
                       <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                         <tr>
                           <th className="py-3.5 px-4">#</th>
                           <th className="py-3.5 px-4 whitespace-nowrap">Pasajero & RUT / ID</th>
                           <th className="py-3.5 px-4">Contacto</th>
-                          <th className="py-3.5 px-4">Tarifa & Total</th>
-                          <th className="py-3.5 px-4">Monto Pagado / Estado</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Tarifa & Total</th>
+                          <th className="py-3.5 px-4 whitespace-nowrap">Monto Pagado / Estado</th>
                           <th className="py-3.5 px-4">Ficha Médica</th>
                           <th className="py-3.5 px-4">Contacto de Emergencia</th>
                           <th className="py-3.5 px-4 text-right">Acción</th>
@@ -12442,48 +12582,55 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </div>
                               </td>
 
-                              <td className="py-3.5 px-4 font-mono">
+                              <td className="py-3.5 px-4 font-mono whitespace-nowrap min-w-[150px]">
                                 <div>
-                                  <strong className="text-[#0b192c] text-xs font-bold block">
+                                  <strong className="text-[#0b192c] text-xs font-bold block whitespace-nowrap">
                                     ${pax.totalAmount.toLocaleString('es-CL')} CLP
                                   </strong>
-                                  <span className="text-[10px] text-slate-400">
+                                  <span className="text-[10px] text-slate-400 block whitespace-nowrap">
                                     {pax.paxCount} {pax.paxCount === 1 ? 'cupo individual' : 'cupos'}
                                   </span>
                                 </div>
                               </td>
 
-                              <td className="py-3.5 px-4 min-w-[220px]">
+                              <td className="py-3.5 px-4 min-w-[250px] whitespace-nowrap">
                                 <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="font-mono font-bold text-xs text-[#0b192c]">
+                                  <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+                                    <span className="font-mono font-bold text-xs text-[#0b192c] whitespace-nowrap">
                                       ${pax.amountPaid.toLocaleString('es-CL')} CLP
                                     </span>
-                                    <span className="text-[10px] text-slate-400 font-mono">
+                                    <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap shrink-0">
                                       {isFullyPaid ? '100% Pagado' : isPartial ? '50% Abono' : '0% Pendiente'}
                                     </span>
                                   </div>
 
-                                  {/* Dos botones / pastillas interactivas (Opción 1) */}
+                                  {/* Dos botones / pastillas interactivas inteligentes */}
                                   <div className="flex items-center gap-1.5">
                                     {/* Botón Cuota 1: Abono 50% */}
                                     <button
                                       type="button"
+                                      disabled={isFullyPaid || isPartial}
                                       onClick={() => {
-                                        const nextStatus = isFullyPaid ? 'partial' : isPartial ? 'pending' : 'partial';
-                                        handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
+                                        if (isFullyPaid || isPartial) return;
+                                        handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, 'partial');
                                       }}
-                                      className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border transition cursor-pointer shadow-2xs ${
+                                      className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border transition shadow-2xs whitespace-nowrap ${
                                         isFullyPaid || isPartial
-                                          ? 'bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100'
-                                          : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
+                                          ? 'bg-sky-50 text-sky-800 border-sky-200/80 cursor-default select-none'
+                                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-sky-50 hover:text-sky-800 hover:border-sky-300 cursor-pointer active:scale-95'
                                       }`}
-                                      title={isFullyPaid || isPartial ? '1° Abono (50%) Pagado. Clic para cambiar estado.' : '1° Abono (50%) Pendiente. Clic para marcar.'}
+                                      title={
+                                        isFullyPaid
+                                          ? '1° Abono (50%) Liquidado dentro del 100% Pagado'
+                                          : isPartial
+                                          ? '1° Abono (50%) Pagado'
+                                          : 'Registrar 1° Abono (50%)'
+                                      }
                                     >
                                       {isFullyPaid || isPartial ? (
                                         <CheckCircle2 className="w-3 h-3 text-sky-600 shrink-0" />
                                       ) : (
-                                        <div className="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" />
+                                        <div className="w-2.5 h-2.5 rounded-full border border-slate-400 shrink-0" />
                                       )}
                                       <span>Abono 50%</span>
                                     </button>
@@ -12491,21 +12638,32 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     {/* Botón Cuota 2: Saldo 50% */}
                                     <button
                                       type="button"
+                                      disabled={isFullyPaid || !isPartial}
                                       onClick={() => {
-                                        const nextStatus = isFullyPaid ? 'partial' : 'paid';
-                                        handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, nextStatus);
+                                        if (isFullyPaid || !isPartial) return;
+                                        handleUpdatePassengerPaymentStatus(pax.bookingId || pax.id, 'paid');
                                       }}
-                                      className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border transition cursor-pointer shadow-2xs ${
+                                      className={`inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border transition shadow-2xs whitespace-nowrap ${
                                         isFullyPaid
-                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                                          : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600'
+                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80 cursor-default select-none'
+                                          : isPartial
+                                          ? 'bg-slate-50 text-emerald-700 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 cursor-pointer active:scale-95'
+                                          : 'bg-slate-100/60 text-slate-300 border-slate-200/50 cursor-not-allowed select-none opacity-50'
                                       }`}
-                                      title={isFullyPaid ? 'Saldo Final (50%) Pagado. Clic para volver a Abono.' : 'Saldo Final (50%) Pendiente. Clic para marcar 100% Pagado & Confirmado.'}
+                                      title={
+                                        isFullyPaid
+                                          ? 'Saldo Final (50%) Pagado — 100% Liquidado'
+                                          : isPartial
+                                          ? 'Registrar Saldo Final (50%) para completar el 100%'
+                                          : 'Bloqueado: Requiere registrar primero el 1° Abono (50%)'
+                                      }
                                     >
-                                      {isFullyPaid ? (
+                                      {!isPartial && !isFullyPaid ? (
+                                        <Lock className="w-2.5 h-2.5 text-slate-300 shrink-0" />
+                                      ) : isFullyPaid ? (
                                         <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                                       ) : (
-                                        <div className="w-2.5 h-2.5 rounded-full border border-slate-300 shrink-0" />
+                                        <div className="w-2.5 h-2.5 rounded-full border-2 border-emerald-500 shrink-0" />
                                       )}
                                       <span>Saldo 50%</span>
                                     </button>
@@ -12942,7 +13100,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       {expPassengerForm.paxCount > 1 && (
                         <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
                           {expPassengerForm.passengers.map((pax, idx) => {
-                            const isComplete = pax.fullName.trim() && pax.rutPassport.trim() && pax.birthDate.trim();
+                            const isComplete = Boolean(pax.fullName.trim());
                             return (
                               <button
                                 key={idx}
@@ -13012,11 +13170,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               {/* RUT o Pasaporte */}
                               <div>
                                 <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
-                                  RUT o Pasaporte <span className="text-rose-500">*</span>
+                                  RUT o Pasaporte (Opcional)
                                 </label>
                                 <input
                                   type="text"
-                                  required
                                   placeholder="Ej: 18.345.678-9 / P123456"
                                   value={pax.rutPassport}
                                   onChange={(e) => handleUpdateExpPassengerField(idx, 'rutPassport', e.target.value)}
@@ -13024,13 +13181,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 />
                               </div>
 
-                              {/* Fecha de Nacimiento (Requerida por el usuario) */}
+                              {/* Fecha de Nacimiento */}
                               <div>
                                 <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
-                                  Fecha de Nacimiento <span className="text-rose-500">*</span>
+                                  Fecha de Nacimiento (Opcional)
                                 </label>
                                 <LuxuryDatePicker
-                                  required
                                   value={pax.birthDate}
                                   onChange={(val) => handleUpdateExpPassengerField(idx, 'birthDate', val)}
                                   placeholder="dd/mm/aaaa"
@@ -13040,10 +13196,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               {/* Teléfono / WhatsApp */}
                               <div>
                                 <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
-                                  Teléfono / WhatsApp {idx === 0 ? <span className="text-rose-500">*</span> : '(Opcional)'}
+                                  Teléfono / WhatsApp (Opcional)
                                 </label>
                                 <CountryPhoneInput
-                                  required={idx === 0}
                                   value={pax.phone}
                                   onChange={(val) => handleUpdateExpPassengerField(idx, 'phone', val)}
                                   placeholder="9 8765 4321"
@@ -13053,11 +13208,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               {/* Correo Electrónico */}
                               <div className="sm:col-span-2">
                                 <label className="block text-[10px] font-mono uppercase font-bold text-slate-600 mb-1">
-                                  Correo Electrónico {idx === 0 ? <span className="text-rose-500">*</span> : '(Opcional)'}
+                                  Correo Electrónico (Opcional)
                                 </label>
                                 <input
                                   type="email"
-                                  required={idx === 0}
                                   placeholder="pasajero@correo.com"
                                   value={pax.email}
                                   onChange={(e) => handleUpdateExpPassengerField(idx, 'email', e.target.value)}
@@ -13747,7 +13901,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     max={editingDeparture.total_slots}
                     required
                     value={editingDeparture.available_slots}
-                    onChange={(e) => setEditingDeparture({ ...editingDeparture, available_slots: Number(e.target.value) })}
+                    onChange={(e) => {
+                      const nextAvail = Number(e.target.value);
+                      setEditingDeparture({
+                        ...editingDeparture,
+                        available_slots: nextAvail,
+                        status: (nextAvail <= 0 && editingDeparture.status !== 'cancelled') ? 'guaranteed' : editingDeparture.status,
+                      });
+                    }}
                     className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
                   />
                 </div>
@@ -13841,11 +14002,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-sky-200/80 font-mono">
-                    <span>{selectedCustomer.rutOrPassport}</span>
-                    <span>•</span>
-                    <span>{selectedCustomer.city}</span>
-                    <span>•</span>
-                    <span>{selectedCustomer.nationality}</span>
+                    {[selectedCustomer.rutOrPassport, selectedCustomer.city, selectedCustomer.nationality].filter(Boolean).map((info, i, arr) => (
+                      <React.Fragment key={i}>
+                        <span>{info}</span>
+                        {i < arr.length - 1 && <span>•</span>}
+                      </React.Fragment>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -13904,13 +14066,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   </svg>
                   <span>WhatsApp: {selectedCustomer.phone}</span>
                 </a>
-                <a
-                  href={`mailto:${selectedCustomer.email}?subject=${encodeURIComponent('Atención Concierge Yates Chile')}`}
-                  className="bg-white hover:bg-slate-100 text-[#0b192c] border border-slate-200 font-semibold px-4 py-1.5 rounded-full flex items-center gap-1.5 transition shadow-2xs"
-                >
-                  <Mail className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{selectedCustomer.email}</span>
-                </a>
+                {selectedCustomer.email && (
+                  <a
+                    href={`mailto:${selectedCustomer.email}?subject=${encodeURIComponent('Atención Concierge Yates Chile')}`}
+                    className="bg-white hover:bg-slate-100 text-[#0b192c] border border-slate-200 font-semibold px-4 py-1.5 rounded-full flex items-center gap-1.5 transition shadow-2xs"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{selectedCustomer.email}</span>
+                  </a>
+                )}
               </div>
 
               <div className="flex items-center gap-6 font-mono text-xs">
@@ -13988,7 +14152,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">RUT / Pasaporte</span>
-                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.rutOrPassport}</span>
+                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.rutOrPassport || 'No registrado'}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Fecha de Nacimiento</span>
@@ -13996,19 +14160,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Nacionalidad</span>
-                        <span className="font-bold text-[#0b192c]">{selectedCustomer.nationality}</span>
+                        <span className="font-bold text-[#0b192c]">{selectedCustomer.nationality || 'No especificada'}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Ciudad de Residencia</span>
-                        <span className="font-bold text-[#0b192c]">{selectedCustomer.city}</span>
+                        <span className="font-bold text-[#0b192c]">{selectedCustomer.city || 'No especificada'}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Teléfono Móvil</span>
-                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.phone}</span>
+                        <span className="font-bold text-[#0b192c] font-mono">{selectedCustomer.phone || 'No registrado'}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 font-mono block">Correo Electrónico</span>
-                        <span className="font-bold text-[#0b192c]">{selectedCustomer.email}</span>
+                        <span className="font-bold text-[#0b192c]">{selectedCustomer.email || 'No registrado'}</span>
                       </div>
                       <div className="sm:col-span-2">
                         <span className="text-[10px] text-slate-400 font-mono block">Contacto de Emergencia</span>
@@ -14456,7 +14620,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Nacionalidad</label>
                     <input
                       type="text"
-                      placeholder="Chilena"
+                      placeholder="Ej: Chilena"
                       value={editCustomerForm.nationality}
                       onChange={(e) => setEditCustomerForm({ ...editCustomerForm, nationality: e.target.value })}
                       className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
@@ -14466,7 +14630,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Ciudad de Residencia</label>
                     <input
                       type="text"
-                      placeholder="Santiago, Chile"
+                      placeholder="Ej: Santiago, Chile"
                       value={editCustomerForm.city}
                       onChange={(e) => setEditCustomerForm({ ...editCustomerForm, city: e.target.value })}
                       className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
@@ -14476,17 +14640,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Teléfono Móvil (WhatsApp)</label>
                     <input
                       type="tel"
-                      placeholder="+56 9 8412 9901"
+                      placeholder="Ej: +56 9 8412 9901"
                       value={editCustomerForm.phone}
                       onChange={(e) => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })}
                       className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Correo Electrónico *</label>
+                    <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Correo Electrónico</label>
                     <input
                       type="email"
-                      required
                       placeholder="cliente@inversionesvr.cl"
                       value={editCustomerForm.email}
                       onChange={(e) => setEditCustomerForm({ ...editCustomerForm, email: e.target.value })}
@@ -14607,10 +14770,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Email *</label>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1">Email</label>
                   <input
                     type="email"
-                    required
                     placeholder="cliente@dominio.cl"
                     value={newCustomerForm.email}
                     onChange={(e) => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
@@ -15534,7 +15696,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   customConfirm.onCancel?.();
                   setCustomConfirm(null);
                 }}
-                className="flex-1 py-3 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold uppercase font-mono tracking-wider transition cursor-pointer active:scale-98 text-center"
+                className="flex-1 py-3 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold uppercase font-mono tracking-wider transition cursor-pointer active:scale-98 text-center whitespace-nowrap"
               >
                 {customConfirm.cancelText || 'Cancelar'}
               </button>
@@ -15545,7 +15707,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   setCustomConfirm(null);
                   cb();
                 }}
-                className={`flex-1 py-3 px-5 rounded-2xl text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-md hover:shadow-lg cursor-pointer active:scale-98 text-center ${
+                className={`flex-1 py-3 px-5 rounded-2xl text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-md hover:shadow-lg cursor-pointer active:scale-98 text-center whitespace-nowrap ${
                   customConfirm.type === 'danger'
                     ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800'
                     : 'bg-[#0b192c] hover:bg-[#182a44]'

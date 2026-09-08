@@ -525,7 +525,9 @@ export const expeditionService = {
           const routeTitle = formatRouteDepartureTitle(d, matchedLocal);
           const depYear = parseInt(d.departure_date?.split('-')[0] || '2026', 10);
           const months = getMonthsFromDates(d.departure_date, d.return_date);
-          const spots = d.available_slots === 0 ? 'completo' : d.status === 'cancelled' ? 'bloqueado' : d.available_slots;
+          const isSoldOut = typeof d.available_slots === 'number' && d.available_slots <= 0;
+          const spots = isSoldOut ? 'completo' : d.status === 'cancelled' ? 'bloqueado' : d.available_slots;
+          const effectiveStatus = (isSoldOut && d.status !== 'cancelled') ? 'guaranteed' : (d.status || 'scheduled');
 
           return {
             id: d.id,
@@ -549,7 +551,7 @@ export const expeditionService = {
             image: matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
             tempEstimate: matchedLocal?.tempEstimate || '14°C - 18°C',
-            status: d.status || 'scheduled',
+            status: effectiveStatus,
           };
         });
 
@@ -1090,7 +1092,9 @@ export const expeditionService = {
         if (params.availableSlots !== undefined) updateData.available_slots = params.availableSlots;
         if (params.pricePerPaxClp !== undefined) updateData.price_per_pax_clp = params.pricePerPaxClp;
         if (params.priceCharterFullClp !== undefined) updateData.price_charter_full_clp = params.priceCharterFullClp;
-        if (params.status) updateData.status = params.status;
+        const isSoldOutDb = params.availableSlots !== undefined && params.availableSlots <= 0;
+        const effectiveStatus = (isSoldOutDb && params.status !== 'cancelled') ? 'guaranteed' : params.status;
+        if (effectiveStatus) updateData.status = effectiveStatus;
 
         await supabase
           .from('expedition_departures')
@@ -1110,7 +1114,8 @@ export const expeditionService = {
           const year = depDate ? parseInt(depDate.split('-')[0], 10) || e.year : e.year;
           const totSlots = params.totalSlots !== undefined ? params.totalSlots : e.totalSlots;
           const availSlots = params.availableSlots !== undefined ? params.availableSlots : e.availableSlots;
-          const stat = params.status || e.status;
+          const isSoldOut = availSlots <= 0;
+          const stat = (isSoldOut && (params.status || e.status) !== 'cancelled') ? 'guaranteed' : (params.status || e.status);
 
           return {
             ...e,
@@ -1126,7 +1131,7 @@ export const expeditionService = {
             year,
             totalSlots: totSlots,
             availableSlots: availSlots,
-            spotsLeft: stat === 'cancelled' ? ('bloqueado' as const) : availSlots === 0 ? ('completo' as const) : availSlots,
+            spotsLeft: stat === 'cancelled' ? ('bloqueado' as const) : availSlots <= 0 ? ('completo' as const) : availSlots,
             pricePerPaxClp: params.pricePerPaxClp !== undefined ? params.pricePerPaxClp : e.pricePerPaxClp,
             priceCharterFullClp: params.priceCharterFullClp !== undefined ? params.priceCharterFullClp : e.priceCharterFullClp,
             status: stat,

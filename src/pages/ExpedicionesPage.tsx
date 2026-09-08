@@ -287,8 +287,8 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                   
                   {/* Status Badge */}
                   <div className="absolute top-4 right-4">
-                    {exp.spotsLeft === 'completo' && (
-                      <span className="bg-red-500/90 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-400/20 backdrop-blur-sm">
+                    {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) && (
+                      <span className="bg-red-500/90 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-400/20 backdrop-blur-sm shadow-xs">
                         {t('Completo', 'Sold Out')}
                       </span>
                     )}
@@ -404,12 +404,12 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
               </div>
 
               <div className="relative z-10 pt-6 border-t border-white/10 space-y-2.5">
-                {selectedExpedition.spotsLeft === 'completo' ? (
+                {(selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0)) ? (
                   <button
                     disabled
-                    className="w-full bg-slate-850 text-slate-500 font-bold py-3 rounded-xl text-xs cursor-not-allowed border border-white/5"
+                    className="w-full bg-slate-850 text-slate-500 font-bold py-3 rounded-xl text-xs cursor-not-allowed border border-white/5 uppercase tracking-wider"
                   >
-                    {t('Reserva Completada', 'Fully Booked')}
+                    {t('Reserva Completada (Agotada)', 'Fully Booked')}
                   </button>
                 ) : selectedExpedition.spotsLeft === 'bloqueado' ? (
                   <button

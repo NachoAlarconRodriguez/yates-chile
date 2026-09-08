@@ -307,7 +307,7 @@ export const ExpeditionCalendar: React.FC = () => {
 
                         <div className="flex items-center gap-3">
                           {/* Availability badge */}
-                          {exp.spotsLeft === 'completo' && (
+                          {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) && (
                             <span className="px-3 py-1 rounded-full bg-red-550/10 border border-red-500/20 text-red-750 font-bold text-[10px] uppercase tracking-wider">
                               {t('Completo', 'Sold Out')}
                             </span>
@@ -435,7 +435,7 @@ export const ExpeditionCalendar: React.FC = () => {
 
                 <div>
                   {/* Status CTA buttons */}
-                  {activeExpedition.spotsLeft === 'completo' && (
+                  {(activeExpedition.spotsLeft === 'completo' || activeExpedition.spotsLeft === 0 || (typeof activeExpedition.availableSlots === 'number' && activeExpedition.availableSlots <= 0)) && (
                     <a
                       href="#/contacto"
                       className="inline-flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-slate-950 font-bold px-6 py-3.5 rounded-xl transition text-sm border border-slate-200 shadow-sm min-h-[48px] cursor-pointer"
@@ -453,7 +453,7 @@ export const ExpeditionCalendar: React.FC = () => {
                       <span>{t('Bloqueado por Misión Especial', 'Reserved for Special Mission')}</span>
                     </button>
                   )}
-                  {typeof activeExpedition.spotsLeft === 'number' && (
+                  {typeof activeExpedition.spotsLeft === 'number' && activeExpedition.spotsLeft > 0 && !(typeof activeExpedition.availableSlots === 'number' && activeExpedition.availableSlots <= 0) && (
                     <button
                       onClick={handleOpenBookingModal}
                       className="inline-flex items-center justify-center gap-2 w-full bg-slate-950 hover:bg-slate-900 text-white font-bold px-6 py-3.5 rounded-xl transition text-sm shadow-md min-h-[48px] cursor-pointer focus:outline-none"
