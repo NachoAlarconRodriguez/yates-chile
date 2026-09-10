@@ -13,14 +13,22 @@ import {
   Compass,
   Lock,
   Clock,
-  Sparkles
+  Sparkles,
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useExpeditions } from '../../hooks/useExpeditions';
 import { leadService } from '../../services/leadService';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatRut, formatPhone } from '../../lib/formatters';
-import type { PublicExpedition } from '../../services/expeditionService';
+import { 
+  DEFAULT_EXPEDITION_POLICIES, 
+  getEmbeddablePdfUrl, 
+  getDirectPdfUrl, 
+  type PublicExpedition, 
+  type ExpeditionPolicySection 
+} from '../../services/expeditionService';
 
 export const getExpeditionAvailableSpots = (exp?: PublicExpedition | null): number => {
   if (!exp) return 0;
@@ -32,13 +40,20 @@ export const getExpeditionAvailableSpots = (exp?: PublicExpedition | null): numb
   ) {
     return 0;
   }
-  if (typeof exp.availableSlots === 'number') {
-    return Math.max(0, exp.availableSlots);
+  if (exp.availableSlots !== undefined && exp.availableSlots !== null && String(exp.availableSlots).trim() !== '') {
+    const parsedAvail = Number(exp.availableSlots);
+    if (!isNaN(parsedAvail)) {
+      return Math.max(0, parsedAvail);
+    }
   }
-  if (typeof exp.spotsLeft === 'number') {
-    return Math.max(0, exp.spotsLeft);
+  if (exp.spotsLeft !== undefined && exp.spotsLeft !== null && String(exp.spotsLeft).trim() !== '') {
+    const parsedSpots = Number(exp.spotsLeft);
+    if (!isNaN(parsedSpots)) {
+      return Math.max(0, parsedSpots);
+    }
   }
-  return exp.totalSlots || (exp.vesselId === 'terranova' ? 8 : 6);
+  const fallback = Number(exp.totalSlots);
+  return !isNaN(fallback) && fallback > 0 ? fallback : (exp.vesselId === 'terranova' ? 8 : 6);
 };
 
 export const isExpeditionSoldOut = (exp?: PublicExpedition | null): boolean => {
@@ -150,6 +165,56 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
   }, [isOpen, showPoliciesModal, onClose]);
 
   const currentActiveExp = selectedExp || (sortedExpeditions.length > 0 ? sortedExpeditions[0] : null);
+
+  const effectivePolicies: ExpeditionPolicySection[] = useMemo(() => {
+    const raw = (currentActiveExp as any)?.policies;
+    if (Array.isArray(raw) && raw.length > 0) return raw;
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return DEFAULT_EXPEDITION_POLICIES;
+  }, [currentActiveExp]);
+
+  const liveExpFromList = useMemo(() => {
+    if (!currentActiveExp?.id) return null;
+    return sortedExpeditions.find((e) => e.id === currentActiveExp.id) || null;
+  }, [currentActiveExp?.id, sortedExpeditions]);
+
+  const currentPolicyUrl = useMemo(() => {
+    let url = (currentActiveExp as any)?.policyUrl || (currentActiveExp as any)?.policy_url || (liveExpFromList as any)?.policyUrl || (liveExpFromList as any)?.policy_url || '';
+    if (!url && typeof window !== 'undefined' && currentActiveExp?.id) {
+      try {
+        const cached = localStorage.getItem('yates_public_expeditions_cache');
+        if (cached) {
+          const list = JSON.parse(cached);
+          const found = list.find((item: any) => item.id === currentActiveExp.id);
+          if (found && (found.policyUrl || found.policy_url)) {
+            url = found.policyUrl || found.policy_url;
+          }
+        }
+      } catch {}
+      if (!url) {
+        try {
+          const stored = localStorage.getItem('yates_stored_departures');
+          if (stored) {
+            const list = JSON.parse(stored);
+            const found = list.find((item: any) => item.id === currentActiveExp.id);
+            if (found && (found.policyUrl || found.policy_url)) {
+              url = found.policyUrl || found.policy_url;
+            }
+          }
+        } catch {}
+      }
+    }
+    return url;
+  }, [currentActiveExp, liveExpFromList]);
+
+  const embedPdfUrl = useMemo(() => getEmbeddablePdfUrl(currentPolicyUrl), [currentPolicyUrl]);
+  const directPdfUrl = useMemo(() => getDirectPdfUrl(currentPolicyUrl), [currentPolicyUrl]);
+  const hasPolicyPdf = Boolean(embedPdfUrl);
 
   const availableSpots = getExpeditionAvailableSpots(currentActiveExp);
   const isSoldOut = currentActiveExp ? availableSpots <= 0 : false;
@@ -403,8 +468,9 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
             <div className="p-4 sm:p-6 overflow-y-auto space-y-3 flex-1 max-h-[52vh]">
               {sortedExpeditions.map((exp, idx) => {
                 const isSelected = selectedExp?.id === exp.id;
-                const spots = typeof exp.spotsLeft === 'number' ? exp.spotsLeft : exp.availableSlots;
-                const spotsText = spots === 1 ? '1 cupo disponible' : `${spots} cupos disponibles`;
+                const spots = getExpeditionAvailableSpots(exp);
+                const isExpSoldOut = spots <= 0;
+                const spotsText = isExpSoldOut ? 'Completo • Sin cupos' : spots === 1 ? '1 cupo disponible' : `${spots} cupos disponibles`;
 
                 return (
                   <div
@@ -416,10 +482,10 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                         : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/60'
                     }`}
                   >
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <div className="relative w-18 h-18 sm:w-22 sm:h-18 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-900">
+                    <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 relative">
                         <img
-                          src={exp.image || '/travesia-robinson.jpg'}
+                          src={exp.image}
                           alt={exp.name}
                           className="w-full h-full object-cover"
                         />
@@ -434,7 +500,11 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                           <span className="text-[9px] font-mono uppercase tracking-wider text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-semibold">
                             {exp.vessel}
                           </span>
-                          <span className="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+                          <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
+                            isExpSoldOut 
+                              ? 'text-rose-800 bg-rose-50 border-rose-200/80' 
+                              : 'text-emerald-800 bg-emerald-50 border-emerald-200/60'
+                          }`}>
                             {spotsText}
                           </span>
                         </div>
@@ -1255,73 +1325,125 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
             if (e.target === e.currentTarget) setShowPoliciesModal(false);
           }}
         >
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col relative text-slate-800 animate-[scaleIn_0.25s_ease-out] overflow-hidden border border-slate-200">
+          <div className={`bg-white rounded-3xl shadow-2xl ${hasPolicyPdf ? 'max-w-4xl w-full h-[88vh] max-h-[92vh]' : 'max-w-2xl w-full max-h-[85vh]'} flex flex-col relative text-slate-800 animate-[scaleIn_0.25s_ease-out] overflow-hidden border border-slate-200`}>
             {/* Header */}
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#F8FAFC]">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-slate-900" />
-                <h3 className="font-serif font-bold text-lg text-slate-900 tracking-tight">
-                  Políticas y Condiciones de Expedición
-                </h3>
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-[#F8FAFC]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#0b192c] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <ShieldCheck className="w-5 h-5 text-sky-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-serif font-bold text-base sm:text-lg text-slate-900 tracking-tight truncate">
+                      Políticas y Condiciones de Expedición
+                    </h3>
+                    {hasPolicyPdf && (
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                        <FileText className="w-3 h-3" />
+                        <span>PDF Oficial</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {currentActiveExp?.name || 'Términos y condiciones de navegación'}
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => setShowPoliciesModal(false)}
-                className="text-slate-400 hover:text-slate-950 p-1.5 rounded-full hover:bg-slate-200/60 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                {hasPolicyPdf && (
+                  <a
+                    href={directPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                    title="Abrir PDF en pestaña nueva"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                    <span className="hidden sm:inline">Pantalla Completa</span>
+                  </a>
+                )}
+                <button
+                  onClick={() => setShowPoliciesModal(false)}
+                  className="text-slate-400 hover:text-slate-950 p-2 rounded-full hover:bg-slate-200/60 transition cursor-pointer"
+                  title="Cerrar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Content */}
-            <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-600 text-left leading-relaxed">
-              <div className="space-y-1">
-                <h4 className="font-bold text-slate-900 text-sm">
-                  1. Modalidad de Reserva y Pagos
-                </h4>
-                <p>
-                  Para garantizar y bloquear los cupos en la expedición seleccionada, se requiere un abono correspondiente al <strong>50% del valor total</strong> mediante transferencia bancaria. El 50% restante deberá ser cancelado a más tardar 30 días antes de la fecha fijada de zarpe o check-in.
-                </p>
+            {hasPolicyPdf ? (
+              <div className="flex-1 w-full bg-slate-100/60 p-2 sm:p-4 overflow-hidden flex flex-col">
+                <iframe
+                  src={embedPdfUrl}
+                  className="w-full h-full rounded-2xl border border-slate-200/80 bg-white shadow-xs"
+                  title="Documento de Políticas y Condiciones en PDF"
+                />
               </div>
-
-              <div className="space-y-1">
-                <h4 className="font-bold text-slate-900 text-sm">
-                  2. Políticas de Cancelación y Reprogramación
-                </h4>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li><strong>Cancelaciones con más de 45 días de anticipación:</strong> Reembolso del 90% del monto abonado o reprogramación sin costo sujeta a cupos.</li>
-                  <li><strong>Cancelaciones entre 44 y 21 días antes del zarpe:</strong> Retención del 30% del total por concepto de gastos operacionales e insumos náuticos, o posibilidad de endosar el cupo a otro pasajero previa notificación.</li>
-                  <li><strong>Cancelaciones con menos de 20 días:</strong> No reembolsable debido a la logística de tripulación y aprovisionamiento insular.</li>
-                </ul>
+            ) : (
+              <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-600 text-left leading-relaxed">
+                {effectivePolicies.map((section, idx) => {
+                  const lines = section.content.split('\n').map(l => l.trim()).filter(Boolean);
+                  const isBulletList = lines.some(l => l.startsWith('•') || l.startsWith('-') || l.startsWith('*'));
+                  return (
+                    <div key={section.id || idx} className="space-y-1">
+                      <h4 className="font-bold text-slate-900 text-sm">
+                        {section.title}
+                      </h4>
+                      {isBulletList ? (
+                        <ul className="list-disc pl-5 space-y-1">
+                          {lines.map((line, lIdx) => {
+                            const clean = line.replace(/^[•\-\*]\s*/, '');
+                            const colonIdx = clean.indexOf(':');
+                            if (colonIdx > 0 && colonIdx < 60) {
+                              const prefix = clean.substring(0, colonIdx + 1);
+                              const rest = clean.substring(colonIdx + 1);
+                              return (
+                                <li key={lIdx}>
+                                  <strong>{prefix}</strong>{rest}
+                                </li>
+                              );
+                            }
+                            return <li key={lIdx}>{clean}</li>;
+                          })}
+                        </ul>
+                      ) : (
+                        <p className="whitespace-pre-line leading-relaxed">
+                          {section.content}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-
-              <div className="space-y-1">
-                <h4 className="font-bold text-slate-900 text-sm">
-                  3. Meteorología, Seguridad y Navegación de Alta Mar
-                </h4>
-                <p>
-                  La seguridad de la tripulación y los pasajeros es la máxima prioridad. Los planes de navegación, rutas y desembarcos en caletas están condicionados a las autorizaciones de la Capitanía de Puerto y las condiciones meteorológicas imperantes evaluadas por el Capitán de Ultramar.
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <h4 className="font-bold text-slate-900 text-sm">
-                  4. Seguros y Certificaciones
-                </h4>
-                <p>
-                  Todas las embarcaciones de Yates Chile cuentan con seguros de navegación marítima y equipamiento salvavidas certificado por DIRECTEMAR (Armada de Chile), incluyendo botes auxiliares Zodiac, radiobalizas satelitales EPIRB y conexión Starlink 24/7.
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-100 bg-[#F8FAFC] flex justify-end">
+            <div className="p-4 border-t border-slate-100 bg-[#F8FAFC] flex items-center justify-between gap-3">
+              {hasPolicyPdf ? (
+                <a
+                  href={directPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-sky-700 hover:text-sky-900 font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar Documento</span>
+                </a>
+              ) : (
+                <div className="text-[11px] text-slate-400">
+                  Condiciones estándar de expedición
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   setTermsAccepted(true);
                   setShowPoliciesModal(false);
                 }}
-                className="bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition cursor-pointer"
+                className="bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition cursor-pointer shrink-0 shadow-sm"
               >
                 Entendido y Aceptar Políticas
               </button>

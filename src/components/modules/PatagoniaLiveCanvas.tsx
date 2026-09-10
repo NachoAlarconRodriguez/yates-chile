@@ -44,31 +44,45 @@ export const PatagoniaLiveCanvas: React.FC = () => {
     fetchLiveWeatherForLocation(selectedLoc);
   }, [selectedLoc, fetchLiveWeatherForLocation]);
 
-  // Periodic refresh every 10 minutes
+  // Pre-fetch all locations on mount
   useEffect(() => {
-    const timer = setInterval(() => {
-      fetchLiveWeatherForLocation(selectedLoc);
-    }, 10 * 60 * 1000);
-    return () => clearInterval(timer);
-  }, [selectedLoc, fetchLiveWeatherForLocation]);
+    WEATHER_LOCATIONS.forEach((loc) => {
+      fetchLiveWeatherForLocation(loc);
+    });
+  }, [fetchLiveWeatherForLocation]);
+
+  // Auto-rotate destinations every 5 seconds for visual dynamism
+  const [isPaused, setIsPaused] = useState(false);
+  const [isFading, setIsFading] = useState(false);
+
+  useEffect(() => {
+    if (isPaused) return;
+
+    const rotateTimer = setInterval(() => {
+      setIsFading(true);
+      setTimeout(() => {
+        setSelectedLocationId((prevId) => {
+          const currentIndex = WEATHER_LOCATIONS.findIndex((l) => l.id === prevId);
+          const nextIndex = (currentIndex + 1) % WEATHER_LOCATIONS.length;
+          return WEATHER_LOCATIONS[nextIndex].id;
+        });
+        setIsFading(false);
+      }, 250);
+    }, 5000);
+
+    return () => clearInterval(rotateTimer);
+  }, [isPaused]);
 
   return (
-    <div className="bg-slate-950/95 text-white text-xs border-y border-slate-800/80 backdrop-blur-md transition-all overflow-x-auto select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    <div 
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      className="bg-slate-950/95 text-white text-xs border-y border-slate-800/80 backdrop-blur-md transition-all overflow-x-auto select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+    >
       <div className="w-full max-w-[1750px] mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-3 xl:gap-6 flex-nowrap whitespace-nowrap min-w-max">
         
-        {/* Left Side: Live Beacon & Location Pills */}
+        {/* Left Side: Location Pills */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {/* Live Indicator */}
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-emerald-500/30 px-2 py-0.5 rounded-full shrink-0 shadow-xs">
-            <span className="flex h-1.5 w-1.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-            </span>
-            <span className="font-mono text-[9px] uppercase tracking-widest text-emerald-400 font-bold">
-              {t('Telemetría en Vivo', 'Live Telemetry')}
-            </span>
-          </div>
-
           {/* Location Selector Pills (Circular / Rounded-Full design) */}
           <div className="inline-flex items-center p-0.5 bg-slate-900/90 rounded-full border border-white/10 shadow-inner shrink-0 gap-0.5">
             {WEATHER_LOCATIONS.map((loc) => {
@@ -76,7 +90,9 @@ export const PatagoniaLiveCanvas: React.FC = () => {
               return (
                 <button
                   key={loc.id}
-                  onClick={() => setSelectedLocationId(loc.id)}
+                  onClick={() => {
+                    setSelectedLocationId(loc.id);
+                  }}
                   className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                     isSelected
                       ? 'bg-blue-600 text-white shadow-md font-bold'
@@ -92,13 +108,13 @@ export const PatagoniaLiveCanvas: React.FC = () => {
           </div>
 
           <span className="hidden 2xl:inline-block text-slate-700">|</span>
-          <span className="hidden 2xl:inline-block text-slate-400 text-[11px] font-mono shrink-0">
+          <span className={`hidden 2xl:inline-block text-slate-400 text-[11px] font-mono shrink-0 transition-opacity duration-300 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
             {lang === 'EN' ? selectedLoc.subtitleEn : selectedLoc.subtitle}
           </span>
         </div>
 
         {/* Center: Live Weather Telemetry Data (All in 1 Line) */}
-        <div className="flex items-center gap-3.5 sm:gap-4.5 xl:gap-5 text-slate-200 text-xs shrink-0 font-mono">
+        <div className={`flex items-center gap-3.5 sm:gap-4.5 xl:gap-5 text-slate-200 text-xs shrink-0 font-mono transition-all duration-300 ${isFading ? 'opacity-0 scale-[0.98]' : 'opacity-100 scale-100'}`}>
           
           {/* Temperature & Condition */}
           <div className="flex items-center gap-1.5 shrink-0" title={t('Temperatura del aire y sensación', 'Air temperature and wind chill')}>

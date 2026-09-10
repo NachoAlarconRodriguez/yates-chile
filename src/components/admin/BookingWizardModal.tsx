@@ -681,12 +681,12 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
             ? d.max_pax
             : 6;
 
-          const rawAvailable = typeof d.availablePax === 'number'
-            ? d.availablePax
-            : typeof d.available_slots === 'number'
-            ? d.available_slots
-            : typeof d.spotsLeft === 'number'
-            ? d.spotsLeft
+          const rawAvailable = (d.availablePax !== undefined && d.availablePax !== null && d.availablePax !== '')
+            ? Number(d.availablePax)
+            : (d.available_slots !== undefined && d.available_slots !== null && d.available_slots !== '')
+            ? Number(d.available_slots)
+            : (d.spotsLeft !== undefined && d.spotsLeft !== null && d.spotsLeft !== '')
+            ? (d.spotsLeft === 'completo' ? 0 : Number(d.spotsLeft))
             : typeof d.bookedPax === 'number'
             ? Math.max(0, rawMax - d.bookedPax)
             : 6;

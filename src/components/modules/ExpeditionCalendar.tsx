@@ -3,7 +3,7 @@ import { Calendar, MapPin, ArrowRight, Sparkles, ChevronLeft, ChevronRight, Lock
 import { useExpeditions } from '../../hooks/useExpeditions';
 import { useLanguage } from '../../context/LanguageContext';
 import { translationService } from '../../services/translationService';
-import { INITIAL_EXPEDITIONS, type PublicExpedition } from '../../services/expeditionService';
+import { INITIAL_EXPEDITIONS, isExpeditionSoldOut, getExpeditionAvailableSpots, type PublicExpedition } from '../../services/expeditionService';
 import { ExpeditionBookingModal } from './ExpeditionBookingModal';
 
 export type Expedition = PublicExpedition;
@@ -337,24 +337,24 @@ export const ExpeditionCalendar: React.FC = () => {
 
                         <div className="flex items-center gap-3">
                           {/* Availability badge */}
-                          {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) && (
+                          {isExpeditionSoldOut(exp) && (
                             <span className="px-3 py-1 rounded-full bg-red-550/10 border border-red-500/20 text-red-750 font-bold text-[10px] uppercase tracking-wider">
                               {t('Completo', 'Sold Out')}
                             </span>
                           )}
-                          {exp.spotsLeft === 'bloqueado' && (
+                          {!isExpeditionSoldOut(exp) && exp.spotsLeft === 'bloqueado' && (
                             <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-655 font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">
                               <Lock className="w-3 h-3" /> {t('Completo', 'Sold Out')}
                             </span>
                           )}
-                          {typeof exp.spotsLeft === 'number' && exp.spotsLeft === 1 && (
+                          {!isExpeditionSoldOut(exp) && exp.spotsLeft !== 'bloqueado' && getExpeditionAvailableSpots(exp) === 1 && (
                             <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-755 font-bold text-[10px] uppercase tracking-wider animate-pulse">
                               {t('1 cupo libre', '1 spot left')}
                             </span>
                           )}
-                          {typeof exp.spotsLeft === 'number' && exp.spotsLeft > 1 && (
+                          {!isExpeditionSoldOut(exp) && exp.spotsLeft !== 'bloqueado' && getExpeditionAvailableSpots(exp) > 1 && (
                             <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 font-bold text-[10px] uppercase tracking-wider">
-                              {exp.spotsLeft} {t('cupos libres', 'spots left')}
+                              {getExpeditionAvailableSpots(exp)} {t('cupos libres', 'spots left')}
                             </span>
                           )}
 
@@ -465,7 +465,7 @@ export const ExpeditionCalendar: React.FC = () => {
 
                 <div>
                   {/* Status CTA buttons */}
-                  {(activeExpedition.spotsLeft === 'completo' || activeExpedition.spotsLeft === 0 || (typeof activeExpedition.availableSlots === 'number' && activeExpedition.availableSlots <= 0)) && (
+                  {isExpeditionSoldOut(activeExpedition) && (
                     <a
                       href="#/contacto"
                       className="inline-flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-slate-950 font-bold px-6 py-3.5 rounded-xl transition text-sm border border-slate-200 shadow-sm min-h-[48px] cursor-pointer"
@@ -474,7 +474,7 @@ export const ExpeditionCalendar: React.FC = () => {
                       <ArrowRight className="w-4 h-4 text-slate-700" />
                     </a>
                   )}
-                  {activeExpedition.spotsLeft === 'bloqueado' && (
+                  {!isExpeditionSoldOut(activeExpedition) && activeExpedition.spotsLeft === 'bloqueado' && (
                     <button
                       disabled
                       className="inline-flex items-center justify-center gap-2 w-full bg-slate-50 text-slate-400 font-bold px-6 py-3.5 rounded-xl text-sm min-h-[48px] border border-slate-200 cursor-not-allowed"
@@ -483,7 +483,7 @@ export const ExpeditionCalendar: React.FC = () => {
                       <span>{t('Bloqueado por Misión Especial', 'Reserved for Special Mission')}</span>
                     </button>
                   )}
-                  {typeof activeExpedition.spotsLeft === 'number' && activeExpedition.spotsLeft > 0 && !(typeof activeExpedition.availableSlots === 'number' && activeExpedition.availableSlots <= 0) && (
+                  {!isExpeditionSoldOut(activeExpedition) && activeExpedition.spotsLeft !== 'bloqueado' && getExpeditionAvailableSpots(activeExpedition) > 0 && (
                     <button
                       onClick={handleOpenBookingModal}
                       className="inline-flex items-center justify-center gap-2 w-full bg-slate-950 hover:bg-slate-900 text-white font-bold px-6 py-3.5 rounded-xl transition text-sm shadow-md min-h-[48px] cursor-pointer focus:outline-none"

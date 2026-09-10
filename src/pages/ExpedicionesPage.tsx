@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useExpeditions } from '../hooks/useExpeditions';
-import type { PublicExpedition as Expedition } from '../services/expeditionService';
+import { isExpeditionSoldOut, getExpeditionAvailableSpots, type PublicExpedition as Expedition } from '../services/expeditionService';
 import { normalizeExternalMediaUrl } from '../services/cmsService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
@@ -363,9 +363,10 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
             >
               {expeditions.map((exp) => {
-                const isSoldOut = exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0);
+                const isSoldOut = isExpeditionSoldOut(exp);
                 const isBlocked = exp.spotsLeft === 'bloqueado';
                 const isUnavailable = isSoldOut || isBlocked;
+                const availableSpots = getExpeditionAvailableSpots(exp);
 
                 return (
                   <div
@@ -408,14 +409,14 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                             {t('Bloqueado', 'Reserved')}
                           </span>
                         )}
-                        {typeof exp.spotsLeft === 'number' && exp.spotsLeft === 1 && (
+                        {!isSoldOut && !isBlocked && availableSpots === 1 && (
                           <span className="bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-400/20 animate-pulse shadow-sm">
                             {t('¡Último cupo!', 'Last spot!')}
                           </span>
                         )}
-                        {typeof exp.spotsLeft === 'number' && exp.spotsLeft > 1 && (
+                        {!isSoldOut && !isBlocked && availableSpots > 1 && (
                           <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20 shadow-xs">
-                            {exp.spotsLeft} {t('cupos disponibles', 'spots available')}
+                            {availableSpots} {t('cupos disponibles', 'spots available')}
                           </span>
                         )}
                       </div>
@@ -534,7 +535,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
 
               {/* Desktop Left-Column CTAs */}
               <div className="relative z-10 pt-3.5 sm:pt-4 border-t border-white/10 space-y-2 hidden md:block mt-4">
-                {(selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0)) ? (
+                {isExpeditionSoldOut(selectedExpedition) ? (
                   <>
                     {/* Botón 1: Descargar Brochure en PDF */}
                     <button
@@ -674,7 +675,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 <span className="truncate">{t('Brochure PDF', 'PDF Brochure')}</span>
               </button>
 
-              {(selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0)) ? (
+              {isExpeditionSoldOut(selectedExpedition) ? (
                 <button
                   type="button"
                   onClick={() => handleOpenBookingModal(selectedExpedition)}

@@ -15,14 +15,101 @@ export type DepartureRow = Database['public']['Tables']['expedition_departures']
   brochureUrl?: string;
   brochure_url?: string;
   policyUrl?: string;
+  policy_url?: string;
   bestViewTime?: string;
   route?: any;
   vessel?: any;
   isFeatured?: boolean;
   highlights?: string;
   includedServices?: string;
+  policies?: ExpeditionPolicySection[] | string;
 };
 export type ExpeditionBookingRow = Database['public']['Tables']['expedition_bookings']['Row'];
+
+export interface ExpeditionPolicySection {
+  id?: string;
+  title: string;
+  content: string;
+}
+
+export const DEFAULT_EXPEDITION_POLICIES: ExpeditionPolicySection[] = [
+  {
+    id: 'policy-1',
+    title: '1. Modalidad de Reserva y Pagos',
+    content: 'Para garantizar y bloquear los cupos en la expedición seleccionada, se requiere un abono correspondiente al 50% del valor total mediante transferencia bancaria. El 50% restante deberá ser cancelado a más tardar 30 días antes de la fecha fijada de zarpe o check-in.',
+  },
+  {
+    id: 'policy-2',
+    title: '2. Políticas de Cancelación y Reprogramación',
+    content: '• Cancelaciones con más de 45 días de anticipación: Reembolso del 90% del monto abonado o reprogramación sin costo sujeta a cupos.\n• Cancelaciones entre 44 y 21 días antes del zarpe: Retención del 30% del total por concepto de gastos operacionales e insumos náuticos, o posibilidad de endosar el cupo a otro pasajero previa notificación.\n• Cancelaciones con menos de 20 días: No reembolsable debido a la logística de tripulación y aprovisionamiento insular.',
+  },
+  {
+    id: 'policy-3',
+    title: '3. Meteorología, Seguridad y Navegación de Alta Mar',
+    content: 'La seguridad de la tripulación y los pasajeros es la máxima prioridad. Los planes de navegación, rutas y desembarcos en caletas están condicionados a las autorizaciones de la Capitanía de Puerto y las condiciones meteorológicas imperantes evaluadas por el Capitán de Ultramar.',
+  },
+  {
+    id: 'policy-4',
+    title: '4. Seguros y Certificaciones',
+    content: 'Todas las embarcaciones de Yates Chile cuentan con seguros de navegación marítima y equipamiento salvavidas certificado por DIRECTEMAR (Armada de Chile), incluyendo botes auxiliares Zodiac, radiobalizas satelitales EPIRB y conexión Starlink 24/7.',
+  },
+];
+
+/**
+ * Transforms external storage / cloud URLs (Google Drive, Dropbox, OneDrive)
+ * into embeddable URLs suitable for iframes and in-browser PDF viewers.
+ */
+export function getEmbeddablePdfUrl(url?: string | null): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+
+  // Google Drive preview URL (permits iframe embedding)
+  const driveFileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveFileMatch && driveFileMatch[1]) {
+    return `https://drive.google.com/file/d/${driveFileMatch[1]}/preview`;
+  }
+  const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (driveOpenMatch && driveOpenMatch[1]) {
+    return `https://drive.google.com/file/d/${driveOpenMatch[1]}/preview`;
+  }
+  const driveDocsMatch = trimmed.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveDocsMatch && driveDocsMatch[1]) {
+    return `https://docs.google.com/document/d/${driveDocsMatch[1]}/preview`;
+  }
+
+  // Dropbox raw mode
+  if (trimmed.includes('dropbox.com')) {
+    return trimmed.replace(/([?&])dl=[01]/, '$1raw=1');
+  }
+
+  // OneDrive embed
+  if (trimmed.includes('onedrive.live.com') && !trimmed.includes('embed')) {
+    return trimmed.replace('view.aspx', 'embed.aspx');
+  }
+
+  return trimmed;
+}
+
+/**
+ * Returns a clean direct URL for opening in a new tab or downloading.
+ */
+export function getDirectPdfUrl(url?: string | null): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch && driveMatch[1]) {
+    return `https://drive.google.com/file/d/${driveMatch[1]}/view?usp=sharing`;
+  }
+  const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (driveOpenMatch && driveOpenMatch[1]) {
+    return `https://drive.google.com/file/d/${driveOpenMatch[1]}/view?usp=sharing`;
+  }
+  const driveDocsMatch = trimmed.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveDocsMatch && driveDocsMatch[1]) {
+    return `https://docs.google.com/document/d/${driveDocsMatch[1]}/edit?usp=sharing`;
+  }
+  return trimmed;
+}
 
 export interface PublicExpedition {
   id: string;
@@ -53,7 +140,43 @@ export interface PublicExpedition {
   isFeatured?: boolean;
   highlights?: string;
   includedServices?: string;
+  policies?: ExpeditionPolicySection[] | string;
 }
+
+export const getExpeditionAvailableSpots = (exp?: Partial<PublicExpedition> | any | null): number => {
+  if (!exp) return 0;
+  if (
+    exp.spotsLeft === 'completo' ||
+    exp.spotsLeft === 'bloqueado' ||
+    exp.status === 'completed' ||
+    exp.status === 'cancelled'
+  ) {
+    return 0;
+  }
+  if (exp.availableSlots !== undefined && exp.availableSlots !== null && exp.availableSlots !== '') {
+    const num = Number(exp.availableSlots);
+    if (!isNaN(num)) return Math.max(0, num);
+  }
+  if (exp.available_slots !== undefined && exp.available_slots !== null && exp.available_slots !== '') {
+    const num = Number(exp.available_slots);
+    if (!isNaN(num)) return Math.max(0, num);
+  }
+  if (exp.availablePax !== undefined && exp.availablePax !== null && exp.availablePax !== '') {
+    const num = Number(exp.availablePax);
+    if (!isNaN(num)) return Math.max(0, num);
+  }
+  if (exp.spotsLeft !== undefined && exp.spotsLeft !== null && exp.spotsLeft !== '') {
+    const num = Number(exp.spotsLeft);
+    if (!isNaN(num)) return Math.max(0, num);
+  }
+  const fallback = Number(exp.totalSlots || exp.total_slots);
+  return !isNaN(fallback) && fallback > 0 ? fallback : (exp.vesselId === 'terranova' ? 8 : 6);
+};
+
+export const isExpeditionSoldOut = (exp?: Partial<PublicExpedition> | any | null): boolean => {
+  if (!exp) return false;
+  return getExpeditionAvailableSpots(exp) <= 0;
+};
 
 export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
   // --- CABO DE HORNOS (Velero Vegvisir) ---
@@ -374,12 +497,26 @@ const sanitizePublicExpedition = (e: PublicExpedition): PublicExpedition => {
   }
   const rawImg = e.image || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
   const image = normalizeExternalMediaUrl(rawImg);
+
+  const rawAvail = e.availableSlots;
+  const numAvail = (rawAvail !== undefined && rawAvail !== null && String(rawAvail).trim() !== '') ? Number(rawAvail) : undefined;
+  const isSoldOut = (numAvail !== undefined && numAvail <= 0) || e.spotsLeft === 'completo';
+  const availableSlots = isSoldOut ? 0 : (numAvail ?? (isTerranova ? 8 : 6));
+  const spotsLeft = (e.status === 'cancelled' || e.spotsLeft === 'bloqueado')
+    ? ('bloqueado' as const)
+    : isSoldOut
+    ? ('completo' as const)
+    : (typeof e.spotsLeft === 'number' ? e.spotsLeft : availableSlots);
+
   return {
     ...e,
     name,
     vessel,
     vesselId,
     image,
+    availableSlots,
+    spotsLeft,
+    status: (isSoldOut && e.status !== 'cancelled') ? 'guaranteed' : (e.status || 'scheduled'),
   };
 };
 
@@ -472,6 +609,13 @@ export const expeditionService = {
             highlights: meta.highlights,
             includedServices: meta.includedServices,
             brochureUrl: meta.brochureUrl || meta.brochure_url,
+            totalSlots: meta.totalSlots !== undefined ? Number(meta.totalSlots) : undefined,
+            availableSlots: meta.availableSlots !== undefined ? Number(meta.availableSlots) : undefined,
+            status: meta.status,
+            pricePerPaxClp: meta.pricePerPaxClp !== undefined ? Number(meta.pricePerPaxClp) : undefined,
+            policies: meta.policies,
+            policyUrl: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
+            policy_url: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
           };
         });
       }
@@ -504,10 +648,13 @@ export const expeditionService = {
         tempEstimate: e.tempEstimate,
         brochureUrl: e.brochureUrl || (e as any).brochure_url,
         brochure_url: e.brochureUrl || (e as any).brochure_url,
+        policyUrl: cloudOverrides[e.id]?.policyUrl || e.policyUrl || (e as any).policy_url,
+        policy_url: cloudOverrides[e.id]?.policyUrl || e.policyUrl || (e as any).policy_url,
         bestViewTime: e.bestViewTime,
         isFeatured: e.isFeatured ?? false,
         highlights: e.highlights,
         includedServices: e.includedServices,
+        policies: e.policies || DEFAULT_EXPEDITION_POLICIES,
         route: EXPEDITION_ROUTES.find((r) => r.id === e.routeId) || {
           id: e.routeId,
           title: name,
@@ -539,8 +686,22 @@ export const expeditionService = {
           const routeLoc = cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández';
           const routeImg = cloud?.image || matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
 
+          const configuredRaw = cloud?.availableSlots !== undefined
+            ? cloud.availableSlots
+            : (d.available_slots !== undefined && d.available_slots !== null ? d.available_slots : matchedLocal?.availableSlots);
+          const availSlots = configuredRaw !== undefined && configuredRaw !== null && configuredRaw !== ''
+            ? Math.max(0, Number(configuredRaw))
+            : (d.total_slots || (isTerranova ? 8 : 6));
+          const isSoldOut = availSlots <= 0;
+          const effectiveStatus = (isSoldOut && (cloud?.status || d.status) !== 'cancelled')
+            ? 'guaranteed'
+            : (cloud?.status || d.status || 'scheduled');
+
           return {
             ...d,
+            available_slots: availSlots,
+            total_slots: cloud?.totalSlots !== undefined ? Number(cloud.totalSlots) : (d.total_slots || (isTerranova ? 8 : 6)),
+            status: effectiveStatus,
             name: routeName,
             location: routeLoc,
             image: routeImg,
@@ -552,6 +713,9 @@ export const expeditionService = {
             includedServices: cloud?.includedServices || matchedLocal?.includedServices,
             brochureUrl: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
             brochure_url: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
+            policies: cloud?.policies || matchedLocal?.policies || DEFAULT_EXPEDITION_POLICIES,
+            policyUrl: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
+            policy_url: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
             vessel_id: isTerranova ? 'terranova' : 'vegvisir',
             vessel: {
               id: isTerranova ? 'terranova' : 'vegvisir',
@@ -595,6 +759,13 @@ export const expeditionService = {
             highlights: meta.highlights,
             includedServices: meta.includedServices,
             brochureUrl: meta.brochureUrl || meta.brochure_url,
+            totalSlots: meta.totalSlots !== undefined ? Number(meta.totalSlots) : undefined,
+            availableSlots: meta.availableSlots !== undefined ? Number(meta.availableSlots) : undefined,
+            status: meta.status,
+            pricePerPaxClp: meta.pricePerPaxClp !== undefined ? Number(meta.pricePerPaxClp) : undefined,
+            policies: meta.policies,
+            policyUrl: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
+            policy_url: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
           };
         });
       }
@@ -618,9 +789,22 @@ export const expeditionService = {
           const routeTitle = cloud?.name || formatRouteDepartureTitle(d, matchedLocal);
           const depYear = parseInt(d.departure_date?.split('-')[0] || '2026', 10);
           const months = getMonthsFromDates(d.departure_date, d.return_date);
-          const isSoldOut = typeof d.available_slots === 'number' && d.available_slots <= 0;
-          const spots = isSoldOut ? 'completo' : d.status === 'cancelled' ? 'bloqueado' : d.available_slots;
-          const effectiveStatus = (isSoldOut && d.status !== 'cancelled') ? 'guaranteed' : (d.status || 'scheduled');
+
+          const configuredRaw = cloud?.availableSlots !== undefined
+            ? cloud.availableSlots
+            : (d.available_slots !== undefined && d.available_slots !== null ? d.available_slots : matchedLocal?.availableSlots);
+          const availSlots = configuredRaw !== undefined && configuredRaw !== null && configuredRaw !== ''
+            ? Math.max(0, Number(configuredRaw))
+            : (d.total_slots || (isTerranova ? 8 : 6));
+          const isSoldOut = availSlots <= 0;
+          const effectiveStatus = (isSoldOut && (cloud?.status || d.status) !== 'cancelled')
+            ? 'guaranteed'
+            : (cloud?.status || d.status || 'scheduled');
+          const spots = effectiveStatus === 'cancelled'
+            ? ('bloqueado' as const)
+            : isSoldOut
+            ? ('completo' as const)
+            : availSlots;
 
           return {
             id: d.id,
@@ -633,9 +817,9 @@ export const expeditionService = {
             monthsActive: months.length > 0 ? months : [10],
             year: isNaN(depYear) ? 2026 : depYear,
             spotsLeft: spots,
-            totalSlots: d.total_slots || (isTerranova ? 8 : 6),
-            availableSlots: d.available_slots ?? (isTerranova ? 8 : 6),
-            pricePerPaxClp: Number(d.price_per_pax_clp) || (isTerranova ? 2350000 : 1950000),
+            totalSlots: cloud?.totalSlots !== undefined ? Number(cloud.totalSlots) : (d.total_slots || (isTerranova ? 8 : 6)),
+            availableSlots: availSlots,
+            pricePerPaxClp: cloud?.pricePerPaxClp !== undefined ? Number(cloud.pricePerPaxClp) : (Number(d.price_per_pax_clp) || (isTerranova ? 2350000 : 1950000)),
             priceCharterFullClp: Number(d.price_charter_full_clp) || (isTerranova ? 18800000 : 11700000),
             vessel: vesselName,
             vesselId: vesselId,
@@ -649,6 +833,9 @@ export const expeditionService = {
             includedServices: cloud?.includedServices || matchedLocal?.includedServices,
             brochureUrl: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
             brochure_url: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
+            policyUrl: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
+            policy_url: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
+            policies: cloud?.policies || matchedLocal?.policies || DEFAULT_EXPEDITION_POLICIES,
             status: effectiveStatus,
           };
         });
@@ -665,8 +852,8 @@ export const expeditionService = {
     } catch {}
 
     const cached = getCachedPublicExpeditions();
-    if (cached.length > 0) return cached;
-    return local.map((l) => ({ ...l, image: normalizeExternalMediaUrl(l.image) }));
+    if (cached.length > 0) return cached.map(c => ({ ...c, policies: c.policies || DEFAULT_EXPEDITION_POLICIES }));
+    return local.map((l) => ({ ...l, image: normalizeExternalMediaUrl(l.image), policies: l.policies || DEFAULT_EXPEDITION_POLICIES }));
   },
 
   async getAllBookings(): Promise<ExpeditionBookingRow[]> {
@@ -835,6 +1022,37 @@ export const expeditionService = {
         } catch {}
       }
 
+      // Pre-validation: do not allow booking if expedition is sold out or has 0 available spots
+      const stored = getStoredDepartures();
+      const localDep = params.departureId ? stored.find(e => e.id === params.departureId) : undefined;
+      let availSpots = localDep ? getExpeditionAvailableSpots(localDep) : 8;
+
+      if (validDepartureId || params.departureDate || params.departureId) {
+        try {
+          let query = supabase.from('expedition_departures').select('id, available_slots, total_slots, status');
+          if (validDepartureId) {
+            query = query.eq('id', validDepartureId);
+          } else if (params.departureDate) {
+            query = query.eq('departure_date', params.departureDate);
+          }
+          const { data: depCheck } = await query.limit(1).maybeSingle();
+          if (depCheck) {
+            if (depCheck.available_slots !== null && depCheck.available_slots !== undefined && String(depCheck.available_slots).trim() !== '') {
+              availSpots = Math.max(0, Number(depCheck.available_slots));
+            } else if (depCheck.total_slots !== null && depCheck.total_slots !== undefined) {
+              availSpots = Math.max(0, Number(depCheck.total_slots));
+            }
+          }
+        } catch {}
+      }
+
+      if (availSpots <= 0) {
+        return {
+          success: false,
+          error: 'Esta expedición se encuentra completa (0 cupos disponibles). No es posible realizar reservas.',
+        };
+      }
+
       const validRouteId = (params.routeId && ['ruta-juan-fernandez', 'ruta-cabo-hornos', 'ruta-fiordos-glaciares', 'ruta-selkirk'].includes(params.routeId))
         ? params.routeId
         : 'ruta-juan-fernandez';
@@ -919,9 +1137,13 @@ export const expeditionService = {
             if (depData) {
               const currentAvail = depData.available_slots ?? depData.total_slots ?? 8;
               const nextAvail = Math.max(0, currentAvail - params.paxCount);
+              const depUpdatePayload: any = { available_slots: nextAvail };
+              if (nextAvail <= 0) {
+                depUpdatePayload.status = 'guaranteed';
+              }
               await supabase
                 .from('expedition_departures')
-                .update({ available_slots: nextAvail })
+                .update(depUpdatePayload)
                 .eq('id', validDepartureId);
             }
           }
@@ -941,11 +1163,34 @@ export const expeditionService = {
               ...e,
               availableSlots: nextAvail,
               spotsLeft: nextAvail === 0 ? ('completo' as const) : nextAvail,
+              status: (nextAvail === 0 && e.status !== 'cancelled') ? 'guaranteed' : e.status,
             };
           }
           return e;
         });
         saveStoredDepartures(updated);
+
+        try {
+          if (typeof window !== 'undefined') {
+            const cached = getCachedPublicExpeditions();
+            if (cached && cached.length > 0) {
+              const updatedCache = cached.map((c) => {
+                if (c.id === params.departureId) {
+                  const cur = typeof c.availableSlots === 'number' ? c.availableSlots : c.totalSlots;
+                  const nextAvail = Math.max(0, cur - params.paxCount);
+                  return {
+                    ...c,
+                    availableSlots: nextAvail,
+                    spotsLeft: nextAvail <= 0 ? ('completo' as const) : nextAvail,
+                    status: (nextAvail <= 0 && c.status !== 'cancelled') ? 'guaranteed' : c.status,
+                  };
+                }
+                return c;
+              });
+              localStorage.setItem(PUBLIC_EXPEDITIONS_CACHE_KEY, JSON.stringify(updatedCache));
+            }
+          }
+        } catch {}
       }
 
       // 3. Always save booking into localStorage for local instant sync & admin view
@@ -1185,6 +1430,8 @@ export const expeditionService = {
       publicHighlights?: string;
       publicIncludedServices?: string;
       publicBrochureUrl?: string;
+      publicPolicyUrl?: string;
+      publicPolicies?: ExpeditionPolicySection[] | string;
     }
   ): Promise<{ success: boolean; data?: DepartureRow; error?: string }> {
     try {
@@ -1193,18 +1440,21 @@ export const expeditionService = {
 
       // Update Supabase
       try {
+        const safeTotalSlots = params.totalSlots !== undefined ? Number(params.totalSlots) : undefined;
+        const safeAvailSlots = params.availableSlots !== undefined ? Math.max(0, Number(params.availableSlots)) : undefined;
+        const isSoldOutDb = safeAvailSlots !== undefined && safeAvailSlots <= 0;
+        const effectiveStatus = (isSoldOutDb && params.status !== 'cancelled') ? 'guaranteed' : params.status;
+
         const updateData: any = {};
         if (params.routeId) updateData.route_id = params.routeId;
         if (params.vesselId) updateData.vessel_id = params.vesselId;
         if (params.departureDate) updateData.departure_date = params.departureDate;
         if (params.returnDate) updateData.return_date = params.returnDate;
-        if (params.totalSlots !== undefined) updateData.total_slots = params.totalSlots;
-        if (params.availableSlots !== undefined) updateData.available_slots = params.availableSlots;
-        if (params.pricePerPaxClp !== undefined) updateData.price_per_pax_clp = params.pricePerPaxClp;
-        if (params.priceCharterFullClp !== undefined) updateData.price_charter_full_clp = params.priceCharterFullClp;
+        if (safeTotalSlots !== undefined) updateData.total_slots = safeTotalSlots;
+        if (safeAvailSlots !== undefined) updateData.available_slots = safeAvailSlots;
+        if (params.pricePerPaxClp !== undefined) updateData.price_per_pax_clp = Number(params.pricePerPaxClp);
+        if (params.priceCharterFullClp !== undefined) updateData.price_charter_full_clp = Number(params.priceCharterFullClp);
         if (params.publicBrochureUrl !== undefined) updateData.brochure_url = params.publicBrochureUrl;
-        const isSoldOutDb = params.availableSlots !== undefined && params.availableSlots <= 0;
-        const effectiveStatus = (isSoldOutDb && params.status !== 'cancelled') ? 'guaranteed' : params.status;
         if (effectiveStatus) updateData.status = effectiveStatus;
 
         await supabase
@@ -1225,8 +1475,8 @@ export const expeditionService = {
           const endFormatted = retDate ? formatDateSpan(retDate) : e.endDate;
           const months = depDate && retDate ? getMonthsFromDates(depDate, retDate) : e.monthsActive;
           const year = depDate ? parseInt(depDate.split('-')[0], 10) || e.year : e.year;
-          const totSlots = params.totalSlots !== undefined ? params.totalSlots : e.totalSlots;
-          const availSlots = params.availableSlots !== undefined ? params.availableSlots : e.availableSlots;
+          const totSlots = params.totalSlots !== undefined ? Number(params.totalSlots) : e.totalSlots;
+          const availSlots = params.availableSlots !== undefined ? Math.max(0, Number(params.availableSlots)) : e.availableSlots;
           const isSoldOut = availSlots <= 0;
           const stat = (isSoldOut && (params.status || e.status) !== 'cancelled') ? 'guaranteed' : (params.status || e.status);
 
@@ -1246,8 +1496,8 @@ export const expeditionService = {
             totalSlots: totSlots,
             availableSlots: availSlots,
             spotsLeft: stat === 'cancelled' ? ('bloqueado' as const) : availSlots <= 0 ? ('completo' as const) : availSlots,
-            pricePerPaxClp: params.pricePerPaxClp !== undefined ? params.pricePerPaxClp : e.pricePerPaxClp,
-            priceCharterFullClp: params.priceCharterFullClp !== undefined ? params.priceCharterFullClp : e.priceCharterFullClp,
+            pricePerPaxClp: params.pricePerPaxClp !== undefined ? Number(params.pricePerPaxClp) : e.pricePerPaxClp,
+            priceCharterFullClp: params.priceCharterFullClp !== undefined ? Number(params.priceCharterFullClp) : e.priceCharterFullClp,
             status: stat,
             description: params.publicDescription !== undefined ? params.publicDescription : e.description,
             location: params.publicLocation !== undefined ? params.publicLocation : e.location,
@@ -1257,6 +1507,9 @@ export const expeditionService = {
             includedServices: params.publicIncludedServices !== undefined ? params.publicIncludedServices : e.includedServices,
             brochureUrl: params.publicBrochureUrl !== undefined ? params.publicBrochureUrl : e.brochureUrl,
             brochure_url: params.publicBrochureUrl !== undefined ? params.publicBrochureUrl : (e as any).brochure_url,
+            policyUrl: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (e.policyUrl || (e as any).policy_url),
+            policy_url: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (e.policyUrl || (e as any).policy_url),
+            policies: params.publicPolicies !== undefined ? params.publicPolicies : (e as any).policies,
           };
         }
         return e;
@@ -1265,8 +1518,8 @@ export const expeditionService = {
       if (!found) {
         const depDate = params.departureDate || '2026-10-01';
         const retDate = params.returnDate || '2026-10-08';
-        const totSlots = params.totalSlots ?? 6;
-        const availSlots = params.availableSlots ?? 6;
+        const totSlots = params.totalSlots !== undefined ? Number(params.totalSlots) : 6;
+        const availSlots = params.availableSlots !== undefined ? Math.max(0, Number(params.availableSlots)) : 6;
         const isSoldOut = availSlots <= 0;
         const stat = (isSoldOut && params.status !== 'cancelled') ? 'guaranteed' : (params.status || 'scheduled');
         updated.push({
@@ -1282,8 +1535,8 @@ export const expeditionService = {
           spotsLeft: stat === 'cancelled' ? 'bloqueado' : isSoldOut ? 'completo' : availSlots,
           totalSlots: totSlots,
           availableSlots: availSlots,
-          pricePerPaxClp: params.pricePerPaxClp ?? 1950000,
-          priceCharterFullClp: params.priceCharterFullClp ?? 11700000,
+          pricePerPaxClp: params.pricePerPaxClp !== undefined ? Number(params.pricePerPaxClp) : 1950000,
+          priceCharterFullClp: params.priceCharterFullClp !== undefined ? Number(params.priceCharterFullClp) : 11700000,
           vessel: vesselName,
           vesselId: params.vesselId || 'vegvisir',
           routeId: params.routeId || 'ruta-juan-fernandez',
@@ -1296,14 +1549,21 @@ export const expeditionService = {
           includedServices: params.publicIncludedServices,
           brochureUrl: params.publicBrochureUrl,
           brochure_url: params.publicBrochureUrl,
+          policyUrl: params.publicPolicyUrl,
+          policy_url: params.publicPolicyUrl,
+          policies: params.publicPolicies !== undefined ? params.publicPolicies : DEFAULT_EXPEDITION_POLICIES,
         });
       }
 
       saveStoredDepartures(updated);
 
-      // Persist custom fields (cover image, highlights, description, brochureUrl, etc.) to Supabase site_content table
+      // Persist custom fields (cover image, highlights, capacity, brochureUrl, etc.) to Supabase site_content table
       try {
         const normImg = params.publicCoverImage !== undefined ? normalizeExternalMediaUrl(params.publicCoverImage) : undefined;
+        const safeAvail = params.availableSlots !== undefined ? Math.max(0, Number(params.availableSlots)) : undefined;
+        const isSoldOutLocal = safeAvail !== undefined && safeAvail <= 0;
+        const effectiveStatusMeta = (isSoldOutLocal && params.status !== 'cancelled') ? 'guaranteed' : params.status;
+
         const metaPayload: Record<string, any> = {
           departureId,
           updated_at: new Date().toISOString(),
@@ -1317,6 +1577,19 @@ export const expeditionService = {
         if (params.publicHighlights !== undefined) metaPayload.highlights = params.publicHighlights;
         if (params.publicIncludedServices !== undefined) metaPayload.includedServices = params.publicIncludedServices;
         if (params.publicBrochureUrl !== undefined) metaPayload.brochureUrl = params.publicBrochureUrl;
+        if (params.publicPolicyUrl !== undefined) {
+          metaPayload.policyUrl = params.publicPolicyUrl;
+          metaPayload.policy_url = params.publicPolicyUrl;
+        }
+        if (params.publicPolicies !== undefined) metaPayload.policies = params.publicPolicies;
+        if (params.totalSlots !== undefined) metaPayload.totalSlots = Number(params.totalSlots);
+        if (safeAvail !== undefined) {
+          metaPayload.availableSlots = safeAvail;
+          metaPayload.spotsLeft = safeAvail <= 0 ? 'completo' : safeAvail;
+        }
+        if (effectiveStatusMeta !== undefined) metaPayload.status = effectiveStatusMeta;
+        if (params.pricePerPaxClp !== undefined) metaPayload.pricePerPaxClp = Number(params.pricePerPaxClp);
+        if (params.priceCharterFullClp !== undefined) metaPayload.priceCharterFullClp = Number(params.priceCharterFullClp);
 
         await supabase
           .from('site_content')
@@ -1332,7 +1605,58 @@ export const expeditionService = {
         console.warn('Could not sync departure to Supabase site_content:', err);
       }
 
-      return { success: true };
+      // Sync PUBLIC_EXPEDITIONS_CACHE_KEY in localStorage for instant frontend update
+      try {
+        if (typeof window !== 'undefined') {
+          const cached = getCachedPublicExpeditions();
+          if (cached && cached.length > 0) {
+            const safeAvail = params.availableSlots !== undefined ? Math.max(0, Number(params.availableSlots)) : undefined;
+            const updatedCache = cached.map((c) => {
+              if (c.id === departureId) {
+                const depDate = params.departureDate || c.departureDate;
+                const retDate = params.returnDate || c.returnDate;
+                const totSlots = params.totalSlots !== undefined ? Number(params.totalSlots) : c.totalSlots;
+                const availSlots = safeAvail !== undefined ? safeAvail : c.availableSlots;
+                const isSoldOut = availSlots <= 0;
+                const stat = (isSoldOut && (params.status || c.status) !== 'cancelled') ? 'guaranteed' : (params.status || c.status);
+                return {
+                  ...c,
+                  name: params.publicName || c.name,
+                  headline: params.publicHeadline !== undefined ? params.publicHeadline : c.headline,
+                  vessel: params.vesselId ? vesselName : c.vessel,
+                  vesselId: params.vesselId || c.vesselId,
+                  routeId: params.routeId || c.routeId,
+                  departureDate: depDate,
+                  returnDate: retDate,
+                  totalSlots: totSlots,
+                  availableSlots: availSlots,
+                  spotsLeft: stat === 'cancelled' ? ('bloqueado' as const) : isSoldOut ? ('completo' as const) : availSlots,
+                  status: stat,
+                  pricePerPaxClp: params.pricePerPaxClp !== undefined ? Number(params.pricePerPaxClp) : c.pricePerPaxClp,
+                  priceCharterFullClp: params.priceCharterFullClp !== undefined ? Number(params.priceCharterFullClp) : c.priceCharterFullClp,
+                  description: params.publicDescription !== undefined ? params.publicDescription : c.description,
+                  location: params.publicLocation !== undefined ? params.publicLocation : c.location,
+                  image: params.publicCoverImage !== undefined ? normalizeExternalMediaUrl(params.publicCoverImage) : c.image,
+                  tempEstimate: params.publicTempEstimate !== undefined ? params.publicTempEstimate : c.tempEstimate,
+                  highlights: params.publicHighlights !== undefined ? params.publicHighlights : c.highlights,
+                  includedServices: params.publicIncludedServices !== undefined ? params.publicIncludedServices : c.includedServices,
+                  brochureUrl: params.publicBrochureUrl !== undefined ? params.publicBrochureUrl : c.brochureUrl,
+                  policyUrl: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (c.policyUrl || (c as any).policy_url),
+                  policy_url: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (c.policyUrl || (c as any).policy_url),
+                  policies: params.publicPolicies !== undefined ? params.publicPolicies : (c as any).policies,
+                };
+              }
+              return c;
+            });
+            localStorage.setItem(PUBLIC_EXPEDITIONS_CACHE_KEY, JSON.stringify(updatedCache));
+          }
+        }
+      } catch {}
+
+      return { 
+        success: true,
+        data: updated.find((e) => e.id === departureId) as any
+      };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
