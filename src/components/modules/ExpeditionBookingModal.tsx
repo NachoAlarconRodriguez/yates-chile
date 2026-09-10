@@ -1275,40 +1275,27 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
               </p>
             </div>
 
-            {/* Actions: Green WhatsApp Button & Elegant Brochure Link */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md">
-              {/* Official Green WhatsApp CTA */}
+            {/* Actions: WhatsApp CTA & Elegant Close Button Side-by-Side */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-sm sm:max-w-md">
+              {/* WhatsApp CTA */}
               <a
                 href={`https://wa.me/56981312920?text=${whatsappMessage}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs uppercase tracking-wider font-bold px-6 py-3.5 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] cursor-pointer"
+                className="group flex-1 w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white text-xs sm:text-sm font-semibold px-5 py-3 rounded-2xl shadow-lg shadow-emerald-950/50 hover:shadow-emerald-500/20 border border-emerald-400/20 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
               >
-                <WhatsAppIcon className="w-4 h-4 text-white" />
-                <span>Enviar Comprobante vía WhatsApp</span>
+                <WhatsAppIcon className="w-4 h-4 text-white group-hover:scale-110 transition-transform duration-200" />
+                <span>Enviar WhatsApp</span>
               </a>
 
-              {/* Elegant Brochure Link */}
-              <a
-                href="/brochure-yates-chile.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-mono uppercase tracking-widest text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/15 px-5 py-3 rounded-xl transition cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-300" />
-                <span>Descargar Itinerario (PDF)</span>
-              </a>
-            </div>
-
-            {/* Bottom Dismiss Button */}
-            <div className="pt-2">
+              {/* Elegant Close / Return Button */}
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-slate-300 hover:text-white text-xs font-mono uppercase tracking-wider transition cursor-pointer border border-white/15 active:scale-95 shadow-sm"
+                className="group flex-1 w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 hover:text-white text-xs sm:text-sm font-medium border border-white/15 hover:border-white/30 backdrop-blur-md px-5 py-3 rounded-2xl shadow-sm transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
-                <span>Cerrar y volver al sitio web</span>
+                <X className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
+                <span>Volver al Sitio</span>
               </button>
             </div>
 

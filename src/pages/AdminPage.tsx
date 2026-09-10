@@ -3734,6 +3734,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       });
     }
 
+    try {
+      localStorage.removeItem('yates_public_expeditions_cache');
+      window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
+    } catch {}
+
     if (res.success) {
       await fetchAllData();
       setActionMessage('Estado de pago y CRM actualizados correctamente.');

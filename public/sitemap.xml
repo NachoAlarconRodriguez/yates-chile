@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <!-- Página Principal -->
+  <url>
+    <loc>https://yateschile.cl/</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://yateschile.cl/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://yateschile.cl/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://yateschile.cl/" />
+  </url>
+
+  <!-- Calendario Oficial de Expediciones -->
+  <url>
+    <loc>https://yateschile.cl/expediciones</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://yateschile.cl/expediciones" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://yateschile.cl/expediciones?lang=en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://yateschile.cl/expediciones" />
+  </url>
+
+  <!-- La Flota Oceánica -->
+  <url>
+    <loc>https://yateschile.cl/flota</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.90</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://yateschile.cl/flota" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://yateschile.cl/flota?lang=en" />
+  </url>
+
+  <!-- Ficha Técnica: Velero Vegvisir (Dufour 52.5 ft) -->
+  <url>
+    <loc>https://yateschile.cl/flota/vegvisir</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- Ficha Técnica: Yate Terranova (Hatteras 65 ft LRC) -->
+  <url>
+    <loc>https://yateschile.cl/flota/terranova</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- El Lodge Cabo de Hornos -->
+  <url>
+    <loc>https://yateschile.cl/lodge</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.90</priority>
+    <xhtml:link rel="alternate" hreflang="es" href="https://yateschile.cl/lodge" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://yateschile.cl/lodge?lang=en" />
+  </url>
+
+  <!-- Contacto & Concierge Privado -->
+  <url>
+    <loc>https://yateschile.cl/contacto</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
+
+</urlset>

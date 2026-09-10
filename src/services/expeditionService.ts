@@ -675,6 +675,19 @@ export const expeditionService = {
         .select('*, route:expedition_routes(*), vessel:vessels(*)')
         .order('departure_date', { ascending: true });
 
+      const { data: allBookingsData } = await supabase
+        .from('expedition_bookings')
+        .select('id, departure_id, pax_count, status')
+        .neq('status', 'cancelled');
+
+      let localBookings: any[] = [];
+      try {
+        if (typeof window !== 'undefined') {
+          const rawB = localStorage.getItem('yates_bookings');
+          if (rawB) localBookings = JSON.parse(rawB);
+        }
+      } catch {}
+
       if (!error && data && data.length > 0) {
         const mappedDb = (data as any[]).map((d) => {
           const matchedLocal = local.find((l) => l.id === d.id);
@@ -686,13 +699,40 @@ export const expeditionService = {
           const routeLoc = cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández';
           const routeImg = cloud?.image || matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
 
+          const matchedDbBookings = (allBookingsData || []).filter(
+            (b: any) => b.departure_id === d.id && b.status !== 'cancelled'
+          );
+          const allDepBookings = [...matchedDbBookings];
+          localBookings.forEach((lb: any) => {
+            if (
+              (lb.departure_id === d.id || lb.departureId === d.id) &&
+              lb.status !== 'cancelled' &&
+              !allDepBookings.some((b) => b.id === lb.id || (b as any).booking_code === lb.booking_code)
+            ) {
+              allDepBookings.push(lb);
+            }
+          });
+
+          const realBookedPax = allDepBookings.reduce(
+            (sum: number, b: any) => sum + (Number(b.pax_count) || 1),
+            0
+          );
+          const totalSlots = cloud?.totalSlots !== undefined
+            ? Number(cloud.totalSlots)
+            : (d.total_slots || (isTerranova ? 8 : 6));
+          const calculatedAvail = Math.max(0, totalSlots - realBookedPax);
+
           const configuredRaw = cloud?.availableSlots !== undefined
             ? cloud.availableSlots
             : (d.available_slots !== undefined && d.available_slots !== null ? d.available_slots : matchedLocal?.availableSlots);
-          const availSlots = configuredRaw !== undefined && configuredRaw !== null && configuredRaw !== ''
+          const configuredAvail = configuredRaw !== undefined && configuredRaw !== null && String(configuredRaw).trim() !== ''
             ? Math.max(0, Number(configuredRaw))
-            : (d.total_slots || (isTerranova ? 8 : 6));
-          const isSoldOut = availSlots <= 0;
+            : undefined;
+
+          const availSlots = configuredAvail !== undefined
+            ? Math.min(configuredAvail, calculatedAvail)
+            : calculatedAvail;
+          const isSoldOut = availSlots <= 0 || realBookedPax >= totalSlots;
           const effectiveStatus = (isSoldOut && (cloud?.status || d.status) !== 'cancelled')
             ? 'guaranteed'
             : (cloud?.status || d.status || 'scheduled');
@@ -779,6 +819,19 @@ export const expeditionService = {
         .gte('return_date', todayIso)
         .order('departure_date', { ascending: true });
 
+      const { data: allBookingsData } = await supabase
+        .from('expedition_bookings')
+        .select('id, departure_id, pax_count, status')
+        .neq('status', 'cancelled');
+
+      let localBookings: any[] = [];
+      try {
+        if (typeof window !== 'undefined') {
+          const rawB = localStorage.getItem('yates_bookings');
+          if (rawB) localBookings = JSON.parse(rawB);
+        }
+      } catch {}
+
       if (!error && data && data.length > 0) {
         const mapped: PublicExpedition[] = data.map((d: any) => {
           const matchedLocal = local.find((l) => l.id === d.id);
@@ -790,13 +843,40 @@ export const expeditionService = {
           const depYear = parseInt(d.departure_date?.split('-')[0] || '2026', 10);
           const months = getMonthsFromDates(d.departure_date, d.return_date);
 
+          const matchedDbBookings = (allBookingsData || []).filter(
+            (b: any) => b.departure_id === d.id && b.status !== 'cancelled'
+          );
+          const allDepBookings = [...matchedDbBookings];
+          localBookings.forEach((lb: any) => {
+            if (
+              (lb.departure_id === d.id || lb.departureId === d.id) &&
+              lb.status !== 'cancelled' &&
+              !allDepBookings.some((b) => b.id === lb.id || (b as any).booking_code === lb.booking_code)
+            ) {
+              allDepBookings.push(lb);
+            }
+          });
+
+          const realBookedPax = allDepBookings.reduce(
+            (sum: number, b: any) => sum + (Number(b.pax_count) || 1),
+            0
+          );
+          const totalSlots = cloud?.totalSlots !== undefined
+            ? Number(cloud.totalSlots)
+            : (d.total_slots || (isTerranova ? 8 : 6));
+          const calculatedAvail = Math.max(0, totalSlots - realBookedPax);
+
           const configuredRaw = cloud?.availableSlots !== undefined
             ? cloud.availableSlots
             : (d.available_slots !== undefined && d.available_slots !== null ? d.available_slots : matchedLocal?.availableSlots);
-          const availSlots = configuredRaw !== undefined && configuredRaw !== null && configuredRaw !== ''
+          const configuredAvail = configuredRaw !== undefined && configuredRaw !== null && String(configuredRaw).trim() !== ''
             ? Math.max(0, Number(configuredRaw))
-            : (d.total_slots || (isTerranova ? 8 : 6));
-          const isSoldOut = availSlots <= 0;
+            : undefined;
+
+          const availSlots = configuredAvail !== undefined
+            ? Math.min(configuredAvail, calculatedAvail)
+            : calculatedAvail;
+          const isSoldOut = availSlots <= 0 || realBookedPax >= totalSlots;
           const effectiveStatus = (isSoldOut && (cloud?.status || d.status) !== 'cancelled')
             ? 'guaranteed'
             : (cloud?.status || d.status || 'scheduled');
@@ -1145,6 +1225,36 @@ export const expeditionService = {
                 .from('expedition_departures')
                 .update(depUpdatePayload)
                 .eq('id', validDepartureId);
+
+              // Also sync site_content to prevent stale metadata overrides
+              try {
+                const { data: scData } = await supabase
+                  .from('site_content')
+                  .select('metadata')
+                  .eq('section_key', `expedition_departure_${validDepartureId}`)
+                  .maybeSingle();
+                if (scData) {
+                  const existingMeta = (scData.metadata && typeof scData.metadata === 'object' && !Array.isArray(scData.metadata))
+                    ? (scData.metadata as Record<string, any>)
+                    : {};
+                  const updatedMeta = {
+                    ...existingMeta,
+                    availableSlots: nextAvail,
+                    spotsLeft: nextAvail <= 0 ? 'completo' : nextAvail,
+                    status: nextAvail <= 0 ? 'guaranteed' : (existingMeta.status || 'scheduled'),
+                  };
+                  await supabase
+                    .from('site_content')
+                    .update({ metadata: updatedMeta, updated_at: new Date().toISOString() })
+                    .eq('section_key', `expedition_departure_${validDepartureId}`);
+                }
+              } catch {}
+
+              try {
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem(PUBLIC_EXPEDITIONS_CACHE_KEY);
+                }
+              } catch {}
             }
           }
         }
@@ -1947,6 +2057,35 @@ export const expeditionService = {
               .from('expedition_departures')
               .update({ available_slots: restored })
               .eq('id', targetDepartureId);
+
+            try {
+              const { data: scData } = await supabase
+                .from('site_content')
+                .select('metadata')
+                .eq('section_key', `expedition_departure_${targetDepartureId}`)
+                .maybeSingle();
+              if (scData) {
+                const existingMeta = (scData.metadata && typeof scData.metadata === 'object' && !Array.isArray(scData.metadata))
+                  ? (scData.metadata as Record<string, any>)
+                  : {};
+                const updatedMeta = {
+                  ...existingMeta,
+                  availableSlots: restored,
+                  spotsLeft: restored <= 0 ? 'completo' : restored,
+                  status: restored <= 0 ? 'guaranteed' : (existingMeta.status || 'scheduled'),
+                };
+                await supabase
+                  .from('site_content')
+                  .update({ metadata: updatedMeta, updated_at: new Date().toISOString() })
+                  .eq('section_key', `expedition_departure_${targetDepartureId}`);
+              }
+            } catch {}
+
+            try {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem(PUBLIC_EXPEDITIONS_CACHE_KEY);
+              }
+            } catch {}
           }
         } catch (depErr) {
           console.warn('Error restoring departure slots:', depErr);

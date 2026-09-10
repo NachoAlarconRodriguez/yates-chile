@@ -1,0 +1,55 @@
+# ==============================================================================
+# Robots.txt for Yates Chile — Expediciones Marítimas de Ultralujo & Lodge
+# https://yateschile.cl
+# ==============================================================================
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /api/*
+
+# ------------------------------------------------------------------------------
+# Generative AI & Answer Engine Bots (AEO & GEO Optimization)
+# Permitted to index, cite, and reference authoritative factual data
+# ------------------------------------------------------------------------------
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /admin
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /admin
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /admin
+
+User-agent: Amazonbot
+Allow: /
+Disallow: /admin
+
+User-agent: CCBot
+Allow: /
+Disallow: /admin
+
+# ------------------------------------------------------------------------------
+# XML Sitemap Reference
+# ------------------------------------------------------------------------------
+Sitemap: https://yateschile.cl/sitemap.xml
