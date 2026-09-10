@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Anchor, Compass, Sparkles, Calendar, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Anchor, Compass, Sparkles, Calendar, ArrowRight, Clock } from 'lucide-react';
 import { useExpeditions } from '../../hooks/useExpeditions';
 import { useLanguage } from '../../context/LanguageContext';
 import { translationService } from '../../services/translationService';
 import type { PublicExpedition } from '../../services/expeditionService';
 import { ExpeditionBookingModal } from './ExpeditionBookingModal';
+import { isMediaVideo, getMediaFallbackUrl } from '../../services/cmsService';
 
 interface Slide {
   id: string;
@@ -15,16 +16,13 @@ interface Slide {
   description: string;
   bgImage: string;
   expedition: PublicExpedition;
+  isSoldOut: boolean;
+  spots: number;
 }
 
 interface HeroCarouselProps {
   onNavigate: (path: string) => void;
 }
-
-const isMediaVideo = (url?: string | null) => {
-  if (!url) return false;
-  return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') || url.includes('video/');
-};
 
 export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -55,11 +53,12 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
 
     return selected.map((exp, idx) => {
       const spots = typeof exp.spotsLeft === 'number' ? exp.spotsLeft : (exp.availableSlots ?? 0);
+      const isSoldOut = spots <= 0 || exp.spotsLeft === 'completo';
       const spotsText =
-        spots === 1
-          ? (isEn ? '1 SPOT AVAILABLE' : '1 CUPO DISPONIBLE')
-          : spots === 0 || exp.spotsLeft === 'completo'
+        isSoldOut
           ? (isEn ? 'SOLD OUT' : 'CUPOS AGOTADOS')
+          : spots === 1
+          ? (isEn ? '1 SPOT AVAILABLE' : '1 CUPO DISPONIBLE')
           : `${spots} ${isEn ? 'SPOTS AVAILABLE' : 'CUPOS DISPONIBLES'}`;
 
       let icon = <Compass className="w-3.5 h-3.5 text-amber-400" />;
@@ -83,6 +82,8 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
         description: expDesc,
         bgImage: exp.image || '/travesia-robinson.jpg',
         expedition: exp,
+        isSoldOut,
+        spots,
       };
     });
   }, [expeditions, isEn]);
@@ -178,7 +179,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = '/travesia-robinson.jpg';
+                (e.target as HTMLImageElement).src = getMediaFallbackUrl(s.bgImage) || '/travesia-robinson.jpg';
               }}
             />
           )}
@@ -216,13 +217,27 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
 
           {/* Action CTAs */}
           <div className="pt-2 flex items-center gap-2.5 sm:gap-3 flex-wrap pb-10 sm:pb-0">
-            <button
-              onClick={() => handleBookExpedition(slide)}
-              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-4 sm:px-5 py-3 rounded-xl transition-all shadow-lg text-xs min-h-[46px] border border-white/90 cursor-pointer active:scale-95"
-            >
-              <Compass className="w-4 h-4 text-slate-950" />
-              <span>{t('Reservar Cupo en esta Expedición', 'Book Spot on this Expedition')}</span>
-            </button>
+            {slide.isSoldOut ? (
+              <a
+                href={`https://wa.me/56981312920?text=${encodeURIComponent(
+                  `Hola Concierge Yates Chile, quisiera consultar por la lista de espera para la expedición "${slide.expedition.name}" (${slide.expedition.startDate} al ${slide.expedition.endDate}).`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-900 text-amber-300 hover:text-amber-200 font-extrabold px-4 sm:px-5 py-3 rounded-xl transition-all shadow-lg text-xs min-h-[46px] border border-amber-400/40 cursor-pointer active:scale-95 backdrop-blur-sm"
+              >
+                <Clock className="w-4 h-4 text-amber-300 shrink-0" />
+                <span>{t('Salida Completa • Lista de Espera', 'Sold Out • Join Waitlist')}</span>
+              </a>
+            ) : (
+              <button
+                onClick={() => handleBookExpedition(slide)}
+                className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-4 sm:px-5 py-3 rounded-xl transition-all shadow-lg text-xs min-h-[46px] border border-white/90 cursor-pointer active:scale-95"
+              >
+                <Compass className="w-4 h-4 text-slate-950" />
+                <span>{t('Reservar Cupo en esta Expedición', 'Book Spot on this Expedition')}</span>
+              </button>
+            )}
 
             <button
               onClick={() => onNavigate('/expediciones')}

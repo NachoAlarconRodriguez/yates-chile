@@ -562,17 +562,41 @@ export const cmsService = {
 
   async uploadMedia(file: File): Promise<{ success: boolean; url?: string; error?: string }> {
     try {
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const path = `cms/${Date.now()}_${sanitizedName}`;
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v|ogv)$/i.test(file.name);
+      let fileToUpload = file;
+      if (!isVideo) {
+        const { compressImageFile } = await import('../lib/imageCompressor');
+        fileToUpload = await compressImageFile(file, { maxWidth: 1920, quality: 0.82 });
+      }
+      const sanitizedName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const folder = isVideo ? 'videos' : 'cms';
+      const path = `${folder}/${Date.now()}_${sanitizedName}`;
 
       const { data, error } = await supabase.storage
         .from('site-media')
-        .upload(path, file, { upsert: true });
+        .upload(path, fileToUpload, { upsert: true, cacheControl: '31536000' });
 
       if (error) return { success: false, error: error.message };
 
       const { data: publicData } = supabase.storage.from('site-media').getPublicUrl(data.path);
       return { success: true, url: publicData.publicUrl };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  async ingestExternalVideo(videoUrl: string): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+      const directUrl = normalizeExternalMediaUrl(videoUrl);
+      const res = await fetch(directUrl);
+      if (!res.ok) {
+        throw new Error(`Error de descarga del video original (HTTP ${res.status})`);
+      }
+      const blob = await res.blob();
+      const isMov = directUrl.includes('.mov') || blob.type.includes('quicktime');
+      const ext = directUrl.includes('.webm') ? 'webm' : isMov ? 'mov' : 'mp4';
+      const file = new File([blob], `video_${Date.now()}.${ext}`, { type: blob.type || 'video/mp4' });
+      return await this.uploadMedia(file);
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
@@ -588,6 +612,7 @@ export interface MediaUrlDiagnosis {
   isDropboxFolder: boolean;
   isGoogleDriveFolder: boolean;
   isHeic: boolean;
+  isVideo: boolean;
   isValidFormat: boolean;
   warning?: {
     level: 'error' | 'warning' | 'info';
@@ -596,6 +621,41 @@ export interface MediaUrlDiagnosis {
     actionHint?: string;
   };
 }
+
+/**
+ * Detects whether a URL represents a video asset based on extension or media stream indicators,
+ * safely handling query parameters (e.g. ?raw=1, ?rlkey=...).
+ */
+export const isMediaVideo = (url?: string | null): boolean => {
+  if (!url) return false;
+  const clean = url.split(/[?#]/)[0].toLowerCase();
+  return (
+    clean.endsWith('.mp4') ||
+    clean.endsWith('.webm') ||
+    clean.endsWith('.mov') ||
+    clean.endsWith('.m4v') ||
+    clean.endsWith('.ogv') ||
+    clean.endsWith('.ogg') ||
+    url.includes('/video/') ||
+    url.includes('videos/') ||
+    /\.(mp4|webm|mov|m4v)($|\?)/i.test(url)
+  );
+};
+
+/**
+ * Recovers the fallback origin URL in case a CDN proxy (like wsrv.nl) fails or is blocked.
+ */
+export const getMediaFallbackUrl = (url?: string | null): string => {
+  if (!url) return '';
+  if (url.includes('wsrv.nl/?url=')) {
+    try {
+      const parsed = new URL(url);
+      const origin = parsed.searchParams.get('url');
+      if (origin) return decodeURIComponent(origin);
+    } catch (_) {}
+  }
+  return url;
+};
 
 /**
  * Diagnoses an external media URL to alert users in real time about folders,
@@ -609,6 +669,7 @@ export const diagnoseMediaUrl = (url?: string | null): MediaUrlDiagnosis => {
       isDropboxFolder: false,
       isGoogleDriveFolder: false,
       isHeic: false,
+      isVideo: false,
       isValidFormat: true,
     };
   }
@@ -618,12 +679,13 @@ export const diagnoseMediaUrl = (url?: string | null): MediaUrlDiagnosis => {
 
   const isDropbox = lower.includes('dropbox.com') || lower.includes('dropboxusercontent.com');
   const isGoogleDrive = lower.includes('drive.google.com') || lower.includes('googleusercontent.com');
+  const isVideo = isMediaVideo(raw);
 
   // Check for Apple iPhone HEIC/HEIF photo format (unsupported in web browsers)
   const isHeic = /\.heic($|\?)/i.test(raw);
 
   // Check for Dropbox folder links (/scl/fo/ or /sh/) without a direct image extension
-  const hasImageExt = /\.(jpe?g|png|webp|avif|gif)($|\?)/i.test(raw);
+  const hasImageExt = /\.(jpe?g|png|webp|avif|gif|mp4|mov|webm)($|\?)/i.test(raw);
   const isDropboxFolder = isDropbox && (raw.includes('/scl/fo/') || raw.includes('/sh/')) && !hasImageExt;
 
   // Check for Google Drive folder links (/drive/folders/ or /drive/u/X/folders/)
@@ -642,21 +704,33 @@ export const diagnoseMediaUrl = (url?: string | null): MediaUrlDiagnosis => {
     warning = {
       level: 'warning',
       title: 'Enlace de Carpeta de Dropbox detectado (/scl/fo/)',
-      description: 'Has pegado el enlace de una CARPETA compartida en lugar del archivo directo de la foto. El navegador no puede cargar una carpeta como si fuera una imagen.',
-      actionHint: 'Entra a Dropbox, haz clic en la foto específica (o en sus 3 puntos •••) y selecciona "Copiar vínculo" (el enlace debe contener /scl/fi/ o terminar en el nombre de la foto .JPG).',
+      description: 'Has pegado el enlace de una CARPETA compartida en lugar del archivo directo. El navegador no puede cargar una carpeta como un archivo multimedia.',
+      actionHint: 'Entra a Dropbox, haz clic en la foto o video específico y selecciona "Copiar vínculo" (debe contener /scl/fi/ o terminar en el nombre del archivo con extensión).',
     };
   } else if (isGoogleDriveFolder) {
     warning = {
       level: 'warning',
       title: 'Enlace de Carpeta de Google Drive detectado',
-      description: 'Has pegado el enlace de una carpeta de Google Drive. Se requiere el enlace directo a una imagen individual.',
-      actionHint: 'Dentro de Google Drive, haz clic derecho sobre la foto específica > "Compartir" > "Copiar enlace".',
+      description: 'Has pegado el enlace de una carpeta de Google Drive. Se requiere el enlace directo a un archivo individual.',
+      actionHint: 'Dentro de Google Drive, haz clic derecho sobre el archivo específico > "Compartir" > "Copiar enlace".',
     };
-  } else if (isGoogleDrive) {
+  } else if (isDropbox && isVideo) {
     warning = {
       level: 'info',
-      title: 'Enlace de Google Drive conectado',
-      description: 'Asegúrate de que la foto tenga el "Acceso general" configurado en "Cualquier persona con el enlace" (Lector) en Google Drive para que todos los visitantes puedan verla.',
+      title: 'Video de Dropbox detectado',
+      description: 'El enlace se configuró para streaming directo (?raw=1). Si deseas máxima velocidad, puedes usar el botón de Acelerar Video.',
+    };
+  } else if (isDropbox && !isVideo) {
+    warning = {
+      level: 'info',
+      title: 'Imagen de Dropbox optimizada automáticamente',
+      description: 'El enlace se convertirá en WebP de carga rápida con caché en Cloudflare (1 año), protegiendo tu cuenta de Dropbox de límites de descarga.',
+    };
+  } else if (isGoogleDrive && !isVideo) {
+    warning = {
+      level: 'info',
+      title: 'Imagen de Google Drive conectada con CDN Fife',
+      description: 'Se optimizará automáticamente en WebP hasta 1920px. Recuerda que el archivo debe tener permiso "Cualquier persona con el enlace".',
     };
   }
 
@@ -668,47 +742,87 @@ export const diagnoseMediaUrl = (url?: string | null): MediaUrlDiagnosis => {
     isDropboxFolder,
     isGoogleDriveFolder,
     isHeic,
+    isVideo,
     isValidFormat,
     warning,
   };
 };
 
 /**
- * Normalizes image and media URLs from third-party hosting services (Dropbox, Google Drive, etc.)
- * into directly embeddable/renderable asset links for <img> and <video> tags.
+ * Normalizes and automatically optimizes image and media URLs from third-party hosting services
+ * (Dropbox, Google Drive, etc.) into high-speed, CDN-cached, embeddable asset links.
+ *
+ * For Images:
+ * - Google Drive: Upgrades to Google's Fife CDN (lh3.googleusercontent.com/d/{ID}=w1920-rw) for instant WebP delivery.
+ * - Dropbox: Converts to raw stream and proxies via Cloudflare edge optimizer (wsrv.nl?output=webp&w=1920&q=82)
+ *   with 1-year cache headers, shielding Dropbox from HTTP 429 rate limit errors.
+ *
+ * For Videos:
+ * - Dropbox: Configures direct binary streaming link (?raw=1) and bypasses image proxies.
+ * - Google Drive: Prepares direct download/stream link.
  */
 export const normalizeExternalMediaUrl = (url?: string | null): string => {
   if (!url) return '';
   let trimmed = url.trim();
+
+  // Local assets: auto-upgrade local images to high-performance WebP if present
+  if (
+    trimmed.startsWith('/') &&
+    !trimmed.startsWith('/icons') &&
+    !trimmed.startsWith('/favicon') &&
+    (trimmed.endsWith('.jpg') || trimmed.endsWith('.jpeg') || trimmed.endsWith('.png'))
+  ) {
+    trimmed = trimmed.replace(/\.(jpg|jpeg|png)$/i, '.webp');
+  }
 
   // If protocol is missing
   if (trimmed.startsWith('www.dropbox.com') || trimmed.startsWith('dropbox.com') || trimmed.startsWith('drive.google.com')) {
     trimmed = `https://${trimmed}`;
   }
 
-  // If already normalized Google usercontent URL
-  if (trimmed.includes('lh3.googleusercontent.com/d/')) {
+  // If already proxied via wsrv.nl
+  if (trimmed.includes('wsrv.nl/?url=')) {
     return trimmed;
   }
 
-  // 1. Google Drive: transform shared preview / open links to direct render link
-  // Supports single-account (/file/d/ID) and multi-account (/file/u/0/d/ID, /file/u/1/d/ID)
+  const isVideo = isMediaVideo(trimmed);
+
+  // 1. Google Drive handling
   const driveMatch = trimmed.match(/drive\.google\.com\/(?:file\/(?:u\/\d+\/)?d\/|open\?id=|uc\?(?:export=view&)?id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
-    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+    const fileId = driveMatch[1];
+    if (isVideo) {
+      return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    }
+    // High-performance Google Fife CDN WebP URL (auto-resizes to max 1920px width & serves modern WebP)
+    return `https://lh3.googleusercontent.com/d/${fileId}=w1920-rw`;
   }
 
-  // 2. Dropbox: transform share links with dl=0 or dl=1 to raw=1 for direct binary stream
-  if (/dropbox\.com/.test(trimmed) || /dropboxusercontent\.com/.test(trimmed)) {
-    let converted = trimmed;
-    if (converted.includes('dl=0')) {
-      converted = converted.replace(/([?&])dl=0/g, '$1raw=1');
-    } else if (converted.includes('dl=1')) {
-      converted = converted.replace(/([?&])dl=1/g, '$1raw=1');
-    } else if (!converted.includes('raw=1')) {
-      converted = converted.includes('?') ? `${converted}&raw=1` : `${converted}?raw=1`;
+  if (trimmed.includes('lh3.googleusercontent.com/d/')) {
+    if (!trimmed.includes('=')) {
+      return `${trimmed}=w1920-rw`;
     }
-    return converted;
+    return trimmed;
+  }
+
+  // 2. Dropbox handling
+  if (/dropbox\.com/.test(trimmed) || /dropboxusercontent\.com/.test(trimmed)) {
+    let rawStreamUrl = trimmed;
+    if (rawStreamUrl.includes('dl=0')) {
+      rawStreamUrl = rawStreamUrl.replace(/([?&])dl=0/g, '$1raw=1');
+    } else if (rawStreamUrl.includes('dl=1')) {
+      rawStreamUrl = rawStreamUrl.replace(/([?&])dl=1/g, '$1raw=1');
+    } else if (!rawStreamUrl.includes('raw=1')) {
+      rawStreamUrl = rawStreamUrl.includes('?') ? `${rawStreamUrl}&raw=1` : `${rawStreamUrl}?raw=1`;
+    }
+
+    // If it's a video file, return direct stream URL (image proxy wsrv.nl cannot process video)
+    if (isVideo) {
+      return rawStreamUrl;
+    }
+
+    // For images, route through Cloudflare Edge image proxy with WebP compression and 1-year cache
+    return `https://wsrv.nl/?url=${encodeURIComponent(rawStreamUrl)}&w=1920&q=82&output=webp`;
   }
 
   return trimmed;

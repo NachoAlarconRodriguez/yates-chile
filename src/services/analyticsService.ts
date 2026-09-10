@@ -602,19 +602,41 @@ class AnalyticsService {
     };
   }
 
+  private cachedViews: AnalyticsPageView[] | null = null;
+  private lastViewsFetchTime = 0;
+  private hasViewsTableError = false;
+
   public async getAllRawViews(): Promise<AnalyticsPageView[]> {
+    const now = Date.now();
+    // Cache for 60 seconds or avoid querying repeatedly if table doesn't exist
+    if (this.hasViewsTableError && now - this.lastViewsFetchTime < 60000) {
+      return FALLBACK_VIEWS;
+    }
+    if (this.cachedViews && now - this.lastViewsFetchTime < 30000) {
+      return this.cachedViews;
+    }
+
     try {
+      this.lastViewsFetchTime = now;
       const { data, error } = await supabase
         .from('analytics_page_views')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(300);
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        this.hasViewsTableError = true;
+        return FALLBACK_VIEWS;
+      }
+
+      if (data && data.length > 0) {
+        this.cachedViews = data as AnalyticsPageView[];
+        this.hasViewsTableError = false;
         return data as AnalyticsPageView[];
       }
       return FALLBACK_VIEWS;
     } catch {
+      this.hasViewsTableError = true;
       return FALLBACK_VIEWS;
     }
   }

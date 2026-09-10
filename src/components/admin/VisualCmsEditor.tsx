@@ -32,9 +32,18 @@ import {
   UtensilsCrossed,
   Sun,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Zap,
 } from 'lucide-react';
-import { DEFAULT_CMS_CONTENT, normalizeExternalMediaUrl, type SiteContent } from '../../services/cmsService';
+import {
+  DEFAULT_CMS_CONTENT,
+  normalizeExternalMediaUrl,
+  isMediaVideo,
+  diagnoseMediaUrl,
+  getMediaFallbackUrl,
+  cmsService,
+  type SiteContent,
+} from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
 import { ExpeditionCalendar } from '../modules/ExpeditionCalendar';
 import { BuildYourJourney } from '../modules/BuildYourJourney';
@@ -538,10 +547,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     }
   };
 
-  const isMediaVideo = (url?: string | null) => {
-    if (!url) return false;
-    return url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.mov') || url.includes('video/');
-  };
+  const [ingestingVideo, setIngestingVideo] = useState(false);
 
   return (
     <CmsContext.Provider value={{ getField, setField }}>
@@ -838,7 +844,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <section className="relative h-[460px] sm:h-[500px] flex items-end justify-start bg-slate-950 text-white overflow-hidden border-b border-slate-800 group/hero">
                 {isMediaVideo(getField('home_hero', 'media_url')) ? (
                   <video
-                    src={getField('home_hero', 'media_url')}
+                    src={normalizeExternalMediaUrl(getField('home_hero', 'media_url'))}
                     autoPlay
                     loop
                     muted
@@ -847,9 +853,12 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   />
                 ) : (
                   <img
-                    src={getField('home_hero', 'media_url') || '/velero-vegvisir.jpg'}
+                    src={normalizeExternalMediaUrl(getField('home_hero', 'media_url')) || '/velero-vegvisir.jpg'}
                     alt="Hero Background"
                     className="absolute inset-0 w-full h-full object-cover opacity-85"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getMediaFallbackUrl(getField('home_hero', 'media_url')) || '/velero-vegvisir.jpg';
+                    }}
                   />
                 )}
                 
@@ -1122,7 +1131,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <section className="relative h-[65vh] sm:h-[75vh] flex items-end justify-start overflow-hidden group/hero">
                 {isMediaVideo(getField('flota_vegvisir', 'media_url')) ? (
                   <video
-                    src={getField('flota_vegvisir', 'media_url')}
+                    src={normalizeExternalMediaUrl(getField('flota_vegvisir', 'media_url'))}
                     autoPlay
                     loop
                     muted
@@ -1131,9 +1140,12 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   />
                 ) : (
                   <img
-                    src={getField('flota_vegvisir', 'media_url') || "/velero-vegvisir.jpg"}
+                    src={normalizeExternalMediaUrl(getField('flota_vegvisir', 'media_url')) || "/velero-vegvisir.jpg"}
                     alt="Velero Vegvisir"
                     className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getMediaFallbackUrl(getField('flota_vegvisir', 'media_url')) || '/velero-vegvisir.jpg';
+                    }}
                   />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
@@ -1225,7 +1237,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <section className="relative h-[65vh] sm:h-[75vh] flex items-end justify-start overflow-hidden group/hero">
                 {isMediaVideo(getField('flota_terranova', 'media_url')) ? (
                   <video
-                    src={getField('flota_terranova', 'media_url')}
+                    src={normalizeExternalMediaUrl(getField('flota_terranova', 'media_url'))}
                     autoPlay
                     loop
                     muted
@@ -1234,9 +1246,12 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   />
                 ) : (
                   <img
-                    src={getField('flota_terranova', 'media_url') || "/yate-terranova.jpg"}
+                    src={normalizeExternalMediaUrl(getField('flota_terranova', 'media_url')) || "/yate-terranova.jpg"}
                     alt="Yate Terranova"
                     className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getMediaFallbackUrl(getField('flota_terranova', 'media_url')) || '/yate-terranova.jpg';
+                    }}
                   />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
@@ -1328,7 +1343,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <section className="relative h-[65vh] sm:h-[75vh] flex items-end justify-start overflow-hidden group/hero">
                 {isMediaVideo(getField('lodge_info', 'media_url')) ? (
                   <video
-                    src={getField('lodge_info', 'media_url')}
+                    src={normalizeExternalMediaUrl(getField('lodge_info', 'media_url'))}
                     autoPlay
                     loop
                     muted
@@ -1337,9 +1352,12 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   />
                 ) : (
                   <img
-                    src={getField('lodge_info', 'media_url') || "/rincon-de-navegantes.jpg"}
+                    src={normalizeExternalMediaUrl(getField('lodge_info', 'media_url')) || "/rincon-de-navegantes.jpg"}
                     alt="Lodge Rincón de Navegantes"
                     className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getMediaFallbackUrl(getField('lodge_info', 'media_url')) || '/rincon-de-navegantes.jpg';
+                    }}
                   />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
@@ -2148,26 +2166,84 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                   </label>
                 </div>
 
-                {mediaModal.currentValue && (
-                  <div className="h-36 rounded-xl overflow-hidden border border-slate-200 relative bg-slate-900">
-                    {isMediaVideo(mediaModal.currentValue) ? (
-                      <video
-                        src={normalizeExternalMediaUrl(mediaModal.currentValue)}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <img
-                        src={normalizeExternalMediaUrl(mediaModal.currentValue)}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
-                )}
+                {mediaModal.currentValue && (() => {
+                  const diagnosis = diagnoseMediaUrl(mediaModal.currentValue);
+                  const isVideo = isMediaVideo(mediaModal.currentValue);
+                  const isExternalVideo = isVideo && (diagnosis.isDropbox || diagnosis.isGoogleDrive);
+
+                  return (
+                    <div className="space-y-2">
+                      {diagnosis.warning && (
+                        <div
+                          className={`p-2.5 rounded-xl text-xs flex items-start gap-2 ${
+                            diagnosis.warning.level === 'error'
+                              ? 'bg-rose-50 border border-rose-100 text-rose-800'
+                              : diagnosis.warning.level === 'warning'
+                              ? 'bg-amber-50 border border-amber-100 text-amber-800'
+                              : 'bg-emerald-50 border border-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          <div>
+                            <span className="font-bold">{diagnosis.warning.title}: </span>
+                            <span>{diagnosis.warning.description}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {isExternalVideo && (
+                        <div className="flex items-center justify-between gap-2 p-2.5 bg-sky-50 border border-sky-100 rounded-xl text-xs">
+                          <div className="flex items-center gap-2 text-sky-800">
+                            <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                            <span>Video externo detectado. ¿Deseas acelerarlo en CDN?</span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={ingestingVideo}
+                            onClick={async () => {
+                              setIngestingVideo(true);
+                              try {
+                                const res = await cmsService.ingestExternalVideo(mediaModal.currentValue);
+                                if (res.success && res.url) {
+                                  setMediaModal((prev) => (prev ? { ...prev, currentValue: res.url! } : null));
+                                } else {
+                                  alert('No se pudo transferir automáticamente: ' + (res.error || 'Error'));
+                                }
+                              } finally {
+                                setIngestingVideo(false);
+                              }
+                            }}
+                            className="px-3 py-1 bg-[#0f2b48] hover:bg-[#0a1e34] text-white rounded-lg font-bold text-[11px] transition shadow-xs disabled:opacity-50 cursor-pointer shrink-0"
+                          >
+                            {ingestingVideo ? 'Acelerando...' : 'Acelerar en Supabase CDN'}
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="h-36 rounded-xl overflow-hidden border border-slate-200 relative bg-slate-900">
+                        {isVideo ? (
+                          <video
+                            src={normalizeExternalMediaUrl(mediaModal.currentValue)}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={normalizeExternalMediaUrl(mediaModal.currentValue)}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                getMediaFallbackUrl(mediaModal.currentValue) || '/travesia-robinson.jpg';
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">

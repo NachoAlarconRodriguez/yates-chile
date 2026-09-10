@@ -1,18 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { FloatingConcierge } from './components/layout/FloatingConcierge';
 import { WelcomeSplash } from './components/modules/WelcomeSplash';
 import { LoadingScreen } from './components/modules/LoadingScreen';
-
-import { HomePage } from './pages/HomePage';
-import { FlotaPage } from './pages/FlotaPage';
-import { LodgePage } from './pages/LodgePage';
-import { ExpedicionesPage } from './pages/ExpedicionesPage';
-import { AdminPage } from './pages/AdminPage';
-import { VegvisirDetailPage } from './pages/VegvisirDetailPage';
-import { TerranovaDetailPage } from './pages/TerranovaDetailPage';
 import { analyticsService } from './services/analyticsService';
+
+// Lazy-loaded pages for optimal bundle code-splitting
+const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
+const FlotaPage = lazy(() => import('./pages/FlotaPage').then((m) => ({ default: m.FlotaPage })));
+const LodgePage = lazy(() => import('./pages/LodgePage').then((m) => ({ default: m.LodgePage })));
+const ExpedicionesPage = lazy(() => import('./pages/ExpedicionesPage').then((m) => ({ default: m.ExpedicionesPage })));
+const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
+const VegvisirDetailPage = lazy(() => import('./pages/VegvisirDetailPage').then((m) => ({ default: m.VegvisirDetailPage })));
+const TerranovaDetailPage = lazy(() => import('./pages/TerranovaDetailPage').then((m) => ({ default: m.TerranovaDetailPage })));
+
+const PageLoaderFallback = () => (
+  <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
+    <div className="relative w-16 h-16 flex items-center justify-center">
+      <div className="absolute inset-0 rounded-full border-2 border-dashed border-blue-900/30 animate-spin" style={{ animationDuration: '14s' }} />
+      <img src="/vegvisir-emblem-dark.png" alt="Cargando" className="w-9 h-9 object-contain opacity-75 animate-pulse" />
+    </div>
+  </div>
+);
 
 export function App() {
   const [appLoading, setAppLoading] = useState<boolean>(true);
@@ -88,13 +98,15 @@ export function App() {
 
           {/* Multi-Page View Container */}
           <main className="flex-1">
-            {currentPath === '/' && <HomePage onNavigate={navigate} />}
-            {currentPath === '/flota' && <FlotaPage onNavigate={navigate} />}
-            {currentPath === '/lodge' && <LodgePage onNavigate={navigate} />}
-            {currentPath === '/expediciones' && <ExpedicionesPage onNavigate={navigate} />}
-            {currentPath === '/admin' && <AdminPage onNavigate={navigate} />}
-            {currentPath === '/velero-vegvisir' && <VegvisirDetailPage onNavigate={navigate} />}
-            {currentPath === '/yate-terranova' && <TerranovaDetailPage onNavigate={navigate} />}
+            <Suspense fallback={<PageLoaderFallback />}>
+              {currentPath === '/' && <HomePage onNavigate={navigate} />}
+              {currentPath === '/flota' && <FlotaPage onNavigate={navigate} />}
+              {currentPath === '/lodge' && <LodgePage onNavigate={navigate} />}
+              {currentPath === '/expediciones' && <ExpedicionesPage onNavigate={navigate} />}
+              {currentPath === '/admin' && <AdminPage onNavigate={navigate} />}
+              {currentPath === '/velero-vegvisir' && <VegvisirDetailPage onNavigate={navigate} />}
+              {currentPath === '/yate-terranova' && <TerranovaDetailPage onNavigate={navigate} />}
+            </Suspense>
           </main>
 
           {/* Footer (hidden in Admin) */}

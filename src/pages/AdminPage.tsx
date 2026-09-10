@@ -1682,7 +1682,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
         window.removeEventListener('storage', handleRealtimeUpdate);
       };
     }
-  }, [isAuthenticated, fetchAllData, refreshLodge, refreshServices, refreshContent]);
+  }, [isAuthenticated]);
 
   // Auto-sincronización bidireccional entre Reservas de Expedición y el Directorio CRM
   useEffect(() => {
@@ -14940,36 +14940,6 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         )}
                       </div>
                     )}
-
-                    {/* Optional URL Input */}
-                    <div className="bg-[#f8fafc] border border-slate-200/90 rounded-2xl p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono">
-                          O Enlace Directo a PDF Externo (Opcional)
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-mono">Dropbox / Google Drive / Cloud</span>
-                      </div>
-                      <div className="relative flex items-center">
-                        <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5" />
-                        <input
-                          type="url"
-                          value={currentBrochure}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditingDeparture({
-                              ...editingDeparture,
-                              brochureUrl: val,
-                              brochure_url: val,
-                            });
-                          }}
-                          placeholder="https://.../brochure.pdf"
-                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200/90 rounded-2xl text-xs font-mono text-[#0b192c] focus:outline-none focus:border-[#0b192c] shadow-2xs transition"
-                        />
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-normal">
-                        Si prefieres enlazar un archivo PDF existente desde Dropbox o Google Drive, puedes pegar su enlace directo aquí.
-                      </p>
-                    </div>
                   </div>
                 );
               })()}

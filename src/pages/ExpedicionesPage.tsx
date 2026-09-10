@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useExpeditions } from '../hooks/useExpeditions';
 import type { PublicExpedition as Expedition } from '../services/expeditionService';
 import { normalizeExternalMediaUrl } from '../services/cmsService';
@@ -6,6 +7,7 @@ import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { leadService } from '../services/leadService';
 import { ExpeditionBookingModal } from '../components/modules/ExpeditionBookingModal';
+import { ExpeditionsLoadingState } from '../components/modules/ExpeditionsLoadingState';
 import { 
   Compass, 
   Download, 
@@ -20,7 +22,7 @@ import {
   CloudSun, 
   ShieldCheck, 
   Anchor, 
-  Footprints 
+  Footprints
 } from 'lucide-react';
 
 interface ExpedicionesPageProps {
@@ -206,7 +208,7 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
 };
 
 export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate }) => {
-  const { expeditions } = useExpeditions();
+  const { expeditions, loading } = useExpeditions();
   const { t } = useLanguage();
   const [downloadEmail, setDownloadEmail] = useState('');
   const [downloadSent, setDownloadSent] = useState(false);
@@ -335,108 +337,133 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {expeditions.map((exp) => {
-              const isSoldOut = exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0);
-              const isBlocked = exp.spotsLeft === 'bloqueado';
-              const isUnavailable = isSoldOut || isBlocked;
+          {loading && expeditions.length === 0 ? (
+            <ExpeditionsLoadingState />
+          ) : expeditions.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 max-w-xl mx-auto space-y-4 shadow-xs">
+              <Compass className="w-10 h-10 text-slate-400 mx-auto" />
+              <h3 className="font-serif text-lg font-bold text-slate-800">
+                {t('No hay expediciones disponibles para este período', 'No expeditions available for this period')}
+              </h3>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                {t('Estamos planificando nuevas fechas y derrotas australes. Si deseas organizar un chárter privado a tu medida, contáctanos.', 'We are planning new dates and austral voyages. If you want to organize a custom private charter, contact us.')}
+              </p>
+              <button
+                onClick={handleOpenGeneralBooking}
+                className="mt-2 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-slate-800 transition cursor-pointer"
+              >
+                {t('Contactar Concierge', 'Contact Concierge')}
+              </button>
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+            >
+              {expeditions.map((exp) => {
+                const isSoldOut = exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0);
+                const isBlocked = exp.spotsLeft === 'bloqueado';
+                const isUnavailable = isSoldOut || isBlocked;
 
-              return (
-                <div
-                  key={exp.id}
-                  onClick={() => setSelectedExpedition(exp)}
-                  className={`rounded-2xl overflow-hidden border flex flex-col justify-between transition-all duration-300 cursor-pointer group ${
-                    isUnavailable
-                      ? 'bg-[#f8fafc] border-slate-200/80 shadow-2xs opacity-80 hover:opacity-100 hover:shadow-md'
-                      : 'bg-white border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300'
-                  }`}
-                >
-                  {/* Image & Vessel Tag */}
-                  <div className="relative h-48 sm:h-52 overflow-hidden bg-slate-100 shrink-0">
-                    <img
-                      src={normalizeExternalMediaUrl(exp.image) || (exp.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg')}
-                      alt={exp.name}
-                      referrerPolicy="no-referrer"
-                      className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${
-                        isUnavailable ? 'grayscale-[55%] contrast-90 group-hover:grayscale-0 group-hover:contrast-100' : ''
-                      }`}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = exp.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg';
-                      }}
-                    />
-                    <div className={`absolute top-4 left-4 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border backdrop-blur-sm ${
-                      isUnavailable ? 'bg-slate-800/80 border-white/10 text-slate-300' : 'bg-slate-900/90 border-white/10'
-                    }`}>
-                      {exp.vessel}
-                    </div>
-                    
-                    {/* Status Badge */}
-                    <div className="absolute top-4 right-4">
-                      {isSoldOut && (
-                        <span className="bg-slate-600/90 text-slate-200 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-500/30 backdrop-blur-sm shadow-xs font-mono">
-                          {t('Completo', 'Sold Out')}
-                        </span>
-                      )}
-                      {isBlocked && (
-                        <span className="bg-slate-700/90 text-slate-300 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-600/30 backdrop-blur-sm">
-                          {t('Bloqueado', 'Reserved')}
-                        </span>
-                      )}
-                      {typeof exp.spotsLeft === 'number' && exp.spotsLeft === 1 && (
-                        <span className="bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-400/20 animate-pulse shadow-sm">
-                          {t('¡Último cupo!', 'Last spot!')}
-                        </span>
-                      )}
-                      {typeof exp.spotsLeft === 'number' && exp.spotsLeft > 1 && (
-                        <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20 shadow-xs">
-                          {exp.spotsLeft} {t('cupos disponibles', 'spots available')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                    <div className="space-y-2">
-                      <div className={`flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-wider uppercase ${
-                        isUnavailable ? 'text-slate-400' : 'text-blue-900'
+                return (
+                  <div
+                    key={exp.id}
+                    onClick={() => setSelectedExpedition(exp)}
+                    className={`rounded-2xl overflow-hidden border flex flex-col justify-between transition-all duration-300 cursor-pointer group ${
+                      isUnavailable
+                        ? 'bg-[#f8fafc] border-slate-200/80 shadow-2xs opacity-80 hover:opacity-100 hover:shadow-md'
+                        : 'bg-white border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300'
+                    }`}
+                  >
+                    {/* Image & Vessel Tag */}
+                    <div className="relative h-48 sm:h-52 overflow-hidden bg-slate-100 shrink-0">
+                      <img
+                        src={normalizeExternalMediaUrl(exp.image) || (exp.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg')}
+                        alt={exp.name}
+                        referrerPolicy="no-referrer"
+                        className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${
+                          isUnavailable ? 'grayscale-[55%] contrast-90 group-hover:grayscale-0 group-hover:contrast-100' : ''
+                        }`}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = exp.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg';
+                        }}
+                      />
+                      <div className={`absolute top-4 left-4 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border backdrop-blur-sm ${
+                        isUnavailable ? 'bg-slate-800/80 border-white/10 text-slate-300' : 'bg-slate-900/90 border-white/10'
                       }`}>
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{exp.startDate} {t('al', 'to')} {exp.endDate}</span>
-                      </div>
-
-                      <h3 className={`font-serif text-lg font-bold leading-snug transition-colors ${
-                        isUnavailable ? 'text-slate-500 group-hover:text-slate-800' : 'text-slate-900 group-hover:text-blue-950'
-                      }`}>
-                        {exp.name}
-                      </h3>
-
-                      <p className={`text-xs line-clamp-2 leading-relaxed font-light ${
-                        isUnavailable ? 'text-slate-400' : 'text-slate-500'
-                      }`}>
-                        {exp.description}
-                      </p>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                      <div className={`flex items-center gap-1 text-xs ${
-                        isUnavailable ? 'text-slate-400' : 'text-slate-500'
-                      }`}>
-                        <MapPin className={`w-3.5 h-3.5 ${isUnavailable ? 'text-slate-400' : 'text-blue-900'}`} />
-                        <span className="truncate max-w-[140px]">{exp.location}</span>
+                        {exp.vessel}
                       </div>
                       
-                      <span className={`font-bold text-xs uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 ${
-                        isUnavailable ? 'text-slate-400 group-hover:text-slate-700' : 'text-blue-900'
-                      }`}>
-                        {t('Ver Descripción ➔', 'View Details ➔')}
-                      </span>
+                      {/* Status Badge */}
+                      <div className="absolute top-4 right-4">
+                        {isSoldOut && (
+                          <span className="bg-slate-600/90 text-slate-200 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-500/30 backdrop-blur-sm shadow-xs font-mono">
+                            {t('Completo', 'Sold Out')}
+                          </span>
+                        )}
+                        {isBlocked && (
+                          <span className="bg-slate-700/90 text-slate-300 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-600/30 backdrop-blur-sm">
+                            {t('Bloqueado', 'Reserved')}
+                          </span>
+                        )}
+                        {typeof exp.spotsLeft === 'number' && exp.spotsLeft === 1 && (
+                          <span className="bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-400/20 animate-pulse shadow-sm">
+                            {t('¡Último cupo!', 'Last spot!')}
+                          </span>
+                        )}
+                        {typeof exp.spotsLeft === 'number' && exp.spotsLeft > 1 && (
+                          <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20 shadow-xs">
+                            {exp.spotsLeft} {t('cupos disponibles', 'spots available')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                      <div className="space-y-2">
+                        <div className={`flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-wider uppercase ${
+                          isUnavailable ? 'text-slate-400' : 'text-blue-900'
+                        }`}>
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{exp.startDate} {t('al', 'to')} {exp.endDate}</span>
+                        </div>
+
+                        <h3 className={`font-serif text-lg font-bold leading-snug transition-colors ${
+                          isUnavailable ? 'text-slate-500 group-hover:text-slate-800' : 'text-slate-900 group-hover:text-blue-950'
+                        }`}>
+                          {exp.name}
+                        </h3>
+
+                        <p className={`text-xs line-clamp-2 leading-relaxed font-light ${
+                          isUnavailable ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
+                          {exp.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <div className={`flex items-center gap-1 text-xs ${
+                          isUnavailable ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
+                          <MapPin className={`w-3.5 h-3.5 ${isUnavailable ? 'text-slate-400' : 'text-blue-900'}`} />
+                          <span className="truncate max-w-[140px]">{exp.location}</span>
+                        </div>
+                        
+                        <span className={`font-bold text-xs uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 ${
+                          isUnavailable ? 'text-slate-400 group-hover:text-slate-700' : 'text-blue-900'
+                        }`}>
+                          {t('Ver Descripción ➔', 'View Details ➔')}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </motion.div>
+          )}
         </div>
       </section>
 
@@ -508,12 +535,26 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
               {/* Desktop Left-Column CTAs */}
               <div className="relative z-10 pt-3.5 sm:pt-4 border-t border-white/10 space-y-2 hidden md:block mt-4">
                 {(selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0)) ? (
-                  <button
-                    disabled
-                    className="w-full bg-slate-850 text-slate-500 font-bold py-2.5 rounded-xl text-xs cursor-not-allowed border border-white/5 uppercase tracking-wider"
-                  >
-                    {t('Reserva Completada (Agotada)', 'Fully Booked')}
-                  </button>
+                  <>
+                    {/* Botón 1: Descargar Brochure en PDF */}
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadExpeditionBrochure(selectedExpedition)}
+                      className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
+                    >
+                      <Download className="w-3.5 h-3.5 text-blue-300" />
+                      <span>{t('Descargar Brochure en PDF', 'Download PDF Brochure')}</span>
+                    </button>
+                    {/* Botón 2: Salida Completa / Lista de Espera */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenBookingModal(selectedExpedition)}
+                      className="w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 font-bold py-3 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
+                    >
+                      <Clock className="w-4 h-4 text-amber-300" />
+                      <span>{t('Salida Completa • Lista de Espera', 'Sold Out • Join Waitlist')}</span>
+                    </button>
+                  </>
                 ) : selectedExpedition.spotsLeft === 'bloqueado' ? (
                   <button
                     disabled
@@ -633,19 +674,30 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 <span className="truncate">{t('Brochure PDF', 'PDF Brochure')}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => handleOpenBookingModal(selectedExpedition)}
-                disabled={selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0) || selectedExpedition.spotsLeft === 'bloqueado'}
-                className={`flex-1 font-bold py-3 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition ${
-                  (selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0) || selectedExpedition.spotsLeft === 'bloqueado')
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'bg-blue-900 hover:bg-blue-800 active:bg-blue-950 text-white cursor-pointer'
-                }`}
-              >
-                <span className="truncate">{t('Reservar Cupo', 'Book Spot')}</span>
-                <ArrowRight className="w-4 h-4 shrink-0" />
-              </button>
+              {(selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0)) ? (
+                <button
+                  type="button"
+                  onClick={() => handleOpenBookingModal(selectedExpedition)}
+                  className="flex-1 bg-amber-500/20 text-amber-300 border border-amber-400/30 font-bold py-3 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Clock className="w-4 h-4 shrink-0 text-amber-400" />
+                  <span className="truncate">{t('Lista de Espera', 'Join Waitlist')}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleOpenBookingModal(selectedExpedition)}
+                  disabled={selectedExpedition.spotsLeft === 'bloqueado'}
+                  className={`flex-1 font-bold py-3 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition ${
+                    selectedExpedition.spotsLeft === 'bloqueado'
+                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-blue-900 hover:bg-blue-800 active:bg-blue-950 text-white cursor-pointer'
+                  }`}
+                >
+                  <span className="truncate">{t('Reservar Cupo', 'Book Spot')}</span>
+                  <ArrowRight className="w-4 h-4 shrink-0" />
+                </button>
+              )}
             </div>
 
           </div>

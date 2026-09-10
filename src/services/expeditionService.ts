@@ -76,7 +76,7 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     routeId: 'ruta-cabo-hornos',
     description: 'La máxima aventura náutica mundial: circunvalar el mítico Cabo de Hornos a vela con patrón de ultramar y máxima seguridad.',
     location: 'Canal Beagle & Cabo de Hornos',
-    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+    image: '/cabo-de-hornos.png',
     bestViewTime: 'Primavera austral',
     tempEstimate: '8°C - 12°C',
     status: 'guaranteed'
@@ -100,7 +100,7 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     routeId: 'ruta-cabo-hornos',
     description: 'Navegación oceánica de altura hacia los confines del planeta en los días más largos del año en latitudes australes.',
     location: 'Isla de Hornos',
-    image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
+    image: '/cabo-de-hornos.png',
     bestViewTime: 'Solsticio de verano',
     tempEstimate: '9°C - 13°C',
     status: 'guaranteed'
@@ -124,7 +124,7 @@ export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
     routeId: 'ruta-cabo-hornos',
     description: 'Travesía de verano en las aguas míticas de Magallanes con desembarco en el monumento al Albatros en Isla de Hornos.',
     location: 'Cabo de Hornos',
-    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+    image: '/cabo-de-hornos.png',
     bestViewTime: 'Verano austral',
     tempEstimate: '10°C - 14°C',
     status: 'scheduled'
@@ -304,9 +304,24 @@ const ROUTE_LOCATION_MAP: Record<string, string> = {
 
 const ROUTE_IMAGE_MAP: Record<string, string> = {
   'ruta-juan-fernandez': '/travesia-robinson.jpg',
-  'ruta-cabo-hornos': 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
-  'ruta-fiordos-glaciares': 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80',
+  'ruta-cabo-hornos': '/cabo-de-hornos.png',
+  'ruta-fiordos-glaciares': '/zarpe-archipielago.jpg',
   'ruta-selkirk': '/juan-fernandez-selkirk.jpg',
+};
+
+export const PUBLIC_EXPEDITIONS_CACHE_KEY = 'yates_public_expeditions_cache';
+
+export const getCachedPublicExpeditions = (): PublicExpedition[] => {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(PUBLIC_EXPEDITIONS_CACHE_KEY) : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map(sanitizePublicExpedition);
+      }
+    }
+  } catch {}
+  return [];
 };
 
 const formatRouteDepartureTitle = (d: any, matchedLocal?: any): string => {
@@ -586,9 +601,11 @@ export const expeditionService = {
     } catch {}
 
     try {
+      const todayIso = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('expedition_departures')
         .select('*, route:expedition_routes(*), vessel:vessels(*)')
+        .gte('return_date', todayIso)
         .order('departure_date', { ascending: true });
 
       if (!error && data && data.length > 0) {
@@ -637,10 +654,18 @@ export const expeditionService = {
         });
 
         const extraLocal = local.filter((l) => !l.id.startsWith('exp-') && !data.some((d: any) => d.id === l.id));
-        return [...mapped, ...extraLocal];
+        const allPublic = [...mapped, ...extraLocal];
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(PUBLIC_EXPEDITIONS_CACHE_KEY, JSON.stringify(allPublic));
+          }
+        } catch {}
+        return allPublic;
       }
     } catch {}
 
+    const cached = getCachedPublicExpeditions();
+    if (cached.length > 0) return cached;
     return local.map((l) => ({ ...l, image: normalizeExternalMediaUrl(l.image) }));
   },
 
@@ -1329,7 +1354,7 @@ export const expeditionService = {
         const client = supabaseAdmin || supabase;
         const { data, error } = await client.storage
           .from('site-media')
-          .upload(path, file, { contentType: 'application/pdf', upsert: true });
+          .upload(path, file, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' });
 
         if (!error && data) {
           const { data: publicData } = client.storage.from('site-media').getPublicUrl(data.path);

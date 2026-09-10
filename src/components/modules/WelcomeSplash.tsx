@@ -73,10 +73,11 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           loop
           muted
           playsInline
-          poster="/expediciones-hero.jpg"
+          poster="/expediciones-hero.webp"
           onLoadedData={onVideoLoaded}
           className="w-full h-full object-cover scale-100"
         >
+          <source src="/welcome-video.mp4" type="video/mp4" />
           <source src={videoUrl} type="video/mp4" />
           <source src={videoUrl} type="video/quicktime" />
         </video>

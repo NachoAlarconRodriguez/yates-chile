@@ -147,3 +147,17 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(15, 23, 42, 0.25);
 }
+
+/* Shimmer Loading Sweep for Skeletons */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-sweep {
+  animation: shimmer 2.2s infinite ease-in-out;
+}

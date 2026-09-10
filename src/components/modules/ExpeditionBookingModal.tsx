@@ -10,7 +10,10 @@ import {
   ArrowLeft, 
   Copy, 
   ShieldCheck,
-  Compass
+  Compass,
+  Lock,
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useExpeditions } from '../../hooks/useExpeditions';
@@ -18,6 +21,30 @@ import { leadService } from '../../services/leadService';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatRut, formatPhone } from '../../lib/formatters';
 import type { PublicExpedition } from '../../services/expeditionService';
+
+export const getExpeditionAvailableSpots = (exp?: PublicExpedition | null): number => {
+  if (!exp) return 0;
+  if (
+    exp.spotsLeft === 'completo' ||
+    exp.spotsLeft === 'bloqueado' ||
+    exp.status === 'completed' ||
+    exp.status === 'cancelled'
+  ) {
+    return 0;
+  }
+  if (typeof exp.availableSlots === 'number') {
+    return Math.max(0, exp.availableSlots);
+  }
+  if (typeof exp.spotsLeft === 'number') {
+    return Math.max(0, exp.spotsLeft);
+  }
+  return exp.totalSlots || (exp.vesselId === 'terranova' ? 8 : 6);
+};
+
+export const isExpeditionSoldOut = (exp?: PublicExpedition | null): boolean => {
+  if (!exp) return false;
+  return getExpeditionAvailableSpots(exp) <= 0;
+};
 
 interface ExpeditionBookingModalProps {
   isOpen: boolean;
@@ -54,12 +81,12 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
   const { expeditions, createBooking } = useExpeditions();
   const { t } = useLanguage();
 
-  // Active expeditions sorted chronologically by departure date
+  // Active expeditions sorted chronologically by departure date (only those with available spots)
   const sortedExpeditions = useMemo(() => {
     return [...expeditions]
       .filter((e) => {
-        const spots = typeof e.spotsLeft === 'number' ? e.spotsLeft : (e.availableSlots ?? 0);
-        return spots > 0 && e.status !== 'completed';
+        const spots = getExpeditionAvailableSpots(e);
+        return spots > 0 && e.status !== 'completed' && e.status !== 'cancelled';
       })
       .sort((a, b) => {
         const dateA = new Date(a.departureDate || a.startDate || '2099-01-01').getTime();
@@ -122,20 +149,24 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, showPoliciesModal, onClose]);
 
-  if (!isOpen) return null;
-
   const currentActiveExp = selectedExp || (sortedExpeditions.length > 0 ? sortedExpeditions[0] : null);
 
-  // Maximum allowed passengers for the vessel / expedition (e.g. 6 for Dufour 52.5 / Lodge, 8 for Terranova)
-  const maxPax = currentActiveExp?.totalSlots 
+  const availableSpots = getExpeditionAvailableSpots(currentActiveExp);
+  const isSoldOut = currentActiveExp ? availableSpots <= 0 : false;
+
+  // Maximum allowed passengers for the vessel / expedition, capped strictly by remaining available spots
+  const vesselCapacity = currentActiveExp?.totalSlots 
     ? currentActiveExp.totalSlots 
     : (currentActiveExp?.vesselId === 'terranova' ? 8 : 6);
+
+  const maxPax = isSoldOut ? 0 : Math.min(vesselCapacity, availableSpots);
 
   const pricePerPax = currentActiveExp?.pricePerPaxClp || 1850000;
   const totalAmount = pricePerPax * paxCount;
   const depositAmount = Math.round(totalAmount * 0.5);
 
   const handleUpdatePaxCount = (newCount: number) => {
+    if (maxPax <= 0) return;
     const count = Math.max(1, Math.min(maxPax, newCount));
     setPaxCount(count);
     setPassengers((prev) => {
@@ -149,6 +180,13 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
       setActivePaxTab(count - 1);
     }
   };
+
+  // Ensure paxCount never exceeds remaining available spots
+  useEffect(() => {
+    if (maxPax > 0 && paxCount > maxPax) {
+      handleUpdatePaxCount(maxPax);
+    }
+  }, [maxPax]);
 
   const handlePassengerChange = (index: number, field: keyof PassengerData, value: string) => {
     let formattedVal = value;
@@ -206,7 +244,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
 
   const handleFinalBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!termsAccepted || bookingLoading || !currentActiveExp || !isStep2Valid) return;
+    if (!termsAccepted || bookingLoading || !currentActiveExp || !isStep2Valid || isSoldOut || paxCount > maxPax) return;
 
     setBookingLoading(true);
 
@@ -316,6 +354,8 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
         `Adjunto comprobante de transferencia bancaria para validación.`
       )
     : '';
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -488,18 +528,40 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     <span className={`h-1 rounded-full transition-all duration-300 ${step >= 1 ? 'w-5 bg-white' : 'w-2 bg-white/20'}`} />
-                    <span className={`h-1 rounded-full transition-all duration-300 ${step >= 2 ? 'w-5 bg-white' : 'w-2 bg-white/20'}`} />
-                    <span className={`h-1 rounded-full transition-all duration-300 ${step >= 3 ? 'w-5 bg-white' : 'w-2 bg-white/20'}`} />
+                    <span className={`h-1 rounded-full transition-all duration-300 ${step >= 2 && !isSoldOut ? 'w-5 bg-white' : 'w-2 bg-white/20'}`} />
+                    <span className={`h-1 rounded-full transition-all duration-300 ${step >= 3 && !isSoldOut ? 'w-5 bg-white' : 'w-2 bg-white/20'}`} />
                   </div>
                   <span className="text-[9px] font-mono tracking-[0.2em] text-slate-300 uppercase font-semibold">
-                    0{step} / 03
+                    {isSoldOut ? 'ESTADO • COMPLETO' : `0${step} / 03`}
                   </span>
                 </div>
 
                 <div className="space-y-1 pt-1 text-left">
-                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-slate-400 font-bold block">
-                    {currentActiveExp.vessel}
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-slate-400 font-bold block">
+                      {currentActiveExp.vessel}
+                    </span>
+                    {isSoldOut ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40">
+                        <Lock className="w-2.5 h-2.5" />
+                        Salida Completa
+                      </span>
+                    ) : availableSpots === 1 ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-400/40 animate-pulse">
+                        <Clock className="w-2.5 h-2.5" />
+                        Último Cupo
+                      </span>
+                    ) : availableSpots <= 3 ? (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-500/25 text-blue-200 border border-blue-400/40">
+                        <Clock className="w-2.5 h-2.5" />
+                        {availableSpots} Cupos Libres
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                        {availableSpots} Cupos Libres
+                      </span>
+                    )}
+                  </div>
                   <h4 className="font-serif font-bold text-xl sm:text-2xl text-white leading-snug tracking-tight">
                     {currentActiveExp.name}
                   </h4>
@@ -522,20 +584,35 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
 
               {/* Bottom Price Summary on Left Card */}
               <div className="relative z-10 space-y-2.5 pt-3 border-t border-white/10 text-left">
-                <div className="space-y-0.5">
-                  <div className="flex justify-between items-baseline text-xs">
-                    <span className="text-slate-400 font-mono text-[10px] uppercase">
-                      Total ({paxCount} {paxCount === 1 ? 'PAX' : 'PAX'}):
-                    </span>
-                    <span className="font-serif text-base font-bold text-white tracking-tight">
-                      ${totalAmount.toLocaleString('es-CL')} <span className="text-[10px] font-mono font-normal text-slate-400">CLP</span>
-                    </span>
+                {isSoldOut ? (
+                  <div className="space-y-1 text-xs">
+                    <div className="text-slate-300 font-mono text-[10px] uppercase tracking-wider">
+                      Estado de Cupos
+                    </div>
+                    <div className="text-amber-300 font-bold text-sm flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                      <span>100% Plazas Ocupadas</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-light leading-relaxed">
+                      Inscríbete en la lista de espera con nuestro Concierge para ser notificado si se abre un cupo.
+                    </p>
                   </div>
-                  <div className="flex justify-between items-baseline text-[11px] text-slate-300 font-mono">
-                    <span className="text-[9px] uppercase tracking-wider">Abono Reserva (50%):</span>
-                    <span className="font-bold text-white">${depositAmount.toLocaleString('es-CL')} CLP</span>
+                ) : (
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between items-baseline text-xs">
+                      <span className="text-slate-400 font-mono text-[10px] uppercase">
+                        Total ({paxCount} {paxCount === 1 ? 'PAX' : 'PAX'}):
+                      </span>
+                      <span className="font-serif text-base font-bold text-white tracking-tight">
+                        ${totalAmount.toLocaleString('es-CL')} <span className="text-[10px] font-mono font-normal text-slate-400">CLP</span>
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline text-[11px] text-slate-300 font-mono">
+                      <span className="text-[9px] uppercase tracking-wider">Abono Reserva (50%):</span>
+                      <span className="font-bold text-white">${depositAmount.toLocaleString('es-CL')} CLP</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <button
                   type="button"
@@ -551,85 +628,200 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
             {/* Right Column: Clean Luxury Interactive Area */}
             <div className="w-full md:w-[64%] flex flex-col justify-between bg-[#FCFDFE] overflow-hidden min-h-0">
               
-              {/* ================= PASO 1: SELECCIÓN DE CANTIDAD DE PASAJEROS ================= */}
-              {step === 1 && (
+              {/* ================= SALIDA COMPLETA: LISTA DE ESPERA / OTRAS FECHAS ================= */}
+              {isSoldOut ? (
                 <div className="flex flex-col justify-between h-full min-h-0">
-                  <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
-                    {/* Header */}
-                    <div className="space-y-1.5 text-left">
-                      <span className="text-[9px] font-mono tracking-[0.2em] text-slate-400 uppercase font-bold block">
-                        Paso 01 • Tripulación
-                      </span>
+                  <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 text-left">
+                    <div className="space-y-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold font-mono uppercase tracking-wider">
+                        <Lock className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Salida 100% Completa</span>
+                      </div>
                       <h3 className="font-serif font-bold text-2xl sm:text-3xl text-slate-900 tracking-tight">
-                        ¿Cuántos pasajeros viajarán?
+                        Esta expedición no tiene cupos disponibles
                       </h3>
-                      <p className="text-slate-500 text-xs sm:text-sm font-light">
-                        Selecciona el número de personas para esta expedición ({currentActiveExp.name}).
+                      <p className="text-slate-600 text-xs sm:text-sm font-light leading-relaxed">
+                        Todas las plazas para <span className="font-semibold text-slate-900">{currentActiveExp.name}</span> ({currentActiveExp.startDate} al {currentActiveExp.endDate}) se encuentran reservadas en su totalidad. Por motivos de confort náutico y seguridad marítima, no es posible admitir reservas directas para esta salida.
                       </p>
                     </div>
 
-                    {/* Minimalist Pax Selector */}
-                    <div className="py-6 space-y-4">
-                      <div className="flex items-center justify-center gap-6 py-4 px-8 rounded-2xl bg-[#F8FAFC] border border-slate-200/80 max-w-xs mx-auto shadow-2xs">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdatePaxCount(paxCount - 1)}
-                          disabled={paxCount <= 1}
-                          className="w-11 h-11 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-slate-900 disabled:opacity-20 flex items-center justify-center font-bold text-lg transition cursor-pointer shadow-xs active:scale-95"
-                          aria-label="Disminuir pasajero"
-                        >
-                          -
-                        </button>
-                        
-                        <div className="text-center min-w-[110px]">
-                          <span className="font-serif text-4xl font-bold text-slate-900 tracking-tight">
-                            {paxCount}
-                          </span>
-                          <span className="text-[11px] font-mono uppercase tracking-widest text-slate-400 block font-bold mt-0.5">
-                            {paxCount === 1 ? 'Pasajero' : 'Pasajeros'}
-                          </span>
+                    {/* Waitlist Box */}
+                    <div className="bg-gradient-to-br from-slate-900 to-[#0B1528] text-white rounded-2xl p-5 sm:p-6 border border-slate-800 space-y-4 shadow-md">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center justify-center shrink-0">
+                          <Sparkles className="w-5 h-5 text-amber-300" />
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleUpdatePaxCount(paxCount + 1)}
-                          disabled={paxCount >= maxPax}
-                          className="w-11 h-11 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-slate-900 disabled:opacity-20 flex items-center justify-center font-bold text-lg transition cursor-pointer shadow-xs active:scale-95"
-                          aria-label="Aumentar pasajero"
-                        >
-                          +
-                        </button>
+                        <div className="space-y-1">
+                          <h4 className="font-serif font-bold text-base text-white">
+                            Lista de Espera Prioritaria
+                          </h4>
+                          <p className="text-xs text-slate-300 font-light leading-relaxed">
+                            Si algún pasajero cancela o abrimos un zarpe adicional para esta ruta, nuestro equipo te contactará directamente con prioridad exclusiva antes del lanzamiento general.
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Value Info Line */}
-                      <div className="text-center text-xs text-slate-500 font-light pt-2">
-                        Tarifa estándar por persona: <span className="font-mono font-semibold text-slate-900">${pricePerPax.toLocaleString('es-CL')} CLP</span>
+                      <a
+                        href={`https://wa.me/56981312920?text=${encodeURIComponent(
+                          `Hola Concierge Yates Chile, veo que la expedición "${currentActiveExp.name}" (${currentActiveExp.startDate} al ${currentActiveExp.endDate}) está completa. Deseo anotarme en la Lista de Espera Prioritaria por si se libera algún cupo o se programa una nueva salida.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3.5 px-4 rounded-xl transition text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                      >
+                        <WhatsAppIcon className="w-4 h-4 text-white" />
+                        <span>Unirse a Lista de Espera vía WhatsApp</span>
+                      </a>
+                    </div>
+
+                    {/* Alternate Departures Suggestion */}
+                    <div className="space-y-3 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                          Otras Travesías Disponibles
+                        </span>
+                        <span className="text-xs text-slate-500 font-light">
+                          {sortedExpeditions.length} salidas con cupos
+                        </span>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setStep(0)}
+                        className="w-full bg-white hover:bg-slate-50 border border-slate-300 text-slate-900 font-bold py-3.5 px-4 rounded-xl transition text-xs shadow-xs flex items-center justify-center gap-2 cursor-pointer hover:border-slate-400 active:scale-98"
+                      >
+                        <Calendar className="w-4 h-4 text-slate-700" />
+                        <span>Explorar Calendario con Cupos Abiertos</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-600" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Bottom Navigation (Always pinned with generous padding) */}
+                  {/* Bottom Navigation */}
                   <div className="shrink-0 px-6 sm:px-8 py-4 border-t border-slate-100 bg-[#FCFDFE] flex items-center justify-between">
                     <button
                       type="button"
                       onClick={() => setStep(0)}
-                      className="text-[10px] uppercase font-mono tracking-wider font-bold text-slate-400 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer py-1"
+                      className="text-[10px] uppercase font-mono tracking-wider font-bold text-slate-500 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer py-1"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Volver</span>
+                      <span>Ver Otras Travesías</span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => setStep(2)}
-                      className="bg-slate-950 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer hover:scale-[1.01] active:scale-98"
+                      onClick={onClose}
+                      className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer px-4 py-2"
                     >
-                      <span>Ingresar Datos</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      Cerrar
                     </button>
                   </div>
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* ================= PASO 1: SELECCIÓN DE CANTIDAD DE PASAJEROS ================= */}
+                  {step === 1 && (
+                    <div className="flex flex-col justify-between h-full min-h-0">
+                      <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+                        {/* Header */}
+                        <div className="space-y-1.5 text-left">
+                          <span className="text-[9px] font-mono tracking-[0.2em] text-slate-400 uppercase font-bold block">
+                            Paso 01 • Tripulación
+                          </span>
+                          <h3 className="font-serif font-bold text-2xl sm:text-3xl text-slate-900 tracking-tight">
+                            ¿Cuántos pasajeros viajarán?
+                          </h3>
+                          <p className="text-slate-500 text-xs sm:text-sm font-light">
+                            Selecciona el número de personas para esta expedición ({currentActiveExp.name}).
+                          </p>
+                        </div>
+
+                        {/* Minimalist Pax Selector */}
+                        <div className="py-4 space-y-4">
+                          {/* Availability Notice */}
+                          {availableSpots === 1 ? (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-center max-w-sm mx-auto">
+                              <span className="text-amber-900 text-xs font-semibold flex items-center justify-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-amber-700 animate-pulse" />
+                                ¡Último cupo disponible para esta fecha de zarpe! (Máx. 1 pasajero)
+                              </span>
+                            </div>
+                          ) : availableSpots <= 3 ? (
+                            <div className="p-2.5 bg-blue-50 border border-blue-200/80 rounded-xl text-center max-w-sm mx-auto">
+                              <span className="text-blue-900 text-xs font-medium flex items-center justify-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-blue-700" />
+                                Salida con alta demanda: solo quedan {availableSpots} cupos disponibles
+                              </span>
+                            </div>
+                          ) : null}
+
+                          <div className="flex items-center justify-center gap-6 py-4 px-8 rounded-2xl bg-[#F8FAFC] border border-slate-200/80 max-w-xs mx-auto shadow-2xs">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdatePaxCount(paxCount - 1)}
+                              disabled={paxCount <= 1}
+                              className="w-11 h-11 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-slate-900 disabled:opacity-20 flex items-center justify-center font-bold text-lg transition cursor-pointer shadow-xs active:scale-95"
+                              aria-label="Disminuir pasajero"
+                            >
+                              -
+                            </button>
+                            
+                            <div className="text-center min-w-[110px]">
+                              <span className="font-serif text-4xl font-bold text-slate-900 tracking-tight">
+                                {paxCount}
+                              </span>
+                              <span className="text-[11px] font-mono uppercase tracking-widest text-slate-400 block font-bold mt-0.5">
+                                {paxCount === 1 ? 'Pasajero' : 'Pasajeros'}
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleUpdatePaxCount(paxCount + 1)}
+                              disabled={paxCount >= maxPax}
+                              className="w-11 h-11 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-slate-900 disabled:opacity-20 flex items-center justify-center font-bold text-lg transition cursor-pointer shadow-xs active:scale-95"
+                              aria-label="Aumentar pasajero"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {paxCount >= maxPax && maxPax < vesselCapacity && (
+                            <p className="text-center text-[11px] font-mono text-amber-700 font-medium">
+                              Has alcanzado el límite máximo de cupos restantes para esta expedición ({maxPax} {maxPax === 1 ? 'cupo' : 'cupos'}).
+                            </p>
+                          )}
+
+                          {/* Value Info Line */}
+                          <div className="text-center text-xs text-slate-500 font-light pt-2">
+                            Tarifa estándar por persona: <span className="font-mono font-semibold text-slate-900">${pricePerPax.toLocaleString('es-CL')} CLP</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Navigation */}
+                      <div className="shrink-0 px-6 sm:px-8 py-4 border-t border-slate-100 bg-[#FCFDFE] flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setStep(0)}
+                          className="text-[10px] uppercase font-mono tracking-wider font-bold text-slate-400 hover:text-slate-900 transition flex items-center gap-1.5 cursor-pointer py-1"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          <span>Volver</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setStep(2)}
+                          disabled={paxCount > maxPax || maxPax <= 0}
+                          className="bg-slate-950 hover:bg-slate-900 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer hover:scale-[1.01] active:scale-98"
+                        >
+                          <span>Ingresar Datos</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
               {/* ================= PASO 2: DATOS PERSONALES DE CADA PASAJERO ================= */}
               {step === 2 && (
@@ -637,9 +829,14 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                   <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-4">
                     {/* Header */}
                     <div className="space-y-1 text-left">
-                      <span className="text-[9px] font-mono tracking-[0.2em] text-slate-400 uppercase font-bold block">
-                        Paso 02 • Registro ({paxCount} {paxCount === 1 ? 'Tripulante' : 'Tripulantes'})
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-mono tracking-[0.2em] text-slate-400 uppercase font-bold block">
+                          Paso 02 • Registro ({paxCount} {paxCount === 1 ? 'Tripulante' : 'Tripulantes'})
+                        </span>
+                        <span className="text-[10px] font-mono font-semibold text-slate-500">
+                          {availableSpots} {availableSpots === 1 ? 'cupo disponible' : 'cupos disponibles'}
+                        </span>
+                      </div>
                       <h3 className="font-serif font-bold text-2xl sm:text-3xl text-slate-900 tracking-tight">
                         Datos Personales de los Pasajeros
                       </h3>
@@ -805,9 +1002,9 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setStep(3)}
-                          disabled={!isStep2Valid}
+                          disabled={!isStep2Valid || paxCount > maxPax || isSoldOut}
                           className={`text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2 ${
-                            isStep2Valid
+                            isStep2Valid && paxCount <= maxPax && !isSoldOut
                               ? 'bg-slate-950 hover:bg-slate-900 text-white cursor-pointer hover:scale-[1.01] active:scale-98'
                               : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                           }`}
@@ -963,6 +1160,9 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                     </button>
                   </div>
                 </form>
+              )}
+
+                </>
               )}
 
             </div>

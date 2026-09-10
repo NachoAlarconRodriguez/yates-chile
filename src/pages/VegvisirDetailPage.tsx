@@ -4,7 +4,7 @@ import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { useLanguage } from '../context/LanguageContext';
 import { translationService } from '../services/translationService';
-import { normalizeExternalMediaUrl } from '../services/cmsService';
+import { normalizeExternalMediaUrl, isMediaVideo, getMediaFallbackUrl } from '../services/cmsService';
 
 interface VegvisirDetailPageProps {
   onNavigate: (path: string) => void;
@@ -156,9 +156,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       
       {/* HERO SECTION */}
       <section className="relative h-[70vh] sm:h-[80vh] flex items-end justify-start overflow-hidden">
-        {(vegvisirCms.media_url?.endsWith('.mp4') || vegvisirCms.media_url?.endsWith('.webm') || vegvisirCms.media_url?.includes('video/')) ? (
+        {isMediaVideo(vegvisirCms.media_url) ? (
           <video
-            src={vegvisirCms.media_url}
+            src={normalizeExternalMediaUrl(vegvisirCms.media_url)}
             autoPlay
             loop
             muted
@@ -167,9 +167,16 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
           />
         ) : (
           <img
-            src={vegvisirCms.media_url && !vegvisirCms.media_url.includes('images.unsplash.com') ? vegvisirCms.media_url : "/velero-vegvisir.jpg"}
-            alt={vegvisirCms.title || "Velero Vegvisir"}
+            src={
+              normalizeExternalMediaUrl(vegvisirCms.media_url) && !vegvisirCms.media_url?.includes('images.unsplash.com')
+                ? normalizeExternalMediaUrl(vegvisirCms.media_url)
+                : '/velero-vegvisir.jpg'
+            }
+            alt={vegvisirCms.title || 'Velero Vegvisir'}
             className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = getMediaFallbackUrl(vegvisirCms.media_url) || '/velero-vegvisir.jpg';
+            }}
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />

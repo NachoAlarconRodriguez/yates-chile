@@ -6,7 +6,7 @@ import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { formatPhone, formatRut } from '../lib/formatters';
 import type { CatalogService } from '../services/catalogService';
-import { normalizeExternalMediaUrl } from '../services/cmsService';
+import { normalizeExternalMediaUrl, isMediaVideo, getMediaFallbackUrl } from '../services/cmsService';
 import { getRoomNightlyRate } from '../services/lodgeService';
 
 interface LodgePageProps {
@@ -177,9 +177,9 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
       
       {/* HERO SECTION */}
       <section className="relative h-[70vh] sm:h-[80vh] flex items-end justify-start overflow-hidden">
-        {(lodgeInfo.media_url?.endsWith('.mp4') || lodgeInfo.media_url?.endsWith('.webm') || lodgeInfo.media_url?.includes('video/')) ? (
+        {isMediaVideo(lodgeInfo.media_url) ? (
           <video
-            src={lodgeInfo.media_url}
+            src={normalizeExternalMediaUrl(lodgeInfo.media_url)}
             autoPlay
             loop
             muted
@@ -188,9 +188,12 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
           />
         ) : (
           <img
-            src={lodgeInfo.media_url || "/rincon-de-navegantes.jpg"}
+            src={normalizeExternalMediaUrl(lodgeInfo.media_url) || "/rincon-de-navegantes.jpg"}
             alt={lodgeInfo.title || "Lodge Rincón de Navegantes"}
             className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = getMediaFallbackUrl(lodgeInfo.media_url) || "/rincon-de-navegantes.jpg";
+            }}
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />

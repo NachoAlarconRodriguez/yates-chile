@@ -59,12 +59,14 @@ export const paymentService = {
 
   async uploadReceipt(installmentId: string, file: File, bankRef?: string): Promise<{ success: boolean; url?: string; error?: string }> {
     try {
-      const ext = file.name.split('.').pop();
+      const { compressImageFile } = await import('../lib/imageCompressor');
+      const optimizedFile = await compressImageFile(file, { maxWidth: 1400, quality: 0.8 });
+      const ext = optimizedFile.name.split('.').pop();
       const path = `receipts/${installmentId}_${Date.now()}.${ext}`;
 
       const { data: uploadData, error: uploadErr } = await supabase.storage
         .from('receipts')
-        .upload(path, file, { upsert: true });
+        .upload(path, optimizedFile, { upsert: true, cacheControl: '31536000' });
 
       if (uploadErr) {
         return { success: false, error: uploadErr.message };

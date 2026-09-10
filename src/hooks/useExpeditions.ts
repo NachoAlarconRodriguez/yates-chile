@@ -1,13 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
-import { expeditionService, type PublicExpedition, type DepartureRow, INITIAL_EXPEDITIONS } from '../services/expeditionService';
+import { expeditionService, type PublicExpedition, type DepartureRow, getCachedPublicExpeditions } from '../services/expeditionService';
 
 export function useExpeditions() {
-  const [expeditions, setExpeditions] = useState<PublicExpedition[]>(INITIAL_EXPEDITIONS);
+  // Stale-While-Revalidate: load from cache immediately if present (0ms wait)
+  const [expeditions, setExpeditions] = useState<PublicExpedition[]>(() => {
+    if (typeof window === 'undefined') return [];
+    return getCachedPublicExpeditions();
+  });
   const [departures, setDepartures] = useState<DepartureRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Only show initial skeleton/spinner if there are no cached expeditions yet
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return getCachedPublicExpeditions().length === 0;
+  });
+  const [isRevalidating, setIsRevalidating] = useState<boolean>(false);
 
   const fetchAll = useCallback(async () => {
-    setLoading(true);
+    setIsRevalidating(true);
     try {
       const [pubExp, depList] = await Promise.all([
         expeditionService.getPublicExpeditions(),
@@ -23,6 +32,7 @@ export function useExpeditions() {
       console.error('Error loading expeditions in hook:', err);
     } finally {
       setLoading(false);
+      setIsRevalidating(false);
     }
   }, []);
 
@@ -46,6 +56,7 @@ export function useExpeditions() {
     expeditions,
     departures,
     loading,
+    isRevalidating,
     refreshExpeditions: fetchAll,
     createDeparture: expeditionService.createDeparture.bind(expeditionService),
     updateDepartureStatus: expeditionService.updateDepartureStatus.bind(expeditionService),

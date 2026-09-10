@@ -3,7 +3,7 @@ import { ArrowLeft, Compass, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRi
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { useLanguage } from '../context/LanguageContext';
-import { normalizeExternalMediaUrl } from '../services/cmsService';
+import { normalizeExternalMediaUrl, isMediaVideo, getMediaFallbackUrl } from '../services/cmsService';
 
 interface TerranovaDetailPageProps {
   onNavigate: (path: string) => void;
@@ -155,9 +155,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
       
       {/* HERO SECTION */}
       <section className="relative h-[70vh] sm:h-[80vh] flex items-end justify-start overflow-hidden">
-        {(terranovaCms.media_url?.endsWith('.mp4') || terranovaCms.media_url?.endsWith('.webm') || terranovaCms.media_url?.includes('video/')) ? (
+        {isMediaVideo(terranovaCms.media_url) ? (
           <video
-            src={terranovaCms.media_url}
+            src={normalizeExternalMediaUrl(terranovaCms.media_url)}
             autoPlay
             loop
             muted
@@ -166,9 +166,12 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
           />
         ) : (
           <img
-            src={terranovaCms.media_url || "/yate-terranova.jpg"}
+            src={normalizeExternalMediaUrl(terranovaCms.media_url) || "/yate-terranova.jpg"}
             alt={terranovaCms.title || "Yate Terranova"}
             className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = getMediaFallbackUrl(terranovaCms.media_url) || "/yate-terranova.jpg";
+            }}
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
