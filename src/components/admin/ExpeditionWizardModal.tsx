@@ -226,6 +226,57 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   ]);
   const [publicWeatherPolicy, setPublicWeatherPolicy] = useState<string>('');
 
+  // Reset all wizard fields to clean initial state
+  const resetWizard = useCallback(() => {
+    setCurrentStep(1);
+    setIsSubmitting(false);
+    setShowPreviewModal(false);
+    setShowNewVesselModal(false);
+
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    const startIso = d.toISOString().split('T')[0];
+    const retD = new Date();
+    retD.setDate(retD.getDate() + 37);
+    const returnIso = retD.toISOString().split('T')[0];
+
+    setDepartureDate(startIso);
+    setReturnDate(returnIso);
+    setActiveDateField('start');
+    setCalendarViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
+
+    setVesselId('vegvisir');
+    setLodgingType('onboard');
+    setTotalSlots(8);
+    setPricePerPaxClp(1850000);
+    setPriceCharterFullClp(14800000);
+
+    setPublicName('Travesía Robinson Crusoe');
+    setPublicHeadline('Expedición a Vela & Navegación Oceánica Austral');
+    setPublicLocation('Océano Pacífico Sur / Juan Fernández');
+    setPublicCoverImage('/velero-vegvisir.jpg');
+    setPublicDescription(
+      'Aventura oceánica de ida y vuelta navegando hacia Juan Fernández. Ideal para navegantes apasionados que buscan el reto del mar abierto, combinada con descanso frente al mar en nuestro Lodge de Bahía Cumberland.'
+    );
+    setPublicBrochureUrl('');
+    setPublicWeatherPolicy('');
+    if (catalogServices.length > 0) {
+      setSelectedServiceIds(catalogServices.filter(s => s.is_active).map(s => s.id));
+    }
+  }, [catalogServices]);
+
+  const handleCloseAndReset = useCallback(() => {
+    resetWizard();
+    onClose();
+  }, [resetWizard, onClose]);
+
+  // Reset wizard whenever modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      resetWizard();
+    }
+  }, [isOpen, resetWizard]);
+
   // Load backend dependencies
   useEffect(() => {
     if (!isOpen) return;
@@ -264,9 +315,12 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     if (activeDateField === 'start') {
       setDepartureDate(dateStr);
       if (returnDate && returnDate < dateStr) {
-        const d = new Date(dateStr + 'T00:00:00');
-        d.setDate(d.getDate() + 7);
-        setReturnDate(d.toISOString().split('T')[0]);
+        const [y, m, day] = dateStr.split('-').map(Number);
+        const d = new Date(y, m - 1, day + 7);
+        const returnY = d.getFullYear();
+        const returnM = String(d.getMonth() + 1).padStart(2, '0');
+        const returnD = String(d.getDate()).padStart(2, '0');
+        setReturnDate(`${returnY}-${returnM}-${returnD}`);
       }
       setActiveDateField('end');
     } else {
@@ -282,11 +336,13 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   // Helper to render month calendar grid
   const renderMonthCalendar = (year: number, month: number) => {
     const monthObj = new Date(year, month, 1);
+    const normalizedYear = monthObj.getFullYear();
+    const normalizedMonth = monthObj.getMonth();
     const monthName = monthObj.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
     const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
     const firstDayOfWeek = (monthObj.getDay() + 6) % 7; // Mon=0, Sun=6
-    const totalDays = new Date(year, month + 1, 0).getDate();
+    const totalDays = new Date(normalizedYear, normalizedMonth + 1, 0).getDate();
     const todayStr = new Date().toISOString().split('T')[0];
 
     const cells: Array<{ dateStr: string | null; dayNum?: number }> = [];
@@ -294,9 +350,9 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
       cells.push({ dateStr: null });
     }
     for (let d = 1; d <= totalDays; d++) {
-      const mStr = String(month + 1).padStart(2, '0');
+      const mStr = String(normalizedMonth + 1).padStart(2, '0');
       const dStr = String(d).padStart(2, '0');
-      cells.push({ dateStr: `${year}-${mStr}-${dStr}`, dayNum: d });
+      cells.push({ dateStr: `${normalizedYear}-${mStr}-${dStr}`, dayNum: d });
     }
 
     return { capitalizedMonth, cells, todayStr };
@@ -584,9 +640,9 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
       <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full flex flex-col md:flex-row h-[94vh] md:h-[88vh] border border-slate-200 overflow-hidden relative">
         
         {/* ========================================================================= */}
-        {/* LEFT SIDEBAR: BRANDING & VERTICAL STEPPER */}
+        {/* LEFT SIDEBAR: BRANDING & VERTICAL STEPPER (Hidden on mobile) */}
         {/* ========================================================================= */}
-        <div className="w-full md:w-72 lg:w-80 shrink-0 bg-gradient-to-b from-[#0b2038] via-[#0f2b48] to-[#163a5f] text-white p-5 sm:p-6 flex flex-col justify-between border-r border-white/10 relative overflow-y-auto">
+        <div className="hidden md:flex md:w-72 lg:w-80 shrink-0 bg-gradient-to-b from-[#0b2038] via-[#0f2b48] to-[#163a5f] text-white p-5 sm:p-6 flex-col justify-between border-r border-white/10 relative overflow-y-auto">
           
           <div className="space-y-5">
             <div className="space-y-1.5">
@@ -669,22 +725,47 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
         {/* ========================================================================= */}
         <div className="flex-1 flex flex-col justify-between min-w-0 h-full overflow-hidden bg-slate-50/50 relative">
           
-          {/* Top Bar with Close Button */}
-          <div className="bg-white px-6 py-3.5 border-b border-slate-200/80 flex items-center justify-between shrink-0">
-            <div className="text-xs font-serif font-bold text-[#0f2b48]">
-              Paso {currentStep} de 6 • {WIZARD_STEPS[currentStep - 1]?.label.replace(/^\d+\.\s*/, '')}
+          {/* Top Bar with Close Button & Mobile Step Indicator */}
+          <div className="bg-white px-4 sm:px-6 py-3 border-b border-slate-200/80 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="md:hidden w-6 h-6 rounded-lg bg-[#0f2b48] text-white font-bold text-xs flex items-center justify-center font-mono">
+                {currentStep}
+              </span>
+              <div className="text-xs font-serif font-bold text-[#0f2b48]">
+                Paso {currentStep} de 6 <span className="hidden sm:inline">• {WIZARD_STEPS[currentStep - 1]?.label.replace(/^\d+\.\s*/, '')}</span>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-slate-400 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 transition rounded-full p-1.5 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
+
+            <div className="flex items-center gap-3">
+              {/* Mobile Progress Dots (md:hidden) */}
+              <div className="flex md:hidden items-center gap-1">
+                {WIZARD_STEPS.map((s) => (
+                  <div
+                    key={s.step}
+                    className={`h-1.5 rounded-full transition-all ${
+                      s.step === currentStep
+                        ? 'w-4 bg-[#0f2b48]'
+                        : s.step < currentStep
+                        ? 'w-1.5 bg-emerald-500'
+                        : 'w-1.5 bg-slate-200'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseAndReset}
+                className="text-slate-400 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 transition rounded-full p-1.5 cursor-pointer"
+                aria-label="Cerrar modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* STEP CONTENT CONTAINER */}
-          <div className="p-5 sm:p-7 overflow-y-auto flex-1">
+          <div className="p-4 sm:p-7 overflow-y-auto flex-1">
             
             {/* ========================================================================= */}
             {/* PASO 1: FECHA DE INICIO Y FECHA DE SALIDA (CALENDARIO PERSONALIZADO) */}
@@ -1827,7 +1908,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
           <div className="bg-white p-4 sm:p-5 border-t border-slate-200 shrink-0 flex items-center justify-between">
             <button
               type="button"
-              onClick={currentStep === 1 ? onClose : handleBack}
+              onClick={currentStep === 1 ? handleCloseAndReset : handleBack}
               className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
             >
               <ChevronLeft className="w-4 h-4" />

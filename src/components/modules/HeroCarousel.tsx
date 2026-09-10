@@ -116,12 +116,43 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
     setIsBookingModalOpen(true);
   };
 
+  const touchStartX = React.useRef<number | null>(null);
+  const touchStartY = React.useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStartX.current - touchEndX;
+    const diffY = touchStartY.current - touchEndY;
+
+    // Only trigger if horizontal movement is dominant and exceeds threshold
+    if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      if (diffX > 0) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
   if (slides.length === 0) return null;
 
   const slide = slides[currentSlide] || slides[0];
 
   return (
-    <section className="relative h-[480px] sm:h-[520px] flex items-end justify-start bg-slate-950 text-white overflow-hidden border-b border-slate-800">
+    <section
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="relative min-h-[500px] sm:h-[520px] flex items-end justify-start bg-slate-950 text-white overflow-hidden border-b border-slate-800 touch-pan-y select-none"
+    >
       
       {/* Background Images / Videos with Fade Transition */}
       {slides.map((s, idx) => (
@@ -144,7 +175,11 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
             <img
               src={s.bgImage}
               alt={s.title}
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/travesia-robinson.jpg';
+              }}
             />
           )}
         </div>
@@ -180,10 +215,10 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
           </p>
 
           {/* Action CTAs */}
-          <div className="pt-2 flex items-center gap-3 flex-wrap">
+          <div className="pt-2 flex items-center gap-2.5 sm:gap-3 flex-wrap pb-10 sm:pb-0">
             <button
               onClick={() => handleBookExpedition(slide)}
-              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-5 py-2.5 rounded-xl transition-all shadow-lg text-xs min-h-[40px] border border-white/90 cursor-pointer hover:scale-[1.02]"
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-4 sm:px-5 py-3 rounded-xl transition-all shadow-lg text-xs min-h-[46px] border border-white/90 cursor-pointer active:scale-95"
             >
               <Compass className="w-4 h-4 text-slate-950" />
               <span>{t('Reservar Cupo en esta Expedición', 'Book Spot on this Expedition')}</span>
@@ -191,7 +226,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
 
             <button
               onClick={() => onNavigate('/expediciones')}
-              className="inline-flex items-center justify-center gap-1.5 bg-slate-900/80 hover:bg-slate-900 text-white font-semibold px-4 py-2.5 rounded-xl transition-all border border-white/20 text-xs min-h-[40px] backdrop-blur-sm cursor-pointer hover:text-amber-200"
+              className="inline-flex items-center justify-center gap-1.5 bg-slate-900/80 hover:bg-slate-900 text-white font-semibold px-4 py-3 rounded-xl transition-all border border-white/20 text-xs min-h-[46px] backdrop-blur-sm cursor-pointer hover:text-amber-200 active:scale-95"
             >
               <span>{t('Ver Calendario Completo', 'View Full Calendar')}</span>
               <ArrowRight className="w-3.5 h-3.5" />

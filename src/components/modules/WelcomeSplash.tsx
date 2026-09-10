@@ -73,6 +73,7 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           loop
           muted
           playsInline
+          poster="/expediciones-hero.jpg"
           onLoadedData={onVideoLoaded}
           className="w-full h-full object-cover scale-100"
         >
@@ -85,36 +86,36 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
       </div>
 
       {/* Top Header — Minimalist & Discrete White Emblem Logo */}
-      <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 py-5 flex items-center justify-between">
+      <div className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 md:px-10 py-3.5 sm:py-5 flex items-center justify-between gap-2">
         
         {/* Small Transparent Emblem Logo */}
-        <div className="flex items-center gap-2.5 opacity-90 hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-2 sm:gap-2.5 opacity-90 hover:opacity-100 transition-opacity shrink-0">
           <img
             src="/vegvisir-emblem-white.png"
             alt="Logo Vegvisir Emblem"
-            className="w-8 h-8 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+            className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
           />
           <div className="flex flex-col">
             <span className="font-bold text-xs sm:text-sm text-white tracking-widest uppercase">
               Yates Chile
             </span>
-            <span className="text-[9px] text-slate-300 tracking-wider uppercase font-light">
+            <span className="text-[8px] sm:text-[9px] text-slate-300 tracking-wider uppercase font-light">
               Sailing & Lodge
             </span>
           </div>
         </div>
 
         {/* Top-Right: Rotating Live Telemetry Capsule (Cabo de Hornos -> Robinson Crusoe -> Alejandro Selkirk every 15s) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div
-            className={`flex items-center gap-3.5 bg-slate-950/60 backdrop-blur-md border border-white/20 px-4 py-2 rounded-full text-xs text-white shadow-2xl transition-all duration-350 select-none ${
+            className={`flex items-center gap-2 sm:gap-3.5 bg-slate-950/60 backdrop-blur-md border border-white/20 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs text-white shadow-2xl transition-all duration-350 select-none ${
               isFading ? 'opacity-0 scale-95 translate-y-[-2px]' : 'opacity-100 scale-100 translate-y-0'
             }`}
           >
             {/* Active Destination */}
             <div className="flex items-center gap-1.5 shrink-0">
-              <MapPin className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-semibold text-[11px] text-white tracking-wide">
+              <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400" />
+              <span className="font-semibold text-[10px] sm:text-[11px] text-white tracking-wide">
                 {activeLocation.name}
               </span>
             </div>
@@ -123,16 +124,16 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
 
             {/* Live Wind */}
             <div className="flex items-center gap-1.5 shrink-0" title={`Viento: ${activeWeather.windSpeed} Nudos ${activeWeather.windDirection}`}>
-              <Wind className="w-3.5 h-3.5 text-sky-300" />
-              <span className="font-medium text-slate-200">
-                {activeWeather.windSpeed} Nudos ({activeWeather.windDirection})
+              <Wind className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-sky-300" />
+              <span className="font-medium text-[10px] sm:text-xs text-slate-200">
+                {activeWeather.windSpeed} Nds <span className="hidden sm:inline">({activeWeather.windDirection})</span>
               </span>
             </div>
 
-            <span className="text-white/25">|</span>
+            <span className="text-white/25 hidden md:inline">|</span>
 
             {/* Live Tide */}
-            <div className="flex items-center gap-1.5 shrink-0" title={`Marea: ${activeWeather.tideState} (${activeWeather.tideHeight})`}>
+            <div className="hidden md:flex items-center gap-1.5 shrink-0" title={`Marea: ${activeWeather.tideState} (${activeWeather.tideHeight})`}>
               <Waves className="w-3.5 h-3.5 text-teal-300" />
               <span className="font-medium text-slate-200">
                 {activeWeather.tideState} ({activeWeather.tideHeight})

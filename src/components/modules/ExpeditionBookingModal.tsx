@@ -701,10 +701,11 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                         <input
                           type="text"
                           required
+                          autoComplete="name"
                           placeholder="Ej. Roberto Silva"
                           value={passengers[activePaxTab].fullName}
                           onChange={(e) => handlePassengerChange(activePaxTab, 'fullName', e.target.value)}
-                          className="w-full bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
+                          className="w-full min-h-[44px] bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
                         />
                       </div>
 
@@ -716,10 +717,11 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                           <input
                             type="text"
                             required
+                            autoCapitalize="characters"
                             placeholder="Ej. 12.345.678-9"
                             value={passengers[activePaxTab].docId}
                             onChange={(e) => handlePassengerChange(activePaxTab, 'docId', e.target.value)}
-                            className="w-full bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
+                            className="w-full min-h-[44px] bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
                           />
                         </div>
 
@@ -729,11 +731,13 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                           </label>
                           <input
                             type="tel"
+                            inputMode="tel"
+                            autoComplete="tel"
                             required={activePaxTab === 0}
                             placeholder="Ej. +56 9 1234 5678"
                             value={passengers[activePaxTab].phone}
                             onChange={(e) => handlePassengerChange(activePaxTab, 'phone', e.target.value)}
-                            className="w-full bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
+                            className="w-full min-h-[44px] bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
                           />
                         </div>
                       </div>
@@ -745,11 +749,13 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                           </label>
                           <input
                             type="email"
+                            inputMode="email"
+                            autoComplete="email"
                             required={activePaxTab === 0}
                             placeholder="ejemplo@correo.com"
                             value={passengers[activePaxTab].email}
                             onChange={(e) => handlePassengerChange(activePaxTab, 'email', e.target.value)}
-                            className="w-full bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
+                            className="w-full min-h-[44px] bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
                           />
                         </div>
 
@@ -762,7 +768,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                             placeholder="Alergias o preferencias"
                             value={passengers[activePaxTab].notes}
                             onChange={(e) => handlePassengerChange(activePaxTab, 'notes', e.target.value)}
-                            className="w-full bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
+                            className="w-full min-h-[44px] bg-[#F8FAFC] border border-slate-200/90 focus:border-slate-900 focus:bg-white focus:outline-none px-3.5 py-2.5 text-sm text-slate-900 rounded-xl placeholder-slate-400 transition-all shadow-2xs focus:ring-2 focus:ring-slate-900/5"
                           />
                         </div>
                       </div>

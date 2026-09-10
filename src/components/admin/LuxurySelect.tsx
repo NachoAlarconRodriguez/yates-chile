@@ -22,6 +22,7 @@ export interface LuxurySelectProps<T extends string = string> {
   className?: string;
   id?: string;
   dropdownClassName?: string;
+  singleLine?: boolean;
 }
 
 export function LuxurySelect<T extends string = string>({
@@ -33,6 +34,7 @@ export function LuxurySelect<T extends string = string>({
   className = '',
   id,
   dropdownClassName = '',
+  singleLine = false,
 }: LuxurySelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,7 +79,7 @@ export function LuxurySelect<T extends string = string>({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full px-3.5 py-2.5 bg-[#f4f7fb] hover:bg-slate-100/90 focus:bg-white border rounded-2xl flex items-center justify-between gap-2.5 transition shadow-2xs cursor-pointer select-none text-left ${
+        className={`w-full px-3.5 ${singleLine ? 'h-[44px]' : 'py-2.5'} bg-[#f4f7fb] hover:bg-slate-100/90 focus:bg-white border rounded-2xl flex items-center justify-between gap-2.5 transition shadow-2xs cursor-pointer select-none text-left ${
           isOpen
             ? 'border-[#0b192c] ring-2 ring-[#0b192c]/10 bg-white'
             : 'border-slate-200/90 hover:border-slate-300'
@@ -94,17 +96,17 @@ export function LuxurySelect<T extends string = string>({
           )}
 
           <div className="min-w-0 flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
               <span className="font-semibold text-xs text-[#0b192c] truncate">
                 {selectedOption ? selectedOption.label : placeholder}
               </span>
-              {selectedOption?.badge && (
+              {!singleLine && selectedOption?.badge && (
                 <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border shrink-0 ${selectedOption.badge.className}`}>
                   {selectedOption.badge.text}
                 </span>
               )}
             </div>
-            {selectedOption?.subtitle && (
+            {!singleLine && selectedOption?.subtitle && (
               <span className="text-[10px] text-slate-400 font-normal truncate leading-tight">
                 {selectedOption.subtitle}
               </span>
@@ -155,17 +157,17 @@ export function LuxurySelect<T extends string = string>({
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs ${isSelected ? 'font-bold text-[#0b192c]' : 'font-medium text-slate-800'}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs truncate ${isSelected ? 'font-bold text-[#0b192c]' : 'font-medium text-slate-800'}`}>
                         {opt.label}
                       </span>
-                      {opt.badge && (
+                      {!singleLine && opt.badge && (
                         <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border ${opt.badge.className}`}>
                           {opt.badge.text}
                         </span>
                       )}
                     </div>
-                    {opt.subtitle && (
+                    {!singleLine && opt.subtitle && (
                       <p className="text-[10px] text-slate-400 font-normal truncate mt-0.5">
                         {opt.subtitle}
                       </p>

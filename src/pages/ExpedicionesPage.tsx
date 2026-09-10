@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useExpeditions } from '../hooks/useExpeditions';
 import type { PublicExpedition as Expedition } from '../services/expeditionService';
+import { normalizeExternalMediaUrl } from '../services/cmsService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { leadService } from '../services/leadService';
@@ -43,8 +44,10 @@ interface ExpeditionOverview {
 const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => string): ExpeditionOverview => {
   const v = exp.vessel.toLowerCase();
 
+  let overview: ExpeditionOverview;
+
   if (v.includes('lodge')) {
-    return {
+    overview = {
       headline: t('Estadía Boutique & Exploraciones en Robinson Crusoe', 'Boutique Stay & Explorations in Robinson Crusoe'),
       summary: t(
         `${exp.description} Tu experiencia combina el descanso en nuestro refugio frente al mar en Bahía Cumberland (Uberlindo Andaur 222) con salidas guiadas por expertos locales, contemplando atardeceres únicos en el océano y explorando la naturaleza prístina de la isla.`,
@@ -81,10 +84,8 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
       ],
       weatherPolicy: t('La programación diaria de excursiones, caminatas de altura y salidas marítimas se coordina en terreno según las condiciones de viento, mar y visibilidad, asegurando siempre el mayor bienestar, seguridad y confort durante tu estadía.', 'Daily schedule of hikes, summits, and sea tours is coordinated on-site according to wind, wave, and visibility conditions, always ensuring top comfort and safety.')
     };
-  }
-
-  if (v.includes('velero') || v.includes('sailing') || exp.name.toLowerCase().includes('travesía')) {
-    return {
+  } else if (v.includes('velero') || v.includes('sailing') || exp.name.toLowerCase().includes('travesía')) {
+    overview = {
       headline: t('Expedición a Vela & Navegación Oceánica Austral', 'Sailing Expedition & Austral Offshore Navigation'),
       summary: t(
         `${exp.description} Una experiencia náutica genuina a bordo del velero de expedición Vegvisir (Dufour 52.5 ft francés), donde vivirás la auténtica pasión del mar abierto, el trabajo en equipo de guardia y la llegada a caletas insulares remotas.`,
@@ -121,46 +122,87 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
       ],
       weatherPolicy: t('La derrota náutica, los tiempos de navegación a vela y los puntos de fondeo se ajustan de manera dinámica según la evolución meteorológica de los vientos y corrientes oceánicas, bajo el mando experto del Capitán para garantizar una travesía segura y placentera.', 'Nautical course, sailing hours, and anchoring spots are dynamically adjusted according to meteorological evolution under the Master Captain command to guarantee safety.')
     };
+  } else {
+    // Yate Terranova or default
+    overview = {
+      headline: t('Crucero de Alta Gama & Exploración de Gran Autonomía', 'Luxury Cruising & Extended Range Exploration'),
+      summary: t(
+        `${exp.description} A bordo del Yate Terranova (Hatteras 65ft LRC de 3 cubiertas), experimentarás una navegación rápida, potente y confortable, accediendo a los rincones más inaccesibles con la máxima sofisticación y servicio a bordo.`,
+        `${exp.description} Aboard the Terranova Yacht (3-deck Hatteras 65ft LRC), experience fast, powerful, and comfortable cruising to remote corners with sophisticated service.`
+      ),
+      pillars: [
+        {
+          icon: <Anchor className="w-5 h-5 text-blue-900" />,
+          title: t('Navegación Rápida & 3 Cubiertas', 'Fast Cruising & 3 Decks'),
+          desc: t('Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.', 'Hydraulic roll stabilizers, twin helm bridges, 5 en-suite cabins, and expansive panoramic decks.')
+        },
+        {
+          icon: <Utensils className="w-5 h-5 text-blue-900" />,
+          title: t('Deck Superior & Gastronomía de Autor', 'Upper Deck & Signature Dining'),
+          desc: t('Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.', 'Open-air top deck grill, fresh seafood paired with select fine wines by our executive chef.')
+        },
+        {
+          icon: <Waves className="w-5 h-5 text-blue-900" />,
+          title: t('Desembarcos Asistidos con Zodiac 70 HP', 'Assisted Landings with 70 HP Zodiac'),
+          desc: t('Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.', '1-ton crane and powerful tender to explore remote fjords, sea caves, and volcanic beaches.')
+        },
+        {
+          icon: <Compass className="w-5 h-5 text-blue-900" />,
+          title: t('Pesca Deportiva de Altura & Fauna Pelágica', 'Sportfishing & Pelagic Wildlife'),
+          desc: t('Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.', 'Top-tier trolling gear and marine radar for spotting cetaceans, seals, and pelagic seabirds.')
+        }
+      ],
+      included: [
+        t('Tripulación profesional completa y chef ejecutivo a bordo', 'Full professional crew and executive chef on board'),
+        t('Todas las comidas gourmet, tablas y barra de autor', 'All gourmet meals, tasting boards, and open signature bar'),
+        t('Uso de lancha auxiliar Zodiac con motor Yamaha 70 HP', 'Use of Zodiac tender with 70 HP Yamaha outboard'),
+        t('Conexión satelital Starlink 24/7 e instrumental doble', '24/7 Starlink satellite connection and dual navigation electronics'),
+        t('Seguro de navegación marítima y equipamiento de seguridad de alta mar', 'Maritime navigation insurance and offshore SOLAS safety gear')
+      ],
+      weatherPolicy: t('Las derrotas de navegación, bahías de fondeo y desembarcos se planifican con total flexibilidad atendiendo a las condiciones meteorológicas y marítimas de cada día, eligiendo siempre las zonas más protegidas y escénicas para tu máxima comodidad.', 'Cruising routes, anchorages, and landings are planned with flexibility according to daily weather, always selecting the most sheltered and scenic bays.')
+    };
   }
 
-  // Yate Terranova or default
-  return {
-    headline: t('Crucero de Alta Gama & Exploración de Gran Autonomía', 'Luxury Cruising & Extended Range Exploration'),
-    summary: t(
-      `${exp.description} A bordo del Yate Terranova (Hatteras 65ft LRC de 3 cubiertas), experimentarás una navegación rápida, potente y confortable, accediendo a los rincones más inaccesibles con la máxima sofisticación y servicio a bordo.`,
-      `${exp.description} Aboard the Terranova Yacht (3-deck Hatteras 65ft LRC), experience fast, powerful, and comfortable cruising to remote corners with sophisticated service.`
-    ),
-    pillars: [
-      {
-        icon: <Anchor className="w-5 h-5 text-blue-900" />,
-        title: t('Navegación Rápida & 3 Cubiertas', 'Fast Cruising & 3 Decks'),
-        desc: t('Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.', 'Hydraulic roll stabilizers, twin helm bridges, 5 en-suite cabins, and expansive panoramic decks.')
-      },
-      {
-        icon: <Utensils className="w-5 h-5 text-blue-900" />,
-        title: t('Deck Superior & Gastronomía de Autor', 'Upper Deck & Signature Dining'),
-        desc: t('Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.', 'Open-air top deck grill, fresh seafood paired with select fine wines by our executive chef.')
-      },
-      {
-        icon: <Waves className="w-5 h-5 text-blue-900" />,
-        title: t('Desembarcos Asistidos con Zodiac 70 HP', 'Assisted Landings with 70 HP Zodiac'),
-        desc: t('Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.', '1-ton crane and powerful tender to explore remote fjords, sea caves, and volcanic beaches.')
-      },
-      {
-        icon: <Compass className="w-5 h-5 text-blue-900" />,
-        title: t('Pesca Deportiva de Altura & Fauna Pelágica', 'Sportfishing & Pelagic Wildlife'),
-        desc: t('Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.', 'Top-tier trolling gear and marine radar for spotting cetaceans, seals, and pelagic seabirds.')
+  // Custom headline and summary enhancement
+  if (exp.headline && exp.headline.trim()) {
+    overview.headline = exp.headline;
+  }
+  if (exp.description && exp.description.trim()) {
+    overview.summary = exp.description;
+  }
+
+  // Custom highlights / pillars enhancement if present
+  if (exp.highlights && exp.highlights.trim()) {
+    try {
+      const parsed = JSON.parse(exp.highlights);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        overview.pillars = parsed.slice(0, 4).map((p: any, idx: number) => ({
+          icon: overview.pillars[idx]?.icon || <Compass className="w-5 h-5 text-blue-900" />,
+          title: typeof p === 'string' ? p : p.title || '',
+          desc: typeof p === 'string' ? (overview.pillars[idx]?.desc || '') : p.desc || ''
+        }));
       }
-    ],
-    included: [
-      t('Tripulación profesional completa y chef ejecutivo a bordo', 'Full professional crew and executive chef on board'),
-      t('Todas las comidas gourmet, tablas y barra de autor', 'All gourmet meals, tasting boards, and open signature bar'),
-      t('Uso de lancha auxiliar Zodiac con motor Yamaha 70 HP', 'Use of Zodiac tender with 70 HP Yamaha outboard'),
-      t('Conexión satelital Starlink 24/7 e instrumental doble', '24/7 Starlink satellite connection and dual navigation electronics'),
-      t('Seguro de navegación marítima y equipamiento de seguridad de alta mar', 'Maritime navigation insurance and offshore SOLAS safety gear')
-    ],
-    weatherPolicy: t('Las derrotas de navegación, bahías de fondeo y desembarcos se planifican con total flexibilidad atendiendo a las condiciones meteorológicas y marítimas de cada día, eligiendo siempre las zonas más protegidas y escénicas para tu máxima comodidad.', 'Cruising routes, anchorages, and landings are planned with flexibility according to daily weather, always selecting the most sheltered and scenic bays.')
-  };
+    } catch {
+      const customHls = exp.highlights.split(/[•\n]/).map((s) => s.trim()).filter(Boolean);
+      if (customHls.length > 0) {
+        overview.pillars = customHls.slice(0, 4).map((hl, idx) => ({
+          icon: overview.pillars[idx]?.icon || <Compass className="w-5 h-5 text-blue-900" />,
+          title: hl,
+          desc: overview.pillars[idx]?.desc || t('Hito principal y experiencia programada de esta expedición.', 'Main milestone and featured activity of this expedition.')
+        }));
+      }
+    }
+  }
+
+  // Custom included services enhancement if present
+  if (exp.includedServices && exp.includedServices.trim()) {
+    const customInc = exp.includedServices.split(/[•\n]/).map((s) => s.trim()).filter(Boolean);
+    if (customInc.length > 0) {
+      overview.included = customInc;
+    }
+  }
+
+  return overview;
 };
 
 export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate }) => {
@@ -212,6 +254,32 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
     setBookingModalExpedition(exp);
     setBookingModalInitialStep(1);
     setIsBookingModalOpen(true);
+  };
+
+  const handleDownloadExpeditionBrochure = (exp: Expedition) => {
+    const brochureUrl = (exp as any).brochureUrl || (exp as any).brochure_url;
+    if (brochureUrl) {
+      const link = document.createElement('a');
+      link.href = brochureUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      const cleanName = exp.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.setAttribute('download', `Dossier_${cleanName}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const confirmWhatsapp = window.confirm(
+        t(
+          `El dossier en PDF para "${exp.name}" se encuentra en preparación. ¿Deseas solicitarlo directamente a nuestro Concierge por WhatsApp?`,
+          `The PDF brochure for "${exp.name}" is being prepared. Would you like to request it directly via WhatsApp Concierge?`
+        )
+      );
+      if (confirmWhatsapp) {
+        const msg = encodeURIComponent(`Hola Concierge Yates Chile, quisiera solicitar el brochure/dossier en PDF para la expedición "${exp.name}".`);
+        window.open(`https://wa.me/56981312920?text=${msg}`, '_blank');
+      }
+    }
   };
 
   return (
@@ -268,120 +336,154 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {expeditions.map((exp) => (
-              <div
-                key={exp.id}
-                onClick={() => setSelectedExpedition(exp)}
-                className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-lg transition-all duration-300 cursor-pointer group"
-              >
-                {/* Image & Vessel Tag */}
-                <div className="relative h-48 sm:h-52 overflow-hidden bg-slate-100 shrink-0">
-                  <img
-                    src={exp.image}
-                    alt={exp.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute top-4 left-4 bg-slate-900/90 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border border-white/10 backdrop-blur-sm">
-                    {exp.vessel}
-                  </div>
-                  
-                  {/* Status Badge */}
-                  <div className="absolute top-4 right-4">
-                    {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) && (
-                      <span className="bg-red-500/90 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-red-400/20 backdrop-blur-sm shadow-xs">
-                        {t('Completo', 'Sold Out')}
-                      </span>
-                    )}
-                    {exp.spotsLeft === 'bloqueado' && (
-                      <span className="bg-slate-700/90 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-500/20 backdrop-blur-sm">
-                        {t('Bloqueado', 'Reserved')}
-                      </span>
-                    )}
-                    {typeof exp.spotsLeft === 'number' && exp.spotsLeft === 1 && (
-                      <span className="bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-400/20 animate-pulse shadow-sm">
-                        {t('¡Último cupo!', 'Last spot!')}
-                      </span>
-                    )}
-                    {typeof exp.spotsLeft === 'number' && exp.spotsLeft > 1 && (
-                      <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20">
-                        {exp.spotsLeft} {t('cupos', 'spots')}
-                      </span>
-                    )}
-                  </div>
-                </div>
+            {expeditions.map((exp) => {
+              const isSoldOut = exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0);
+              const isBlocked = exp.spotsLeft === 'bloqueado';
+              const isUnavailable = isSoldOut || isBlocked;
 
-                {/* Content */}
-                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-blue-900 font-mono text-[10px] font-bold tracking-wider uppercase">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{exp.startDate} {t('al', 'to')} {exp.endDate}</span>
-                    </div>
-
-                    <h3 className="font-serif text-lg font-bold text-slate-900 leading-snug group-hover:text-blue-950 transition-colors">
-                      {exp.name}
-                    </h3>
-
-                    <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed font-light">
-                      {exp.description}
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-slate-500 text-xs">
-                      <MapPin className="w-3.5 h-3.5 text-blue-900" />
-                      <span className="truncate max-w-[140px]">{exp.location}</span>
+              return (
+                <div
+                  key={exp.id}
+                  onClick={() => setSelectedExpedition(exp)}
+                  className={`rounded-2xl overflow-hidden border flex flex-col justify-between transition-all duration-300 cursor-pointer group ${
+                    isUnavailable
+                      ? 'bg-[#f8fafc] border-slate-200/80 shadow-2xs opacity-80 hover:opacity-100 hover:shadow-md'
+                      : 'bg-white border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300'
+                  }`}
+                >
+                  {/* Image & Vessel Tag */}
+                  <div className="relative h-48 sm:h-52 overflow-hidden bg-slate-100 shrink-0">
+                    <img
+                      src={normalizeExternalMediaUrl(exp.image) || (exp.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg')}
+                      alt={exp.name}
+                      referrerPolicy="no-referrer"
+                      className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${
+                        isUnavailable ? 'grayscale-[55%] contrast-90 group-hover:grayscale-0 group-hover:contrast-100' : ''
+                      }`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = exp.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg';
+                      }}
+                    />
+                    <div className={`absolute top-4 left-4 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border backdrop-blur-sm ${
+                      isUnavailable ? 'bg-slate-800/80 border-white/10 text-slate-300' : 'bg-slate-900/90 border-white/10'
+                    }`}>
+                      {exp.vessel}
                     </div>
                     
-                    <span className="text-blue-900 font-bold text-xs uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                      {t('Ver Descripción ➔', 'View Details ➔')}
-                    </span>
+                    {/* Status Badge */}
+                    <div className="absolute top-4 right-4">
+                      {isSoldOut && (
+                        <span className="bg-slate-600/90 text-slate-200 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-500/30 backdrop-blur-sm shadow-xs font-mono">
+                          {t('Completo', 'Sold Out')}
+                        </span>
+                      )}
+                      {isBlocked && (
+                        <span className="bg-slate-700/90 text-slate-300 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-600/30 backdrop-blur-sm">
+                          {t('Bloqueado', 'Reserved')}
+                        </span>
+                      )}
+                      {typeof exp.spotsLeft === 'number' && exp.spotsLeft === 1 && (
+                        <span className="bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-amber-400/20 animate-pulse shadow-sm">
+                          {t('¡Último cupo!', 'Last spot!')}
+                        </span>
+                      )}
+                      {typeof exp.spotsLeft === 'number' && exp.spotsLeft > 1 && (
+                        <span className="bg-emerald-600 text-white text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20 shadow-xs">
+                          {exp.spotsLeft} {t('cupos disponibles', 'spots available')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className={`flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-wider uppercase ${
+                        isUnavailable ? 'text-slate-400' : 'text-blue-900'
+                      }`}>
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{exp.startDate} {t('al', 'to')} {exp.endDate}</span>
+                      </div>
+
+                      <h3 className={`font-serif text-lg font-bold leading-snug transition-colors ${
+                        isUnavailable ? 'text-slate-500 group-hover:text-slate-800' : 'text-slate-900 group-hover:text-blue-950'
+                      }`}>
+                        {exp.name}
+                      </h3>
+
+                      <p className={`text-xs line-clamp-2 leading-relaxed font-light ${
+                        isUnavailable ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
+                        {exp.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <div className={`flex items-center gap-1 text-xs ${
+                        isUnavailable ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
+                        <MapPin className={`w-3.5 h-3.5 ${isUnavailable ? 'text-slate-400' : 'text-blue-900'}`} />
+                        <span className="truncate max-w-[140px]">{exp.location}</span>
+                      </div>
+                      
+                      <span className={`font-bold text-xs uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 ${
+                        isUnavailable ? 'text-slate-400 group-hover:text-slate-700' : 'text-blue-900'
+                      }`}>
+                        {t('Ver Descripción ➔', 'View Details ➔')}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* Large Expedition Overview Modal */}
       {selectedExpedition && overview && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full h-[90vh] md:h-[84vh] flex flex-col md:flex-row relative text-slate-800 animate-[scaleIn_0.3s_cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-5xl w-full h-[94vh] md:h-[88vh] md:max-h-[840px] flex flex-col md:flex-row relative text-slate-800 animate-[scaleIn_0.3s_cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden">
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto sm:hidden mt-2 mb-1 absolute top-1 left-1/2 -translate-x-1/2 z-50 pointer-events-none" />
             
             {/* Close Button */}
             <button
               onClick={() => setSelectedExpedition(null)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-950 transition cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center z-40 bg-white/90 backdrop-blur-md rounded-full shadow-md hover:scale-105"
+              className="absolute top-4 sm:top-5 right-4 sm:right-5 text-slate-400 hover:text-slate-950 transition cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center z-40 bg-white/90 backdrop-blur-md rounded-full shadow-md hover:scale-105"
               aria-label="Cerrar modal"
             >
               <X className="w-5 h-5" />
             </button>
 
             {/* Left Column: Cover & Quick Stats */}
-            <div className="relative w-full md:w-[36%] text-white p-6 sm:p-8 flex flex-col justify-between overflow-hidden min-h-[220px] md:min-h-auto shrink-0">
+            <div className="relative w-full md:w-[38%] lg:w-[36%] text-white p-5 sm:p-6 lg:p-7 flex flex-col justify-between overflow-y-auto no-scrollbar min-h-[220px] md:min-h-full shrink-0">
               <img
-                src={selectedExpedition.image}
+                src={normalizeExternalMediaUrl(selectedExpedition.image) || (selectedExpedition.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg')}
                 alt={selectedExpedition.name}
+                referrerPolicy="no-referrer"
                 className="absolute inset-0 w-full h-full object-cover transition-all duration-500 ease-in-out"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = selectedExpedition.vessel.toLowerCase().includes('terranova') ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg';
+                }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/40" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/85 to-slate-950/45" />
 
-              <div className="relative z-10 space-y-4">
+              <div className="relative z-10 space-y-3 sm:space-y-3.5">
                 <span className="text-[10px] uppercase tracking-widest text-slate-350 font-mono block font-bold">
                   {t('Expedición Yates Chile', 'Yates Chile Expedition')}
                 </span>
-                <div className="space-y-2">
-                  <h2 className="font-serif font-bold text-2xl sm:text-3xl text-white leading-tight">
+                <div className="space-y-1.5">
+                  <h2 className="font-serif font-bold text-xl sm:text-2xl lg:text-[26px] text-white leading-snug">
                     {selectedExpedition.name}
                   </h2>
                   <div className="flex items-center gap-1.5 text-slate-350 text-xs">
-                    <MapPin className="w-4 h-4 text-blue-400 shrink-0" />
+                    <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                     <span>{selectedExpedition.location}</span>
                   </div>
                 </div>
 
-                <div className="border-t border-white/10 pt-3.5 space-y-2.5 font-mono text-[11px] text-slate-300">
+                <div className="border-t border-white/10 pt-2.5 sm:pt-3 space-y-2 font-mono text-[11px] text-slate-300">
                   <div className="flex justify-between">
                     <span>{t('Zarpe / Estadía:', 'Departure / Stay:')}</span>
                     <span className="font-bold text-white">{selectedExpedition.startDate}</span>
@@ -403,18 +505,19 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 </div>
               </div>
 
-              <div className="relative z-10 pt-6 border-t border-white/10 space-y-2.5">
+              {/* Desktop Left-Column CTAs */}
+              <div className="relative z-10 pt-3.5 sm:pt-4 border-t border-white/10 space-y-2 hidden md:block mt-4">
                 {(selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0)) ? (
                   <button
                     disabled
-                    className="w-full bg-slate-850 text-slate-500 font-bold py-3 rounded-xl text-xs cursor-not-allowed border border-white/5 uppercase tracking-wider"
+                    className="w-full bg-slate-850 text-slate-500 font-bold py-2.5 rounded-xl text-xs cursor-not-allowed border border-white/5 uppercase tracking-wider"
                   >
                     {t('Reserva Completada (Agotada)', 'Fully Booked')}
                   </button>
                 ) : selectedExpedition.spotsLeft === 'bloqueado' ? (
                   <button
                     disabled
-                    className="w-full bg-slate-850 text-slate-500 font-bold py-3 rounded-xl text-xs cursor-not-allowed border border-white/5"
+                    className="w-full bg-slate-850 text-slate-500 font-bold py-2.5 rounded-xl text-xs cursor-not-allowed border border-white/5"
                   >
                     {t('Bloqueado por Misión', 'Reserved for Mission')}
                   </button>
@@ -423,18 +526,10 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                     {/* Botón 1: Descargar Brochure en PDF */}
                     <button
                       type="button"
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = '#';
-                        link.setAttribute('download', `Dossier_${selectedExpedition.name.replace(/\s+/g, '_')}_2026.pdf`);
-                        document.body.appendChild(link);
-                        setTimeout(() => {
-                          alert(`Descargando Brochure Oficial en PDF de: ${selectedExpedition.name}`);
-                        }, 200);
-                      }}
-                      className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
+                      onClick={() => handleDownloadExpeditionBrochure(selectedExpedition)}
+                      className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2 cursor-pointer backdrop-blur-xs hover:scale-[1.02]"
                     >
-                      <Download className="w-4 h-4 text-blue-300" />
+                      <Download className="w-3.5 h-3.5 text-blue-300" />
                       <span>{t('Descargar Brochure en PDF', 'Download PDF Brochure')}</span>
                     </button>
 
@@ -442,7 +537,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                     <button
                       type="button"
                       onClick={() => handleOpenBookingModal(selectedExpedition)}
-                      className="w-full bg-white hover:bg-slate-100 text-slate-950 font-bold py-3.5 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
+                      className="w-full bg-white hover:bg-slate-100 text-slate-950 font-bold py-3 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
                     >
                       <span>{t('Reservar Cupo de Expedición', 'Book Expedition Spot')}</span>
                       <ArrowRight className="w-4 h-4 text-slate-900" />
@@ -525,6 +620,32 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 </div>
 
               </div>
+            </div>
+
+            {/* Mobile Sticky Bottom CTA Bar */}
+            <div className="md:hidden sticky bottom-0 z-40 bg-white/95 backdrop-blur-md p-3 border-t border-slate-200 flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleDownloadExpeditionBrochure(selectedExpedition)}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold py-3 px-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-slate-600 shrink-0" />
+                <span className="truncate">{t('Brochure PDF', 'PDF Brochure')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenBookingModal(selectedExpedition)}
+                disabled={selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0) || selectedExpedition.spotsLeft === 'bloqueado'}
+                className={`flex-1 font-bold py-3 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition ${
+                  (selectedExpedition.spotsLeft === 'completo' || selectedExpedition.spotsLeft === 0 || (typeof selectedExpedition.availableSlots === 'number' && selectedExpedition.availableSlots <= 0) || selectedExpedition.spotsLeft === 'bloqueado')
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-blue-900 hover:bg-blue-800 active:bg-blue-950 text-white cursor-pointer'
+                }`}
+              >
+                <span className="truncate">{t('Reservar Cupo', 'Book Spot')}</span>
+                <ArrowRight className="w-4 h-4 shrink-0" />
+              </button>
             </div>
 
           </div>

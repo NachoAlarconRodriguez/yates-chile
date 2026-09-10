@@ -580,27 +580,132 @@ export const cmsService = {
 };
 
 /**
+ * Detailed diagnosis for external media URLs (Dropbox, Google Drive, OneDrive, etc.)
+ */
+export interface MediaUrlDiagnosis {
+  isDropbox: boolean;
+  isGoogleDrive: boolean;
+  isDropboxFolder: boolean;
+  isGoogleDriveFolder: boolean;
+  isHeic: boolean;
+  isValidFormat: boolean;
+  warning?: {
+    level: 'error' | 'warning' | 'info';
+    title: string;
+    description: string;
+    actionHint?: string;
+  };
+}
+
+/**
+ * Diagnoses an external media URL to alert users in real time about folders,
+ * unsupported Apple HEIC files, or private Google Drive permissions.
+ */
+export const diagnoseMediaUrl = (url?: string | null): MediaUrlDiagnosis => {
+  if (!url || !url.trim()) {
+    return {
+      isDropbox: false,
+      isGoogleDrive: false,
+      isDropboxFolder: false,
+      isGoogleDriveFolder: false,
+      isHeic: false,
+      isValidFormat: true,
+    };
+  }
+
+  const raw = url.trim();
+  const lower = raw.toLowerCase();
+
+  const isDropbox = lower.includes('dropbox.com') || lower.includes('dropboxusercontent.com');
+  const isGoogleDrive = lower.includes('drive.google.com') || lower.includes('googleusercontent.com');
+
+  // Check for Apple iPhone HEIC/HEIF photo format (unsupported in web browsers)
+  const isHeic = /\.heic($|\?)/i.test(raw);
+
+  // Check for Dropbox folder links (/scl/fo/ or /sh/) without a direct image extension
+  const hasImageExt = /\.(jpe?g|png|webp|avif|gif)($|\?)/i.test(raw);
+  const isDropboxFolder = isDropbox && (raw.includes('/scl/fo/') || raw.includes('/sh/')) && !hasImageExt;
+
+  // Check for Google Drive folder links (/drive/folders/ or /drive/u/X/folders/)
+  const isGoogleDriveFolder = isGoogleDrive && /\/folders\/[a-zA-Z0-9_-]+/i.test(raw);
+
+  let warning: MediaUrlDiagnosis['warning'] = undefined;
+
+  if (isHeic) {
+    warning = {
+      level: 'error',
+      title: 'Formato .HEIC de iPhone no compatible con la web',
+      description: 'Los navegadores web (Google Chrome, Edge, Firefox, Brave) no pueden decodificar fotos en formato .HEIC de manera nativa.',
+      actionHint: 'En tu iPhone o Mac, abre la foto y elígela como "Exportar como JPG" o conviértela a JPG/PNG antes de subirla o copiar su enlace.',
+    };
+  } else if (isDropboxFolder) {
+    warning = {
+      level: 'warning',
+      title: 'Enlace de Carpeta de Dropbox detectado (/scl/fo/)',
+      description: 'Has pegado el enlace de una CARPETA compartida en lugar del archivo directo de la foto. El navegador no puede cargar una carpeta como si fuera una imagen.',
+      actionHint: 'Entra a Dropbox, haz clic en la foto específica (o en sus 3 puntos •••) y selecciona "Copiar vínculo" (el enlace debe contener /scl/fi/ o terminar en el nombre de la foto .JPG).',
+    };
+  } else if (isGoogleDriveFolder) {
+    warning = {
+      level: 'warning',
+      title: 'Enlace de Carpeta de Google Drive detectado',
+      description: 'Has pegado el enlace de una carpeta de Google Drive. Se requiere el enlace directo a una imagen individual.',
+      actionHint: 'Dentro de Google Drive, haz clic derecho sobre la foto específica > "Compartir" > "Copiar enlace".',
+    };
+  } else if (isGoogleDrive) {
+    warning = {
+      level: 'info',
+      title: 'Enlace de Google Drive conectado',
+      description: 'Asegúrate de que la foto tenga el "Acceso general" configurado en "Cualquier persona con el enlace" (Lector) en Google Drive para que todos los visitantes puedan verla.',
+    };
+  }
+
+  const isValidFormat = !isHeic && !isDropboxFolder && !isGoogleDriveFolder;
+
+  return {
+    isDropbox,
+    isGoogleDrive,
+    isDropboxFolder,
+    isGoogleDriveFolder,
+    isHeic,
+    isValidFormat,
+    warning,
+  };
+};
+
+/**
  * Normalizes image and media URLs from third-party hosting services (Dropbox, Google Drive, etc.)
  * into directly embeddable/renderable asset links for <img> and <video> tags.
  */
 export const normalizeExternalMediaUrl = (url?: string | null): string => {
   if (!url) return '';
-  const trimmed = url.trim();
+  let trimmed = url.trim();
+
+  // If protocol is missing
+  if (trimmed.startsWith('www.dropbox.com') || trimmed.startsWith('dropbox.com') || trimmed.startsWith('drive.google.com')) {
+    trimmed = `https://${trimmed}`;
+  }
+
+  // If already normalized Google usercontent URL
+  if (trimmed.includes('lh3.googleusercontent.com/d/')) {
+    return trimmed;
+  }
 
   // 1. Google Drive: transform shared preview / open links to direct render link
-  const driveMatch = trimmed.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
+  // Supports single-account (/file/d/ID) and multi-account (/file/u/0/d/ID, /file/u/1/d/ID)
+  const driveMatch = trimmed.match(/drive\.google\.com\/(?:file\/(?:u\/\d+\/)?d\/|open\?id=|uc\?(?:export=view&)?id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
     return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
   }
 
-  // 2. Dropbox: transform share links with dl=0 to raw=1 for direct binary stream
-  if (/dropbox\.com/.test(trimmed)) {
+  // 2. Dropbox: transform share links with dl=0 or dl=1 to raw=1 for direct binary stream
+  if (/dropbox\.com/.test(trimmed) || /dropboxusercontent\.com/.test(trimmed)) {
     let converted = trimmed;
     if (converted.includes('dl=0')) {
-      converted = converted.replace('dl=0', 'raw=1');
+      converted = converted.replace(/([?&])dl=0/g, '$1raw=1');
     } else if (converted.includes('dl=1')) {
-      converted = converted.replace('dl=1', 'raw=1');
-    } else if (!converted.includes('raw=1') && (converted.includes('/scl/') || converted.includes('/s/'))) {
+      converted = converted.replace(/([?&])dl=1/g, '$1raw=1');
+    } else if (!converted.includes('raw=1')) {
       converted = converted.includes('?') ? `${converted}&raw=1` : `${converted}?raw=1`;
     }
     return converted;

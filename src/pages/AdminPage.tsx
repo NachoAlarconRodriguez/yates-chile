@@ -5,6 +5,8 @@ import {
   Calendar,
   CheckCircle2,
   Anchor,
+  Utensils,
+  Waves,
   XCircle,
   Plus,
   Search,
@@ -65,6 +67,10 @@ import {
   MoreVertical,
   Save,
   Star,
+  Menu,
+  Image as ImageIcon,
+  Link2,
+  Upload,
   X
 } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
@@ -73,7 +79,7 @@ import { useSiteContent } from '../hooks/useSiteContent';
 import { useLeads } from '../hooks/useLeads';
 import { type LeadItem } from '../services/leadService';
 import { paymentService, type PaymentInstallment } from '../services/paymentService';
-import { lodgeService, type LodgeRoom, type LodgeBooking } from '../services/lodgeService';
+import { lodgeService, getRoomNightlyRate, type LodgeRoom, type LodgeBooking } from '../services/lodgeService';
 import { BookingWizardModal, type BookingWizardData } from '../components/admin/BookingWizardModal';
 import { ExpeditionWizardModal, type ExpeditionWizardData } from '../components/admin/ExpeditionWizardModal';
 import { VisualCmsEditor } from '../components/admin/VisualCmsEditor';
@@ -89,7 +95,7 @@ import {
   type ExpeditionRouteRow,
   type VesselRow,
 } from '../services/expeditionService';
-import { cmsService, DEFAULT_CMS_CONTENT, type SiteContent } from '../services/cmsService';
+import { cmsService, DEFAULT_CMS_CONTENT, normalizeExternalMediaUrl, diagnoseMediaUrl, type SiteContent } from '../services/cmsService';
 import {
   analyticsService,
   type AnalyticsSummary,
@@ -100,6 +106,7 @@ import { formatRut, formatPhone, formatCompactClp } from '../lib/formatters';
 import { LuxuryDatePicker } from '../components/admin/LuxuryDatePicker';
 import { CountryPhoneInput } from '../components/admin/CountryPhoneInput';
 import { LuxurySelect } from '../components/admin/LuxurySelect';
+import { CalendarDateCardPicker } from '../components/admin/CalendarDateCardPicker';
 import { exportBookingsToExcel, exportExpeditionManifestToExcel, type ExpeditionManifestExportRow } from '../lib/excelExport';
 import { supabase } from '../lib/supabase';
 import { crmService } from '../services/crmService';
@@ -134,6 +141,8 @@ export const addDeletedClientIdentifier = (identifiers: (string | undefined | nu
 const AirbnbIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <img src="/airbnb-logo.png" alt="Airbnb" className={`${className} object-contain`} />
 );
+
+
 
 const formatDateDDMMYYYY = (d?: any): string => {
   if (!d) return '-';
@@ -739,6 +748,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Active Tab: 'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests'>('dashboard');
+  const [mobileAdminSidebarOpen, setMobileAdminSidebarOpen] = useState(false);
 
   // Estados de Solicitud de Acceso en Login
   const [loginViewMode, setLoginViewMode] = useState<'login' | 'request_access'>('login');
@@ -910,6 +920,133 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   // Modal para nueva salida de expedición y edición
   const [showNewDepartureModal, setShowNewDepartureModal] = useState(false);
   const [editingDeparture, setEditingDeparture] = useState<DepartureRow | null>(null);
+  const [editDepartureTab, setEditDepartureTab] = useState<'general' | 'experience' | 'media' | 'brochure'>('general');
+  const [editPillars, setEditPillars] = useState<Array<{ title: string; desc: string }>>([]);
+  const [editDepartureImgError, setEditDepartureImgError] = useState(false);
+  const [editDepartureImgLoading, setEditDepartureImgLoading] = useState(false);
+  const [isUploadingBrochure, setIsUploadingBrochure] = useState(false);
+  const brochureFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleOpenEditDeparture = useCallback((dep: any) => {
+    const vId = ((dep.vessel_id || dep.vesselName || '') as string).toLowerCase().includes('terranova')
+      ? 'terranova'
+      : ((dep.vessel_id || dep.vesselName || '') as string).toLowerCase().includes('lodge')
+      ? 'lodge'
+      : 'vegvisir';
+
+    const defaultHeadlines: Record<'vegvisir' | 'terranova' | 'lodge', string> = {
+      vegvisir: 'Expedición a Vela & Navegación Oceánica Austral',
+      terranova: 'Crucero de Alta Gama & Exploración de Gran Autonomía',
+      lodge: 'Refugio Austral & Exploraciones en el Fin del Mundo',
+    };
+
+    const defaultDescriptions: Record<'vegvisir' | 'terranova' | 'lodge', string> = {
+      vegvisir: 'La expedición insular por excelencia hacia uno de los ecosistemas con mayor endemismo del planeta. Una experiencia náutica genuina a bordo del velero de expedición Vegvisir (Dufour 52.5 ft francés), donde vivirás la auténtica pasión del mar abierto, el trabajo en equipo de guardia y la llegada a caletas insulares remotas.',
+      terranova: 'Navegación rápida de alto confort en Yate Terranova de 3 cubiertas por el Archipiélago Juan Fernández. A bordo del Yate Terranova (Hatteras 65ft LRC de 3 cubiertas), experimentarás una navegación rápida, potente y confortable, accediendo a los rincones más inaccesibles con la máxima sofisticación y servicio a bordo.',
+      lodge: 'Estadía de expedición en lodge boutique exclusivo en las costas australes más remotas, combinando el confort de montaña con navegaciones en fiordos y canales fueguinos.',
+    };
+
+    const defaultPillars: Record<'vegvisir' | 'terranova' | 'lodge', Array<{ title: string; desc: string }>> = {
+      vegvisir: [
+        {
+          title: 'Velerismo Oceánico de Altura',
+          desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.'
+        },
+        {
+          title: 'Pesca de Altura (Trolling) & Menú a Bordo',
+          desc: 'Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.'
+        },
+        {
+          title: 'Recaladas en Bahías Míticas',
+          desc: 'Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.'
+        },
+        {
+          title: 'Autonomía Total & Starlink 24/7',
+          desc: '5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.'
+        }
+      ],
+      terranova: [
+        {
+          title: 'Navegación Rápida & 3 Cubiertas',
+          desc: 'Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.'
+        },
+        {
+          title: 'Deck Superior & Gastronomía de Autor',
+          desc: 'Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.'
+        },
+        {
+          title: 'Desembarcos Asistidos con Zodiac 70 HP',
+          desc: 'Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.'
+        },
+        {
+          title: 'Pesca Deportiva de Altura & Fauna Pelágica',
+          desc: 'Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.'
+        }
+      ],
+      lodge: [
+        {
+          title: 'Hospedaje Boutique Frente al Mar',
+          desc: 'Habitaciones privadas con vista a los fiordos, calefacción a leña y arquitectura bioclimática integrada al entorno salvaje.'
+        },
+        {
+          title: 'Gastronomía Fueguina & Cenas en Quincho',
+          desc: 'Centolla fresca, cordero al palo y cocina con ingredientes recolectados en los bosques y costas patagónicas.'
+        },
+        {
+          title: 'Senderismo & Miradores Glaciares',
+          desc: 'Trekks guiados a turberas milenarias, bosques de lenga y cumbres con vistas panorámicas al archipiélago fueguino.'
+        },
+        {
+          title: 'Santuarios Marinos & Snorkel',
+          desc: 'Navegaciones costeras hacia farellones y loberías protegidas con sesiones de snorkel junto a los amigables lobos marinos de dos pelos.'
+        }
+      ]
+    };
+
+    const effectiveHeadline = dep.headline || defaultHeadlines[vId];
+
+    let effectiveDescription = dep.description || '';
+    if (!effectiveDescription || effectiveDescription.length < 120) {
+      effectiveDescription = defaultDescriptions[vId];
+    }
+
+    let initialPillars: Array<{ title: string; desc: string }> = [];
+    if (dep.highlights) {
+      try {
+        const parsed = JSON.parse(dep.highlights);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          initialPillars = parsed.map((p: any) => ({
+            title: typeof p === 'string' ? p : p.title || '',
+            desc: typeof p === 'string' ? '' : p.desc || ''
+          }));
+        }
+      } catch {
+        const items = dep.highlights.split(/[•\n]/).map((s: string) => s.trim()).filter(Boolean);
+        if (items.length > 0) {
+          initialPillars = items.slice(0, 4).map((title: string, idx: number) => ({
+            title,
+            desc: defaultPillars[vId][idx]?.desc || 'Hito principal y experiencia programada.'
+          }));
+        }
+      }
+    }
+
+    if (initialPillars.length === 0) {
+      initialPillars = defaultPillars[vId].map(p => ({ ...p }));
+    }
+
+    setEditPillars(initialPillars);
+    setEditingDeparture({
+      ...dep,
+      headline: effectiveHeadline,
+      description: effectiveDescription,
+      brochureUrl: dep.brochureUrl || dep.brochure_url || '',
+      brochure_url: dep.brochureUrl || dep.brochure_url || '',
+    });
+    setEditDepartureImgError(false);
+    setEditDepartureImgLoading(false);
+    setEditDepartureTab('general');
+  }, []);
   // Modal moderno de confirmación para eliminar salida de expedición
   const [departureToDelete, setDepartureToDelete] = useState<any | null>(null);
   const [isDeletingDeparture, setIsDeletingDeparture] = useState(false);
@@ -1264,12 +1401,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     roomName: string;
     maxPax: number;
     basePrice: number;
+    ratesByPax: Record<number, number>;
   }>({
     isOpen: false,
     room: null,
     roomName: '',
     maxPax: 3,
     basePrice: 240000,
+    ratesByPax: {},
   });
   const [isSavingRoom, setIsSavingRoom] = useState(false);
   const [airbnbConfirmModal, setAirbnbConfirmModal] = useState<{
@@ -2752,7 +2891,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     const checkOutDate = new Date(blockForm.checkOut);
     const nights = Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)));
     const room = rooms.find((r) => r.id === blockForm.roomId);
-    const calculatedAmount = (room?.base_price_clp || 240000) * nights;
+    const calculatedAmount = getRoomNightlyRate(room, blockForm.paxCount) * nights;
 
     const primaryGuest = guestList[0] || { name: blockForm.guestName, email: blockForm.guestEmail, phone: blockForm.guestPhone, rut: '' };
     const effectiveName = primaryGuest.name.trim() || blockForm.guestName.trim() || 'Huésped Lodge';
@@ -2884,12 +3023,23 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   // EDIT LODGE ROOM NAME & DETAILS HANDLERS
   // ----------------------------------------------------
   const handleOpenEditRoomModal = (room: LodgeRoom) => {
+    const maxPax = room.max_pax || 3;
+    const base = room.base_price_clp || 240000;
+    const initialRates: Record<number, number> = room.rates_by_pax ? { ...room.rates_by_pax } : {};
+    for (let p = 1; p <= maxPax; p++) {
+      if (!initialRates[p]) {
+        if (p === 1) initialRates[p] = Math.round(base * 0.88 / 1000) * 1000;
+        else if (p === 2) initialRates[p] = base;
+        else initialRates[p] = base + (p - 2) * 40000;
+      }
+    }
     setEditRoomModal({
       isOpen: true,
       room,
       roomName: room.room_name,
-      maxPax: room.max_pax || 3,
-      basePrice: room.base_price_clp || 240000,
+      maxPax,
+      basePrice: base,
+      ratesByPax: initialRates,
     });
   };
 
@@ -2902,6 +3052,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         room_name: editRoomModal.roomName.trim(),
         max_pax: Number(editRoomModal.maxPax),
         base_price_clp: Number(editRoomModal.basePrice),
+        rates_by_pax: editRoomModal.ratesByPax,
       });
       const updatedName = editRoomModal.roomName.trim();
       const roomNumber = editRoomModal.room.room_number;
@@ -3322,6 +3473,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
     const res = await expeditionService.updateDeparture(editingDeparture.id, {
       publicName: editingDeparture.name,
+      publicHeadline: editingDeparture.headline,
       vesselId: editingDeparture.vessel_id,
       departureDate: editingDeparture.departure_date,
       returnDate: editingDeparture.return_date,
@@ -3331,14 +3483,66 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       status: targetStatus,
       publicLocation: editingDeparture.location,
       publicDescription: editingDeparture.description,
+      publicCoverImage: editingDeparture.image,
+      publicTempEstimate: editingDeparture.tempEstimate,
+      publicHighlights: JSON.stringify(editPillars),
+      publicIncludedServices: editingDeparture.includedServices,
+      publicBrochureUrl: (editingDeparture as any).brochureUrl || (editingDeparture as any).brochure_url || '',
     });
     if (res.success) {
       await fetchAllData();
+      const savedImg = editingDeparture.image;
       setEditingDeparture(null);
-      setActionMessage('Expedición actualizada exitosamente.');
-      setTimeout(() => setActionMessage(null), 3000);
+      setEditDepartureTab('general');
+      setEditDepartureImgError(false);
+
+      if (savedImg) {
+        const diag = diagnoseMediaUrl(savedImg);
+        if (diag.isDropboxFolder) {
+          triggerAlert('Expedición guardada. Atención: el enlace ingresado es una CARPETA de Dropbox (/scl/fo/). Para que los visitantes vean la foto en la web pública, ingresa a Dropbox y copia el enlace individual del archivo .JPG (/scl/fi/).', 'warning');
+        } else if (diag.isHeic) {
+          triggerAlert('Expedición guardada. Atención: el archivo es .HEIC de iPhone. Para que sea visible en Google Chrome y otros navegadores, conviértelo a .JPG o .PNG.', 'warning');
+        } else {
+          setActionMessage('Expedición y detalles actualizados exitosamente.');
+          setTimeout(() => setActionMessage(null), 3000);
+        }
+      } else {
+        setActionMessage('Expedición actualizada exitosamente.');
+        setTimeout(() => setActionMessage(null), 3000);
+      }
     } else {
       triggerAlert('Error al actualizar la expedición: ' + (res.error || 'Error desconocido'), 'error');
+    }
+  };
+
+  const handleBrochureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !editingDeparture) return;
+    const file = e.target.files[0];
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      triggerAlert('Solo se admiten documentos en formato PDF (.pdf).', 'warning', 'Formato no permitido');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    try {
+      setIsUploadingBrochure(true);
+      const res = await expeditionService.uploadBrochurePdf(file, editingDeparture.id);
+      setIsUploadingBrochure(false);
+      if (res.success && res.url) {
+        setEditingDeparture({
+          ...editingDeparture,
+          brochureUrl: res.url,
+          brochure_url: res.url,
+        });
+        triggerAlert('Documento PDF cargado exitosamente. Haz clic en "Guardar Cambios" para confirmar.', 'info', 'Brochure Conectado');
+      } else {
+        triggerAlert(res.error || 'Error al subir el archivo PDF.', 'error');
+      }
+    } catch (err: any) {
+      setIsUploadingBrochure(false);
+      triggerAlert(err?.message || 'Ocurrió un error al subir el PDF.', 'error');
+    } finally {
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -4464,7 +4668,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       type="button"
                       onClick={() => setShowForgotPasswordModal(false)}
                       className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-full font-semibold transition cursor-pointer"
-                    >
+>
                       Cancelar
                     </button>
                     <button
@@ -4486,57 +4690,69 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   // ----------------------------------------------------
   // AUTHENTICATED DASHBOARD (100% WHITE & NAVY BLUE LUXURY THEME)
   // ----------------------------------------------------
-  return (
-    <div className="min-h-screen bg-[#fcfdfe] text-[#0f2b48] flex font-sans selection:bg-[#0f2b48] selection:text-white">
-      
-      {/* ========================================================================= */}
-      {/* MENÚ LATERAL BLANCO ELEGANTE CON TONOS AZUL MARINO */}
-      {/* ========================================================================= */}
-      <aside className="w-72 bg-white text-[#0b192c] flex flex-col border-r border-slate-200/80 shrink-0 sticky top-0 h-screen z-30 shadow-[4px_0_24px_rgba(11,25,44,0.02)] overflow-hidden">
-        
+  const renderSidebarContent = (isMobile: boolean = false) => {
+    const handleTabClick = (tab: typeof activeTab) => {
+      setActiveTab(tab);
+      if (isMobile) setMobileAdminSidebarOpen(false);
+    };
+
+    return (
+      <div className="flex flex-col h-full bg-white">
         {/* Brand Header with Live Nautical Weather & Wind */}
         <div className="p-5 pb-4 border-b border-slate-100 shrink-0 bg-white">
-          <div className="flex items-start gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-[#0b192c] flex items-center justify-center p-2 shrink-0 shadow-md shadow-[#0b192c]/15">
-              <img
-                src="/vegvisir-emblem-dark.png"
-                alt="Logo Yates Chile"
-                className="w-full h-full object-contain invert brightness-200"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <h2 className="font-serif text-base font-bold text-[#0b192c] tracking-tight leading-tight truncate">
-                  Yates Chile
-                </h2>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-xs" title="Sistema y Base de Datos Conectada" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-[#0b192c] flex items-center justify-center p-2 shrink-0 shadow-md shadow-[#0b192c]/15">
+                <img
+                  src="/vegvisir-emblem-dark.png"
+                  alt="Logo Yates Chile"
+                  className="w-full h-full object-contain invert brightness-200"
+                />
               </div>
-              
-              {liveWeather ? (
-                <div className="mt-1 space-y-0.5 font-mono text-[10px]">
-                  {/* Localidad & Temperatura */}
-                  <div className="flex items-center gap-1 text-[#0b192c] font-bold truncate">
-                    <MapPin className="w-2.5 h-2.5 text-sky-600 shrink-0" />
-                    <span className="truncate">{liveWeather.city}</span>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-amber-600 font-bold">{liveWeather.temperature}</span>
-                  </div>
-                  {/* Viento Náutico & Estado */}
-                  <div className="flex items-center gap-1 text-slate-500 text-[9px] truncate">
-                    <Wind className="w-2.5 h-2.5 text-sky-500 shrink-0" />
-                    <span className="font-semibold text-slate-700">{liveWeather.windSpeed}</span>
-                    <span className="text-slate-600 font-medium">{liveWeather.windDirection}</span>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-slate-400 font-sans">{liveWeather.condition}</span>
-                  </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <h2 className="font-serif text-base font-bold text-[#0b192c] tracking-tight leading-tight truncate">
+                    Yates Chile
+                  </h2>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-xs" title="Sistema y Base de Datos Conectada" />
                 </div>
-              ) : (
-                <span className="text-[10px] text-emerald-700 font-mono font-bold flex items-center gap-1.5 mt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Obteniendo clima...</span>
-                </span>
-              )}
+                
+                {liveWeather ? (
+                  <div className="mt-1 space-y-0.5 font-mono text-[10px]">
+                    {/* Localidad & Temperatura */}
+                    <div className="flex items-center gap-1 text-[#0b192c] font-bold truncate">
+                      <MapPin className="w-2.5 h-2.5 text-sky-600 shrink-0" />
+                      <span className="truncate">{liveWeather.city}</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-amber-600 font-bold">{liveWeather.temperature}</span>
+                    </div>
+                    {/* Viento Náutico & Estado */}
+                    <div className="flex items-center gap-1 text-slate-500 text-[9px] truncate">
+                      <Wind className="w-2.5 h-2.5 text-sky-500 shrink-0" />
+                      <span className="font-semibold text-slate-700">{liveWeather.windSpeed}</span>
+                      <span className="text-slate-600 font-medium">{liveWeather.windDirection}</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-slate-400 font-sans">{liveWeather.condition}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-emerald-700 font-mono font-bold flex items-center gap-1.5 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Obteniendo clima...</span>
+                  </span>
+                )}
+              </div>
             </div>
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setMobileAdminSidebarOpen(false)}
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer shrink-0"
+                aria-label="Cerrar menú lateral"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -4552,7 +4768,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* Dashboard */}
               <button
-                onClick={() => setActiveTab('dashboard')}
+                onClick={() => handleTabClick('dashboard')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'dashboard'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4568,7 +4784,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* Tráfico */}
               <button
-                onClick={() => setActiveTab('analytics')}
+                onClick={() => handleTabClick('analytics')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'analytics'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4591,7 +4807,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* Reservas */}
               <button
-                onClick={() => setActiveTab('bookings')}
+                onClick={() => handleTabClick('bookings')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'bookings'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4611,7 +4827,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* Lodge */}
               <button
-                onClick={() => setActiveTab('lodge')}
+                onClick={() => handleTabClick('lodge')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'lodge'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4620,14 +4836,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               >
                 <div className="flex items-center gap-3">
                   <BedDouble className={`w-4 h-4 ${activeTab === 'lodge' ? 'text-sky-300' : 'text-slate-400'}`} />
-                  <span>Lodge</span>
+                  <span>Lodge Cabo de Hornos</span>
                 </div>
                 {activeTab === 'lodge' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
 
               {/* Expediciones */}
               <button
-                onClick={() => setActiveTab('expeditions')}
+                onClick={() => handleTabClick('expeditions')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'expeditions'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4636,7 +4852,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               >
                 <div className="flex items-center gap-3">
                   <Ship className={`w-4 h-4 ${activeTab === 'expeditions' ? 'text-sky-300' : 'text-slate-400'}`} />
-                  <span>Expediciones Náuticas</span>
+                  <span>Expediciones & Rutas</span>
                 </div>
                 {(expBookings.some((b) => b.status === 'pending_transfer') || departures.length > 0) ? (
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-xs" title="Nuevas reservas de expediciones por gestionar" />
@@ -4646,15 +4862,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </button>
             </div>
 
-            {/* SECCIÓN 3: CLIENTES & CRM */}
+            {/* SECCIÓN 3: RELACIÓN CON CLIENTES & ACCESOS */}
             <div className="space-y-1">
               <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
-                Clientes & CRM
+                Relación con Clientes
               </div>
 
-              {/* Clientes & Leads */}
+              {/* CRM & Concierge */}
               <button
-                onClick={() => setActiveTab('payments')}
+                onClick={() => handleTabClick('payments')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'payments'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4670,7 +4886,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* Solicitudes de Acceso */}
               <button
-                onClick={() => setActiveTab('access-requests')}
+                onClick={() => handleTabClick('access-requests')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'access-requests'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4682,7 +4898,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   <span>Solicitudes de Acceso</span>
                 </div>
                 {pendingCount > 0 ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500 text-white shadow-2xs">
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
                     {pendingCount}
                   </span>
                 ) : activeTab === 'access-requests' ? (
@@ -4691,15 +4907,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </button>
             </div>
 
-            {/* SECCIÓN 4: CONTENIDO & CATÁLOGO */}
+            {/* SECCIÓN 4: CATÁLOGO & CONFIGURACIÓN */}
             <div className="space-y-1">
               <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 px-3 py-1">
-                Contenido & Catálogo
+                Catálogo & Configuración
               </div>
 
-              {/* Catálogo & Servicios */}
+              {/* Experiencias Adicionales */}
               <button
-                onClick={() => setActiveTab('services')}
+                onClick={() => handleTabClick('services')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'services'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4708,14 +4924,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               >
                 <div className="flex items-center gap-3">
                   <Tag className={`w-4 h-4 ${activeTab === 'services' ? 'text-sky-300' : 'text-slate-400'}`} />
-                  <span>Catálogo & Servicios</span>
+                  <span>Catálogo de Experiencias</span>
                 </div>
                 {activeTab === 'services' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
 
               {/* Config Embarcaciones */}
               <button
-                onClick={() => setActiveTab('config-vessels')}
+                onClick={() => handleTabClick('config-vessels')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'config-vessels'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4731,7 +4947,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* Config Lodge */}
               <button
-                onClick={() => setActiveTab('config-lodge')}
+                onClick={() => handleTabClick('config-lodge')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'config-lodge'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4747,7 +4963,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* CMS Web */}
               <button
-                onClick={() => setActiveTab('cms')}
+                onClick={() => handleTabClick('cms')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
                   activeTab === 'cms'
                     ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
@@ -4767,7 +4983,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         {/* Sidebar Footer Actions */}
         <div className="p-4 border-t border-slate-100 space-y-2 shrink-0 bg-white">
           <button
-            onClick={() => (onNavigate ? onNavigate('/') : (window.location.hash = '/'))}
+            onClick={() => {
+              if (isMobile) setMobileAdminSidebarOpen(false);
+              if (onNavigate) onNavigate('/');
+              else window.location.hash = '/';
+            }}
             className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-[#0b192c] px-4 py-2.5 rounded-2xl text-xs font-semibold transition border border-slate-200/80 cursor-pointer"
           >
             <div className="flex items-center gap-2">
@@ -4779,6 +4999,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
           <button
             onClick={() => {
+              if (isMobile) setMobileAdminSidebarOpen(false);
               setIsAuthenticated(false);
               if (onNavigate) onNavigate('/');
               else window.location.hash = '/';
@@ -4789,6 +5010,35 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             <span>Cerrar Sesión</span>
           </button>
         </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-[#fcfdfe] text-[#0f2b48] flex font-sans selection:bg-[#0f2b48] selection:text-white">
+      
+      {/* ========================================================================= */}
+      {/* DRAWER MÓVIL (OFF-CANVAS) PARA PANTALLAS < 1024px */}
+      {/* ========================================================================= */}
+      {mobileAdminSidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex animate-fadeIn">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setMobileAdminSidebarOpen(false)}
+          />
+          {/* Slide-over Drawer */}
+          <aside className="relative w-80 max-w-[85vw] bg-white text-[#0b192c] flex flex-col h-full z-10 shadow-2xl overflow-hidden">
+            {renderSidebarContent(true)}
+          </aside>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MENÚ LATERAL ESCRITORIO (visible desde breakpoint lg:flex) */}
+      {/* ========================================================================= */}
+      <aside className="hidden lg:flex w-72 bg-white text-[#0b192c] flex-col border-r border-slate-200/80 shrink-0 sticky top-0 h-screen z-30 shadow-[4px_0_24px_rgba(11,25,44,0.02)] overflow-hidden">
+        {renderSidebarContent(false)}
       </aside>
 
       {/* ========================================================================= */}
@@ -4797,10 +5047,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       <div className="flex-1 flex flex-col min-w-0 bg-[#f4f7fb]">
         
         {/* Unified Top Header — BankDash Style with Pill Search, Quick Action & User Capsule */}
-        <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 sm:px-8 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-20 shadow-[0_4px_20px_rgba(11,25,44,0.02)]">
+        <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-3 sm:gap-4 sticky top-0 z-20 shadow-[0_4px_20px_rgba(11,25,44,0.02)]">
           {/* Active Tab Title & Subtitle (Left) */}
-          <div className="flex items-center gap-3.5 shrink-0">
-            <div className="w-9 h-9 rounded-2xl bg-[#f4f7fb] border border-slate-200/80 flex items-center justify-center text-[#0b192c] shadow-2xs">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
+            {/* Mobile Hamburger Button to Toggle Drawer */}
+            <button
+              type="button"
+              onClick={() => setMobileAdminSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl text-slate-700 hover:text-[#0b192c] hover:bg-slate-100 border border-slate-200/80 transition cursor-pointer flex items-center justify-center shrink-0"
+              aria-label="Abrir menú de navegación lateral"
+              title="Abrir menú"
+            >
+              <Menu className="w-5 h-5 text-[#0b192c]" />
+            </button>
+            <div className="w-9 h-9 rounded-2xl bg-[#f4f7fb] border border-slate-200/80 flex items-center justify-center text-[#0b192c] shadow-2xs shrink-0">
               {activeTab === 'dashboard' && <LayoutDashboard className="w-4.5 h-4.5 text-[#0b192c]" />}
               {activeTab === 'bookings' && <CalendarCheck className="w-4.5 h-4.5 text-[#0b192c]" />}
               {activeTab === 'analytics' && <Compass className="w-4.5 h-4.5 text-[#0b192c]" />}
@@ -5255,8 +5515,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 {isRecentBookingsOpen && (
-                  <div className="overflow-x-auto border-t border-slate-100 animate-fadeIn">
-                    <table className="w-full text-left text-xs">
+                  <div className="overflow-x-auto custom-scrollbar border-t border-slate-100 animate-fadeIn">
+                    <table className="w-full min-w-[720px] text-left text-xs">
                       <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                         <tr>
                           <th className="px-7 py-3.5">Tipo</th>
@@ -6815,7 +7075,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 /* 4.A VISTA LISTA / TABLA MINIMALISTA & LUXURY */
                 <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden">
                   <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left text-xs">
+                    <table className="w-full min-w-[980px] text-left text-xs">
                       <thead>
                         <tr className="bg-[#fbfcfd] border-b border-slate-100 text-[10px] uppercase font-mono font-bold text-slate-400 tracking-wider">
                           <th className="px-5 py-3.5 whitespace-nowrap">Tipo</th>
@@ -8758,7 +9018,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                                   <button
                                     type="button"
-                                    onClick={() => setEditingDeparture(dep)}
+                                    onClick={() => handleOpenEditDeparture(dep)}
                                     className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
                                     title="Editar Expedición"
                                   >
@@ -9303,9 +9563,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                       <Users className="w-3.5 h-3.5" />
                                     </button>
                                     <button
-                                      onClick={() => setEditingDeparture(dep)}
+                                      type="button"
+                                      onClick={() => handleOpenEditDeparture(dep)}
                                       className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
-                                      title="Editar"
+                                      title="Editar Expedición"
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </button>
@@ -9383,9 +9644,10 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
                                     <button
+                                      type="button"
                                       onClick={() => {
                                         const vId = exp.vesselName.toLowerCase().includes('terranova') ? 'terranova' : exp.vesselName.toLowerCase().includes('lodge') ? 'lodge' : 'vegvisir';
-                                        setEditingDeparture({
+                                        handleOpenEditDeparture({
                                           id: exp.id,
                                           name: exp.routeTitle,
                                           vessel_id: vId,
@@ -9396,8 +9658,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                           available_slots: exp.availablePax,
                                           price_per_pax_clp: parseInt(exp.pricePerPax.replace(/[^0-9]/g, ''), 10) || 1850000,
                                           status: exp.status === 'Zarpe Garantizado' ? 'guaranteed' : 'scheduled',
+                                          image: (exp as any).image || '/travesia-robinson.jpg',
+                                          description: (exp as any).description || '',
+                                          location: (exp as any).location || 'Archipiélago Juan Fernández',
+                                          highlights: (exp as any).highlights || '',
+                                          includedServices: (exp as any).includedServices || '',
                                           created_at: new Date().toISOString(),
-                                        } as any);
+                                        });
                                       }}
                                       className="w-7 h-7 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
                                       title="Editar"
@@ -10369,7 +10636,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     ) : (
                       /* Table / List View of Customers */
                       <div className="overflow-x-auto custom-scrollbar border border-slate-200/80 rounded-3xl shadow-2xs">
-                        <table className="w-full text-left text-xs whitespace-nowrap">
+                        <table className="w-full min-w-[740px] text-left text-xs whitespace-nowrap">
                           <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                             <tr>
                               <th className="px-6 py-3.5">Cliente</th>
@@ -10919,7 +11186,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     ) : (
                       /* Table / List View of Leads */
                       <div className="overflow-x-auto custom-scrollbar border border-slate-200/80 rounded-3xl shadow-2xs">
-                        <table className="w-full text-left text-xs">
+                        <table className="w-full min-w-[780px] text-left text-xs">
                           <thead className="bg-[#fbfcfd] text-slate-400 text-[10px] uppercase font-mono tracking-wider font-bold border-b border-slate-100">
                             <tr>
                               <th className="px-6 py-4">Prospecto</th>
@@ -11396,7 +11663,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               const calculatedNights = isDatesValid && checkInDate && checkOutDate
                 ? Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)))
                 : 1;
-              const totalStayPrice = (selectedRoom?.base_price_clp || 240000) * calculatedNights;
+              const totalStayPrice = getRoomNightlyRate(selectedRoom, blockForm.paxCount) * calculatedNights;
 
               // Check availability for selected room
               const isSelectedRoomOccupied = Boolean(
@@ -11635,7 +11902,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             const hasCapacity = r.max_pax >= blockForm.paxCount;
                             const isAvailable = !isOccupied && hasCapacity;
                             const isSelected = blockForm.roomId === r.id;
-                            const roomStayPrice = (r.base_price_clp || 240000) * calculatedNights;
+                            const roomStayPrice = getRoomNightlyRate(r, blockForm.paxCount) * calculatedNights;
 
                             return (
                               <div
@@ -11990,7 +12257,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* ========================================================================= */}
       {editRoomModal.isOpen && editRoomModal.room && (
         <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.25)] space-y-6 animate-scale-in">
+          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.25)] space-y-5 animate-scale-in max-h-[92vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -12048,12 +12315,22 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     min="10000"
                     step="1000"
                     value={editRoomModal.basePrice}
-                    onChange={(e) =>
-                      setEditRoomModal((prev) => ({
-                        ...prev,
-                        basePrice: Number(e.target.value),
-                      }))
-                    }
+                    onChange={(e) => {
+                      const newBase = Number(e.target.value);
+                      setEditRoomModal((prev) => {
+                        const updatedRates = { ...prev.ratesByPax };
+                        // If 2 pax rate is currently matching base or not set, keep in sync
+                        const basePaxKey = prev.maxPax === 1 ? 1 : 2;
+                        if (!updatedRates[basePaxKey] || updatedRates[basePaxKey] === prev.basePrice) {
+                          updatedRates[basePaxKey] = newBase;
+                        }
+                        return {
+                          ...prev,
+                          basePrice: newBase,
+                          ratesByPax: updatedRates,
+                        };
+                      });
+                    }}
                     className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-xs text-[#0b192c] font-mono font-bold focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
                   />
                 </div>
@@ -12068,14 +12345,88 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     min="1"
                     max="10"
                     value={editRoomModal.maxPax}
-                    onChange={(e) =>
-                      setEditRoomModal((prev) => ({
-                        ...prev,
-                        maxPax: Number(e.target.value),
-                      }))
-                    }
+                    onChange={(e) => {
+                      const newMax = Math.max(1, Math.min(10, Number(e.target.value)));
+                      setEditRoomModal((prev) => {
+                        const updatedRates = { ...prev.ratesByPax };
+                        for (let p = 1; p <= newMax; p++) {
+                          if (!updatedRates[p]) {
+                            updatedRates[p] = p === 1 ? Math.round(prev.basePrice * 0.88 / 1000) * 1000 : prev.basePrice;
+                          }
+                        }
+                        return {
+                          ...prev,
+                          maxPax: newMax,
+                          ratesByPax: updatedRates,
+                        };
+                      });
+                    }}
                     className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-xs text-[#0b192c] font-mono font-bold focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
                   />
+                </div>
+              </div>
+
+              {/* Dynamic Rates by Occupancy Grid (Opción 2) */}
+              <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-sky-700" />
+                    <span className="text-[10px] uppercase font-mono font-bold text-[#0b192c]">
+                      Tarifas por Cantidad de Pasajeros
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    CLP / noche
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 font-light leading-relaxed">
+                  Fija el valor total por noche de la habitación según la cantidad exacta de personas que se hospeden:
+                </p>
+
+                <div className="space-y-2 pt-0.5">
+                  {Array.from({ length: Math.max(1, editRoomModal.maxPax) }, (_, idx) => idx + 1).map((pax) => {
+                    const isBasePax = pax === (editRoomModal.maxPax === 1 ? 1 : 2);
+                    return (
+                      <div
+                        key={pax}
+                        className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="text-xs font-bold text-[#0b192c]">
+                            {pax} {pax === 1 ? 'Pasajero' : 'Pasajeros'}
+                          </span>
+                          {isBasePax && (
+                            <span className="text-[9px] font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200/60 px-1.5 py-0.5 rounded-md">
+                              Base
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs font-mono text-slate-400 font-bold">$</span>
+                          <input
+                            type="number"
+                            min="10000"
+                            step="1000"
+                            required
+                            value={editRoomModal.ratesByPax[pax] ?? editRoomModal.basePrice}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setEditRoomModal((prev) => ({
+                                ...prev,
+                                ratesByPax: {
+                                  ...prev.ratesByPax,
+                                  [pax]: val,
+                                },
+                              }));
+                            }}
+                            className="w-28 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-[#0b192c] font-mono font-bold text-right focus:outline-none focus:border-[#0b192c] transition"
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">CLP</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -13708,261 +14059,982 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       })()}
 
       {/* MODAL: CREADOR INTELIGENTE DE EXPEDICIONES EN 6 PASOS */}
-      <ExpeditionWizardModal
-        isOpen={showNewDepartureModal}
-        onClose={() => setShowNewDepartureModal(false)}
-        onSuccess={handleExpeditionWizardSuccess}
-        existingDepartures={departures}
-      />
+      {showNewDepartureModal && (
+        <ExpeditionWizardModal
+          isOpen={showNewDepartureModal}
+          onClose={() => setShowNewDepartureModal(false)}
+          onSuccess={handleExpeditionWizardSuccess}
+          existingDepartures={departures}
+        />
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL: EDITAR INFORMACIÓN DE EXPEDICIÓN */}
       {/* ========================================================================= */}
       {editingDeparture && (
-        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
             {/* Modal Header */}
-            <div className="px-7 py-5 bg-[#0b192c] text-white flex items-center justify-between">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
-                  <Pencil className="w-4.5 h-4.5 text-sky-300" />
+            <div className="px-6 py-4 bg-[#0b192c] text-white flex items-center justify-between border-b border-white/10">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 shrink-0">
+                  <Pencil className="w-4 h-4 text-sky-300" />
                 </div>
-                <div>
-                  <h3 className="font-serif text-lg font-bold text-white">Editar Expedición</h3>
-                  <p className="text-xs text-sky-200/80 font-light">Modifica la información, fechas, cupos y tarifas</p>
+                <div className="min-w-0">
+                  <h3 className="font-serif text-base sm:text-lg font-bold text-white tracking-tight truncate">
+                    Editar Expedición
+                  </h3>
+                  <p className="text-[11px] text-sky-200/80 font-light truncate">
+                    {editingDeparture.name || 'Personaliza la información, travesía y portada'}
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setEditingDeparture(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+                onClick={() => {
+                  setEditingDeparture(null);
+                  setEditDepartureTab('general');
+                }}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-2"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Form Body */}
-            <form onSubmit={handleSaveEditedDeparture} className="p-7 space-y-4.5 overflow-y-auto flex-1 text-xs">
-              {/* Nombre de la Expedición */}
-              <div>
-                <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                  Nombre de la Expedición
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingDeparture.name || ''}
-                  onChange={(e) => setEditingDeparture({ ...editingDeparture, name: e.target.value })}
-                  placeholder="Ej: Expedición Robinson Crusoe"
-                  className="w-full px-4 py-2.5 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl font-bold text-[#0b192c] text-sm focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
-                />
-              </div>
-
-              {/* Embarcación / Activo */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="relative z-30">
-                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                    Embarcación de Expedición
-                  </label>
-                  <LuxurySelect
-                    value={editingDeparture.vessel_id || 'vegvisir'}
-                    onChange={(val) => setEditingDeparture({ ...editingDeparture, vessel_id: val })}
-                    options={[
-                      {
-                        value: 'vegvisir',
-                        label: 'Velero Vegvisir',
-                        subtitle: 'Dufour 52.5 ft • Velero de Altura',
-                        icon: Sailboat,
-                        badge: { text: 'Velero', className: 'bg-sky-50 text-sky-800 border-sky-200' },
-                      },
-                      {
-                        value: 'terranova',
-                        label: 'Yate Terranova',
-                        subtitle: 'Hatteras 65ft LRC • Yate Oceánico',
-                        icon: Ship,
-                        badge: { text: 'Yate Motor', className: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
-                      },
-                      ...vessels
-                        .filter((v) => v.id !== 'vegvisir' && v.id !== 'terranova' && v.name)
-                        .map((v) => ({
-                          value: v.id,
-                          label: v.name,
-                          subtitle: v.tagline || (v.capacity_pax ? `${v.type || 'Embarcación'} • Hasta ${v.capacity_pax} pax` : v.type || 'Embarcación'),
-                          icon: (v.type || '').toLowerCase().includes('velero') ? Sailboat : Ship,
-                          badge: {
-                            text: (v.type || '').toLowerCase().includes('velero') ? 'Velero' : 'Yate',
-                            className: (v.type || '').toLowerCase().includes('velero')
-                              ? 'bg-sky-50 text-sky-800 border-sky-200'
-                              : 'bg-indigo-50 text-indigo-800 border-indigo-200',
-                          },
-                        })),
-                    ]}
-                    placeholder="Seleccionar Embarcación..."
-                  />
-                </div>
-
-                <div className="relative z-20">
-                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                    Estado de Zarpe
-                  </label>
-                  <LuxurySelect
-                    value={editingDeparture.status}
-                    onChange={(val) => setEditingDeparture({ ...editingDeparture, status: val as any })}
-                    options={[
-                      {
-                        value: 'scheduled',
-                        label: 'Programada',
-                        subtitle: 'Abierta a reservas',
-                        icon: Calendar,
-                        badge: { text: 'En Agenda', className: 'bg-sky-50 text-sky-800 border-sky-200' },
-                        dotColor: 'bg-sky-500',
-                      },
-                      {
-                        value: 'guaranteed',
-                        label: 'Zarpe Garantizado',
-                        subtitle: 'Cupos mínimos confirmados',
-                        icon: CheckCircle2,
-                        badge: { text: 'Confirmado', className: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-                        dotColor: 'bg-emerald-500',
-                      },
-                      {
-                        value: 'completed',
-                        label: 'Completada',
-                        subtitle: 'Expedición realizada',
-                        icon: Anchor,
-                        badge: { text: 'Finalizada', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-                        dotColor: 'bg-slate-500',
-                      },
-                      {
-                        value: 'cancelled',
-                        label: 'Cancelada',
-                        subtitle: 'Expedición suspendida',
-                        icon: AlertTriangle,
-                        badge: { text: 'Cancelada', className: 'bg-rose-50 text-rose-800 border-rose-200' },
-                        dotColor: 'bg-rose-500',
-                      },
-                    ]}
-                    placeholder="Seleccionar Estado..."
-                  />
-                </div>
-              </div>
-
-              {/* Fechas: Zarpe & Retorno */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                    Fecha de Zarpe / Salida
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={editingDeparture.departure_date}
-                    onChange={(e) => setEditingDeparture({ ...editingDeparture, departure_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                    Fecha de Retorno
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={editingDeparture.return_date}
-                    onChange={(e) => setEditingDeparture({ ...editingDeparture, return_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
-                  />
-                </div>
-              </div>
-
-              {/* Cupos & Tarifas */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                    Cupos Totales
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    required
-                    value={editingDeparture.total_slots}
-                    onChange={(e) => setEditingDeparture({ ...editingDeparture, total_slots: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                    Cupos Disponibles
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={editingDeparture.total_slots}
-                    required
-                    value={editingDeparture.available_slots}
-                    onChange={(e) => {
-                      const nextAvail = Number(e.target.value);
-                      setEditingDeparture({
-                        ...editingDeparture,
-                        available_slots: nextAvail,
-                        status: (nextAvail <= 0 && editingDeparture.status !== 'cancelled') ? 'guaranteed' : editingDeparture.status,
-                      });
-                    }}
-                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                    Tarifa p/Pax (CLP)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    required
-                    value={formatClpInput(editingDeparture.price_per_pax_clp)}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/\D/g, '');
-                      setEditingDeparture({
-                        ...editingDeparture,
-                        price_per_pax_clp: raw ? parseInt(raw, 10) : 0,
-                      });
-                    }}
-                    placeholder="Ej: 3.000.000"
-                    className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
-                  />
-                </div>
-              </div>
-
-              {/* Ubicación / Región */}
-              <div>
-                <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
-                  Destino / Ubicación
-                </label>
-                <input
-                  type="text"
-                  value={editingDeparture.location || ''}
-                  onChange={(e) => setEditingDeparture({ ...editingDeparture, location: e.target.value })}
-                  placeholder="Ej: Archipiélago Juan Fernández / Bahía Cumberland"
-                  className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-medium text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
-                />
-              </div>
-
-              {/* Footer Actions */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+            {/* Segmented Tab Navigation */}
+            <div className="px-6 pt-3.5 pb-2 bg-slate-50/80 border-b border-slate-200/80">
+              <div className="grid grid-cols-2 sm:grid-cols-4 p-1 bg-slate-200/70 rounded-2xl gap-1 text-xs font-semibold">
                 <button
                   type="button"
-                  onClick={() => setEditingDeparture(null)}
-                  className="px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition cursor-pointer"
+                  onClick={() => setEditDepartureTab('general')}
+                  className={`py-2 px-2 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
+                    editDepartureTab === 'general'
+                      ? 'bg-[#0b192c] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
                 >
-                  Cancelar
+                  <Calendar className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">1. Datos & Salida</span>
                 </button>
                 <button
-                  type="submit"
-                  className="px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold transition shadow-xs cursor-pointer active:scale-95"
+                  type="button"
+                  onClick={() => setEditDepartureTab('experience')}
+                  className={`py-2 px-2 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
+                    editDepartureTab === 'experience'
+                      ? 'bg-[#0b192c] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
                 >
-                  Guardar Cambios
+                  <Compass className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">2. Travesía & Hitos</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setEditDepartureTab('media')}
+                  className={`py-2 px-2 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
+                    editDepartureTab === 'media'
+                      ? 'bg-[#0b192c] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">3. Portada & Foto</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditDepartureTab('brochure')}
+                  className={`py-2 px-2 sm:px-3 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
+                    editDepartureTab === 'brochure'
+                      ? 'bg-[#0b192c] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">4. Brochure & PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleSaveEditedDeparture} className="p-6 overflow-y-auto flex-1 text-xs space-y-4">
+              {/* ========================================================= */}
+              {/* TAB 1: DATOS & SALIDA */}
+              {/* ========================================================= */}
+              {editDepartureTab === 'general' && (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Nombre de la Expedición */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                      Nombre de la Expedición
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editingDeparture.name || ''}
+                      onChange={(e) => setEditingDeparture({ ...editingDeparture, name: e.target.value })}
+                      placeholder="Ej: Expedición Robinson Crusoe — Selkirk"
+                      className="w-full px-4 py-2.5 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl font-bold text-[#0b192c] text-sm focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Embarcación / Activo & Estado */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="relative z-30">
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                        Embarcación de Expedición
+                      </label>
+                      <LuxurySelect
+                        singleLine
+                        value={editingDeparture.vessel_id || 'vegvisir'}
+                        onChange={(val) => setEditingDeparture({ ...editingDeparture, vessel_id: val })}
+                        options={[
+                          {
+                            value: 'vegvisir',
+                            label: 'Velero Vegvisir',
+                            subtitle: 'Dufour 52.5 ft • Velero de Altura',
+                            icon: Sailboat,
+                            badge: { text: 'Velero', className: 'bg-sky-50 text-sky-800 border-sky-200' },
+                          },
+                          {
+                            value: 'terranova',
+                            label: 'Yate Terranova',
+                            subtitle: 'Hatteras 65ft LRC • Yate Oceánico',
+                            icon: Ship,
+                            badge: { text: 'Yate Motor', className: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+                          },
+                          ...vessels
+                            .filter((v) => v.id !== 'vegvisir' && v.id !== 'terranova' && v.name)
+                            .map((v) => ({
+                              value: v.id,
+                              label: v.name,
+                              subtitle: v.tagline || (v.capacity_pax ? `${v.type || 'Embarcación'} • Hasta ${v.capacity_pax} pax` : v.type || 'Embarcación'),
+                              icon: (v.type || '').toLowerCase().includes('velero') ? Sailboat : Ship,
+                              badge: {
+                                text: (v.type || '').toLowerCase().includes('velero') ? 'Velero' : 'Yate',
+                                className: (v.type || '').toLowerCase().includes('velero')
+                                  ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                  : 'bg-indigo-50 text-indigo-800 border-indigo-200',
+                              },
+                            })),
+                        ]}
+                        placeholder="Seleccionar Embarcación..."
+                      />
+                    </div>
+
+                    <div className="relative z-20">
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                        Estado de Zarpe
+                      </label>
+                      <LuxurySelect
+                        singleLine
+                        value={editingDeparture.status}
+                        onChange={(val) => setEditingDeparture({ ...editingDeparture, status: val as any })}
+                        options={[
+                          {
+                            value: 'scheduled',
+                            label: 'Programada',
+                            icon: Calendar,
+                            dotColor: 'bg-sky-500',
+                          },
+                          {
+                            value: 'guaranteed',
+                            label: 'Zarpe Garantizado',
+                            icon: CheckCircle2,
+                            dotColor: 'bg-emerald-500',
+                          },
+                          {
+                            value: 'completed',
+                            label: 'Completada',
+                            icon: Anchor,
+                            dotColor: 'bg-slate-500',
+                          },
+                          {
+                            value: 'cancelled',
+                            label: 'Cancelada',
+                            icon: AlertTriangle,
+                            dotColor: 'bg-rose-500',
+                          },
+                        ]}
+                        placeholder="Seleccionar Estado..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Fechas: Zarpe & Retorno con Calendario Luxury */}
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <CalendarDateCardPicker
+                        label="Fecha de Zarpe / Salida"
+                        subLabel="Zarpe de Expedición"
+                        badgeColor="bg-[#0b192c]"
+                        icon={Calendar}
+                        value={editingDeparture.departure_date}
+                        onChange={(val) => setEditingDeparture({ ...editingDeparture, departure_date: val })}
+                      />
+                      <CalendarDateCardPicker
+                        label="Fecha de Retorno"
+                        subLabel="Retorno a Puerto"
+                        badgeColor="bg-sky-700"
+                        icon={Anchor}
+                        minDate={editingDeparture.departure_date}
+                        value={editingDeparture.return_date}
+                        onChange={(val) => setEditingDeparture({ ...editingDeparture, return_date: val })}
+                      />
+                    </div>
+
+                    {/* Duración estimada de la travesía */}
+                    {(() => {
+                      if (editingDeparture.departure_date && editingDeparture.return_date) {
+                        const p1 = editingDeparture.departure_date.split('-');
+                        const p2 = editingDeparture.return_date.split('-');
+                        if (p1.length === 3 && p2.length === 3) {
+                          const d1 = new Date(parseInt(p1[0], 10), parseInt(p1[1], 10) - 1, parseInt(p1[2], 10));
+                          const d2 = new Date(parseInt(p2[0], 10), parseInt(p2[1], 10) - 1, parseInt(p2[2], 10));
+                          const diffDays = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+                          if (diffDays > 0) {
+                            return (
+                              <div className="flex items-center justify-between px-3.5 py-1.5 bg-sky-50/70 border border-sky-200/60 rounded-xl text-[11px] text-[#0b192c] font-mono">
+                                <div className="flex items-center gap-1.5">
+                                  <Compass className="w-3.5 h-3.5 text-sky-700 shrink-0" />
+                                  <span>Duración travesía: <strong className="font-bold text-sky-950">{diffDays} {diffDays === 1 ? 'día' : 'días'}</strong> {diffDays - 1 > 0 ? `(${diffDays - 1} noches)` : ''}</span>
+                                </div>
+                                <span className="text-[10px] text-sky-700 font-sans font-medium">Itinerario fijado</span>
+                              </div>
+                            );
+                          }
+                        }
+                      }
+                      return null;
+                    })()}
+                  </div>
+
+                  {/* Cupos & Tarifas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                        Cupos Totales
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        required
+                        value={editingDeparture.total_slots}
+                        onChange={(e) => setEditingDeparture({ ...editingDeparture, total_slots: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                        Cupos Disponibles
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={editingDeparture.total_slots}
+                        required
+                        value={editingDeparture.available_slots}
+                        onChange={(e) => {
+                          const nextAvail = Number(e.target.value);
+                          setEditingDeparture({
+                            ...editingDeparture,
+                            available_slots: nextAvail,
+                            status: (nextAvail <= 0 && editingDeparture.status !== 'cancelled') ? 'guaranteed' : editingDeparture.status,
+                          });
+                        }}
+                        className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                        Tarifa p/Pax (CLP)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        required
+                        value={formatClpInput(editingDeparture.price_per_pax_clp)}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, '');
+                          setEditingDeparture({
+                            ...editingDeparture,
+                            price_per_pax_clp: raw ? parseInt(raw, 10) : 0,
+                          });
+                        }}
+                        placeholder="Ej: 3.000.000"
+                        className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-mono font-bold text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Destino / Ubicación */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                      Destino / Ubicación
+                    </label>
+                    <input
+                      type="text"
+                      value={editingDeparture.location || ''}
+                      onChange={(e) => setEditingDeparture({ ...editingDeparture, location: e.target.value })}
+                      placeholder="Ej: Archipiélago Juan Fernández / Bahía Cumberland"
+                      className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl font-medium text-[#0b192c] focus:bg-white focus:outline-none focus:border-[#0b192c]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================= */}
+              {/* TAB 2: TRAVESÍA & HITOS */}
+              {/* ========================================================= */}
+              {editDepartureTab === 'experience' && (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Titular Principal / Headline */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono">
+                        Titular Principal de la Travesía
+                      </label>
+                      <span className="text-[10px] text-sky-700 font-mono font-medium">Aparece destacado arriba del relato</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={editingDeparture.headline || ''}
+                      onChange={(e) => setEditingDeparture({ ...editingDeparture, headline: e.target.value })}
+                      placeholder="Ej: Expedición a Vela & Navegación Oceánica Austral"
+                      className="w-full px-4 py-2.5 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl font-bold text-[#0b192c] text-sm focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Relato / Resumen Completo de la Travesía */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono">
+                        Relato & Descripción Completa de la Travesía
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-light">Párrafo visible en el modal público</span>
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={editingDeparture.description || ''}
+                      onChange={(e) => setEditingDeparture({ ...editingDeparture, description: e.target.value })}
+                      placeholder="Relato completo de la expedición..."
+                      className="w-full px-4 py-2.5 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl text-[#0b192c] text-xs leading-relaxed focus:outline-none focus:border-[#0b192c] transition resize-none shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Pilares & Experiencias de la Expedición (4 Tarjetas de la Web) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono">
+                          Pilares & Experiencias de la Expedición (4 Tarjetas)
+                        </label>
+                        <p className="text-[10px] text-slate-400">
+                          Edita el título y detalle de las 4 tarjetas que se muestran en la web pública
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const vId = ((editingDeparture.vessel_id || '') as string).toLowerCase().includes('terranova')
+                            ? 'terranova'
+                            : ((editingDeparture.vessel_id || '') as string).toLowerCase().includes('lodge')
+                            ? 'lodge'
+                            : 'vegvisir';
+                          const defaultPillars: Record<'vegvisir' | 'terranova' | 'lodge', Array<{ title: string; desc: string }>> = {
+                            vegvisir: [
+                              { title: 'Velerismo Oceánico de Altura', desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.' },
+                              { title: 'Pesca de Altura (Trolling) & Menú a Bordo', desc: 'Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.' },
+                              { title: 'Recaladas en Bahías Míticas', desc: 'Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.' },
+                              { title: 'Autonomía Total & Starlink 24/7', desc: '5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.' }
+                            ],
+                            terranova: [
+                              { title: 'Navegación Rápida & 3 Cubiertas', desc: 'Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.' },
+                              { title: 'Deck Superior & Gastronomía de Autor', desc: 'Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.' },
+                              { title: 'Desembarcos Asistidos con Zodiac 70 HP', desc: 'Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.' },
+                              { title: 'Pesca Deportiva de Altura & Fauna Pelágica', desc: 'Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.' }
+                            ],
+                            lodge: [
+                              { title: 'Hospedaje Boutique Frente al Mar', desc: 'Habitaciones privadas con vista a los fiordos, calefacción a leña y arquitectura bioclimática integrada al entorno salvaje.' },
+                              { title: 'Gastronomía Fueguina & Cenas en Quincho', desc: 'Centolla fresca, cordero al palo y cocina con ingredientes recolectados en los bosques y costas patagónicas.' },
+                              { title: 'Senderismo & Miradores Glaciares', desc: 'Trekks guiados a turberas milenarias, bosques de lenga y cumbres con vistas panorámicas al archipiélago fueguino.' },
+                              { title: 'Santuarios Marinos & Snorkel', desc: 'Navegaciones costeras hacia farellones y loberías protegidas con sesiones de snorkel junto a los amigables lobos marinos de dos pelos.' }
+                            ]
+                          };
+                          setEditPillars(defaultPillars[vId].map(p => ({ ...p })));
+                        }}
+                        className="text-[10px] text-sky-700 font-mono font-medium hover:underline cursor-pointer"
+                      >
+                        ↺ Restablecer sugeridos
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                      {editPillars.slice(0, 4).map((pillar, idx) => {
+                        const icons = [Anchor, Utensils, Compass, Waves];
+                        const IconComp = icons[idx % icons.length];
+                        return (
+                          <div key={idx} className="bg-[#f8fafc] border border-slate-200/90 rounded-2xl p-2.5 space-y-1.5 shadow-3xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-3xs">
+                                <IconComp className="w-3.5 h-3.5 text-sky-700" />
+                              </div>
+                              <input
+                                type="text"
+                                value={pillar.title}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditPillars(prev => {
+                                    const next = [...prev];
+                                    if (!next[idx]) next[idx] = { title: '', desc: '' };
+                                    next[idx] = { ...next[idx], title: val };
+                                    return next;
+                                  });
+                                }}
+                                placeholder={`Título Tarjeta ${idx + 1}`}
+                                className="w-full bg-white border border-slate-200/90 rounded-xl px-2.5 py-1 text-xs font-bold text-[#0b192c] focus:outline-none focus:border-[#0b192c]"
+                              />
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={pillar.desc}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditPillars(prev => {
+                                  const next = [...prev];
+                                  if (!next[idx]) next[idx] = { title: '', desc: '' };
+                                  next[idx] = { ...next[idx], desc: val };
+                                  return next;
+                                });
+                              }}
+                              placeholder="Descripción detallada de la experiencia..."
+                              className="w-full bg-white border border-slate-200/90 rounded-xl p-2 text-[11px] text-slate-700 leading-snug focus:outline-none focus:border-[#0b192c] resize-none"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Servicios Incluidos & Clima */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                        Servicios & Qué Incluye
+                      </label>
+                      <input
+                        type="text"
+                        value={editingDeparture.includedServices || ''}
+                        onChange={(e) => setEditingDeparture({ ...editingDeparture, includedServices: e.target.value })}
+                        placeholder="Pensión completa • Guía de ultramar • Zodiac • Starlink"
+                        className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl text-[#0b192c] text-xs focus:bg-white focus:outline-none focus:border-[#0b192c]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
+                        Clima & Estimación Térmica
+                      </label>
+                      <input
+                        type="text"
+                        value={editingDeparture.tempEstimate || ''}
+                        onChange={(e) => setEditingDeparture({ ...editingDeparture, tempEstimate: e.target.value })}
+                        placeholder="Ej: 16°C - 21°C • Templado oceánico"
+                        className="w-full px-4 py-2.5 bg-[#f4f7fb] border border-slate-200/90 rounded-2xl text-[#0b192c] text-xs focus:bg-white focus:outline-none focus:border-[#0b192c]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ========================================================= */}
+              {/* TAB 3: PORTADA & FOTO */}
+              {/* ========================================================= */}
+              {editDepartureTab === 'media' && (() => {
+                const imgDiagnosis = diagnoseMediaUrl(editingDeparture.image);
+
+                return (
+                  <div className="space-y-4 animate-fadeIn">
+                    {/* Vista Previa de la Portada Actual */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono">
+                          Vista Previa de la Portada
+                        </label>
+                        {editingDeparture.image && (
+                          <a
+                            href={editingDeparture.image}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-sky-700 hover:text-sky-900 font-mono font-medium inline-flex items-center gap-1 hover:underline"
+                          >
+                            <span>Abrir original</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="relative h-48 sm:h-60 w-full rounded-2xl overflow-hidden border border-slate-200/90 shadow-inner bg-slate-900 group">
+                        <img
+                          key={editingDeparture.image || 'default-cover'}
+                          src={normalizeExternalMediaUrl(editingDeparture.image) || '/travesia-robinson.jpg'}
+                          alt="Portada de la Expedición"
+                          referrerPolicy="no-referrer"
+                          className={`w-full h-full object-cover transition-all duration-500 ${
+                            editDepartureImgError ? 'opacity-30 blur-xs' : 'group-hover:scale-105'
+                          }`}
+                          onLoad={() => {
+                            setEditDepartureImgLoading(false);
+                            setEditDepartureImgError(false);
+                          }}
+                          onError={(e) => {
+                            setEditDepartureImgLoading(false);
+                            if (editingDeparture.image) {
+                              setEditDepartureImgError(true);
+                            }
+                            (e.target as HTMLImageElement).src = '/travesia-robinson.jpg';
+                          }}
+                        />
+
+                        {/* Loading Spinner Overlay */}
+                        {editDepartureImgLoading && (
+                          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-15">
+                            <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          </div>
+                        )}
+
+                        {/* Top Overlay Badges */}
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 z-20">
+                          {editingDeparture.image && !editDepartureImgError ? (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-600/90 backdrop-blur-xs text-white text-[10px] font-semibold flex items-center gap-1 border border-emerald-400/40 shadow-xs">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-200" />
+                              <span>Foto Conectada</span>
+                            </span>
+                          ) : editDepartureImgError ? (
+                            <span className="px-2.5 py-1 rounded-full bg-rose-600/90 backdrop-blur-xs text-white text-[10px] font-semibold flex items-center gap-1 border border-rose-400/40 shadow-xs">
+                              <AlertTriangle className="w-3 h-3 text-rose-200" />
+                              <span>Error al Cargar Foto</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-[#0b192c]/80 backdrop-blur-xs text-white text-[10px] font-semibold flex items-center gap-1 border border-white/20 shadow-xs">
+                              <Eye className="w-3 h-3 text-sky-300" />
+                              <span>Foto Predeterminada</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="absolute top-3 right-3 z-20">
+                          <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-xs text-[#0b192c] text-[10px] font-bold font-mono shadow-xs border border-slate-200">
+                            {editingDeparture.vessel_id === 'terranova' ? 'Yate Terranova' : editingDeparture.vessel_id === 'lodge' ? 'Lodge Rincón' : 'Velero Vegvisir'}
+                          </span>
+                        </div>
+
+                        {/* Error Overlay if Image fails to load */}
+                        {editDepartureImgError && editingDeparture.image && (
+                          <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center z-10 animate-fadeIn">
+                            <div className="w-11 h-11 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mb-2.5 shadow-lg">
+                              <AlertTriangle className="w-5 h-5" />
+                            </div>
+                            <h5 className="font-bold text-white text-xs mb-1">
+                              {imgDiagnosis.isDropboxFolder
+                                ? 'Enlace de Carpeta detectado (No es una imagen)'
+                                : imgDiagnosis.isHeic
+                                ? 'Formato .HEIC de iPhone no compatible'
+                                : imgDiagnosis.isGoogleDriveFolder
+                                ? 'Enlace de Carpeta de Google Drive'
+                                : 'No se pudo cargar la imagen desde este enlace'}
+                            </h5>
+                            <p className="text-[11px] text-slate-300 max-w-sm leading-relaxed mb-3">
+                              {imgDiagnosis.isDropboxFolder
+                                ? 'Has pegado el enlace de una CARPETA (/scl/fo/). Para que la web muestre la foto, debes copiar el vínculo directo del archivo .JPG (debe decir /scl/fi/).'
+                                : imgDiagnosis.isHeic
+                                ? 'Google Chrome no puede mostrar fotos .HEIC directamente. Abre la foto y expórtala como JPG o PNG.'
+                                : imgDiagnosis.isGoogleDrive
+                                ? 'Google Drive denegó la carga. Asegúrate de configurar el acceso general en "Cualquier persona con el enlace" (Lector).'
+                                : 'El navegador no pudo obtener un archivo de imagen válido. Verifica que el enlace sea público y directo.'}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingDeparture({ ...editingDeparture, image: '' });
+                                  setEditDepartureImgError(false);
+                                }}
+                                className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition border border-white/20 cursor-pointer"
+                              >
+                                Limpiar Enlace
+                              </button>
+                              <a
+                                href={editingDeparture.image}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 rounded-full bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-semibold transition inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>Ver archivo original</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bottom Banner */}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0b192c]/95 via-[#0b192c]/70 to-transparent p-4 text-white z-20">
+                          <h4 className="font-serif font-bold text-sm tracking-tight truncate drop-shadow-xs">
+                            {editingDeparture.name || 'Nombre de la Expedición'}
+                          </h4>
+                          <p className="text-[11px] text-sky-200 font-light truncate">
+                            {editingDeparture.location || 'Archipiélago Juan Fernández'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Enlace de Imagen (Dropbox / Google Drive / Almacenamiento) */}
+                    <div className="bg-[#f8fafc] border border-slate-200/90 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono">
+                          Enlace de Portada (Dropbox, Google Drive o Nube)
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-[10px] font-mono font-medium">
+                            Dropbox
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-mono font-medium">
+                            Google Drive
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="relative flex items-center">
+                        <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5" />
+                        <input
+                          type="url"
+                          value={editingDeparture.image || ''}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const normalized = normalizeExternalMediaUrl(raw);
+                            setEditDepartureImgError(false);
+                            if (normalized && normalized !== editingDeparture.image) {
+                              setEditDepartureImgLoading(true);
+                            }
+                            setEditingDeparture({ ...editingDeparture, image: normalized });
+                          }}
+                          placeholder="https://www.dropbox.com/... o https://drive.google.com/..."
+                          className={`w-full pl-10 pr-20 py-2.5 bg-white border rounded-2xl text-xs font-mono text-[#0b192c] focus:outline-none shadow-2xs transition ${
+                            editDepartureImgError || (editingDeparture.image && !imgDiagnosis.isValidFormat)
+                              ? 'border-rose-300 focus:border-rose-500 ring-2 ring-rose-100'
+                              : 'border-slate-200/90 focus:border-[#0b192c]'
+                          }`}
+                        />
+                        {editingDeparture.image && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDeparture({ ...editingDeparture, image: '' });
+                              setEditDepartureImgError(false);
+                              setEditDepartureImgLoading(false);
+                            }}
+                            className="absolute right-3 px-2 py-1 text-[11px] text-slate-400 hover:text-rose-600 font-medium cursor-pointer transition"
+                          >
+                            Limpiar
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Real-time Diagnostics Warning Callout */}
+                      {imgDiagnosis.warning && (
+                        <div className={`rounded-2xl p-3.5 border text-xs leading-relaxed transition ${
+                          imgDiagnosis.warning.level === 'error'
+                            ? 'bg-rose-50 border-rose-200/90 text-rose-950'
+                            : imgDiagnosis.warning.level === 'warning'
+                            ? 'bg-amber-50 border-amber-200/90 text-amber-950'
+                            : 'bg-sky-50 border-sky-200/90 text-sky-950'
+                        }`}>
+                          <div className="flex items-start gap-2.5">
+                            <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
+                              imgDiagnosis.warning.level === 'error'
+                                ? 'text-rose-600'
+                                : imgDiagnosis.warning.level === 'warning'
+                                ? 'text-amber-600'
+                                : 'text-sky-600'
+                            }`} />
+                            <div className="space-y-1">
+                              <h6 className="font-bold text-[11px]">{imgDiagnosis.warning.title}</h6>
+                              <p className="text-[11px] opacity-90">{imgDiagnosis.warning.description}</p>
+                              {imgDiagnosis.warning.actionHint && (
+                                <p className="text-[11px] font-medium pt-1 border-t border-black/5 mt-1">
+                                  💡 <strong>Cómo solucionarlo:</strong> {imgDiagnosis.warning.actionHint}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Guía Rápida para Copiar el Enlace Correcto */}
+                      <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 text-[11px] text-slate-600 space-y-2">
+                        <div className="flex items-center gap-1.5 font-bold text-[#0b192c] text-xs font-mono">
+                          <Compass className="w-3.5 h-3.5 text-sky-700" />
+                          <span>¿Cómo obtener el enlace correcto para la web?</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div className="space-y-1 bg-sky-50/50 p-2.5 rounded-xl border border-sky-100">
+                            <strong className="text-sky-950 font-bold block">En Dropbox:</strong>
+                            <ul className="list-disc list-inside space-y-0.5 text-[10.5px]">
+                              <li>Abre la foto individual (no la carpeta).</li>
+                              <li>Haz clic en <strong>•••</strong> &gt; <strong>Copiar vínculo</strong>.</li>
+                              <li>El enlace debe decir <code className="bg-sky-100 px-1 py-0.2 rounded text-[10px]">/scl/fi/</code> (archivo), no <code className="bg-rose-100 px-1 py-0.2 rounded text-[10px]">/scl/fo/</code> (carpeta).</li>
+                              <li>Si tu foto es de iPhone y dice <strong>.HEIC</strong>, expórtala como <strong>.JPG</strong> antes de enlazarla.</li>
+                            </ul>
+                          </div>
+                          <div className="space-y-1 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
+                            <strong className="text-emerald-950 font-bold block">En Google Drive:</strong>
+                            <ul className="list-disc list-inside space-y-0.5 text-[10.5px]">
+                              <li>Clic derecho sobre la foto &gt; <strong>Compartir</strong>.</li>
+                              <li>En <em>Acceso general</em>, selecciona <strong>"Cualquier persona con el enlace"</strong>.</li>
+                              <li>Haz clic en <strong>Copiar enlace</strong> y pégalo aquí.</li>
+                              <li>El sistema lo adaptará para renderizado directo en la web.</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ========================================================= */}
+              {/* TAB 4: BROCHURE & PDF */}
+              {/* ========================================================= */}
+              {editDepartureTab === 'brochure' && (() => {
+                const currentBrochure = (editingDeparture as any).brochureUrl || (editingDeparture as any).brochure_url || '';
+                const isPdfActive = !!currentBrochure;
+
+                return (
+                  <div className="space-y-4 animate-fadeIn">
+                    {/* Header Info Banner */}
+                    <div className="bg-gradient-to-r from-[#0b192c] to-[#182a44] p-4 rounded-2xl text-white flex items-start gap-3.5 shadow-sm border border-white/10">
+                      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 shrink-0 text-sky-300">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-serif font-bold text-sm text-white">
+                          Brochure Oficial & Dossier en PDF
+                        </h4>
+                        <p className="text-[11px] text-sky-200/80 font-light mt-0.5 leading-relaxed">
+                          Sube el documento técnico o dossier oficial en formato PDF. Este archivo se descargará automáticamente cuando los usuarios hagan clic en el botón <strong>«Descargar Brochure en PDF»</strong> en la página pública de expediciones.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Hidden input for file selection */}
+                    <input
+                      type="file"
+                      ref={brochureFileInputRef}
+                      accept="application/pdf,.pdf"
+                      onChange={handleBrochureUpload}
+                      className="hidden"
+                    />
+
+                    {/* Active PDF Card if uploaded */}
+                    {isPdfActive ? (
+                      <div className="bg-white border-2 border-emerald-500/30 rounded-2xl p-4 shadow-sm space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200 shrink-0">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {`Dossier_${(editingDeparture.name || 'Expedicion').replace(/\s+/g, '_')}.pdf`}
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold inline-flex items-center gap-1 shrink-0">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>PDF Conectado</span>
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 truncate max-w-md font-mono mt-0.5">
+                                {currentBrochure.startsWith('data:') ? 'Documento PDF codificado y listo para descarga directa' : currentBrochure}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={currentBrochure}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-sky-300" />
+                              <span>Ver / Previsualizar PDF</span>
+                            </a>
+                            <button
+                              type="button"
+                              disabled={isUploadingBrochure}
+                              onClick={() => brochureFileInputRef.current?.click()}
+                              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-slate-600" />
+                              <span>Reemplazar PDF</span>
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDeparture({
+                                ...editingDeparture,
+                                brochureUrl: '',
+                                brochure_url: '',
+                              });
+                            }}
+                            className="px-3 py-1.5 rounded-xl hover:bg-rose-50 text-rose-600 font-semibold text-xs inline-flex items-center gap-1 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Eliminar PDF</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Upload Trigger Box */
+                      <div
+                        onClick={() => !isUploadingBrochure && brochureFileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center text-center transition cursor-pointer group ${
+                          isUploadingBrochure
+                            ? 'bg-slate-50 border-slate-300 cursor-wait'
+                            : 'border-slate-300 hover:border-[#0b192c] bg-[#f8fafc] hover:bg-white hover:shadow-md'
+                        }`}
+                      >
+                        {isUploadingBrochure ? (
+                          <div className="space-y-3 flex flex-col items-center">
+                            <div className="w-10 h-10 border-3 border-sky-600 border-t-transparent rounded-full animate-spin" />
+                            <div>
+                              <h5 className="font-bold text-slate-800 text-sm">Subiendo documento PDF...</h5>
+                              <p className="text-[11px] text-slate-500">Almacenando archivo para descarga pública</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 flex flex-col items-center">
+                            <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-xs">
+                              <FileText className="w-7 h-7" />
+                            </div>
+                            <div className="space-y-1">
+                              <h5 className="font-bold text-slate-900 text-sm group-hover:text-sky-950">
+                                Haz clic para subir el Brochure en PDF
+                              </h5>
+                              <p className="text-[11px] text-slate-500 max-w-sm">
+                                Se admite únicamente documentos en formato PDF (.pdf) de hasta 25 MB.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className="mt-1 px-4 py-2 rounded-xl bg-[#0b192c] group-hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-2 shadow-xs transition pointer-events-none"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-sky-300" />
+                              <span>Seleccionar Archivo PDF</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Optional URL Input */}
+                    <div className="bg-[#f8fafc] border border-slate-200/90 rounded-2xl p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono">
+                          O Enlace Directo a PDF Externo (Opcional)
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-mono">Dropbox / Google Drive / Cloud</span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <Link2 className="w-4 h-4 text-slate-400 absolute left-3.5" />
+                        <input
+                          type="url"
+                          value={currentBrochure}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditingDeparture({
+                              ...editingDeparture,
+                              brochureUrl: val,
+                              brochure_url: val,
+                            });
+                          }}
+                          placeholder="https://.../brochure.pdf"
+                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200/90 rounded-2xl text-xs font-mono text-[#0b192c] focus:outline-none focus:border-[#0b192c] shadow-2xs transition"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-normal">
+                        Si prefieres enlazar un archivo PDF existente desde Dropbox o Google Drive, puedes pegar su enlace directo aquí.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Footer Actions */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div>
+                  {editDepartureTab === 'general' ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditDepartureTab('experience')}
+                      className="text-xs text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 cursor-pointer transition"
+                    >
+                      <span>Continuar a Travesía</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : editDepartureTab === 'experience' ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditDepartureTab('media')}
+                      className="text-xs text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 cursor-pointer transition"
+                    >
+                      <span>Continuar a Portada</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : editDepartureTab === 'media' ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditDepartureTab('brochure')}
+                      className="text-xs text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 cursor-pointer transition"
+                    >
+                      <span>Continuar a Brochure & PDF</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditDepartureTab('media')}
+                      className="text-xs text-slate-500 hover:text-slate-800 font-medium flex items-center gap-1 cursor-pointer transition"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>Volver a Portada</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDeparture(null);
+                      setEditDepartureTab('general');
+                    }}
+                    className="px-4 sm:px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition cursor-pointer text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 sm:px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold transition shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5 text-xs"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Guardar Cambios</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

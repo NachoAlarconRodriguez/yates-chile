@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Compass, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge, Download, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Compass, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge, Download, ArrowRight, ChevronDown } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { useLanguage } from '../context/LanguageContext';
@@ -236,7 +236,11 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <img
                       src={exp.image}
                       alt={exp.name}
+                      referrerPolicy="no-referrer"
                       className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-200"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/yate-terranova.jpg';
+                      }}
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -315,8 +319,153 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
       {/* TECH SPECS GRID (3D FLIPS ON CLICK) */}
       <section className="py-16 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 sm:px-10">
-          {/* Tech Specs Cards in a Single Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
+          {/* Mobile Tech Specs Cards (md:hidden) */}
+          <div className="md:hidden flex flex-col gap-3 max-w-xl mx-auto">
+            {/* Mobile Card 1: Astillero & Modelo */}
+            <div
+              onClick={() => toggleFlip('eslora')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Maximize2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">Hatteras 65ft LRC • {t('Americano', 'American')}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">PMO 6128 • Eslora 20m</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['eslora'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['eslora'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-1">{t('Identificación & Eslora', 'Identification & Length')}</span>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    {t('Astillero Americano Hatteras 65ft LRC (Long Range Cruiser). Matrícula oficial PMO 6128. Eslora 20 metros de máxima estabilidad oceánica.', 'American Shipyard Hatteras 65ft LRC (Long Range Cruiser). Official Registration PMO 6128. Length 20 meters with maximum oceanic stability.')}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Card 2: 3 Cubiertas & 20 PAX */}
+            <div
+              onClick={() => toggleFlip('capacidad')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('OESTE / CUBIERTAS', 'WEST / DECKS')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{t('3 Cubiertas', '3 Decks')} • 20 PAX</h4>
+                    <span className="text-[11px] text-slate-500">{t('4 Cabinas / 4 Baños en suite', '4 Cabins / 4 En-suite baths')}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['capacidad'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['capacidad'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-2">{t('Distribución de Cubiertas', 'Deck Distribution')}</span>
+                  <ul className="text-slate-600 text-xs leading-relaxed space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Cubierta 1:', 'Deck 1:')}</strong> {t('4 cabinas con 4 baños en suite', '4 cabins with 4 en-suite bathrooms')}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Cubierta 2:', 'Deck 2:')}</strong> {t('Puente de mando, salón, comedor y cocina', 'Bridge, salon, dining & galley')}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Cubierta 3:', 'Deck 3:')}</strong> {t('Zodiac de desembarco & Flybridge panorámico', 'Landing Zodiac & Panoramic Flybridge')}</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Card 3: Propulsión Detroit */}
+            <div
+              onClick={() => toggleFlip('tripulacion')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Gauge className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('SUR / PROPULSIÓN', 'SOUTH / PROPULSION')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">2 Detroit 450 HP</h4>
+                    <span className="text-[11px] text-slate-500">10.000L • 3.000 Millas Autonomía</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['tripulacion'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['tripulacion'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-1">{t('Potencia & Rango Oceánico', 'Power & Oceanic Range')}</span>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    {t('Dos motores Detroit de 450 HP c/u y estanque de 10.000 Litros con 3.000 millas náuticas de autonomía continua a 10 nudos para expediciones de largo aliento.', 'Twin 450 HP Detroit diesel engines and 10,000-liter fuel tank delivering 3,000 nautical miles of continuous range at 10 knots for long-range expeditions.')}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Card 4: Equipamiento & Electrónica */}
+            <div
+              onClick={() => toggleFlip('navegacion')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Radio className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('ESTE / EQUIPAMIENTO', 'EAST / EQUIPMENT')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">Raymarine + Garmin</h4>
+                    <span className="text-[11px] text-slate-500">Starlink 24/7 • Cocina Full</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['navegacion'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['navegacion'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-2">{t('Equipamiento & Confort de Altura', 'Equipment & Elevated Comfort')}</span>
+                  <ul className="text-slate-600 text-xs leading-relaxed space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Navegación:', 'Navigation:')}</strong> {t('Plotter Raymarine, Piloto Automático & Starlink 24/7', 'Raymarine Chartplotter, Autopilot & 24/7 Starlink')}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Habitabilidad:', 'Habitability:')}</strong> {t('4 Cabinas con 4 Baños en suite privados', '4 Cabins with 4 private en-suite bathrooms')}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Cocina Full Equipada:', 'Fully Equipped Galley:')}</strong> {t('Horno eléctrico, encimera, 3 refris y 1 congelador', 'Electric oven, cooktop, 3 fridges and 1 freezer')}</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tech Specs Cards in a Single Row (Desktop 3D Flip) */}
+          <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
             
             {/* Card 1: NORTH - ASTILLERO & MODELO */}
             <div
@@ -699,6 +848,34 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
             <p className="text-slate-500 text-sm mt-2">
               {t('Explora las vivencias de navegación rápida y los detalles técnicos que hacen del Terranova un yate a motor de travesía insuperable.', 'Explore rapid cruising chronicles and technical details that make Terranova an unmatched expedition motor yacht.')}
             </p>
+          </div>
+
+          {/* Mobile Fast-Switch Feature Pills (< lg) */}
+          <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar mb-4">
+            {[
+              { id: 'climatizacion' as const, label: t('Deck Superior', 'Upper Deck'), icon: Layers },
+              { id: 'gastronomia' as const, label: t('Salón & Cocina', 'Salon & Galley'), icon: Sparkles },
+              { id: 'casco' as const, label: t('Propulsión Detroit', 'Detroit Propulsion'), icon: Gauge },
+              { id: 'desembarcos' as const, label: t('Zodiac Yamaha', 'Yamaha Zodiac'), icon: Anchor },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = selectedFeature === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSelectedFeature(tab.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 border cursor-pointer active:scale-95 ${
+                    isActive
+                      ? 'bg-blue-900 border-blue-800 text-white shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-200' : 'text-slate-500'}`} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">

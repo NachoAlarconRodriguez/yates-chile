@@ -5,6 +5,7 @@ export type LodgeRoom = Database['public']['Tables']['lodge_rooms']['Row'] & {
   description?: string;
   image_url?: string;
   amenities?: string[];
+  rates_by_pax?: Record<number, number>;
 };
 export type LodgeBooking = Database['public']['Tables']['lodge_bookings']['Row'];
 
@@ -15,7 +16,8 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     room_name: 'Albatros',
     room_type: 'doble',
     max_pax: 2,
-    base_price_clp: 210000,
+    base_price_clp: 250000,
+    rates_by_pax: { 1: 210000, 2: 250000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -30,6 +32,7 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     room_type: 'triple',
     max_pax: 3,
     base_price_clp: 240000,
+    rates_by_pax: { 1: 190000, 2: 240000, 3: 280000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -44,6 +47,7 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     room_type: 'triple',
     max_pax: 3,
     base_price_clp: 240000,
+    rates_by_pax: { 1: 190000, 2: 240000, 3: 280000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -58,6 +62,7 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     room_type: 'triple',
     max_pax: 3,
     base_price_clp: 240000,
+    rates_by_pax: { 1: 190000, 2: 240000, 3: 280000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -71,6 +76,26 @@ export const LODGE_TOTAL_MAX_PAX = 11; // 2 (Albatros) + 3 (Cumberland) + 3 (Sel
 
 export const isRoomSuitableForPax = (room: LodgeRoom, pax: number): boolean => {
   return (room.max_pax ?? 3) >= pax;
+};
+
+/**
+ * Calculates the nightly rate for a room based on occupancy (rates_by_pax).
+ * Falls back cleanly to base_price_clp if occupancy pricing is not specifically set.
+ */
+export const getRoomNightlyRate = (room?: LodgeRoom | null, pax: number = 2): number => {
+  if (!room) return 240000;
+  if (room.rates_by_pax && typeof room.rates_by_pax === 'object') {
+    const targetPax = Math.max(1, Math.round(pax));
+    if (room.rates_by_pax[targetPax] != null && Number(room.rates_by_pax[targetPax]) > 0) {
+      return Number(room.rates_by_pax[targetPax]);
+    }
+    const keys = Object.keys(room.rates_by_pax).map(Number).sort((a, b) => a - b);
+    if (keys.length > 0) {
+      if (targetPax > keys[keys.length - 1]) return Number(room.rates_by_pax[keys[keys.length - 1]]);
+      if (targetPax < keys[0]) return Number(room.rates_by_pax[keys[0]]);
+    }
+  }
+  return room.base_price_clp || 240000;
 };
 
 const LOCAL_STORAGE_BOOKINGS_KEY = 'yates_lodge_bookings_v3';
@@ -197,13 +222,16 @@ export const lodgeService = {
       const updatedList = current.map((r) => (r.id === roomId ? { ...r, ...updates } : r));
       saveCachedRooms(updatedList);
 
-      // 2. Update Supabase
-      const { error } = await (supabase.from('lodge_rooms') as any)
-        .update(updates)
-        .eq('id', roomId);
+      // 2. Separate database fields from extended virtual fields
+      const { rates_by_pax, description, image_url, amenities, ...dbFields } = updates as any;
+      if (Object.keys(dbFields).length > 0) {
+        const { error } = await (supabase.from('lodge_rooms') as any)
+          .update(dbFields)
+          .eq('id', roomId);
 
-      if (error) {
-        console.warn('Lodge room update on Supabase warning, preserved in cache:', error);
+        if (error) {
+          console.warn('Lodge room update on Supabase warning, preserved in cache:', error);
+        }
       }
       return { success: true };
     } catch {

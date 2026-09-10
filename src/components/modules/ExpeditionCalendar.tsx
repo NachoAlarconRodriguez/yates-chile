@@ -194,6 +194,32 @@ export const ExpeditionCalendar: React.FC = () => {
 
   const activeExpedition = expeditions.find(e => e.id === activeExpeditionId) || activeExpeditions[0] || null;
 
+  const touchStartX = React.useRef<number | null>(null);
+  const touchStartY = React.useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStartX.current - touchEndX;
+    const diffY = touchStartY.current - touchEndY;
+
+    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+      if (diffX > 0) {
+        setSelectedMonth((prev) => (prev === 12 ? 1 : prev + 1));
+      } else {
+        setSelectedMonth((prev) => (prev === 1 ? 12 : prev - 1));
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
   const handleOpenBookingModal = () => {
     setIsModalOpen(true);
   };
@@ -271,8 +297,12 @@ export const ExpeditionCalendar: React.FC = () => {
           </div>
         </div>
 
-        {/* Detail Split View */}
-        <div className="grid lg:grid-cols-12 gap-8 items-stretch">
+        {/* Detail Split View with Touch Swipe Support */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="grid lg:grid-cols-12 gap-8 items-stretch touch-pan-y"
+        >
           
           {/* Left: Expeditions list of the month */}
           <div className="lg:col-span-7 space-y-4 flex flex-col">

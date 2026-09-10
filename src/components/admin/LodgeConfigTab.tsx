@@ -48,6 +48,7 @@ export const LodgeConfigTab: React.FC = () => {
   ]);
   const [newAmenityText, setNewAmenityText] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [formRatesByPax, setFormRatesByPax] = useState<Record<number, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Delete Confirmation Modal
@@ -64,6 +65,7 @@ export const LodgeConfigTab: React.FC = () => {
     setFormRoomType('doble');
     setFormMaxPax(2);
     setFormBasePriceClp(220000);
+    setFormRatesByPax({ 1: 190000, 2: 220000 });
     setFormHasOceanView(true);
     setFormDescription('Habitación de alto confort con vista panorámica a Bahía Cumberland y baño privado.');
     setFormImageUrl('/rincon-de-navegantes.jpg');
@@ -86,6 +88,17 @@ export const LodgeConfigTab: React.FC = () => {
     setFormRoomType(room.room_type || 'doble');
     setFormMaxPax(room.max_pax || 2);
     setFormBasePriceClp(room.base_price_clp || 220000);
+    const initialRates: Record<number, number> = room.rates_by_pax ? { ...room.rates_by_pax } : {};
+    const maxPax = room.max_pax || 2;
+    const base = room.base_price_clp || 220000;
+    for (let p = 1; p <= maxPax; p++) {
+      if (!initialRates[p]) {
+        if (p === 1) initialRates[p] = Math.round(base * 0.88 / 1000) * 1000;
+        else if (p === 2) initialRates[p] = base;
+        else initialRates[p] = base + (p - 2) * 40000;
+      }
+    }
+    setFormRatesByPax(initialRates);
     setFormHasOceanView(room.has_ocean_view !== false);
     setFormDescription(room.description || 'Habitación con vista al mar y baño en suite en Lodge Bahía Cumberland.');
     setFormImageUrl(room.image_url || '/rincon-de-navegantes.jpg');
@@ -127,6 +140,7 @@ export const LodgeConfigTab: React.FC = () => {
           room_type: formRoomType as 'doble' | 'triple',
           max_pax: formMaxPax,
           base_price_clp: formBasePriceClp,
+          rates_by_pax: formRatesByPax,
           has_ocean_view: formHasOceanView,
           description: formDescription.trim(),
           image_url: formImageUrl.trim(),
@@ -141,6 +155,7 @@ export const LodgeConfigTab: React.FC = () => {
           room_type: formRoomType as 'doble' | 'triple',
           max_pax: formMaxPax,
           base_price_clp: formBasePriceClp,
+          rates_by_pax: formRatesByPax,
           has_ocean_view: formHasOceanView,
           description: formDescription.trim(),
           image_url: formImageUrl.trim() || '/rincon-de-navegantes.jpg',
@@ -425,7 +440,7 @@ export const LodgeConfigTab: React.FC = () => {
       {/* ========================================================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 text-left my-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 text-left my-auto max-h-[92vh] overflow-y-auto">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -526,13 +541,85 @@ export const LodgeConfigTab: React.FC = () => {
                       step="1000"
                       min="10000"
                       value={formBasePriceClp}
-                      onChange={(e) => setFormBasePriceClp(Number(e.target.value))}
+                      onChange={(e) => {
+                        const newBase = Number(e.target.value);
+                        setFormBasePriceClp(newBase);
+                        setFormRatesByPax(prev => {
+                          const updated = { ...prev };
+                          const baseKey = formMaxPax === 1 ? 1 : 2;
+                          if (!updated[baseKey] || updated[baseKey] === formBasePriceClp) {
+                            updated[baseKey] = newBase;
+                          }
+                          return updated;
+                        });
+                      }}
                       className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 font-mono font-bold focus:border-[#0b192c] focus:outline-none"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 font-bold">
                       CLP / noche
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Dynamic Rates by Occupancy Grid (Opción 2) */}
+              <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-sky-700" />
+                    <span className="text-[10px] uppercase font-mono font-bold text-[#0b192c]">
+                      Tarifas por Cantidad de Pasajeros
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    CLP / noche
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 font-light leading-relaxed">
+                  Fija el valor total por noche de la habitación según la cantidad exacta de personas que se hospeden:
+                </p>
+
+                <div className="space-y-2 pt-0.5">
+                  {Array.from({ length: Math.max(1, formMaxPax) }, (_, idx) => idx + 1).map((pax) => {
+                    const isBasePax = pax === (formMaxPax === 1 ? 1 : 2);
+                    return (
+                      <div
+                        key={pax}
+                        className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <span className="text-xs font-bold text-[#0b192c]">
+                            {pax} {pax === 1 ? 'Pasajero' : 'Pasajeros'}
+                          </span>
+                          {isBasePax && (
+                            <span className="text-[9px] font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200/60 px-1.5 py-0.5 rounded-md">
+                              Base
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs font-mono text-slate-400 font-bold">$</span>
+                          <input
+                            type="number"
+                            min="10000"
+                            step="1000"
+                            required
+                            value={formRatesByPax[pax] ?? formBasePriceClp}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setFormRatesByPax((prev) => ({
+                                ...prev,
+                                [pax]: val,
+                              }));
+                            }}
+                            className="w-28 bg-[#fbfcfd] hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-[#0b192c] font-mono font-bold text-right focus:outline-none focus:border-[#0b192c] transition"
+                          />
+                          <span className="text-[10px] text-slate-400 font-mono">CLP</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

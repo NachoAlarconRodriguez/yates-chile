@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X, Radio, Droplets, FileText, Download, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Thermometer, Sparkles, Anchor, MapPin, Maximize2, ChevronLeft, ChevronRight, X, Radio, Droplets, FileText, Download, ArrowRight, ChevronDown } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { useLanguage } from '../context/LanguageContext';
@@ -242,7 +242,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <img
                       src={exp.image}
                       alt={exp.name}
+                      referrerPolicy="no-referrer"
                       className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-200"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/velero-vegvisir.jpg';
+                      }}
                     />
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -321,8 +325,165 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
       {/* TECH SPECS GRID (3D FLIPS ON CLICK) */}
       <section className="py-16 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 sm:px-10">
-          {/* Tech Specs Cards in a Single Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
+          {/* Mobile Tech Specs Cards (md:hidden) */}
+          <div className="md:hidden flex flex-col gap-3 max-w-xl mx-auto">
+            {/* Mobile Card 1: Eslora & Astillero */}
+            <div
+              onClick={() => toggleFlip('eslora')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Maximize2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">Dufour 52.5 ft • {t('Francés', 'French')}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">QUI 2718</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['eslora'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['eslora'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-1">{t('Identificación & Travesía', 'Identification & Journey')}</span>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    {t('Diseñado para navegar las aguas del Pacífico Sur, Archipiélago Juan Fernández, Canal Beagle y el Cabo de Hornos con total serenidad.', 'Engineered to sail the waters of the South Pacific, Juan Fernández Archipelago, Beagle Channel and Cape Horn with absolute serenity.')}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Card 2: Capacidad */}
+            <div
+              onClick={() => toggleFlip('capacidad')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('OESTE / CAPACIDAD', 'WEST / CAPACITY')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">12 PAX • {t('5 Cabinas / 5 Baños', '5 Cabins / 5 Baths')}</h4>
+                    <span className="text-[11px] text-slate-500">{t('Salón central & Cocina completa', 'Central salon & Full galley')}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['capacidad'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['capacidad'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-1">{t('Habitabilidad & Confort', 'Habitability & Comfort')}</span>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    {t('Capacidad para 12 pasajeros con 5 cabinas y 5 baños completos. Amplio salón central y cocina completa para travesías prolongadas.', 'Capacity for 12 guests with 5 cabins and 5 full en-suite bathrooms. Spacious central salon and full galley for extended journeys.')}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Card 3: Navegación */}
+            <div
+              onClick={() => toggleFlip('tripulacion')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Radio className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">Starlink 24/7 • Raymarine</h4>
+                    <span className="text-[11px] text-slate-500">{t('Electrónica oceánica de precisión', 'Precision oceanic electronics')}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['tripulacion'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['tripulacion'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-2">{t('Electrónica Raymarine', 'Raymarine Electronics')}</span>
+                  <ul className="text-slate-600 text-xs leading-relaxed space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span>Plotter Raymarine de última generación</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span>{t('Piloto Automático Raymarine', 'Raymarine Autopilot')}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span>{t('Conexión satelital Starlink 24/7 de alta velocidad', '24/7 High-speed Starlink Satellite Internet')}</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Card 4: Autonomía & Energía */}
+            <div
+              onClick={() => toggleFlip('navegacion')}
+              className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs cursor-pointer active:bg-slate-50 transition"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0 text-blue-900">
+                    <Droplets className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('ESTE / AUTONOMÍA', 'EAST / AUTONOMY')}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">140 Ltrs/hr • Perkins 90 HP</h4>
+                    <span className="text-[11px] text-slate-500">Zodiac 4.3m / 15hp</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${flipped['navegacion'] ? 'rotate-180 text-blue-900' : 'text-slate-400'}`} />
+                </div>
+              </div>
+              {flipped['navegacion'] && (
+                <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
+                  <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-2">{t('Autonomía & Equipamiento', 'Autonomy & Equipment')}</span>
+                  <ul className="text-slate-600 text-xs leading-relaxed space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Combustible:', 'Fuel:')}</strong> 500 L (2 estanques)</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Agua:', 'Freshwater:')}</strong> 1.000 L (4 estanques)</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span><strong>{t('Motor:', 'Engine:')}</strong> Perkins 90 HP</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span>{t('Planta Desalinizadora (140 L/hr)', 'Watermaker System (140 L/hr)')}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span>{t('Panel Solar 600W & 2 Baterías de Litio', '600W Solar & 2 Lithium Batteries')}</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-900 shrink-0" />
+                      <span>{t('2 Calefacciones tipo Webasto', '2 Webasto Marine Heaters')}</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tech Specs Cards in a Single Row (Desktop 3D Flip) */}
+          <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
             
             {/* Card 1: NORTH - ESLORA & ASTILLERO */}
             <div
@@ -714,6 +875,34 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
             <p className="text-slate-500 text-sm mt-2">
               {t('Explora las vivencias de navegación austral y los detalles técnicos que hacen del Vegvisir una embarcación de travesía insuperable.', 'Explore austral sailing chronicles and technical engineering that make Vegvisir an unmatched expedition vessel.')}
             </p>
+          </div>
+
+          {/* Mobile Fast-Switch Feature Pills (< lg) */}
+          <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar mb-4">
+            {[
+              { id: 'climatizacion' as const, label: t('Climatización', 'Climate Control'), icon: Thermometer },
+              { id: 'gastronomia' as const, label: t('Gastronomía', 'Gastronomy'), icon: Sparkles },
+              { id: 'casco' as const, label: t('Casco Reforzado', 'Reinforced Hull'), icon: Anchor },
+              { id: 'desembarcos' as const, label: t('Desembarcos', 'Landings'), icon: MapPin },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = selectedFeature === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSelectedFeature(tab.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 border cursor-pointer active:scale-95 ${
+                    isActive
+                      ? 'bg-blue-900 border-blue-800 text-white shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-200' : 'text-slate-500'}`} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">

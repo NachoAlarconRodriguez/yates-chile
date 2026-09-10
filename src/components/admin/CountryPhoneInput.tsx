@@ -127,7 +127,7 @@ export const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="h-full min-h-[38px] bg-[#f4f7fb] hover:bg-slate-200/80 focus:bg-white border border-r-0 border-slate-200/90 rounded-l-xl px-2.5 sm:px-3 py-2 flex items-center gap-1.5 text-xs font-mono font-bold text-[#0b192c] transition shadow-2xs cursor-pointer select-none"
+          className="h-full min-h-[44px] bg-[#f4f7fb] hover:bg-slate-200/80 focus:bg-white border border-r-0 border-slate-200/90 rounded-l-xl px-2.5 sm:px-3 py-2.5 flex items-center gap-1.5 text-xs font-mono font-bold text-[#0b192c] transition shadow-2xs cursor-pointer select-none"
           title={`País: ${selectedCountry.name} (${selectedCountry.code})`}
         >
           <span className="text-base leading-none">{selectedCountry.flag}</span>
@@ -207,11 +207,13 @@ export const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
       {/* Input de Número Telefónico Local */}
       <input
         type="tel"
+        inputMode="tel"
+        autoComplete="tel"
         required={required}
         value={localNumber}
         onChange={handleNumberChange}
         placeholder={placeholder || selectedCountry.example}
-        className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-r-xl px-3 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+        className="w-full min-h-[44px] bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-r-xl px-3 py-2.5 text-xs text-[#0b192c] font-mono focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
       />
     </div>
   );

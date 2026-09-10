@@ -41,7 +41,7 @@ export const FleetHotspotViewer: React.FC = () => {
   };
 
   return (
-    <section id="flota-visualizer" className="py-20 bg-slate-900 text-white relative overflow-hidden border-t border-slate-800">
+    <section id="flota-visualizer" className="py-20 bg-slate-900 text-white relative overflow-hidden border-t border-slate-800 touch-pan-y">
       
       {/* Background radial soft light */}
       <div className="absolute w-[600px] h-[600px] rounded-full bg-blue-900/5 -top-40 -left-40 blur-[150px] pointer-events-none" />
@@ -87,7 +87,7 @@ export const FleetHotspotViewer: React.FC = () => {
         <div className="grid lg:grid-cols-12 gap-8 items-stretch">
           
           {/* Left / Center simulated 3D model */}
-          <div className="lg:col-span-8 bg-slate-950 rounded-3xl p-6 sm:p-8 text-white relative min-h-[450px] flex flex-col justify-between overflow-hidden shadow-2xl border border-slate-800">
+          <div className="lg:col-span-8 bg-slate-950 rounded-3xl p-6 sm:p-8 text-white relative min-h-[450px] flex flex-col justify-between overflow-hidden shadow-2xl border border-slate-800 touch-pan-y">
             {/* Background Vessel Image with overlay */}
             <img
               src={selectedVessel.mainImage}
@@ -106,7 +106,7 @@ export const FleetHotspotViewer: React.FC = () => {
             </div>
 
             {/* Simulated 3D Hotspot Nodes */}
-            <div className="relative z-10 my-12 grid sm:grid-cols-3 gap-4">
+            <div className="relative z-10 my-6 sm:my-12 grid sm:grid-cols-3 gap-3 sm:gap-4">
               {(selectedVessel.hotspots || []).map((hs) => {
                 const isActive = activeHotspotId === hs.id;
                 return (

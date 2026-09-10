@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { formatPhone, formatRut } from '../lib/formatters';
 import type { CatalogService } from '../services/catalogService';
 import { normalizeExternalMediaUrl } from '../services/cmsService';
+import { getRoomNightlyRate } from '../services/lodgeService';
 
 interface LodgePageProps {
   onNavigate: (path: string) => void;
@@ -606,6 +607,34 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
             </p>
           </div>
 
+          {/* Mobile Fast-Switch Feature Pills (< lg) */}
+          <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar mb-4">
+            {[
+              { id: 'arquitectura' as const, label: t('Arquitectura', 'Architecture'), icon: Home },
+              { id: 'quincho' as const, label: t('Quincho & Asados', 'Quincho & BBQ'), icon: UtensilsCrossed },
+              { id: 'exploraciones' as const, label: t('Exploraciones', 'Expeditions'), icon: Compass },
+              { id: 'atardeceres' as const, label: t('Atardeceres', 'Sunsets'), icon: Sun },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = selectedFeature === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSelectedFeature(tab.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 border cursor-pointer active:scale-95 ${
+                    isActive
+                      ? 'bg-emerald-800 border-emerald-700 text-white shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-200' : 'text-slate-500'}`} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">
             
             {/* Left Column: Logbook (5 cols) */}
@@ -1103,13 +1132,16 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
 
       {/* BOOKING MODAL */}
       {showBookingModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+          <div className="max-w-xl w-full bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl space-y-6 max-h-[92vh] overflow-y-auto">
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden -mt-1 mb-3" />
+
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div>
                 <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 block">Lodge Rincón de Navegantes</span>
-                <h4 className="font-serif text-xl font-bold text-white">Reserva de Estadía & Excursiones</h4>
+                <h4 className="font-serif text-lg sm:text-xl font-bold text-white">Reserva de Estadía & Excursiones</h4>
               </div>
               <button
                 onClick={() => {
@@ -1217,7 +1249,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                           value={checkIn}
                           min={new Date().toISOString().split('T')[0]}
                           onChange={(e) => setCheckIn(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                           required
                         />
                       </div>
@@ -1228,7 +1260,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                           value={checkOut}
                           min={checkIn || new Date().toISOString().split('T')[0]}
                           onChange={(e) => setCheckOut(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                           required
                         />
                       </div>
@@ -1286,7 +1318,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                               <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-white">{r.room_name}</span>
                                 <span className="text-[10px] text-emerald-400 font-mono">
-                                  ${(r.base_price_clp || 220000).toLocaleString('es-CL')}/noche
+                                  ${getRoomNightlyRate(r, paxCount).toLocaleString('es-CL')}/noche
                                 </span>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-1">
@@ -1459,7 +1491,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       const d1 = new Date(checkIn);
                       const d2 = new Date(checkOut);
                       const nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
-                      const roomSubtotal = (room?.base_price_clp || 220000) * nights;
+                      const roomSubtotal = getRoomNightlyRate(room, paxCount) * nights;
                       const excursionsSubtotal = selectedExcursions.reduce((acc, it) => acc + it.service.price_clp * it.pax, 0);
                       const grandTotal = roomSubtotal + excursionsSubtotal;
 
@@ -1499,23 +1531,26 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Nombre Completo</label>
                       <input
                         type="text"
+                        autoComplete="name"
                         value={guestName}
                         onChange={(e) => setGuestName(e.target.value)}
                         placeholder="Ej: Sebastián Errázuriz"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                         required
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Correo Electrónico</label>
                         <input
                           type="email"
+                          inputMode="email"
+                          autoComplete="email"
                           value={guestEmail}
                           onChange={(e) => setGuestEmail(e.target.value)}
                           placeholder="nombre@email.com"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                           required
                         />
                       </div>
@@ -1523,10 +1558,12 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Teléfono / WhatsApp</label>
                         <input
                           type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
                           value={guestPhone}
                           onChange={(e) => setGuestPhone(formatPhone(e.target.value))}
                           placeholder="+56 9 1234 5678"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                           required
                         />
                       </div>
@@ -1536,10 +1573,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">RUT o Pasaporte (Opcional)</label>
                       <input
                         type="text"
+                        autoCapitalize="characters"
                         value={guestRut}
                         onChange={(e) => setGuestRut(formatRut(e.target.value))}
                         placeholder="12.345.678-9"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>
 
@@ -1551,7 +1589,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                         const d1 = new Date(checkIn || '2026-01-01');
                         const d2 = new Date(checkOut || '2026-01-02');
                         const nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
-                        const roomSubtotal = (room?.base_price_clp || 220000) * nights;
+                        const roomSubtotal = getRoomNightlyRate(room, paxCount) * nights;
                         const excursionsSubtotal = selectedExcursions.reduce((acc, it) => acc + it.service.price_clp * it.pax, 0);
                         const grandTotal = roomSubtotal + excursionsSubtotal;
 

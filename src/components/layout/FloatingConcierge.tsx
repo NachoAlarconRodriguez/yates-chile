@@ -13,7 +13,7 @@ export const FloatingConcierge: React.FC = () => {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Atención Concierge por WhatsApp"
-      className="fixed bottom-24 right-6 z-50 group w-14 h-14 rounded-full bg-[#25D366] hover:bg-[#20ba5a] text-white shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center"
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] sm:bottom-24 right-4 sm:right-6 z-50 group w-14 h-14 rounded-full bg-[#25D366] hover:bg-[#20ba5a] text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center"
     >
       {/* Official WhatsApp SVG Logo Icon */}
       <svg

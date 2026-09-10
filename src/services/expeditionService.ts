@@ -1,27 +1,33 @@
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseAdmin } from '../lib/supabase';
 import type { Database } from '../types/database.types';
 import { EXPEDITION_ROUTES, FLEET_DATA } from '../lib/constants';
+import { normalizeExternalMediaUrl } from './cmsService';
 
 export type ExpeditionRouteRow = Database['public']['Tables']['expedition_routes']['Row'];
 export type VesselRow = Database['public']['Tables']['vessels']['Row'];
 export type DepartureRow = Database['public']['Tables']['expedition_departures']['Row'] & {
   name?: string;
+  headline?: string;
   location?: string;
   image?: string;
   description?: string;
   tempEstimate?: string;
   brochureUrl?: string;
+  brochure_url?: string;
   policyUrl?: string;
   bestViewTime?: string;
   route?: any;
   vessel?: any;
   isFeatured?: boolean;
+  highlights?: string;
+  includedServices?: string;
 };
 export type ExpeditionBookingRow = Database['public']['Tables']['expedition_bookings']['Row'];
 
 export interface PublicExpedition {
   id: string;
   name: string;
+  headline?: string;
   startDate: string;
   endDate: string;
   departureDate: string;
@@ -45,6 +51,8 @@ export interface PublicExpedition {
   policyUrl?: string;
   status: 'scheduled' | 'guaranteed' | 'completed' | 'cancelled';
   isFeatured?: boolean;
+  highlights?: string;
+  includedServices?: string;
 }
 
 export const INITIAL_EXPEDITIONS: PublicExpedition[] = [
@@ -349,11 +357,14 @@ const sanitizePublicExpedition = (e: PublicExpedition): PublicExpedition => {
   if (name.startsWith('JF ')) {
     name = name.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
   }
+  const rawImg = e.image || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
+  const image = normalizeExternalMediaUrl(rawImg);
   return {
     ...e,
     name,
     vessel,
     vesselId,
+    image,
   };
 };
 
@@ -368,6 +379,9 @@ const getStoredDepartures = (): PublicExpedition[] => {
         if (!hasAnyFeatured) {
           sanitized.slice(0, 3).forEach((e) => (e.isFeatured = true));
         }
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sanitized));
+        } catch {}
         return sanitized;
       }
     }
@@ -422,6 +436,32 @@ export const expeditionService = {
 
   async getDepartures(): Promise<DepartureRow[]> {
     const local = getStoredDepartures();
+    const cloudOverrides: Record<string, any> = {};
+
+    try {
+      const { data: cloudData } = await supabase
+        .from('site_content')
+        .select('section_key, title, media_url, body_text, metadata')
+        .ilike('section_key', 'expedition_departure_%');
+      if (cloudData && cloudData.length > 0) {
+        cloudData.forEach((row: any) => {
+          const depId = row.section_key.replace('expedition_departure_', '');
+          const meta = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
+          cloudOverrides[depId] = {
+            image: normalizeExternalMediaUrl(row.media_url || meta.image),
+            name: meta.name || row.title,
+            headline: meta.headline,
+            location: meta.location,
+            description: meta.description || row.body_text,
+            tempEstimate: meta.tempEstimate,
+            highlights: meta.highlights,
+            includedServices: meta.includedServices,
+            brochureUrl: meta.brochureUrl || meta.brochure_url,
+          };
+        });
+      }
+    } catch {}
+
     const mapLocalToRow = (e: PublicExpedition): DepartureRow => {
       const isTerranova = e.vessel.toLowerCase().includes('terranova') || e.vesselId === 'terranova';
       const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
@@ -447,8 +487,12 @@ export const expeditionService = {
         image: e.image,
         description: e.description,
         tempEstimate: e.tempEstimate,
+        brochureUrl: e.brochureUrl || (e as any).brochure_url,
+        brochure_url: e.brochureUrl || (e as any).brochure_url,
         bestViewTime: e.bestViewTime,
         isFeatured: e.isFeatured ?? false,
+        highlights: e.highlights,
+        includedServices: e.includedServices,
         route: EXPEDITION_ROUTES.find((r) => r.id === e.routeId) || {
           id: e.routeId,
           title: name,
@@ -472,22 +516,27 @@ export const expeditionService = {
       if (!error && data && data.length > 0) {
         const mappedDb = (data as any[]).map((d) => {
           const matchedLocal = local.find((l) => l.id === d.id);
+          const cloud = cloudOverrides[d.id];
           const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
           const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
           const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
-          const routeName = formatRouteDepartureTitle(d, matchedLocal);
-          const routeLoc = matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández';
-          const routeImg = matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
+          const routeName = cloud?.name || formatRouteDepartureTitle(d, matchedLocal);
+          const routeLoc = cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández';
+          const routeImg = cloud?.image || matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
 
           return {
             ...d,
             name: routeName,
             location: routeLoc,
             image: routeImg,
-            description: matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
-            tempEstimate: matchedLocal?.tempEstimate || '14°C - 18°C',
+            description: cloud?.description || matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
+            tempEstimate: cloud?.tempEstimate || matchedLocal?.tempEstimate || '14°C - 18°C',
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
             isFeatured: matchedLocal?.isFeatured ?? false,
+            highlights: cloud?.highlights || matchedLocal?.highlights,
+            includedServices: cloud?.includedServices || matchedLocal?.includedServices,
+            brochureUrl: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
+            brochure_url: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
             vessel_id: isTerranova ? 'terranova' : 'vegvisir',
             vessel: {
               id: isTerranova ? 'terranova' : 'vegvisir',
@@ -510,6 +559,32 @@ export const expeditionService = {
 
   async getPublicExpeditions(): Promise<PublicExpedition[]> {
     const local = getStoredDepartures();
+    const cloudOverrides: Record<string, any> = {};
+
+    try {
+      const { data: cloudData } = await supabase
+        .from('site_content')
+        .select('section_key, title, media_url, body_text, metadata')
+        .ilike('section_key', 'expedition_departure_%');
+      if (cloudData && cloudData.length > 0) {
+        cloudData.forEach((row: any) => {
+          const depId = row.section_key.replace('expedition_departure_', '');
+          const meta = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
+          cloudOverrides[depId] = {
+            image: normalizeExternalMediaUrl(row.media_url || meta.image),
+            name: meta.name || row.title,
+            headline: meta.headline,
+            location: meta.location,
+            description: meta.description || row.body_text,
+            tempEstimate: meta.tempEstimate,
+            highlights: meta.highlights,
+            includedServices: meta.includedServices,
+            brochureUrl: meta.brochureUrl || meta.brochure_url,
+          };
+        });
+      }
+    } catch {}
+
     try {
       const { data, error } = await supabase
         .from('expedition_departures')
@@ -519,10 +594,11 @@ export const expeditionService = {
       if (!error && data && data.length > 0) {
         const mapped: PublicExpedition[] = data.map((d: any) => {
           const matchedLocal = local.find((l) => l.id === d.id);
+          const cloud = cloudOverrides[d.id];
           const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
           const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
           const vesselId = isTerranova ? 'terranova' : 'vegvisir';
-          const routeTitle = formatRouteDepartureTitle(d, matchedLocal);
+          const routeTitle = cloud?.name || formatRouteDepartureTitle(d, matchedLocal);
           const depYear = parseInt(d.departure_date?.split('-')[0] || '2026', 10);
           const months = getMonthsFromDates(d.departure_date, d.return_date);
           const isSoldOut = typeof d.available_slots === 'number' && d.available_slots <= 0;
@@ -532,6 +608,7 @@ export const expeditionService = {
           return {
             id: d.id,
             name: routeTitle,
+            headline: cloud?.headline || matchedLocal?.headline,
             startDate: formatDateSpan(d.departure_date),
             endDate: formatDateSpan(d.return_date),
             departureDate: d.departure_date,
@@ -546,11 +623,15 @@ export const expeditionService = {
             vessel: vesselName,
             vesselId: vesselId,
             routeId: d.route_id || 'ruta-juan-fernandez',
-            description: matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
-            location: matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández',
-            image: matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
+            description: cloud?.description || matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
+            location: cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández',
+            image: cloud?.image || normalizeExternalMediaUrl(matchedLocal?.image) || normalizeExternalMediaUrl(d.image) || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
-            tempEstimate: matchedLocal?.tempEstimate || '14°C - 18°C',
+            tempEstimate: cloud?.tempEstimate || matchedLocal?.tempEstimate || '14°C - 18°C',
+            highlights: cloud?.highlights || matchedLocal?.highlights,
+            includedServices: cloud?.includedServices || matchedLocal?.includedServices,
+            brochureUrl: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
+            brochure_url: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
             status: effectiveStatus,
           };
         });
@@ -560,7 +641,7 @@ export const expeditionService = {
       }
     } catch {}
 
-    return local;
+    return local.map((l) => ({ ...l, image: normalizeExternalMediaUrl(l.image) }));
   },
 
   async getAllBookings(): Promise<ExpeditionBookingRow[]> {
@@ -1071,10 +1152,14 @@ export const expeditionService = {
       priceCharterFullClp?: number;
       status?: 'scheduled' | 'guaranteed' | 'completed' | 'cancelled';
       publicName?: string;
+      publicHeadline?: string;
       publicLocation?: string;
       publicCoverImage?: string;
       publicDescription?: string;
       publicTempEstimate?: string;
+      publicHighlights?: string;
+      publicIncludedServices?: string;
+      publicBrochureUrl?: string;
     }
   ): Promise<{ success: boolean; data?: DepartureRow; error?: string }> {
     try {
@@ -1092,6 +1177,7 @@ export const expeditionService = {
         if (params.availableSlots !== undefined) updateData.available_slots = params.availableSlots;
         if (params.pricePerPaxClp !== undefined) updateData.price_per_pax_clp = params.pricePerPaxClp;
         if (params.priceCharterFullClp !== undefined) updateData.price_charter_full_clp = params.priceCharterFullClp;
+        if (params.publicBrochureUrl !== undefined) updateData.brochure_url = params.publicBrochureUrl;
         const isSoldOutDb = params.availableSlots !== undefined && params.availableSlots <= 0;
         const effectiveStatus = (isSoldOutDb && params.status !== 'cancelled') ? 'guaranteed' : params.status;
         if (effectiveStatus) updateData.status = effectiveStatus;
@@ -1104,8 +1190,10 @@ export const expeditionService = {
 
       // Update localStorage
       const stored = getStoredDepartures();
+      let found = false;
       const updated = stored.map((e) => {
         if (e.id === departureId) {
+          found = true;
           const depDate = params.departureDate || e.departureDate;
           const retDate = params.returnDate || e.returnDate;
           const startFormatted = depDate ? formatDateSpan(depDate) : e.startDate;
@@ -1120,6 +1208,7 @@ export const expeditionService = {
           return {
             ...e,
             name: params.publicName || e.name,
+            headline: params.publicHeadline !== undefined ? params.publicHeadline : e.headline,
             vessel: params.vesselId ? vesselName : e.vessel,
             vesselId: params.vesselId || e.vesselId,
             routeId: params.routeId || e.routeId,
@@ -1135,17 +1224,132 @@ export const expeditionService = {
             pricePerPaxClp: params.pricePerPaxClp !== undefined ? params.pricePerPaxClp : e.pricePerPaxClp,
             priceCharterFullClp: params.priceCharterFullClp !== undefined ? params.priceCharterFullClp : e.priceCharterFullClp,
             status: stat,
-            description: params.publicDescription || e.description,
-            location: params.publicLocation || e.location,
-            image: params.publicCoverImage || e.image,
-            tempEstimate: params.publicTempEstimate || e.tempEstimate,
+            description: params.publicDescription !== undefined ? params.publicDescription : e.description,
+            location: params.publicLocation !== undefined ? params.publicLocation : e.location,
+            image: params.publicCoverImage !== undefined ? normalizeExternalMediaUrl(params.publicCoverImage) : e.image,
+            tempEstimate: params.publicTempEstimate !== undefined ? params.publicTempEstimate : e.tempEstimate,
+            highlights: params.publicHighlights !== undefined ? params.publicHighlights : e.highlights,
+            includedServices: params.publicIncludedServices !== undefined ? params.publicIncludedServices : e.includedServices,
+            brochureUrl: params.publicBrochureUrl !== undefined ? params.publicBrochureUrl : e.brochureUrl,
+            brochure_url: params.publicBrochureUrl !== undefined ? params.publicBrochureUrl : (e as any).brochure_url,
           };
         }
         return e;
       });
+
+      if (!found) {
+        const depDate = params.departureDate || '2026-10-01';
+        const retDate = params.returnDate || '2026-10-08';
+        const totSlots = params.totalSlots ?? 6;
+        const availSlots = params.availableSlots ?? 6;
+        const isSoldOut = availSlots <= 0;
+        const stat = (isSoldOut && params.status !== 'cancelled') ? 'guaranteed' : (params.status || 'scheduled');
+        updated.push({
+          id: departureId,
+          name: params.publicName || 'Expedición Archipiélago',
+          headline: params.publicHeadline,
+          startDate: formatDateSpan(depDate),
+          endDate: formatDateSpan(retDate),
+          departureDate: depDate,
+          returnDate: retDate,
+          monthsActive: getMonthsFromDates(depDate, retDate),
+          year: parseInt(depDate.split('-')[0], 10) || 2026,
+          spotsLeft: stat === 'cancelled' ? 'bloqueado' : isSoldOut ? 'completo' : availSlots,
+          totalSlots: totSlots,
+          availableSlots: availSlots,
+          pricePerPaxClp: params.pricePerPaxClp ?? 1950000,
+          priceCharterFullClp: params.priceCharterFullClp ?? 11700000,
+          vessel: vesselName,
+          vesselId: params.vesselId || 'vegvisir',
+          routeId: params.routeId || 'ruta-juan-fernandez',
+          description: params.publicDescription || 'Expedición náutica oceánica.',
+          location: params.publicLocation || 'Archipiélago Juan Fernández',
+          image: params.publicCoverImage ? normalizeExternalMediaUrl(params.publicCoverImage) : '/travesia-robinson.jpg',
+          tempEstimate: params.publicTempEstimate || '14°C - 18°C',
+          status: stat as any,
+          highlights: params.publicHighlights,
+          includedServices: params.publicIncludedServices,
+          brochureUrl: params.publicBrochureUrl,
+          brochure_url: params.publicBrochureUrl,
+        });
+      }
+
       saveStoredDepartures(updated);
 
+      // Persist custom fields (cover image, highlights, description, brochureUrl, etc.) to Supabase site_content table
+      try {
+        const normImg = params.publicCoverImage !== undefined ? normalizeExternalMediaUrl(params.publicCoverImage) : undefined;
+        const metaPayload: Record<string, any> = {
+          departureId,
+          updated_at: new Date().toISOString(),
+        };
+        if (params.publicName !== undefined) metaPayload.name = params.publicName;
+        if (params.publicHeadline !== undefined) metaPayload.headline = params.publicHeadline;
+        if (params.publicLocation !== undefined) metaPayload.location = params.publicLocation;
+        if (params.publicDescription !== undefined) metaPayload.description = params.publicDescription;
+        if (normImg !== undefined) metaPayload.image = normImg;
+        if (params.publicTempEstimate !== undefined) metaPayload.tempEstimate = params.publicTempEstimate;
+        if (params.publicHighlights !== undefined) metaPayload.highlights = params.publicHighlights;
+        if (params.publicIncludedServices !== undefined) metaPayload.includedServices = params.publicIncludedServices;
+        if (params.publicBrochureUrl !== undefined) metaPayload.brochureUrl = params.publicBrochureUrl;
+
+        await supabase
+          .from('site_content')
+          .upsert({
+            section_key: `expedition_departure_${departureId}`,
+            title: params.publicName || 'Expedición Personalizada',
+            media_url: normImg !== undefined ? (normImg || null) : undefined,
+            body_text: params.publicDescription || null,
+            metadata: metaPayload,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'section_key' });
+      } catch (err) {
+        console.warn('Could not sync departure to Supabase site_content:', err);
+      }
+
       return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
+    }
+  },
+
+  async uploadBrochurePdf(file: File, departureId?: string): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+      if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+        return { success: false, error: 'El archivo seleccionado debe ser un documento en formato PDF (.pdf).' };
+      }
+
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const timestamp = Date.now();
+      const depSlug = departureId ? `${departureId}_` : '';
+      const path = `brochures/${depSlug}${timestamp}_${sanitizedName}`;
+
+      // 1. Intentar subida directa a Supabase Storage (bucket site-media)
+      try {
+        const client = supabaseAdmin || supabase;
+        const { data, error } = await client.storage
+          .from('site-media')
+          .upload(path, file, { contentType: 'application/pdf', upsert: true });
+
+        if (!error && data) {
+          const { data: publicData } = client.storage.from('site-media').getPublicUrl(data.path);
+          return { success: true, url: publicData.publicUrl };
+        }
+      } catch (storageErr) {
+        console.warn('Error en storage directo Supabase, activando fallback local:', storageErr);
+      }
+
+      // 2. Fallback de alta resiliencia: Codificación Base64 Data URL (funciona siempre)
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({ success: true, url: reader.result as string });
+        };
+        reader.onerror = () => {
+          resolve({ success: false, error: 'No se pudo leer el archivo PDF localmente.' });
+        };
+        reader.readAsDataURL(file);
+      });
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
