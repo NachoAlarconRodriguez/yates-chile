@@ -12443,16 +12443,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     onChange={(e) => {
                       const newBase = Number(e.target.value);
                       setEditRoomModal((prev) => {
-                        const updatedRates = { ...prev.ratesByPax };
-                        // If 2 pax rate is currently matching base or not set, keep in sync
                         const basePaxKey = prev.maxPax === 1 ? 1 : 2;
-                        if (!updatedRates[basePaxKey] || updatedRates[basePaxKey] === prev.basePrice) {
-                          updatedRates[basePaxKey] = newBase;
-                        }
                         return {
                           ...prev,
                           basePrice: newBase,
-                          ratesByPax: updatedRates,
+                          ratesByPax: {
+                            ...prev.ratesByPax,
+                            [basePaxKey]: newBase,
+                          },
                         };
                       });
                     }}
@@ -12537,13 +12535,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             value={editRoomModal.ratesByPax[pax] ?? editRoomModal.basePrice}
                             onChange={(e) => {
                               const val = Number(e.target.value);
-                              setEditRoomModal((prev) => ({
-                                ...prev,
-                                ratesByPax: {
-                                  ...prev.ratesByPax,
-                                  [pax]: val,
-                                },
-                              }));
+                              setEditRoomModal((prev) => {
+                                const isBase = pax === (prev.maxPax === 1 ? 1 : 2);
+                                return {
+                                  ...prev,
+                                  ...(isBase ? { basePrice: val } : {}),
+                                  ratesByPax: {
+                                    ...prev.ratesByPax,
+                                    [pax]: val,
+                                  },
+                                };
+                              });
                             }}
                             className="w-28 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-[#0b192c] font-mono font-bold text-right focus:outline-none focus:border-[#0b192c] transition"
                           />

@@ -11,13 +11,13 @@ export type LodgeBooking = Database['public']['Tables']['lodge_bookings']['Row']
 
 export const FALLBACK_ROOMS: LodgeRoom[] = [
   {
-    id: 'room-1',
+    id: '9cd4b007-da25-423d-91cf-3a4d042f5110',
     room_number: 1,
     room_name: 'Albatros',
     room_type: 'doble',
     max_pax: 2,
     base_price_clp: 250000,
-    rates_by_pax: { 1: 210000, 2: 250000 },
+    rates_by_pax: { 1: 220000, 2: 250000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -26,13 +26,13 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     amenities: ['Cama King / Doble', 'Baño en suite privado', 'Vista panorámica al mar', 'Calefacción central', 'Starlink WiFi']
   },
   {
-    id: 'room-2',
+    id: '219bc857-4594-4811-9bcc-dce8cd3e4f77',
     room_number: 2,
     room_name: 'Cumberland',
     room_type: 'triple',
     max_pax: 3,
-    base_price_clp: 240000,
-    rates_by_pax: { 1: 190000, 2: 240000, 3: 280000 },
+    base_price_clp: 260000,
+    rates_by_pax: { 1: 210000, 2: 240000, 3: 260000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -41,13 +41,13 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     amenities: ['1 Cama King + 1 Single', 'Baño privado completo', 'Vista a Bahía Cumberland', 'Ropa de cama premium', 'Starlink WiFi']
   },
   {
-    id: 'room-3',
+    id: 'aebcfa0e-0add-465c-9c86-307422051eee',
     room_number: 3,
     room_name: 'Selkirk',
     room_type: 'triple',
     max_pax: 3,
-    base_price_clp: 240000,
-    rates_by_pax: { 1: 190000, 2: 240000, 3: 280000 },
+    base_price_clp: 260000,
+    rates_by_pax: { 1: 210000, 2: 240000, 3: 260000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -56,13 +56,13 @@ export const FALLBACK_ROOMS: LodgeRoom[] = [
     amenities: ['3 Camas o 1 Matrimonial + 1 Single', 'Baño en suite', 'Vista a acantilados y mar', 'Calefacción', 'Starlink WiFi']
   },
   {
-    id: 'room-4',
+    id: '605b5ec1-819c-4537-b883-8d653aadbfe6',
     room_number: 4,
     room_name: 'Vidriola',
     room_type: 'triple',
     max_pax: 3,
-    base_price_clp: 240000,
-    rates_by_pax: { 1: 190000, 2: 240000, 3: 280000 },
+    base_price_clp: 260000,
+    rates_by_pax: { 1: 210000, 2: 240000, 3: 260000 },
     has_ocean_view: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -95,29 +95,21 @@ export const getRoomNightlyRate = (room?: LodgeRoom | null, pax: number = 2): nu
       if (targetPax < keys[0]) return Number(room.rates_by_pax[keys[0]]);
     }
   }
-  return room.base_price_clp || 240000;
+  return Number(room.base_price_clp) || 240000;
 };
 
 const LOCAL_STORAGE_BOOKINGS_KEY = 'yates_lodge_bookings_v3';
-const LOCAL_STORAGE_ROOMS_KEY = 'yates_lodge_rooms_v3';
+const LOCAL_STORAGE_ROOMS_KEY = 'yates_lodge_rooms_v4';
 
 const getCachedRooms = (): LodgeRoom[] => {
   try {
-    // Clean all legacy keys
-    localStorage.removeItem('yates_lodge_rooms_cache');
-    localStorage.removeItem('yates_lodge_rooms_v2');
     const raw = localStorage.getItem(LOCAL_STORAGE_ROOMS_KEY);
     if (!raw) {
       localStorage.setItem(LOCAL_STORAGE_ROOMS_KEY, JSON.stringify(FALLBACK_ROOMS));
       return FALLBACK_ROOMS;
     }
     const parsed: LodgeRoom[] = JSON.parse(raw);
-    // If any old names or parentheses remain, force reset to official pure names
-    if (parsed.some(r => r.room_name.includes('Cabina') || r.room_name.includes('Proa') || r.room_name.includes('Popa') || r.room_name.includes('Barlovento') || r.room_name.includes('('))) {
-      localStorage.setItem(LOCAL_STORAGE_ROOMS_KEY, JSON.stringify(FALLBACK_ROOMS));
-      return FALLBACK_ROOMS;
-    }
-    return parsed;
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : FALLBACK_ROOMS;
   } catch {
     return FALLBACK_ROOMS;
   }
@@ -148,38 +140,77 @@ export const lodgeService = {
   async getRooms(): Promise<LodgeRoom[]> {
     const local = getCachedRooms();
     try {
-      const { data, error } = await supabase
-        .from('lodge_rooms')
-        .select('*')
-        .order('room_number', { ascending: true });
+      const [roomsRes, ratesRes] = await Promise.all([
+        supabase
+          .from('lodge_rooms')
+          .select('*')
+          .order('room_number', { ascending: true }),
+        supabase
+          .from('site_content')
+          .select('metadata')
+          .eq('section_key', 'lodge_room_rates')
+          .maybeSingle(),
+      ]);
 
-      if (error || !data || data.length === 0) {
+      const data = roomsRes.data;
+      if (roomsRes.error || !data || data.length === 0) {
         return local;
       }
 
-      const officialMap: Record<number, { name: string; maxPax: number; price: number }> = {
-        1: { name: 'Albatros', maxPax: 2, price: 210000 },
-        2: { name: 'Cumberland', maxPax: 3, price: 240000 },
-        3: { name: 'Selkirk', maxPax: 3, price: 240000 },
-        4: { name: 'Vidriola', maxPax: 3, price: 240000 },
-      };
+      const ratesMetadata = (ratesRes.data?.metadata as Record<string, any>) || {};
 
-      const normalized: LodgeRoom[] = data.map((room) => {
-        const official = officialMap[room.room_number];
-        if (official && (room.room_name.includes('Cabina') || room.room_name.includes('Proa') || room.room_name.includes('Popa') || room.room_name.includes('Barlovento') || room.room_name.includes('Sotavento') || room.room_name.includes('('))) {
-          // Asynchronously persist official names in remote DB
-          supabase
-            .from('lodge_rooms')
-            .update({ room_name: official.name, max_pax: official.maxPax, base_price_clp: official.price })
-            .eq('id', room.id)
-            .then();
-          return { ...room, room_name: official.name, max_pax: official.maxPax, base_price_clp: official.price };
+      const enriched: LodgeRoom[] = data.map((room) => {
+        const fallback = FALLBACK_ROOMS.find((f) => f.room_number === room.room_number);
+        const localRoom = local.find((l) => l.id === room.id || l.room_number === room.room_number);
+
+        // Saved rates by priority:
+        // 1. Supabase site_content ratesMetadata by room.id
+        // 2. Supabase site_content ratesMetadata by room_{room_number}
+        // 3. Local cached room rates_by_pax
+        // 4. Fallback room rates_by_pax
+        const savedRates =
+          ratesMetadata[room.id] ||
+          ratesMetadata[`room_${room.room_number}`] ||
+          localRoom?.rates_by_pax ||
+          fallback?.rates_by_pax;
+
+        const effectiveRates: Record<number, number> = {};
+        if (savedRates && typeof savedRates === 'object') {
+          Object.entries(savedRates).forEach(([k, v]) => {
+            const paxNum = Number(k);
+            const rateVal = Number(v);
+            if (!isNaN(paxNum) && !isNaN(rateVal) && rateVal > 0) {
+              effectiveRates[paxNum] = rateVal;
+            }
+          });
         }
-        return room;
+
+        const maxPax = room.max_pax || fallback?.max_pax || 2;
+        const base = Number(room.base_price_clp) || fallback?.base_price_clp || 240000;
+
+        // Ensure every pax from 1 to maxPax has a rate defined
+        for (let p = 1; p <= maxPax; p++) {
+          if (!effectiveRates[p]) {
+            if (p === 1) effectiveRates[p] = Math.round((base * 0.88) / 1000) * 1000;
+            else if (p === 2) effectiveRates[p] = base;
+            else effectiveRates[p] = base + (p - 2) * 40000;
+          }
+        }
+
+        return {
+          ...fallback,
+          ...localRoom,
+          ...room,
+          base_price_clp: base,
+          rates_by_pax: effectiveRates,
+          description: (room as any).description || localRoom?.description || fallback?.description || 'Habitación en Lodge Bahía Cumberland.',
+          image_url: (room as any).image_url || localRoom?.image_url || fallback?.image_url || '/rincon-de-navegantes.jpg',
+          amenities: (room as any).amenities || localRoom?.amenities || fallback?.amenities || ['Baño privado en suite', 'Vista al mar', 'Starlink WiFi'],
+        };
       });
 
-      saveCachedRooms(normalized);
-      return normalized;
+      saveCachedRooms(enriched);
+      return enriched;
     } catch {
       return local;
     }
@@ -196,20 +227,56 @@ export const lodgeService = {
       room_name: newRoomData.room_name || `Habitación ${nextNumber}`,
       room_type: newRoomData.room_type || 'doble',
       max_pax: newRoomData.max_pax || 2,
-      base_price_clp: newRoomData.base_price_clp || 220000,
+      base_price_clp: Number(newRoomData.base_price_clp) || 220000,
       has_ocean_view: newRoomData.has_ocean_view !== undefined ? newRoomData.has_ocean_view : true,
       is_active: newRoomData.is_active !== undefined ? newRoomData.is_active : true,
       created_at: new Date().toISOString(),
       description: newRoomData.description || 'Habitación con vista al mar y baño en suite en Lodge Bahía Cumberland.',
       image_url: newRoomData.image_url || '/rincon-de-navegantes.jpg',
-      amenities: newRoomData.amenities || ['Baño privado en suite', 'Vista al mar', 'Starlink WiFi']
+      amenities: newRoomData.amenities || ['Baño privado en suite', 'Vista al mar', 'Starlink WiFi'],
+      rates_by_pax: newRoomData.rates_by_pax || { 1: Math.round(((newRoomData.base_price_clp || 220000) * 0.88) / 1000) * 1000, 2: newRoomData.base_price_clp || 220000 }
     };
 
     const updated = [...current, newRoom].sort((a, b) => a.room_number - b.room_number);
     saveCachedRooms(updated);
 
     try {
-      await (supabase.from('lodge_rooms') as any).insert([newRoom]);
+      const dbRoom = {
+        room_number: newRoom.room_number,
+        room_name: newRoom.room_name,
+        room_type: newRoom.room_type,
+        max_pax: newRoom.max_pax,
+        base_price_clp: newRoom.base_price_clp,
+        has_ocean_view: newRoom.has_ocean_view,
+        is_active: newRoom.is_active,
+      };
+      const { data: createdRoom } = await (supabase.from('lodge_rooms') as any).insert([dbRoom]).select().single();
+      const actualId = createdRoom?.id || newId;
+
+      if (newRoom.rates_by_pax) {
+        const { data: existingContent } = await supabase
+          .from('site_content')
+          .select('metadata')
+          .eq('section_key', 'lodge_room_rates')
+          .maybeSingle();
+
+        const currentMeta = (existingContent?.metadata as Record<string, any>) || {};
+        const updatedMeta = {
+          ...currentMeta,
+          [actualId]: newRoom.rates_by_pax,
+          [`room_${nextNumber}`]: newRoom.rates_by_pax,
+        };
+
+        await supabase.from('site_content').upsert(
+          {
+            section_key: 'lodge_room_rates',
+            title: 'Tarifas por Pasajero Lodge',
+            metadata: updatedMeta,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'section_key' }
+        );
+      }
     } catch {}
 
     return newRoom;
@@ -217,25 +284,66 @@ export const lodgeService = {
 
   async updateRoom(roomId: string, updates: Partial<LodgeRoom>): Promise<{ success: boolean; error?: string }> {
     try {
-      // 1. Update local cache immediately
+      // 1. Update local cache immediately for instant UI responsiveness
       const current = getCachedRooms();
       const updatedList = current.map((r) => (r.id === roomId ? { ...r, ...updates } : r));
       saveCachedRooms(updatedList);
 
-      // 2. Separate database fields from extended virtual fields
-      const { rates_by_pax, description, image_url, amenities, ...dbFields } = updates as any;
+      const targetRoom = current.find((r) => r.id === roomId);
+      const roomNumber = targetRoom?.room_number ?? updates.room_number;
+
+      // 2. Persist columns into public.lodge_rooms
+      const dbFields: Record<string, any> = {};
+      if (updates.room_name !== undefined) dbFields.room_name = updates.room_name;
+      if (updates.room_number !== undefined) dbFields.room_number = updates.room_number;
+      if (updates.room_type !== undefined) dbFields.room_type = updates.room_type;
+      if (updates.max_pax !== undefined) dbFields.max_pax = Number(updates.max_pax);
+      if (updates.base_price_clp !== undefined) dbFields.base_price_clp = Number(updates.base_price_clp);
+      if (updates.has_ocean_view !== undefined) dbFields.has_ocean_view = updates.has_ocean_view;
+      if (updates.is_active !== undefined) dbFields.is_active = updates.is_active;
+
       if (Object.keys(dbFields).length > 0) {
-        const { error } = await (supabase.from('lodge_rooms') as any)
+        const { error: dbErr } = await (supabase.from('lodge_rooms') as any)
           .update(dbFields)
           .eq('id', roomId);
-
-        if (error) {
-          console.warn('Lodge room update on Supabase warning, preserved in cache:', error);
+        if (dbErr) {
+          console.warn('Error updating lodge_rooms on Supabase:', dbErr.message);
         }
       }
+
+      // 3. Persist rates_by_pax into public.site_content ('lodge_room_rates')
+      if (updates.rates_by_pax) {
+        try {
+          const { data: existingContent } = await supabase
+            .from('site_content')
+            .select('metadata')
+            .eq('section_key', 'lodge_room_rates')
+            .maybeSingle();
+
+          const currentMeta = (existingContent?.metadata as Record<string, any>) || {};
+          const updatedMeta = {
+            ...currentMeta,
+            [roomId]: updates.rates_by_pax,
+            ...(roomNumber ? { [`room_${roomNumber}`]: updates.rates_by_pax } : {}),
+          };
+
+          await supabase.from('site_content').upsert(
+            {
+              section_key: 'lodge_room_rates',
+              title: 'Tarifas por Pasajero Lodge',
+              metadata: updatedMeta,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'section_key' }
+          );
+        } catch (ratesErr) {
+          console.warn('Error persisting rates_by_pax in site_content:', ratesErr);
+        }
+      }
+
       return { success: true };
-    } catch {
-      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error al actualizar habitación.' };
     }
   },
 

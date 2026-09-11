@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Compass, Users, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
 import { useCatalogServices } from '../hooks/useCatalogServices';
@@ -8,13 +8,31 @@ import { formatPhone, formatRut } from '../lib/formatters';
 import type { CatalogService } from '../services/catalogService';
 import { normalizeExternalMediaUrl, isMediaVideo, getMediaFallbackUrl } from '../services/cmsService';
 import { getRoomNightlyRate } from '../services/lodgeService';
+import { LodgeDateRangePicker } from '../components/modules/LodgeDateRangePicker';
+
+// Reliable calculation of stay nights avoiding timezone drift and past-date anomalies
+export const calculateStayNights = (inDate: string, outDate: string): number => {
+  if (!inDate || !outDate) return 1;
+  const p1 = inDate.split('-').map(Number);
+  const p2 = outDate.split('-').map(Number);
+  if (p1.length !== 3 || p2.length !== 3) return 1;
+  const [y1, m1, d1] = p1;
+  const [y2, m2, d2] = p2;
+  if (!y1 || !m1 || !d1 || !y2 || !m2 || !d2) return 1;
+  const date1 = new Date(y1, m1 - 1, d1);
+  const date2 = new Date(y2, m2 - 1, d2);
+  const diffMs = date2.getTime() - date1.getTime();
+  const rawNights = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  if (isNaN(rawNights) || rawNights < 1) return 1;
+  return Math.min(rawNights, 60);
+};
 
 interface LodgePageProps {
   onNavigate: (path: string) => void;
 }
 
 export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
-  const { rooms, createBooking } = useLodge();
+  const { rooms, isRoomBookedForRange, isDateFullyBooked, createBooking } = useLodge();
   const { services: catalogExcursions } = useCatalogServices();
   const { getSection } = useSiteContent();
   const { language, t } = useLanguage();
@@ -38,6 +56,30 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<{ code: string; deposit: number; total: number; roomName: string; excursionsTotal: number } | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // Auto-deselect or reassign room if selected room is occupied or oversized for chosen dates/pax
+  useEffect(() => {
+    if (!checkIn || !checkOut || rooms.length === 0) return;
+    if (selectedRoomId) {
+      const isOccupied = isRoomBookedForRange(selectedRoomId, checkIn, checkOut);
+      const room = rooms.find((r) => r.id === selectedRoomId);
+      const isOversized = room ? paxCount > (room.max_pax ?? 3) : false;
+      if (isOccupied || isOversized) {
+        const firstAvailable = rooms.find(
+          (r) => !isRoomBookedForRange(r.id, checkIn, checkOut) && paxCount <= (r.max_pax ?? 3)
+        );
+        setSelectedRoomId(firstAvailable ? firstAvailable.id : '');
+      }
+    } else {
+      const firstAvailable = rooms.find(
+        (r) => !isRoomBookedForRange(r.id, checkIn, checkOut) && paxCount <= (r.max_pax ?? 3)
+      );
+      if (firstAvailable) {
+        setSelectedRoomId(firstAvailable.id);
+      }
+    }
+  }, [checkIn, checkOut, paxCount, rooms, selectedRoomId, isRoomBookedForRange]);
+
 
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
   const toggleFlip = (id: string) => {
@@ -1122,29 +1164,31 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
               <BedDouble className="w-4 h-4 text-slate-950" />
               <span>Reservar Habitación en el Lodge</span>
             </button>
-            <button
-              onClick={() => onNavigate('/contacto')}
+            <a
+              href={`https://wa.me/56981312920?text=${encodeURIComponent('Hola, me gustaría comunicarme con un Concierge de Yates Chile para consultar sobre estadías en el Lodge y excursiones.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold px-6 py-4 rounded-xl transition text-sm min-h-[48px] cursor-pointer border border-slate-700"
             >
               <Home className="w-4 h-4 text-slate-300" />
               <span>Consultar con Concierge</span>
-            </button>
+            </a>
           </div>
         </div>
       </section>
 
       {/* BOOKING MODAL */}
       {showBookingModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="max-w-xl w-full bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl space-y-6 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-[#060B14]/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+          <div className="max-w-xl w-full bg-white sm:rounded-3xl rounded-t-3xl border-t sm:border border-slate-200/90 p-5 sm:p-8 shadow-[0_25px_70px_rgba(11,25,44,0.35)] space-y-6 max-h-[92vh] overflow-y-auto text-slate-800">
             {/* Mobile Drag Indicator */}
-            <div className="w-10 h-1 rounded-full bg-slate-700 mx-auto sm:hidden -mt-1 mb-3" />
+            <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto sm:hidden -mt-1 mb-3" />
 
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 block">Lodge Rincón de Navegantes</span>
-                <h4 className="font-serif text-lg sm:text-xl font-bold text-white">Reserva de Estadía & Excursiones</h4>
+                <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-[#0B192C]/80 block">Lodge Rincón de Navegantes</span>
+                <h4 className="font-serif text-xl sm:text-2xl font-bold text-[#0B192C]">Reserva de Estadía & Excursiones</h4>
               </div>
               <button
                 onClick={() => {
@@ -1153,43 +1197,43 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   setBookingError(null);
                   setModalStep(1);
                 }}
-                className="text-slate-400 hover:text-white transition p-1.5 rounded-full hover:bg-slate-800"
+                className="text-slate-400 hover:text-[#0B192C] transition p-2 rounded-full hover:bg-slate-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {bookingSuccess ? (
-              <div className="bg-emerald-950/60 border border-emerald-500/40 rounded-2xl p-6 text-center space-y-4">
-                <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-                <h5 className="font-serif text-xl font-bold text-white">¡Solicitud de Reserva Registrada!</h5>
-                <div className="bg-slate-950 p-3.5 rounded-xl font-mono text-emerald-300 text-xs border border-emerald-900/50">
-                  Código de Reserva: <strong className="text-white text-sm tracking-wider">{bookingSuccess.code}</strong>
+              <div className="bg-[#F8FAFC] border border-slate-200/90 rounded-2xl p-6 text-center space-y-4">
+                <CheckCircle2 className="w-12 h-12 text-[#0B192C] mx-auto" />
+                <h5 className="font-serif text-xl font-bold text-[#0B192C]">¡Solicitud de Reserva Registrada!</h5>
+                <div className="bg-white p-3.5 rounded-xl font-mono text-[#0B192C] text-xs border border-slate-200 shadow-sm">
+                  Código de Reserva: <strong className="text-[#0B192C] text-sm tracking-wider font-bold">{bookingSuccess.code}</strong>
                 </div>
                 
                 {/* Breakdown */}
-                <div className="text-left bg-slate-950 p-4 rounded-xl space-y-2 text-xs text-slate-300 border border-slate-800">
-                  <span className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider block">
+                <div className="text-left bg-white p-4 rounded-xl space-y-2 text-xs text-slate-700 border border-slate-200 shadow-2xs">
+                  <span className="font-bold text-[#0B192C] uppercase text-[10px] tracking-wider block">
                     Resumen de tu Estadía
                   </span>
                   <div className="flex justify-between">
                     <span>Habitación Asignada:</span>
-                    <strong className="text-white">{bookingSuccess.roomName}</strong>
+                    <strong className="text-[#0B192C]">{bookingSuccess.roomName}</strong>
                   </div>
                   {bookingSuccess.excursionsTotal > 0 && (
-                    <div className="flex justify-between text-amber-300">
+                    <div className="flex justify-between text-amber-700">
                       <span>Excursiones Adicionales:</span>
                       <strong>+${bookingSuccess.excursionsTotal.toLocaleString('es-CL')} CLP</strong>
                     </div>
                   )}
-                  <div className="flex justify-between pt-2 border-t border-slate-800 text-white font-bold">
+                  <div className="flex justify-between pt-2 border-t border-slate-100 text-[#0B192C] font-bold">
                     <span>Total General:</span>
                     <span>${bookingSuccess.total.toLocaleString('es-CL')} CLP</span>
                   </div>
                 </div>
 
-                <div className="text-left bg-slate-950 p-4 rounded-xl space-y-2 text-xs text-slate-300 border border-slate-800">
-                  <span className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider block">
+                <div className="text-left bg-white p-4 rounded-xl space-y-2 text-xs text-slate-700 border border-slate-200 shadow-2xs">
+                  <span className="font-bold text-[#0B192C] uppercase text-[10px] tracking-wider block">
                     Datos para Transferencia Bancaria
                   </span>
                   <div><strong>Pie Requerido (50%):</strong> ${bookingSuccess.deposit.toLocaleString('es-CL')} CLP</div>
@@ -1200,7 +1244,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   <div><strong>Email Comprobantes:</strong> pagos@yateschile.cl</div>
                 </div>
                 
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   Nuestro concierge validará el comprobante de transferencia y te enviará el voucher oficial de check-in a tu correo.
                 </p>
                 <button
@@ -1209,7 +1253,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     setBookingSuccess(null);
                     setModalStep(1);
                   }}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs transition"
+                  className="w-full bg-[#0B192C] hover:bg-[#182C4A] text-white font-bold py-3.5 rounded-xl text-xs transition shadow-md shadow-[#0B192C]/15 cursor-pointer"
                 >
                   Entendido, Finalizar
                 </button>
@@ -1218,171 +1262,216 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
               <div>
                 {/* Step Indicators */}
                 <div className="flex items-center justify-between mb-6 px-2">
-                  <div className={`flex items-center gap-2 text-xs font-semibold ${modalStep === 1 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${modalStep === 1 ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'}`}>1</span>
+                  <div className={`flex items-center gap-2 text-xs font-semibold ${modalStep === 1 ? 'text-[#0B192C]' : 'text-slate-400'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition ${modalStep === 1 ? 'bg-[#0B192C] text-white font-bold shadow-sm' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>1</span>
                     <span>Habitación</span>
                   </div>
-                  <div className="h-0.5 w-8 bg-slate-800" />
-                  <div className={`flex items-center gap-2 text-xs font-semibold ${modalStep === 2 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${modalStep === 2 ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'}`}>2</span>
+                  <div className="h-0.5 w-8 bg-slate-200" />
+                  <div className={`flex items-center gap-2 text-xs font-semibold ${modalStep === 2 ? 'text-[#0B192C]' : 'text-slate-400'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition ${modalStep === 2 ? 'bg-[#0B192C] text-white font-bold shadow-sm' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>2</span>
                     <span>Excursiones</span>
                   </div>
-                  <div className="h-0.5 w-8 bg-slate-800" />
-                  <div className={`flex items-center gap-2 text-xs font-semibold ${modalStep === 3 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${modalStep === 3 ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-400'}`}>3</span>
+                  <div className="h-0.5 w-8 bg-slate-200" />
+                  <div className={`flex items-center gap-2 text-xs font-semibold ${modalStep === 3 ? 'text-[#0B192C]' : 'text-slate-400'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition ${modalStep === 3 ? 'bg-[#0B192C] text-white font-bold shadow-sm' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>3</span>
                     <span>Confirmación</span>
                   </div>
                 </div>
 
                 {bookingError && (
-                  <div className="bg-rose-950/80 border border-rose-500/40 text-rose-200 p-3.5 rounded-xl flex items-center gap-2 text-xs mb-4">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-xl flex items-center gap-2 text-xs mb-4">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                     <span>{bookingError}</span>
                   </div>
                 )}
 
                 {/* STEP 1: DATES & ROOM */}
-                {modalStep === 1 && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Check-in</label>
-                        <input
-                          type="date"
-                          value={checkIn}
-                          min={new Date().toISOString().split('T')[0]}
-                          onChange={(e) => setCheckIn(e.target.value)}
-                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Check-out</label>
-                        <input
-                          type="date"
-                          value={checkOut}
-                          min={checkIn || new Date().toISOString().split('T')[0]}
-                          onChange={(e) => setCheckOut(e.target.value)}
-                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          required
-                        />
-                      </div>
-                    </div>
+                {modalStep === 1 && (() => {
+                  const hasDates = Boolean(checkIn && checkOut);
+                  const hasAvailableRoom = hasDates
+                    ? rooms.some((r) => !isRoomBookedForRange(r.id, checkIn, checkOut) && paxCount <= (r.max_pax ?? 3))
+                    : true;
 
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                        Cantidad de Pasajeros ({paxCount} {paxCount === 1 ? 'huésped' : 'huéspedes'})
-                      </label>
-                      <div className="flex items-center gap-2">
-                        {[1, 2, 3].map((num) => (
-                          <button
-                            key={num}
-                            type="button"
-                            onClick={() => {
-                              setPaxCount(num);
-                              if (num > 2 && selectedRoomId === 'room-1') {
-                                setSelectedRoomId('room-2');
-                              }
-                            }}
-                            className={`flex-1 py-2 text-xs font-bold rounded-xl border transition ${
-                              paxCount === num
-                                ? 'bg-emerald-500 text-slate-950 border-emerald-400'
-                                : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                            }`}
-                          >
-                            {num} {num === 1 ? 'Pasajero' : 'Pasajeros'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  return (
+                    <div className="space-y-4">
+                      <LodgeDateRangePicker
+                        checkIn={checkIn}
+                        checkOut={checkOut}
+                        onCheckInChange={(newDate) => {
+                          setCheckIn(newDate);
+                          if (bookingError) setBookingError(null);
+                        }}
+                        onCheckOutChange={(newDate) => {
+                          setCheckOut(newDate);
+                          if (bookingError) setBookingError(null);
+                        }}
+                        isDateDisabled={isDateFullyBooked}
+                      />
 
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
-                        Selecciona tu Habitación en el Lodge
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {rooms.map((r) => {
-                          const isOversized = paxCount > (r.max_pax ?? 3);
-                          const isSelected = selectedRoomId === r.id;
-                          return (
+                      {/* NO ROOMS AVAILABLE ALERT */}
+                      {hasDates && !hasAvailableRoom && (
+                        <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200/90 text-rose-900 text-xs flex items-start gap-2.5 animate-fadeIn">
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <span className="font-bold block text-rose-950">Todas las habitaciones están ocupadas en estas fechas</span>
+                            <span className="text-[11px] text-rose-800 leading-relaxed block">
+                              No hay disponibilidad entre el {checkIn} y el {checkOut}. Por favor selecciona otro rango de fechas en el calendario o contáctanos con nuestro Concierge para alternativas.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-600 block mb-1">
+                          Cantidad de Pasajeros ({paxCount} {paxCount === 1 ? 'huésped' : 'huéspedes'})
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3].map((num) => (
                             <button
-                              key={r.id}
+                              key={num}
                               type="button"
-                              disabled={isOversized}
-                              onClick={() => setSelectedRoomId(r.id)}
-                              className={`p-3 rounded-2xl border text-left transition relative ${
-                                isOversized
-                                  ? 'opacity-40 border-slate-800/60 bg-slate-950 cursor-not-allowed'
-                                  : isSelected
-                                  ? 'bg-emerald-950/50 border-emerald-500 ring-1 ring-emerald-500 shadow-md'
-                                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                              onClick={() => {
+                                setPaxCount(num);
+                                if (num > 2 && selectedRoomId === 'room-1') {
+                                  setSelectedRoomId('room-2');
+                                }
+                              }}
+                              className={`flex-1 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                                paxCount === num
+                                  ? 'bg-[#0B192C] text-white border-[#0B192C] shadow-sm'
+                                  : 'bg-[#F8FAFC] text-slate-700 border-slate-200 hover:bg-slate-100'
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-white">{r.room_name}</span>
-                                <span className="text-[10px] text-emerald-400 font-mono">
-                                  ${getRoomNightlyRate(r, paxCount).toLocaleString('es-CL')}/noche
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-slate-400 mt-1">
-                                {r.max_pax === 2 ? 'Matrimonial / Doble (Máx 2 pax)' : 'Triple con vista al mar (Máx 3 pax)'}
-                              </p>
-                              {isOversized && (
-                                <span className="text-[9px] text-rose-400 font-semibold block mt-1">
-                                  Excede capacidad para {paxCount} pax
-                                </span>
-                              )}
+                              {num} {num === 1 ? 'Pasajero' : 'Pasajeros'}
                             </button>
-                          );
-                        })}
+                          ))}
+                        </div>
                       </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!checkIn || !checkOut) {
-                          setBookingError('Por favor selecciona las fechas de Check-in y Check-out.');
-                          return;
-                        }
-                        if (checkIn >= checkOut) {
-                          setBookingError('La fecha de Check-out debe ser posterior al Check-in.');
-                          return;
-                        }
-                        if (!selectedRoomId) {
-                          setBookingError('Por favor selecciona una habitación disponible.');
-                          return;
-                        }
-                        setBookingError(null);
-                        setModalStep(2);
-                      }}
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-xs transition flex items-center justify-center gap-2 mt-4"
-                    >
-                      <span>Siguiente: Personalizar con Excursiones</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-600 block mb-1.5">
+                          Selecciona tu Habitación en el Lodge
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {rooms.map((r) => {
+                            const isOversized = paxCount > (r.max_pax ?? 3);
+                            const isOccupied = hasDates ? isRoomBookedForRange(r.id, checkIn, checkOut) : false;
+                            const isSelectable = !isOversized && !isOccupied;
+                            const isSelected = selectedRoomId === r.id;
+
+                            return (
+                              <button
+                                key={r.id}
+                                type="button"
+                                disabled={!isSelectable}
+                                onClick={() => {
+                                  if (isSelectable) {
+                                    setSelectedRoomId(r.id);
+                                    if (bookingError) setBookingError(null);
+                                  }
+                                }}
+                                className={`p-3.5 rounded-2xl border text-left transition relative ${
+                                  isOccupied
+                                    ? 'opacity-60 border-rose-200 bg-rose-50/40 cursor-not-allowed'
+                                    : isOversized
+                                    ? 'opacity-40 border-slate-200 bg-slate-100 cursor-not-allowed'
+                                    : isSelected
+                                    ? 'bg-[#0B192C]/5 border-[#0B192C] ring-2 ring-[#0B192C]/15 shadow-sm cursor-pointer'
+                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/70 cursor-pointer'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-[#0B192C]">{r.room_name}</span>
+                                  <span className="text-[10px] text-[#0B192C] font-mono font-bold">
+                                    ${getRoomNightlyRate(r, paxCount).toLocaleString('es-CL')}/noche
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-1">
+                                  {r.max_pax === 2 ? 'Matrimonial / Doble (Máx 2 pax)' : 'Triple con vista al mar (Máx 3 pax)'}
+                                </p>
+                                {isOccupied && (
+                                  <span className="inline-flex items-center gap-1.5 text-[9px] text-rose-700 font-bold bg-rose-100/90 px-2 py-0.5 rounded-md mt-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+                                    No disponible en estas fechas
+                                  </span>
+                                )}
+                                {isOversized && !isOccupied && (
+                                  <span className="text-[9px] text-rose-600 font-semibold block mt-1">
+                                    Excede capacidad para {paxCount} pax
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={hasDates && !hasAvailableRoom}
+                        onClick={() => {
+                          if (!checkIn || !checkOut) {
+                            setBookingError('Por favor selecciona las fechas de Check-in y Check-out.');
+                            return;
+                          }
+                          const now = new Date();
+                          const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                          if (checkIn < localToday) {
+                            setBookingError('La fecha de Check-in no puede ser anterior a la fecha de hoy.');
+                            return;
+                          }
+                          if (checkIn >= checkOut) {
+                            setBookingError('La fecha de Check-out debe ser posterior al Check-in.');
+                            return;
+                          }
+                          const nights = calculateStayNights(checkIn, checkOut);
+                          if (nights > 30) {
+                            setBookingError('La estadía máxima en línea es de 30 noches. Para estadías prolongadas, consulta con nuestro Concierge.');
+                            return;
+                          }
+                          if (!selectedRoomId) {
+                            setBookingError('Por favor selecciona una habitación disponible.');
+                            return;
+                          }
+                          if (isRoomBookedForRange(selectedRoomId, checkIn, checkOut)) {
+                            setBookingError('La habitación seleccionada no está disponible en las fechas elegidas. Por favor selecciona otra habitación.');
+                            return;
+                          }
+                          setBookingError(null);
+                          setModalStep(2);
+                        }}
+                        className={`w-full font-bold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 mt-4 shadow-lg ${
+                          hasDates && !hasAvailableRoom
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                            : 'bg-[#0B192C] hover:bg-[#182C4A] text-white shadow-[#0B192C]/15 cursor-pointer'
+                        }`}
+                      >
+                        <span>Siguiente: Personalizar con Excursiones</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* STEP 2: OPTIONAL EXCURSIONS */}
                 {modalStep === 2 && (
                   <div className="space-y-4">
-                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                      <div className="text-[11px] text-slate-300">
-                        <span className="text-slate-400 block text-[9px] uppercase font-bold">Estadía Seleccionada:</span>
-                        {checkIn} ➔ {checkOut}
+                    <div className="bg-[#F8FAFC] p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                      <div className="text-[11px] text-slate-700">
+                        <span className="text-slate-500 block text-[9px] uppercase font-bold">Estadía Seleccionada:</span>
+                        {checkIn} ➔ {checkOut} <span className="text-[#0B192C] font-semibold">({calculateStayNights(checkIn, checkOut)} {calculateStayNights(checkIn, checkOut) === 1 ? 'noche' : 'noches'})</span>
                       </div>
-                      <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800/50 px-2 py-0.5 rounded-md font-semibold">
+                      <span className="text-[10px] bg-[#0B192C]/10 text-[#0B192C] border border-[#0B192C]/15 px-2 py-0.5 rounded-md font-semibold">
                         {paxCount} {paxCount === 1 ? 'Pasajero' : 'Pasajeros'}
                       </span>
                     </div>
 
                     <div className="space-y-1">
-                      <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <Compass className="w-4 h-4 text-emerald-400" />
+                      <h5 className="text-xs font-bold text-[#0B192C] flex items-center gap-1.5">
+                        <Compass className="w-4 h-4 text-[#0B192C]" />
                         <span>Agrega Excursiones a tu Estadía (Opcional)</span>
                       </h5>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-slate-500">
                         Solo disponibles para huéspedes del Lodge durante las fechas de su reserva.
                       </p>
                     </div>
@@ -1395,23 +1484,23 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                             key={service.id}
                             className={`p-3 rounded-xl border transition ${
                               existing
-                                ? 'bg-emerald-950/30 border-emerald-500/60'
-                                : 'bg-slate-950 border-slate-800/80 hover:border-slate-700'
+                                ? 'bg-[#0B192C]/5 border-[#0B192C]/40 ring-1 ring-[#0B192C]/20'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-white">{service.name}</span>
-                              <span className="text-xs font-mono text-emerald-400 font-semibold">
+                              <span className="text-xs font-bold text-[#0B192C]">{service.name}</span>
+                              <span className="text-xs font-mono text-[#0B192C] font-semibold">
                                 ${service.price_clp.toLocaleString('es-CL')} CLP
                               </span>
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-0.5">{service.description}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{service.description}</p>
                             
-                            <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
                               {existing ? (
                                 <div className="flex items-center gap-2 w-full justify-between">
                                   <div className="flex items-center gap-2">
-                                    <label className="text-[9px] text-slate-400 font-bold uppercase">Día:</label>
+                                    <label className="text-[9px] text-slate-500 font-bold uppercase">Día:</label>
                                     <input
                                       type="date"
                                       min={checkIn}
@@ -1423,7 +1512,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                                           prev.map((it) => (it.service.id === service.id ? { ...it, date: newDate } : it))
                                         );
                                       }}
-                                      className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-white"
+                                      className="bg-[#F8FAFC] border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-[#0B192C]"
                                     />
                                   </div>
                                   <button
@@ -1431,7 +1520,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                                     onClick={() => {
                                       setSelectedExcursions((prev) => prev.filter((it) => it.service.id !== service.id));
                                     }}
-                                    className="text-rose-400 hover:text-rose-300 text-[10px] font-semibold flex items-center gap-1"
+                                    className="text-rose-500 hover:text-rose-700 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
                                   >
                                     <Trash2 className="w-3 h-3" />
                                     <span>Quitar</span>
@@ -1446,7 +1535,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                                       { service, date: checkIn || '', pax: paxCount },
                                     ]);
                                   }}
-                                  className="text-emerald-400 hover:text-emerald-300 text-[10px] font-bold flex items-center gap-1 ml-auto"
+                                  className="text-[#0B192C] hover:text-[#182C4A] hover:underline text-[10px] font-bold flex items-center gap-1 ml-auto cursor-pointer"
                                 >
                                   <Plus className="w-3.5 h-3.5" />
                                   <span>Agregar a mi estadía</span>
@@ -1462,14 +1551,14 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       <button
                         type="button"
                         onClick={() => setModalStep(1)}
-                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl text-xs transition"
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-xl text-xs transition border border-slate-200 cursor-pointer"
                       >
                         Atrás
                       </button>
                       <button
                         type="button"
                         onClick={() => setModalStep(3)}
-                        className="flex-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-xs transition flex items-center justify-center gap-2"
+                        className="flex-2 bg-[#0B192C] hover:bg-[#182C4A] text-white font-bold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-[#0B192C]/15 cursor-pointer"
                       >
                         <span>Siguiente: Datos de Contacto</span>
                         <ArrowRight className="w-4 h-4" />
@@ -1491,9 +1580,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       setBookingError(null);
 
                       const room = rooms.find((r) => r.id === selectedRoomId);
-                      const d1 = new Date(checkIn);
-                      const d2 = new Date(checkOut);
-                      const nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
+                      const nights = calculateStayNights(checkIn, checkOut);
                       const roomSubtotal = getRoomNightlyRate(room, paxCount) * nights;
                       const excursionsSubtotal = selectedExcursions.reduce((acc, it) => acc + it.service.price_clp * it.pax, 0);
                       const grandTotal = roomSubtotal + excursionsSubtotal;
@@ -1531,21 +1618,21 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     className="space-y-4 text-xs"
                   >
                     <div>
-                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Nombre Completo</label>
+                      <label className="text-[10px] uppercase font-bold text-slate-600 block mb-1">Nombre Completo</label>
                       <input
                         type="text"
                         autoComplete="name"
                         value={guestName}
                         onChange={(e) => setGuestName(e.target.value)}
                         placeholder="Ej: Sebastián Errázuriz"
-                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full min-h-[44px] bg-[#F8FAFC] hover:bg-slate-100/60 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2 text-[#0B192C] focus:outline-none focus:border-[#0B192C] focus:ring-2 focus:ring-[#0B192C]/10 text-xs transition"
                         required
                       />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Correo Electrónico</label>
+                        <label className="text-[10px] uppercase font-bold text-slate-600 block mb-1">Correo Electrónico</label>
                         <input
                           type="email"
                           inputMode="email"
@@ -1553,12 +1640,12 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                           value={guestEmail}
                           onChange={(e) => setGuestEmail(e.target.value)}
                           placeholder="nombre@email.com"
-                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                          className="w-full min-h-[44px] bg-[#F8FAFC] hover:bg-slate-100/60 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2 text-[#0B192C] focus:outline-none focus:border-[#0B192C] focus:ring-2 focus:ring-[#0B192C]/10 text-xs transition"
                           required
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Teléfono / WhatsApp</label>
+                        <label className="text-[10px] uppercase font-bold text-slate-600 block mb-1">Teléfono / WhatsApp</label>
                         <input
                           type="tel"
                           inputMode="tel"
@@ -1566,32 +1653,30 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                           value={guestPhone}
                           onChange={(e) => setGuestPhone(formatPhone(e.target.value))}
                           placeholder="+56 9 1234 5678"
-                          className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                          className="w-full min-h-[44px] bg-[#F8FAFC] hover:bg-slate-100/60 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2 text-[#0B192C] focus:outline-none focus:border-[#0B192C] focus:ring-2 focus:ring-[#0B192C]/10 text-xs transition"
                           required
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">RUT o Pasaporte (Opcional)</label>
+                      <label className="text-[10px] uppercase font-bold text-slate-600 block mb-1">RUT o Pasaporte (Opcional)</label>
                       <input
                         type="text"
                         autoCapitalize="characters"
                         value={guestRut}
                         onChange={(e) => setGuestRut(formatRut(e.target.value))}
                         placeholder="12.345.678-9"
-                        className="w-full min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full min-h-[44px] bg-[#F8FAFC] hover:bg-slate-100/60 focus:bg-white border border-slate-200/90 rounded-xl px-3.5 py-2 text-[#0B192C] focus:outline-none focus:border-[#0B192C] focus:ring-2 focus:ring-[#0B192C]/10 text-xs transition"
                       />
                     </div>
 
                     {/* Cost Breakdown */}
-                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-slate-300">
-                      <span className="text-[10px] font-bold uppercase text-slate-400 block">Desglose de la Inversión</span>
+                    <div className="bg-[#F8FAFC] p-4 rounded-xl border border-slate-200 space-y-2 text-slate-700">
+                      <span className="text-[10px] font-bold uppercase text-slate-500 block">Desglose de la Inversión</span>
                       {(() => {
                         const room = rooms.find((r) => r.id === selectedRoomId);
-                        const d1 = new Date(checkIn || '2026-01-01');
-                        const d2 = new Date(checkOut || '2026-01-02');
-                        const nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
+                        const nights = calculateStayNights(checkIn, checkOut);
                         const roomSubtotal = getRoomNightlyRate(room, paxCount) * nights;
                         const excursionsSubtotal = selectedExcursions.reduce((acc, it) => acc + it.service.price_clp * it.pax, 0);
                         const grandTotal = roomSubtotal + excursionsSubtotal;
@@ -1600,21 +1685,21 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                           <>
                             <div className="flex justify-between text-xs">
                               <span>Estadía {nights} {nights === 1 ? 'noche' : 'noches'} ({room?.room_name || 'Lodge'}):</span>
-                              <span className="font-mono">${roomSubtotal.toLocaleString('es-CL')} CLP</span>
+                              <span className="font-mono text-[#0B192C] font-semibold">${roomSubtotal.toLocaleString('es-CL')} CLP</span>
                             </div>
                             {selectedExcursions.map((ex, idx) => (
-                              <div key={idx} className="flex justify-between text-[11px] text-amber-300/90 pl-2">
+                              <div key={idx} className="flex justify-between text-[11px] text-amber-700 pl-2">
                                 <span>+ {ex.service.name} ({ex.date}):</span>
                                 <span className="font-mono">${(ex.service.price_clp * ex.pax).toLocaleString('es-CL')} CLP</span>
                               </div>
                             ))}
-                            <div className="flex justify-between pt-2 border-t border-slate-800 font-bold text-white text-sm">
+                            <div className="flex justify-between pt-2 border-t border-slate-200 font-bold text-[#0B192C] text-sm">
                               <span>Total General:</span>
-                              <span className="text-emerald-400 font-mono">${grandTotal.toLocaleString('es-CL')} CLP</span>
+                              <span className="text-[#0B192C] font-mono text-base font-bold">${grandTotal.toLocaleString('es-CL')} CLP</span>
                             </div>
-                            <div className="flex justify-between text-[11px] text-slate-400 pt-1">
+                            <div className="flex justify-between text-[11px] text-slate-500 pt-1">
                               <span>Pie para Confirmar (50%):</span>
-                              <span className="text-white font-mono">${Math.round(grandTotal * 0.5).toLocaleString('es-CL')} CLP</span>
+                              <span className="text-[#0B192C] font-mono font-semibold">${Math.round(grandTotal * 0.5).toLocaleString('es-CL')} CLP</span>
                             </div>
                           </>
                         );
@@ -1625,14 +1710,14 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       <button
                         type="button"
                         onClick={() => setModalStep(2)}
-                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 rounded-xl text-xs transition"
+                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-xl text-xs transition border border-slate-200 cursor-pointer"
                       >
                         Atrás
                       </button>
                       <button
                         type="submit"
                         disabled={bookingLoading}
-                        className="flex-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-extrabold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-950"
+                        className="flex-2 bg-[#0B192C] hover:bg-[#182C4A] disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#0B192C]/15"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>{bookingLoading ? 'Registrando...' : 'Confirmar Solicitud de Reserva'}</span>

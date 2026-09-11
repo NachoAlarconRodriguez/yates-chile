@@ -544,13 +544,12 @@ export const LodgeConfigTab: React.FC = () => {
                       onChange={(e) => {
                         const newBase = Number(e.target.value);
                         setFormBasePriceClp(newBase);
-                        setFormRatesByPax(prev => {
-                          const updated = { ...prev };
-                          const baseKey = formMaxPax === 1 ? 1 : 2;
-                          if (!updated[baseKey] || updated[baseKey] === formBasePriceClp) {
-                            updated[baseKey] = newBase;
-                          }
-                          return updated;
+                        setFormRatesByPax((prev) => {
+                          const basePaxKey = formMaxPax === 1 ? 1 : 2;
+                          return {
+                            ...prev,
+                            [basePaxKey]: newBase,
+                          };
                         });
                       }}
                       className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 font-mono font-bold focus:border-[#0b192c] focus:outline-none"
@@ -612,6 +611,10 @@ export const LodgeConfigTab: React.FC = () => {
                                 ...prev,
                                 [pax]: val,
                               }));
+                              const basePaxKey = formMaxPax === 1 ? 1 : 2;
+                              if (pax === basePaxKey) {
+                                setFormBasePriceClp(val);
+                              }
                             }}
                             className="w-28 bg-[#fbfcfd] hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-[#0b192c] font-mono font-bold text-right focus:outline-none focus:border-[#0b192c] transition"
                           />

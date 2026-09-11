@@ -43,6 +43,33 @@ export function useLodge() {
     });
   };
 
+  const isDateFullyBooked = (dateStr: string) => {
+    if (!dateStr || rooms.length === 0) return false;
+    const activeRooms = rooms.filter((r) => r.is_active !== false);
+    if (activeRooms.length === 0) return false;
+    return activeRooms.every((r) => isDateBookedForRoom(r.id, dateStr));
+  };
+
+  const createBooking = async (params: Parameters<typeof lodgeService.createBooking>[0]) => {
+    const res = await lodgeService.createBooking(params);
+    if (res.success) {
+      await fetchData();
+    }
+    return res;
+  };
+
+  const adminBlockRoom = async (params: Parameters<typeof lodgeService.adminBlockRoom>[0]) => {
+    const res = await lodgeService.adminBlockRoom(params);
+    await fetchData();
+    return res;
+  };
+
+  const deleteBookingOrBlock = async (bookingIdOrCode: string) => {
+    const res = await lodgeService.deleteBookingOrBlock(bookingIdOrCode);
+    await fetchData();
+    return res;
+  };
+
   return {
     rooms,
     bookings,
@@ -50,9 +77,10 @@ export function useLodge() {
     refreshLodge: fetchData,
     isDateBookedForRoom,
     isRoomBookedForRange,
-    createBooking: lodgeService.createBooking.bind(lodgeService),
-    adminBlockRoom: lodgeService.adminBlockRoom.bind(lodgeService),
-    deleteBookingOrBlock: lodgeService.deleteBookingOrBlock.bind(lodgeService),
+    isDateFullyBooked,
+    createBooking,
+    adminBlockRoom,
+    deleteBookingOrBlock,
     createRoom: async (newRoom: Partial<LodgeRoom>) => {
       const res = await lodgeService.createRoom(newRoom);
       await fetchData();
