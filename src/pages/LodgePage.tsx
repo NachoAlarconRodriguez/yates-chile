@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Compass, Users, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle, Plus, Trash2, ArrowRight, ShieldCheck, Loader2, ExternalLink, Download } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
 import { useCatalogServices } from '../hooks/useCatalogServices';
 import { useSiteContent } from '../hooks/useSiteContent';
@@ -9,6 +9,7 @@ import type { CatalogService } from '../services/catalogService';
 import { normalizeExternalMediaUrl, isMediaVideo, getMediaFallbackUrl } from '../services/cmsService';
 import { getRoomNightlyRate } from '../services/lodgeService';
 import { LodgeDateRangePicker } from '../components/modules/LodgeDateRangePicker';
+import { getEmbeddablePdfUrl, getDirectPdfUrl } from '../services/expeditionService';
 
 // Reliable calculation of stay nights avoiding timezone drift and past-date anomalies
 export const calculateStayNights = (inDate: string, outDate: string): number => {
@@ -40,6 +41,14 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   const lodgeInfo = getSection('lodge_info');
   const lodgeDining = getSection('lodge_dining');
   
+  const lodgePolicyPdfUrl =
+    (lodgeInfo?.metadata as any)?.policy_pdf_url ||
+    (typeof window !== 'undefined' ? localStorage.getItem('yates_lodge_policy_pdf_url') : '') ||
+    '';
+  const hasPolicyPdf = Boolean(lodgePolicyPdfUrl && lodgePolicyPdfUrl.trim().length > 0);
+  const embedPdfUrl = hasPolicyPdf ? getEmbeddablePdfUrl(lodgePolicyPdfUrl) : '';
+  const directPdfUrl = hasPolicyPdf ? getDirectPdfUrl(lodgePolicyPdfUrl) : '';
+  
   // Modal State
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [modalStep, setModalStep] = useState<1 | 2 | 3>(1); // 1: Fechas & Habitación, 2: Excursiones, 3: Contacto & Resumen
@@ -56,6 +65,8 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<{ code: string; deposit: number; total: number; roomName: string; excursionsTotal: number } | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [acceptPolicies, setAcceptPolicies] = useState(false);
+  const [showPoliciesModal, setShowPoliciesModal] = useState(false);
 
   // Auto-deselect or reassign room if selected room is occupied or oversized for chosen dates/pax
   useEffect(() => {
@@ -107,19 +118,30 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   };
 
   React.useEffect(() => {
-    if (fullscreenIndex === null) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') {
-        setFullscreenIndex((prev) => (prev !== null ? (prev + 1) % images.length : null));
-      } else if (e.key === 'ArrowLeft') {
-        setFullscreenIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : null));
-      } else if (e.key === 'Escape') {
-        setFullscreenIndex(null);
+      if (e.key === 'Escape') {
+        if (showPoliciesModal) {
+          setShowPoliciesModal(false);
+        } else if (showBookingModal) {
+          setShowBookingModal(false);
+          setBookingSuccess(null);
+          setBookingError(null);
+          setModalStep(1);
+          setAcceptPolicies(false);
+        } else if (fullscreenIndex !== null) {
+          setFullscreenIndex(null);
+        }
+      } else if (fullscreenIndex !== null) {
+        if (e.key === 'ArrowRight') {
+          setFullscreenIndex((prev) => (prev !== null ? (prev + 1) % images.length : null));
+        } else if (e.key === 'ArrowLeft') {
+          setFullscreenIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : null));
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fullscreenIndex]);
+  }, [fullscreenIndex, showBookingModal, showPoliciesModal]);
 
   const [selectedFeature, setSelectedFeature] = React.useState<'arquitectura' | 'quincho' | 'exploraciones' | 'atardeceres'>('arquitectura');
 
@@ -1038,7 +1060,12 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
 
       {/* Lightbox full-screen modal */}
       {fullscreenIndex !== null && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex items-center justify-center p-4 sm:p-6 select-none animate-[fadeIn_0.2s_ease-out]">
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex items-center justify-center p-4 sm:p-6 select-none animate-[fadeIn_0.2s_ease-out] cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setFullscreenIndex(null);
+          }}
+        >
           {/* Close trigger button */}
           <button
             onClick={() => setFullscreenIndex(null)}
@@ -1179,8 +1206,22 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
 
       {/* BOOKING MODAL */}
       {showBookingModal && (
-        <div className="fixed inset-0 z-50 bg-[#060B14]/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="max-w-xl w-full bg-white sm:rounded-3xl rounded-t-3xl border-t sm:border border-slate-200/90 p-5 sm:p-8 shadow-[0_25px_70px_rgba(11,25,44,0.35)] space-y-6 max-h-[92vh] overflow-y-auto text-slate-800">
+        <div
+          className="fixed inset-0 z-50 bg-[#060B14]/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowBookingModal(false);
+              setBookingSuccess(null);
+              setBookingError(null);
+              setModalStep(1);
+              setAcceptPolicies(false);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-xl w-full bg-white sm:rounded-3xl rounded-t-3xl border-t sm:border border-slate-200/90 p-5 sm:p-8 shadow-[0_25px_70px_rgba(11,25,44,0.35)] space-y-6 max-h-[92vh] overflow-y-auto text-slate-800 cursor-default"
+          >
             {/* Mobile Drag Indicator */}
             <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto sm:hidden -mt-1 mb-3" />
 
@@ -1196,6 +1237,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                   setBookingSuccess(null);
                   setBookingError(null);
                   setModalStep(1);
+                  setAcceptPolicies(false);
                 }}
                 className="text-slate-400 hover:text-[#0B192C] transition p-2 rounded-full hover:bg-slate-100 cursor-pointer"
               >
@@ -1252,6 +1294,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     setShowBookingModal(false);
                     setBookingSuccess(null);
                     setModalStep(1);
+                    setAcceptPolicies(false);
                   }}
                   className="w-full bg-[#0B192C] hover:bg-[#182C4A] text-white font-bold py-3.5 rounded-xl text-xs transition shadow-md shadow-[#0B192C]/15 cursor-pointer"
                 >
@@ -1477,7 +1520,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     </div>
 
                     <div className="space-y-2.5 max-h-[40vh] overflow-y-auto pr-1">
-                      {catalogExcursions.map((service) => {
+                      {catalogExcursions.filter((service) => service.is_active !== false).map((service) => {
                         const existing = selectedExcursions.find((item) => item.service.id === service.id);
                         return (
                           <div
@@ -1488,13 +1531,24 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                                 : 'bg-white border-slate-200 hover:border-slate-300'
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-[#0B192C]">{service.name}</span>
-                              <span className="text-xs font-mono text-[#0B192C] font-semibold">
-                                ${service.price_clp.toLocaleString('es-CL')} CLP
-                              </span>
+                            <div className="flex items-start gap-3">
+                              {service.image_url && (
+                                <img
+                                  src={service.image_url}
+                                  alt={service.name}
+                                  className="w-12 h-12 rounded-lg object-cover shrink-0 border border-slate-200"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-bold text-[#0B192C] leading-snug">{service.name}</span>
+                                  <span className="text-xs font-mono text-[#0B192C] font-semibold shrink-0">
+                                    ${service.price_clp.toLocaleString('es-CL')} CLP
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2">{service.description}</p>
+                              </div>
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{service.description}</p>
                             
                             <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
                               {existing ? (
@@ -1574,6 +1628,10 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       e.preventDefault();
                       if (!guestName || !guestEmail || !guestPhone) {
                         setBookingError('Por favor completa todos los campos de contacto requeridos.');
+                        return;
+                      }
+                      if (!acceptPolicies) {
+                        setBookingError('Debes aceptar las políticas de reserva del lodge para continuar.');
                         return;
                       }
                       setBookingLoading(true);
@@ -1706,6 +1764,35 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       })()}
                     </div>
 
+                    {/* Checkbox Aceptación Políticas de Reserva */}
+                    <div className="pt-1">
+                      <label className="flex items-start gap-2.5 cursor-pointer select-none text-slate-600 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={acceptPolicies}
+                          onChange={(e) => {
+                            setAcceptPolicies(e.target.checked);
+                            if (bookingError) setBookingError(null);
+                          }}
+                          className="mt-0.5 w-4 h-4 min-w-[16px] min-h-[16px] shrink-0 accent-[#0B192C] cursor-pointer rounded border border-slate-300 transition"
+                        />
+                        <span className="text-xs text-slate-600 leading-snug">
+                          He leído y acepto las{' '}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setShowPoliciesModal(true);
+                            }}
+                            className="text-[#0B192C] font-bold underline hover:text-[#182C4A] cursor-pointer inline-flex items-center gap-0.5"
+                          >
+                            políticas de reserva del lodge
+                          </button>
+                          .
+                        </span>
+                      </label>
+                    </div>
+
                     <div className="flex gap-2 pt-2">
                       <button
                         type="button"
@@ -1716,17 +1803,194 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                       </button>
                       <button
                         type="submit"
-                        disabled={bookingLoading}
-                        className="flex-2 bg-[#0B192C] hover:bg-[#182C4A] disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#0B192C]/15"
+                        disabled={bookingLoading || !acceptPolicies}
+                        className={`flex-2 py-3.5 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2 shadow-lg ${
+                          acceptPolicies && !bookingLoading
+                            ? 'bg-[#0B192C] hover:bg-[#182C4A] text-white cursor-pointer shadow-[#0B192C]/15 hover:scale-[1.005] active:scale-[0.995]'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border border-slate-200'
+                        }`}
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>{bookingLoading ? 'Registrando...' : 'Confirmar Solicitud de Reserva'}</span>
+                        {bookingLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Registrando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>Confirmar Solicitud de Reserva</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </form>
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE POLÍTICAS DE RESERVA DEL LODGE */}
+      {showPoliciesModal && (
+        <div
+          className="fixed inset-0 z-60 bg-[#060B14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPoliciesModal(false);
+          }}
+        >
+          <div className={`bg-white rounded-3xl shadow-2xl ${hasPolicyPdf ? 'max-w-4xl w-full h-[88vh] max-h-[92vh]' : 'max-w-xl w-full max-h-[85vh]'} flex flex-col relative text-slate-800 border border-slate-200 overflow-hidden animate-scaleIn`}>
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-[#F8FAFC]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#0B192C] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <ShieldCheck className="w-5 h-5 text-sky-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-serif font-bold text-base sm:text-lg text-[#0B192C] tracking-tight truncate">
+                      Políticas de Reserva del Lodge
+                    </h3>
+                    {hasPolicyPdf && (
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                        <FileText className="w-3 h-3" />
+                        <span>PDF Oficial</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    Lodge Rincón de Navegantes — Cabo de Hornos
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {hasPolicyPdf && (
+                  <a
+                    href={directPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                    title="Abrir PDF en pestaña nueva"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                    <span className="hidden sm:inline">Pantalla Completa</span>
+                  </a>
+                )}
+                <button
+                  onClick={() => setShowPoliciesModal(false)}
+                  className="text-slate-400 hover:text-slate-900 p-2 rounded-full hover:bg-slate-100 transition cursor-pointer"
+                  title="Cerrar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            {hasPolicyPdf ? (
+              <div className="flex-1 w-full bg-slate-100/60 p-2 sm:p-4 overflow-hidden flex flex-col">
+                <iframe
+                  src={embedPdfUrl}
+                  className="w-full h-full rounded-2xl border border-slate-200/80 bg-white shadow-xs"
+                  title="Documento de Políticas de Reserva del Lodge en PDF"
+                />
+              </div>
+            ) : (
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs text-slate-600 leading-relaxed text-left">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-[#0B192C] text-xs uppercase tracking-wider">
+                    1. Garantía y Abono de Reserva (Pie)
+                  </h4>
+                  <p>
+                    Para confirmar y bloquear su reserva en el lodge, se solicita el abono del <strong>50% del total presupuestado</strong> dentro de las 24 horas siguientes a la emisión de la solicitud vía transferencia bancaria. El cupo queda sujeto a la validación de dicho abono.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="font-bold text-[#0B192C] text-xs uppercase tracking-wider">
+                    2. Saldo Restante y Liquidación
+                  </h4>
+                  <p>
+                    El 50% restante del valor de la estadía y excursiones contratadas deberá ser cancelado antes de su llegada o directamente durante el Check-in en las dependencias del Lodge.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="font-bold text-[#0B192C] text-xs uppercase tracking-wider">
+                    3. Horarios de Check-in & Check-out
+                  </h4>
+                  <p>
+                    <strong>Check-in:</strong> Desde las 15:00 hrs.<br />
+                    <strong>Check-out:</strong> Hasta las 11:00 hrs.<br />
+                    En caso de requerir horarios especiales por itinerario de vuelos o navegación por el Canal Beagle, se deberá coordinar previamente con nuestro equipo de Concierge.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="font-bold text-[#0B192C] text-xs uppercase tracking-wider">
+                    4. Políticas de Cancelación y Reprogramación
+                  </h4>
+                  <p>
+                    • <strong>Más de 15 días antes del ingreso:</strong> Permite reprogramar la estadía sin penalización dentro de la misma temporada, o solicitar reembolso con un cargo administrativo del 15%.<br />
+                    • <strong>Menos de 15 días o No-show:</strong> El abono inicial (50%) no es reembolsable debido a los costos logísticos y al bloqueo exclusivo de habitaciones en territorio austral.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="font-bold text-[#0B192C] text-xs uppercase tracking-wider">
+                    5. Excursiones y Condiciones Meteorológicas
+                  </h4>
+                  <p>
+                    Dada la naturaleza geográfica y climática de la Región de Magallanes y Cabo de Hornos, las excursiones marítimas y terrestres están supeditadas a las directrices de la Autoridad Marítima (DIRECTEMAR) y criterios de seguridad náutica. En caso de suspensión por condiciones climáticas adversas, la actividad será reprogramada o sustituida por otra experiencia equivalente.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="font-bold text-[#0B192C] text-xs uppercase tracking-wider">
+                    6. Conservación del Territorio Austral
+                  </h4>
+                  <p>
+                    Exigimos un estricto compromiso con el cuidado de los ecosistemas prístinos australes, respetando senderos habilitados y la fauna y flora nativa de la reserva.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 bg-[#F8FAFC] flex items-center justify-between gap-3">
+              {hasPolicyPdf ? (
+                <a
+                  href={directPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-sky-700 hover:text-sky-900 font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar Documento</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowPoliciesModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setAcceptPolicies(true);
+                  setShowPoliciesModal(false);
+                  if (bookingError) setBookingError(null);
+                }}
+                className="px-5 py-2.5 bg-[#0B192C] hover:bg-[#182C4A] text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-[#0B192C]/10"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Entendido y Aceptar Políticas</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

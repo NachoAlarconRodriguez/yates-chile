@@ -176,7 +176,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   // Initialize selected service IDs from active catalog services once per open
   useEffect(() => {
     if (isOpen && !initializedServicesRef.current && catalogServices.length > 0) {
-      setSelectedServiceIds(catalogServices.filter(s => s.is_active).map(s => s.id));
+      setSelectedServiceIds(catalogServices.filter(s => s.is_active !== false).map(s => s.id));
       initializedServicesRef.current = true;
     }
     if (!isOpen) {
@@ -261,7 +261,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     setPublicBrochureUrl('');
     setPublicWeatherPolicy('');
     if (catalogServices.length > 0) {
-      setSelectedServiceIds(catalogServices.filter(s => s.is_active).map(s => s.id));
+      setSelectedServiceIds(catalogServices.filter(s => s.is_active !== false).map(s => s.id));
     }
   }, [catalogServices]);
 
@@ -418,7 +418,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
 
   // Selected services objects
   const selectedServicesList = useMemo(() => {
-    return catalogServices.filter(s => selectedServiceIds.includes(s.id));
+    return catalogServices.filter(s => s.is_active !== false && selectedServiceIds.includes(s.id));
   }, [catalogServices, selectedServiceIds]);
 
   const activePillars = useMemo(() => {
@@ -633,11 +633,38 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showPreviewModal) {
+          setShowPreviewModal(false);
+        } else if (showNewVesselModal) {
+          setShowNewVesselModal(false);
+        } else if (!isSubmitting) {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, showPreviewModal, showNewVesselModal, isSubmitting, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fadeIn">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full flex flex-col md:flex-row h-[94vh] md:h-[88vh] border border-slate-200 overflow-hidden relative">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fadeIn cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSubmitting) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full flex flex-col md:flex-row h-[94vh] md:h-[88vh] border border-slate-200 overflow-hidden relative cursor-default"
+      >
         
         {/* ========================================================================= */}
         {/* LEFT SIDEBAR: BRANDING & VERTICAL STEPPER (Hidden on mobile) */}
@@ -1615,7 +1642,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                             if (selectedServiceIds.length > 0) {
                               setSelectedServiceIds([]);
                             } else {
-                              setSelectedServiceIds(catalogServices.map(s => s.id));
+                              setSelectedServiceIds(catalogServices.filter(s => s.is_active !== false).map(s => s.id));
                             }
                           }}
                           className="text-[10px] font-semibold text-slate-600 hover:text-[#0b192c] underline cursor-pointer"
@@ -1626,7 +1653,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                      {catalogServices.map((svc) => {
+                      {catalogServices.filter(svc => svc.is_active !== false).map((svc) => {
                         const isSelected = selectedServiceIds.includes(svc.id);
                         return (
                           <div
@@ -1947,8 +1974,16 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
       {/* MODAL: + NUEVA EMBARCACIÓN */}
       {/* ========================================================================= */}
       {showNewVesselModal && (
-        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-left">
+        <div
+          className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isCreatingVessel) setShowNewVesselModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-left cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-900 flex items-center justify-center">
@@ -2079,8 +2114,16 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
       {/* LIVE PUBLIC PREVIEW MODAL */}
       {/* ========================================================================= */}
       {showPreviewModal && (
-        <div className="fixed inset-0 z-60 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full h-[90vh] md:h-[84vh] flex flex-col md:flex-row relative text-slate-800 overflow-hidden">
+        <div
+          className="fixed inset-0 z-60 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPreviewModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full h-[90vh] md:h-[84vh] flex flex-col md:flex-row relative text-slate-800 overflow-hidden cursor-default"
+          >
             
             {/* Close Button */}
             <button

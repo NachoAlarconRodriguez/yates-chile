@@ -432,6 +432,36 @@ const ROUTE_IMAGE_MAP: Record<string, string> = {
   'ruta-selkirk': '/juan-fernandez-selkirk.jpg',
 };
 
+export const FEATURED_EXPEDITIONS_KEY = 'yates_featured_expedition_ids';
+
+export const getLocalFeaturedDepartureIds = (): string[] => {
+  try {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(FEATURED_EXPEDITIONS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter((id) => typeof id === 'string' && id.trim() !== '' && !id.startsWith('exp-'));
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem(FEATURED_EXPEDITIONS_KEY, JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
+      }
+    }
+  } catch {}
+  return [];
+};
+
+export const setLocalFeaturedDepartureIds = (ids: string[]): void => {
+  try {
+    if (typeof window !== 'undefined') {
+      const unique = Array.from(new Set(ids.filter((id) => typeof id === 'string' && id.trim() !== '')));
+      localStorage.setItem(FEATURED_EXPEDITIONS_KEY, JSON.stringify(unique));
+    }
+  } catch {}
+};
+
 export const PUBLIC_EXPEDITIONS_CACHE_KEY = 'yates_public_expeditions_cache';
 
 export const getCachedPublicExpeditions = (): PublicExpedition[] => {
@@ -521,15 +551,23 @@ const sanitizePublicExpedition = (e: PublicExpedition): PublicExpedition => {
 };
 
 const getStoredDepartures = (): PublicExpedition[] => {
+  const localFeat = getLocalFeaturedDepartureIds();
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
         const sanitized = parsed.map(sanitizePublicExpedition);
-        const hasAnyFeatured = sanitized.some((e) => e.isFeatured);
-        if (!hasAnyFeatured) {
-          sanitized.slice(0, 3).forEach((e) => (e.isFeatured = true));
+        if (localFeat.length > 0) {
+          sanitized.forEach((e) => {
+            e.isFeatured = localFeat.includes(e.id);
+          });
+        } else {
+          sanitized.forEach((e) => {
+            if (e.id.startsWith('exp-')) {
+              e.isFeatured = false;
+            }
+          });
         }
         try {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sanitized));
@@ -539,7 +577,15 @@ const getStoredDepartures = (): PublicExpedition[] => {
     }
   } catch {}
   const initial = INITIAL_EXPEDITIONS.map(sanitizePublicExpedition);
-  initial.slice(0, 3).forEach((e) => (e.isFeatured = true));
+  if (localFeat.length > 0) {
+    initial.forEach((e) => {
+      e.isFeatured = localFeat.includes(e.id);
+    });
+  } else {
+    initial.forEach((e) => {
+      e.isFeatured = false;
+    });
+  }
   return initial;
 };
 
@@ -589,12 +635,30 @@ export const expeditionService = {
   async getDepartures(): Promise<DepartureRow[]> {
     const local = getStoredDepartures();
     const cloudOverrides: Record<string, any> = {};
+    let cloudFeaturedIds: string[] = [];
 
     try {
-      const { data: cloudData } = await supabase
-        .from('site_content')
-        .select('section_key, title, media_url, body_text, metadata')
-        .ilike('section_key', 'expedition_departure_%');
+      const [depRes, featuredRes] = await Promise.all([
+        supabase
+          .from('site_content')
+          .select('section_key, title, media_url, body_text, metadata')
+          .ilike('section_key', 'expedition_departure_%'),
+        supabase
+          .from('site_content')
+          .select('section_key, metadata')
+          .eq('section_key', 'featured_expeditions')
+          .maybeSingle(),
+      ]);
+
+      if (featuredRes?.data?.metadata && typeof featuredRes.data.metadata === 'object') {
+        const meta = featuredRes.data.metadata as any;
+        const fIds = meta.featuredIds || meta.ids;
+        if (Array.isArray(fIds)) {
+          cloudFeaturedIds = fIds.filter((id: any) => typeof id === 'string' && id.trim() !== '' && !id.startsWith('exp-'));
+        }
+      }
+
+      const cloudData = depRes.data;
       if (cloudData && cloudData.length > 0) {
         cloudData.forEach((row: any) => {
           const depId = row.section_key.replace('expedition_departure_', '');
@@ -616,10 +680,19 @@ export const expeditionService = {
             policies: meta.policies,
             policyUrl: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
             policy_url: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
+            isFeatured: meta.isFeatured,
           };
         });
       }
     } catch {}
+
+    const localFeaturedIds = getLocalFeaturedDepartureIds();
+    if (cloudFeaturedIds.length > 0 && localFeaturedIds.length === 0) {
+      setLocalFeaturedDepartureIds(cloudFeaturedIds);
+    }
+    const effectiveFeaturedSet = new Set<string>(
+      [...localFeaturedIds, ...cloudFeaturedIds].filter((id) => typeof id === 'string' && id.trim() !== '' && !id.startsWith('exp-'))
+    );
 
     const mapLocalToRow = (e: PublicExpedition): DepartureRow => {
       const isTerranova = e.vessel.toLowerCase().includes('terranova') || e.vesselId === 'terranova';
@@ -651,7 +724,7 @@ export const expeditionService = {
         policyUrl: cloudOverrides[e.id]?.policyUrl || e.policyUrl || (e as any).policy_url,
         policy_url: cloudOverrides[e.id]?.policyUrl || e.policyUrl || (e as any).policy_url,
         bestViewTime: e.bestViewTime,
-        isFeatured: e.isFeatured ?? false,
+        isFeatured: effectiveFeaturedSet.has(e.id) || cloudOverrides[e.id]?.isFeatured === true || e.isFeatured === true,
         highlights: e.highlights,
         includedServices: e.includedServices,
         policies: e.policies || DEFAULT_EXPEDITION_POLICIES,
@@ -737,6 +810,13 @@ export const expeditionService = {
             ? 'guaranteed'
             : (cloud?.status || d.status || 'scheduled');
 
+          const isDepFeatured =
+            effectiveFeaturedSet.has(d.id) ||
+            cloudOverrides[d.id]?.isFeatured === true ||
+            matchedLocal?.isFeatured === true ||
+            (d as any).is_featured === true ||
+            (d as any).isFeatured === true;
+
           return {
             ...d,
             available_slots: availSlots,
@@ -748,7 +828,7 @@ export const expeditionService = {
             description: cloud?.description || matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
             tempEstimate: cloud?.tempEstimate || matchedLocal?.tempEstimate || '14°C - 18°C',
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
-            isFeatured: matchedLocal?.isFeatured ?? false,
+            isFeatured: isDepFeatured,
             highlights: cloud?.highlights || matchedLocal?.highlights,
             includedServices: cloud?.includedServices || matchedLocal?.includedServices,
             brochureUrl: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
@@ -779,12 +859,30 @@ export const expeditionService = {
   async getPublicExpeditions(): Promise<PublicExpedition[]> {
     const local = getStoredDepartures();
     const cloudOverrides: Record<string, any> = {};
+    let cloudFeaturedIds: string[] = [];
 
     try {
-      const { data: cloudData } = await supabase
-        .from('site_content')
-        .select('section_key, title, media_url, body_text, metadata')
-        .ilike('section_key', 'expedition_departure_%');
+      const [depRes, featuredRes] = await Promise.all([
+        supabase
+          .from('site_content')
+          .select('section_key, title, media_url, body_text, metadata')
+          .ilike('section_key', 'expedition_departure_%'),
+        supabase
+          .from('site_content')
+          .select('section_key, metadata')
+          .eq('section_key', 'featured_expeditions')
+          .maybeSingle(),
+      ]);
+
+      if (featuredRes?.data?.metadata && typeof featuredRes.data.metadata === 'object') {
+        const meta = featuredRes.data.metadata as any;
+        const fIds = meta.featuredIds || meta.ids;
+        if (Array.isArray(fIds)) {
+          cloudFeaturedIds = fIds.filter((id: any) => typeof id === 'string' && id.trim() !== '' && !id.startsWith('exp-'));
+        }
+      }
+
+      const cloudData = depRes.data;
       if (cloudData && cloudData.length > 0) {
         cloudData.forEach((row: any) => {
           const depId = row.section_key.replace('expedition_departure_', '');
@@ -806,10 +904,19 @@ export const expeditionService = {
             policies: meta.policies,
             policyUrl: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
             policy_url: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
+            isFeatured: meta.isFeatured,
           };
         });
       }
     } catch {}
+
+    const localFeaturedIds = getLocalFeaturedDepartureIds();
+    if (cloudFeaturedIds.length > 0 && localFeaturedIds.length === 0) {
+      setLocalFeaturedDepartureIds(cloudFeaturedIds);
+    }
+    const effectiveFeaturedSet = new Set<string>(
+      [...localFeaturedIds, ...cloudFeaturedIds].filter((id) => typeof id === 'string' && id.trim() !== '' && !id.startsWith('exp-'))
+    );
 
     try {
       const todayIso = new Date().toISOString().split('T')[0];
@@ -886,6 +993,13 @@ export const expeditionService = {
             ? ('completo' as const)
             : availSlots;
 
+          const isDepFeatured =
+            effectiveFeaturedSet.has(d.id) ||
+            cloudOverrides[d.id]?.isFeatured === true ||
+            matchedLocal?.isFeatured === true ||
+            (d as any).is_featured === true ||
+            (d as any).isFeatured === true;
+
           return {
             id: d.id,
             name: routeTitle,
@@ -917,10 +1031,16 @@ export const expeditionService = {
             policy_url: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
             policies: cloud?.policies || matchedLocal?.policies || DEFAULT_EXPEDITION_POLICIES,
             status: effectiveStatus,
+            isFeatured: isDepFeatured,
           };
         });
 
-        const extraLocal = local.filter((l) => !l.id.startsWith('exp-') && !data.some((d: any) => d.id === l.id));
+        const extraLocal = local
+          .filter((l) => !l.id.startsWith('exp-') && !data.some((d: any) => d.id === l.id))
+          .map((l) => ({
+            ...l,
+            isFeatured: effectiveFeaturedSet.has(l.id) || cloudOverrides[l.id]?.isFeatured === true || l.isFeatured === true,
+          }));
         const allPublic = [...mapped, ...extraLocal];
         try {
           if (typeof window !== 'undefined') {
@@ -932,8 +1052,19 @@ export const expeditionService = {
     } catch {}
 
     const cached = getCachedPublicExpeditions();
-    if (cached.length > 0) return cached.map(c => ({ ...c, policies: c.policies || DEFAULT_EXPEDITION_POLICIES }));
-    return local.map((l) => ({ ...l, image: normalizeExternalMediaUrl(l.image), policies: l.policies || DEFAULT_EXPEDITION_POLICIES }));
+    if (cached.length > 0) {
+      return cached.map((c) => ({
+        ...c,
+        isFeatured: effectiveFeaturedSet.has(c.id) || cloudOverrides[c.id]?.isFeatured === true || c.isFeatured === true,
+        policies: c.policies || DEFAULT_EXPEDITION_POLICIES,
+      }));
+    }
+    return local.map((l) => ({
+      ...l,
+      isFeatured: effectiveFeaturedSet.has(l.id) || cloudOverrides[l.id]?.isFeatured === true || l.isFeatured === true,
+      image: normalizeExternalMediaUrl(l.image),
+      policies: l.policies || DEFAULT_EXPEDITION_POLICIES,
+    }));
   },
 
   async getAllBookings(): Promise<ExpeditionBookingRow[]> {
@@ -1854,6 +1985,25 @@ export const expeditionService = {
           .eq('id', departureId);
       } catch {}
 
+      const featIds = getLocalFeaturedDepartureIds();
+      if (featIds.includes(departureId)) {
+        const remaining = featIds.filter((id) => id !== departureId);
+        setLocalFeaturedDepartureIds(remaining);
+        try {
+          await supabase
+            .from('site_content')
+            .upsert({
+              section_key: 'featured_expeditions',
+              title: 'Expediciones Destacadas Carrusel',
+              metadata: {
+                featuredIds: remaining,
+                updatedAt: new Date().toISOString(),
+              },
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'section_key' });
+        } catch {}
+      }
+
       const stored = getStoredDepartures();
       const updated = stored.filter((e) => e.id !== departureId);
       saveStoredDepartures(updated);
@@ -2107,39 +2257,151 @@ export const expeditionService = {
   async toggleFeaturedDeparture(departureId: string): Promise<{ success: boolean; isFeatured?: boolean; error?: string }> {
     try {
       const stored = getStoredDepartures();
-      const target = stored.find((e) => e.id === departureId);
-      if (!target) {
+      let targetStored = stored.find((e) => e.id === departureId);
+
+      let depExists = !!targetStored;
+      let depTitle = targetStored?.name || '';
+
+      if (!depExists) {
+        const cached = getCachedPublicExpeditions();
+        const targetCached = cached.find((c) => c.id === departureId);
+        if (targetCached) {
+          depExists = true;
+          depTitle = targetCached.name;
+        }
+      }
+
+      if (!depExists) {
+        try {
+          const { data: dbDep } = await supabase
+            .from('expedition_departures')
+            .select('id, route_id, route:expedition_routes(title)')
+            .eq('id', departureId)
+            .maybeSingle();
+          if (dbDep) {
+            depExists = true;
+            depTitle = (dbDep as any).route?.title || 'Expedición';
+          }
+        } catch {}
+      }
+
+      if (!depExists) {
         return { success: false, error: 'Expedición no encontrada.' };
       }
 
-      const currentlyFeatured = stored.filter((e) => e.isFeatured);
-      const willBeFeatured = !target.isFeatured;
+      let featuredIds = getLocalFeaturedDepartureIds().filter((id) => !id.startsWith('exp-'));
 
-      if (willBeFeatured && currentlyFeatured.length >= 3) {
+      if (featuredIds.length === 0) {
+        try {
+          const { data: cloudFeatured } = await supabase
+            .from('site_content')
+            .select('metadata')
+            .eq('section_key', 'featured_expeditions')
+            .maybeSingle();
+          if (cloudFeatured?.metadata && typeof cloudFeatured.metadata === 'object') {
+            const fIds = (cloudFeatured.metadata as any).featuredIds || (cloudFeatured.metadata as any).ids;
+            if (Array.isArray(fIds)) {
+              featuredIds = fIds.filter((id: any) => typeof id === 'string' && id.trim() !== '' && !id.startsWith('exp-'));
+            }
+          }
+        } catch {}
+      }
+
+      featuredIds = featuredIds.filter((id) => !id.startsWith('exp-'));
+
+      const isCurrentlyFeatured = featuredIds.includes(departureId);
+      const willBeFeatured = !isCurrentlyFeatured;
+
+      if (willBeFeatured && featuredIds.length >= 3) {
         return {
           success: false,
           error: 'Solo puedes seleccionar un máximo de 3 expediciones para mostrar en el carrusel de inicio. Desmarca una primero.',
         };
       }
 
-      const updated = stored.map((e) => {
-        if (e.id === departureId) {
-          return {
-            ...e,
-            isFeatured: willBeFeatured,
-          };
-        }
-        return e;
-      });
+      const newFeaturedIds = willBeFeatured
+        ? Array.from(new Set([...featuredIds, departureId]))
+        : featuredIds.filter((id) => id !== departureId);
 
-      saveStoredDepartures(updated);
+      setLocalFeaturedDepartureIds(newFeaturedIds);
+
+      const updatedStored = stored.map((e) => ({
+        ...e,
+        isFeatured: newFeaturedIds.includes(e.id),
+      }));
+      if (willBeFeatured && !updatedStored.some((e) => e.id === departureId)) {
+        updatedStored.push({
+          id: departureId,
+          name: depTitle || 'Expedición Destacada',
+          isFeatured: true,
+        } as any);
+      }
+      saveStoredDepartures(updatedStored);
+
+      try {
+        if (typeof window !== 'undefined') {
+          const cached = getCachedPublicExpeditions();
+          if (cached && cached.length > 0) {
+            const updatedCached = cached.map((c) => ({
+              ...c,
+              isFeatured: newFeaturedIds.includes(c.id),
+            }));
+            localStorage.setItem(PUBLIC_EXPEDITIONS_CACHE_KEY, JSON.stringify(updatedCached));
+          }
+        }
+      } catch {}
 
       try {
         await supabase
+          .from('site_content')
+          .upsert({
+            section_key: 'featured_expeditions',
+            title: 'Expediciones Destacadas Carrusel',
+            metadata: {
+              featuredIds: newFeaturedIds,
+              updatedAt: new Date().toISOString(),
+            },
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'section_key' });
+      } catch (err) {
+        console.warn('Could not sync featured_expeditions to site_content:', err);
+      }
+
+      try {
+        const { data: existingRow } = await supabase
+          .from('site_content')
+          .select('metadata, title, media_url, body_text')
+          .eq('section_key', `expedition_departure_${departureId}`)
+          .maybeSingle();
+
+        const currentMeta = (existingRow?.metadata && typeof existingRow.metadata === 'object') ? existingRow.metadata : {};
+        await supabase
+          .from('site_content')
+          .upsert({
+            section_key: `expedition_departure_${departureId}`,
+            title: existingRow?.title || depTitle || 'Expedición',
+            media_url: existingRow?.media_url || null,
+            body_text: existingRow?.body_text || null,
+            metadata: {
+              ...currentMeta,
+              isFeatured: willBeFeatured,
+              updatedAt: new Date().toISOString(),
+            },
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'section_key' });
+      } catch {}
+
+      try {
+        await supabaseAdmin
           .from('expedition_departures')
           .update({ is_featured: willBeFeatured } as any)
           .eq('id', departureId);
       } catch {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
+        window.dispatchEvent(new Event('storage'));
+      }
 
       return { success: true, isFeatured: willBeFeatured };
     } catch (err: unknown) {

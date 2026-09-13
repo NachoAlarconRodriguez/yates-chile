@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFleet } from '../../hooks/useFleet';
 import type { Vessel } from '../../types';
 import {
@@ -57,6 +57,20 @@ export const VesselsConfigTab: React.FC = () => {
 
   // Delete Confirmation Modal
   const [deleteConfirmVessel, setDeleteConfirmVessel] = useState<Vessel | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (deleteConfirmVessel) {
+          setDeleteConfirmVessel(null);
+        } else if (isModalOpen && !isSubmitting) {
+          setIsModalOpen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [deleteConfirmVessel, isModalOpen, isSubmitting]);
 
   const openCreateModal = () => {
     setEditingVessel(null);
@@ -407,8 +421,16 @@ export const VesselsConfigTab: React.FC = () => {
       {/* MODAL: CREAR / EDITAR EMBARCACIÓN */}
       {/* ========================================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 text-left my-auto">
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn overflow-y-auto cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSubmitting) setIsModalOpen(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 text-left my-auto cursor-default"
+          >
             
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -683,8 +705,16 @@ export const VesselsConfigTab: React.FC = () => {
       {/* MODAL: CONFIRMACIÓN DE ELIMINACIÓN */}
       {/* ========================================================================= */}
       {deleteConfirmVessel && (
-        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-center">
+        <div
+          className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeleteConfirmVessel(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-center cursor-default"
+          >
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>

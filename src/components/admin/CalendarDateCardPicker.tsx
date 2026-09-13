@@ -248,13 +248,13 @@ export const CalendarDateCardPicker: React.FC<CalendarDateCardPickerProps> = ({
       {/* ========================================================================= */}
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-70 bg-[#0b192c]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn"
+          className="fixed inset-0 z-70 bg-[#0b192c]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn cursor-pointer"
           onClick={() => setIsModalOpen(false)}
         >
           <div
             ref={modalRef}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 animate-scaleIn select-none"
+            className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 animate-scaleIn select-none cursor-default"
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

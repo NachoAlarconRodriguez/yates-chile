@@ -1249,10 +1249,26 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
     onClose();
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+    <div
+      className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       {/* IN-APP LUXURY ALERT NOTIFICATION POPUP */}
       {notification && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-60 max-w-md w-full px-4 animate-slideDown">
@@ -1280,7 +1296,10 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       )}
 
       {/* MODAL WRAPPER */}
-      <div className="max-w-4xl w-full bg-white border border-slate-200/90 rounded-3xl shadow-[0_25px_60px_rgba(11,25,44,0.2)] overflow-hidden flex flex-col my-auto max-h-[92vh]">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-4xl w-full bg-white border border-slate-200/90 rounded-3xl shadow-[0_25px_60px_rgba(11,25,44,0.2)] overflow-hidden flex flex-col my-auto max-h-[92vh] cursor-default"
+      >
         
         {/* HEADER MODAL */}
         <div className="px-7 py-4.5 bg-[#fbfcfd] border-b border-slate-100 flex items-center justify-between shrink-0">

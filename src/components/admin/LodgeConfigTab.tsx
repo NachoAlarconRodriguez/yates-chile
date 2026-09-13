@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLodge } from '../../hooks/useLodge';
 import type { LodgeRoom } from '../../services/lodgeService';
 import {
@@ -33,15 +33,14 @@ export const LodgeConfigTab: React.FC = () => {
 
   // Form State
   const [formRoomNumber, setFormRoomNumber] = useState<number>(1);
-  const [formRoomName, setFormRoomName] = useState('');
-  const [formRoomType, setFormRoomType] = useState('doble');
+  const [formRoomName, setFormRoomName] = useState('Habitación 1');
+  const [formRoomType, setFormRoomType] = useState<'individual' | 'doble' | 'triple' | 'suite'>('doble');
   const [formMaxPax, setFormMaxPax] = useState<number>(2);
-  const [formBasePriceClp, setFormBasePriceClp] = useState<number>(220000);
-  const [formHasOceanView, setFormHasOceanView] = useState(true);
+  const [formBasePrice, setFormBasePrice] = useState<number>(180000);
   const [formDescription, setFormDescription] = useState('');
-  const [formImageUrl, setFormImageUrl] = useState('/rincon-de-navegantes.jpg');
+  const [formMainImage, setFormMainImage] = useState('/rincon-de-navegantes.jpg');
   const [formAmenities, setFormAmenities] = useState<string[]>([
-    'Baño privado en suite',
+    'Baño privado con agua caliente',
     'Vista panorámica al mar',
     'Calefacción central',
     'Starlink WiFi 24/7'
@@ -53,6 +52,20 @@ export const LodgeConfigTab: React.FC = () => {
 
   // Delete Confirmation Modal
   const [deleteConfirmRoom, setDeleteConfirmRoom] = useState<LodgeRoom | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (deleteConfirmRoom) {
+          setDeleteConfirmRoom(null);
+        } else if (isModalOpen && !isSubmitting) {
+          setIsModalOpen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [deleteConfirmRoom, isModalOpen, isSubmitting]);
 
   const totalMaxPax = rooms.reduce((acc, r) => acc + (r.max_pax || 2), 0);
   const activeRoomsCount = rooms.filter(r => r.is_active !== false).length;
@@ -86,16 +99,18 @@ export const LodgeConfigTab: React.FC = () => {
     setFormRoomNumber(room.room_number);
     setFormRoomName(room.room_name);
     setFormRoomType(room.room_type || 'doble');
-    setFormMaxPax(room.max_pax || 2);
-    setFormBasePriceClp(room.base_price_clp || 220000);
-    const initialRates: Record<number, number> = room.rates_by_pax ? { ...room.rates_by_pax } : {};
     const maxPax = room.max_pax || 2;
-    const base = room.base_price_clp || 220000;
+    setFormMaxPax(maxPax);
+    const initialRates: Record<number, number> = room.rates_by_pax ? { ...room.rates_by_pax } : {};
+    const base = initialRates[maxPax] ?? room.base_price_clp ?? 220000;
+    setFormBasePriceClp(base);
     for (let p = 1; p <= maxPax; p++) {
       if (!initialRates[p]) {
-        if (p === 1) initialRates[p] = Math.round(base * 0.88 / 1000) * 1000;
-        else if (p === 2) initialRates[p] = base;
-        else initialRates[p] = base + (p - 2) * 40000;
+        if (p === maxPax) initialRates[p] = base;
+        else {
+          const diff = maxPax - p;
+          initialRates[p] = Math.max(10000, Math.round((base - diff * 25000) / 1000) * 1000);
+        }
       }
     }
     setFormRatesByPax(initialRates);
@@ -126,12 +141,15 @@ export const LodgeConfigTab: React.FC = () => {
   const handleSaveRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formRoomName.trim()) {
-      alert('Por favor ingresa el nombre de la habitación.');
+      alert('Por favor ingresa un nombre para la habitación.');
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const finalBasePrice = formRatesByPax[formMaxPax] ?? formBasePriceClp;
+      const finalRatesByPax = { ...formRatesByPax, [formMaxPax]: finalBasePrice };
+
       if (editingRoom) {
         // Update existing room
         await updateRoom(editingRoom.id, {
@@ -139,8 +157,8 @@ export const LodgeConfigTab: React.FC = () => {
           room_name: formRoomName.trim(),
           room_type: formRoomType as 'doble' | 'triple',
           max_pax: formMaxPax,
-          base_price_clp: formBasePriceClp,
-          rates_by_pax: formRatesByPax,
+          base_price_clp: finalBasePrice,
+          rates_by_pax: finalRatesByPax,
           has_ocean_view: formHasOceanView,
           description: formDescription.trim(),
           image_url: formImageUrl.trim(),
@@ -154,8 +172,8 @@ export const LodgeConfigTab: React.FC = () => {
           room_name: formRoomName.trim(),
           room_type: formRoomType as 'doble' | 'triple',
           max_pax: formMaxPax,
-          base_price_clp: formBasePriceClp,
-          rates_by_pax: formRatesByPax,
+          base_price_clp: finalBasePrice,
+          rates_by_pax: finalRatesByPax,
           has_ocean_view: formHasOceanView,
           description: formDescription.trim(),
           image_url: formImageUrl.trim() || '/rincon-de-navegantes.jpg',
@@ -439,8 +457,16 @@ export const LodgeConfigTab: React.FC = () => {
       {/* MODAL: CREAR / EDITAR HABITACIÓN */}
       {/* ========================================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 text-left my-auto max-h-[92vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn overflow-y-auto cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSubmitting) setIsModalOpen(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl border border-slate-200 text-left my-auto max-h-[92vh] overflow-y-auto cursor-default"
+          >
             
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -526,7 +552,20 @@ export const LodgeConfigTab: React.FC = () => {
                     min="1"
                     max="6"
                     value={formMaxPax}
-                    onChange={(e) => setFormMaxPax(Math.max(1, Number(e.target.value)))}
+                    onChange={(e) => {
+                      const newMax = Math.max(1, Number(e.target.value));
+                      setFormMaxPax(newMax);
+                      setFormRatesByPax((prev) => {
+                        const updated = { ...prev };
+                        for (let p = 1; p <= newMax; p++) {
+                          if (!updated[p]) {
+                            const diff = newMax - p;
+                            updated[p] = p === newMax ? formBasePriceClp : Math.max(10000, Math.round((formBasePriceClp - diff * 25000) / 1000) * 1000);
+                          }
+                        }
+                        return updated;
+                      });
+                    }}
                     className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 font-mono font-bold focus:border-[#0b192c] focus:outline-none"
                   />
                 </div>
@@ -545,7 +584,7 @@ export const LodgeConfigTab: React.FC = () => {
                         const newBase = Number(e.target.value);
                         setFormBasePriceClp(newBase);
                         setFormRatesByPax((prev) => {
-                          const basePaxKey = formMaxPax === 1 ? 1 : 2;
+                          const basePaxKey = formMaxPax;
                           return {
                             ...prev,
                             [basePaxKey]: newBase,
@@ -580,7 +619,7 @@ export const LodgeConfigTab: React.FC = () => {
 
                 <div className="space-y-2 pt-0.5">
                   {Array.from({ length: Math.max(1, formMaxPax) }, (_, idx) => idx + 1).map((pax) => {
-                    const isBasePax = pax === (formMaxPax === 1 ? 1 : 2);
+                    const isBasePax = pax === formMaxPax;
                     return (
                       <div
                         key={pax}
@@ -604,14 +643,14 @@ export const LodgeConfigTab: React.FC = () => {
                             min="10000"
                             step="1000"
                             required
-                            value={formRatesByPax[pax] ?? formBasePriceClp}
+                            value={formRatesByPax[pax] ?? (pax === formMaxPax ? formBasePriceClp : 0)}
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               setFormRatesByPax((prev) => ({
                                 ...prev,
                                 [pax]: val,
                               }));
-                              const basePaxKey = formMaxPax === 1 ? 1 : 2;
+                              const basePaxKey = formMaxPax;
                               if (pax === basePaxKey) {
                                 setFormBasePriceClp(val);
                               }
@@ -792,8 +831,16 @@ export const LodgeConfigTab: React.FC = () => {
       {/* MODAL: CONFIRMACIÓN DE ELIMINACIÓN */}
       {/* ========================================================================= */}
       {deleteConfirmRoom && (
-        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-center">
+        <div
+          className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeleteConfirmRoom(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-center cursor-default"
+          >
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>

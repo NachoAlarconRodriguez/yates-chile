@@ -424,10 +424,16 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-[#060B14]/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-[fadeIn_0.25s_ease-out]"
-      /* Backdrop click intentionally does not close the modal to avoid accidental data loss */
+      className="fixed inset-0 z-50 overflow-y-auto bg-[#060B14]/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-[fadeIn_0.25s_ease-out] cursor-pointer"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
-      <div className={`bg-[#FCFDFE] rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.5)] w-full relative text-slate-800 animate-[scaleIn_0.3s_cubic-bezier(0.16,1,0.3,1)] overflow-hidden transition-all border border-white/15 ${
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className={`bg-[#FCFDFE] rounded-3xl shadow-[0_25px_70px_rgba(0,0,0,0.5)] w-full relative text-slate-800 animate-[scaleIn_0.3s_cubic-bezier(0.16,1,0.3,1)] overflow-hidden transition-all border border-white/15 cursor-default ${
         step === 0 
           ? 'max-w-4xl max-h-[92vh] flex flex-col' 
           : 'max-w-4xl md:min-h-[580px] max-h-[92vh] flex flex-col md:flex-row'

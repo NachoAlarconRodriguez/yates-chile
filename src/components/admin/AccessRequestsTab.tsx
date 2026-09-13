@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAccessRequests } from '../../hooks/useAccessRequests';
 import type { AdminAccessRequest } from '../../services/accessRequestService';
 import {
@@ -31,6 +31,16 @@ export const AccessRequestsTab: React.FC = () => {
     type: 'approve' | 'reject' | 'delete';
     request: AdminAccessRequest;
   } | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && actionConfirm) {
+        setActionConfirm(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [actionConfirm]);
 
   const filteredRequests = requests.filter((r) => {
     const matchesSearch =
@@ -315,8 +325,16 @@ export const AccessRequestsTab: React.FC = () => {
       {/* MODAL: CONFIRMACIÓN DE ACCIÓN */}
       {/* ========================================================================= */}
       {actionConfirm && (
-        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-center">
+        <div
+          className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActionConfirm(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 text-center cursor-default"
+          >
             <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ${
               actionConfirm.type === 'approve'
                 ? 'bg-emerald-100 text-emerald-600'

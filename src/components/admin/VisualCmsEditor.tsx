@@ -193,17 +193,6 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   // Fullscreen Preview State
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  // ESC key listener to exit Fullscreen
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
-
   // Drafts State
   const [drafts, setDrafts] = useState<Record<string, Partial<SiteContent>>>({});
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -218,6 +207,23 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   } | null>(null);
 
   const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
+
+  // ESC key listener to exit Fullscreen or close active modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (mediaModal && !uploadingMedia) {
+          setMediaModal(null);
+        } else if (showApiKeyModal) {
+          setShowApiKeyModal(false);
+        } else if (isFullscreen) {
+          setIsFullscreen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mediaModal, uploadingMedia, showApiKeyModal, isFullscreen]);
 
   // Logbook Dynamic Data Helpers
   const getLogbookEntry = (vesselKey: 'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook', entryId: string) => {
@@ -2089,8 +2095,16 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       {/* MODAL CONTEXTUAL DE MEDIOS (SOLO PARA FOTOS Y VIDEOS) */}
       {/* ========================================================================= */}
       {mediaModal && (
-        <div className="fixed inset-0 z-70 bg-[#0a1e34]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-lg w-full shadow-[0_25px_60px_rgba(15,43,72,0.25)] space-y-4 animate-scale-in">
+        <div
+          className="fixed inset-0 z-70 bg-[#0a1e34]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !uploadingMedia) setMediaModal(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white border border-slate-200 rounded-3xl p-6 max-w-lg w-full shadow-[0_25px_60px_rgba(15,43,72,0.25)] space-y-4 animate-scale-in cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-[#0f2b48] text-white flex items-center justify-center shadow-xs">
@@ -2268,8 +2282,16 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
       {/* AI API KEY SETTINGS MODAL */}
       {showApiKeyModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4">
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowApiKeyModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-4 cursor-default"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">

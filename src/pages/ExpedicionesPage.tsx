@@ -246,6 +246,16 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
     }, 500);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedExpedition) {
+        setSelectedExpedition(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedExpedition]);
+
   const handleOpenGeneralBooking = () => {
     setBookingModalExpedition(null);
     setBookingModalInitialStep(0);
@@ -470,8 +480,16 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
 
       {/* Large Expedition Overview Modal */}
       {selectedExpedition && overview && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6 animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-5xl w-full h-[94vh] md:h-[88vh] md:max-h-[840px] flex flex-col md:flex-row relative text-slate-800 animate-[scaleIn_0.3s_cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6 animate-[fadeIn_0.2s_ease-out] cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedExpedition(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-w-5xl w-full h-[94vh] md:h-[88vh] md:max-h-[840px] flex flex-col md:flex-row relative text-slate-800 animate-[scaleIn_0.3s_cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden cursor-default"
+          >
             {/* Mobile Drag Indicator */}
             <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto sm:hidden mt-2 mb-1 absolute top-1 left-1/2 -translate-x-1/2 z-50 pointer-events-none" />
             

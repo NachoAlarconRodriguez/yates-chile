@@ -44,19 +44,24 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
   };
 
   React.useEffect(() => {
-    if (fullscreenIndex === null) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') {
-        setFullscreenIndex((prev) => (prev !== null ? (prev + 1) % images.length : null));
-      } else if (e.key === 'ArrowLeft') {
-        setFullscreenIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : null));
-      } else if (e.key === 'Escape') {
-        setFullscreenIndex(null);
+      if (e.key === 'Escape') {
+        if (showExpeditionsModal) {
+          setShowExpeditionsModal(false);
+        } else if (fullscreenIndex !== null) {
+          setFullscreenIndex(null);
+        }
+      } else if (fullscreenIndex !== null) {
+        if (e.key === 'ArrowRight') {
+          setFullscreenIndex((prev) => (prev !== null ? (prev + 1) % images.length : null));
+        } else if (e.key === 'ArrowLeft') {
+          setFullscreenIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : null));
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fullscreenIndex]);
+  }, [fullscreenIndex, showExpeditionsModal]);
 
   const [selectedFeature, setSelectedFeature] = React.useState<'climatizacion' | 'gastronomia' | 'casco' | 'desembarcos'>('climatizacion');
 
@@ -219,8 +224,16 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
       {/* MODAL DE EXPEDICIONES DEL VELERO VEGVISIR */}
       {showExpeditionsModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative text-slate-800 overflow-hidden border border-slate-200">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowExpeditionsModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col relative text-slate-800 overflow-hidden border border-slate-200 cursor-default"
+          >
             {/* Header */}
             <div className="bg-[#0f2b48] text-white p-5 sm:p-6 flex items-center justify-between shrink-0">
               <h3 className="font-serif text-xl sm:text-2xl font-bold text-white pr-4">
@@ -1260,7 +1273,12 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
 
       {/* FULLSCREEN LIGHTBOX MODAL */}
       {fullscreenIndex !== null && (
-        <div className="fixed inset-0 z-50 bg-transparent backdrop-blur-sm flex flex-col justify-between p-4 sm:p-10 text-white select-none overflow-y-auto lg:overflow-y-hidden">
+        <div
+          className="fixed inset-0 z-50 bg-transparent backdrop-blur-sm flex flex-col justify-between p-4 sm:p-10 text-white select-none overflow-y-auto lg:overflow-y-hidden cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setFullscreenIndex(null);
+          }}
+        >
           
           {/* Ambient blurred backdrop image */}
           <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">

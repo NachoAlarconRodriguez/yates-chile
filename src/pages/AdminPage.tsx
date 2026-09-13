@@ -71,10 +71,14 @@ import {
   Image as ImageIcon,
   Link2,
   Upload,
+  Pause,
+  PauseCircle,
+  Play,
   X
 } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
 import { useCatalogServices } from '../hooks/useCatalogServices';
+import type { CatalogService } from '../services/catalogService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLeads } from '../hooks/useLeads';
 import { type LeadItem } from '../services/leadService';
@@ -92,6 +96,7 @@ import {
   INITIAL_EXPEDITIONS,
   DEFAULT_EXPEDITION_POLICIES,
   getDirectPdfUrl,
+  getEmbeddablePdfUrl,
   type ExpeditionPolicySection,
   type ExpeditionBookingRow,
   type DepartureRow,
@@ -793,7 +798,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Hooks & Data
   const { rooms, bookings: lodgeBookings, refreshLodge, createBooking, adminBlockRoom, deleteBookingOrBlock, isRoomBookedForRange, updateRoom } = useLodge();
-  const { services, refreshServices, createService, toggleServiceActive, deleteService } = useCatalogServices();
+  const { services, refreshServices, createService, updateService, toggleServiceActive, deleteService } = useCatalogServices({ admin: true });
   const { content, refreshContent } = useSiteContent();
 
   const [installments, setInstallments] = useState<PaymentInstallment[]>([]);
@@ -1460,6 +1465,67 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   // Modals state
   const [showBookingWizardModal, setShowBookingWizardModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showLodgePoliciesModal, setShowLodgePoliciesModal] = useState(false);
+  const [lodgePolicyPdfInput, setLodgePolicyPdfInput] = useState('');
+  const [isSavingLodgePolicy, setIsSavingLodgePolicy] = useState(false);
+
+  const currentLodgePolicyPdf =
+    (content.lodge_info?.metadata as any)?.policy_pdf_url ||
+    (typeof window !== 'undefined' ? localStorage.getItem('yates_lodge_policy_pdf_url') : '') ||
+    '';
+
+  const handleOpenLodgePoliciesModal = () => {
+    setLodgePolicyPdfInput(currentLodgePolicyPdf);
+    setShowLodgePoliciesModal(true);
+  };
+
+  const handleSaveLodgePolicyPdf = async () => {
+    setIsSavingLodgePolicy(true);
+    try {
+      const trimmed = lodgePolicyPdfInput.trim();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('yates_lodge_policy_pdf_url', trimmed);
+      }
+      const existingMeta = (content.lodge_info?.metadata as Record<string, any>) || {};
+      await cmsService.updateContent('lodge_info', {
+        metadata: {
+          ...existingMeta,
+          policy_pdf_url: trimmed,
+        },
+      });
+      await refreshContent();
+      triggerAlert('Documento PDF de políticas del Lodge guardado correctamente.', 'success', 'Políticas Actualizadas');
+      setShowLodgePoliciesModal(false);
+    } catch (err: any) {
+      triggerAlert('Error al guardar las políticas: ' + (err?.message || 'Error inesperado'), 'error', 'Error');
+    } finally {
+      setIsSavingLodgePolicy(false);
+    }
+  };
+
+  const handleRemoveLodgePolicyPdf = async () => {
+    setIsSavingLodgePolicy(true);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('yates_lodge_policy_pdf_url');
+      }
+      const existingMeta = (content.lodge_info?.metadata as Record<string, any>) || {};
+      await cmsService.updateContent('lodge_info', {
+        metadata: {
+          ...existingMeta,
+          policy_pdf_url: '',
+        },
+      });
+      await refreshContent();
+      setLodgePolicyPdfInput('');
+      triggerAlert('Enlace de políticas PDF eliminado. Se utilizarán las políticas estándar.', 'info', 'Políticas Restauradas');
+      setShowLodgePoliciesModal(false);
+    } catch (err: any) {
+      triggerAlert('Error al actualizar: ' + (err?.message || 'Error inesperado'), 'error', 'Error');
+    } finally {
+      setIsSavingLodgePolicy(false);
+    }
+  };
   const [editRoomModal, setEditRoomModal] = useState<{
     isOpen: boolean;
     room: LodgeRoom | null;
@@ -1483,6 +1549,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     checkOut: string;
   } | null>(null);
   const [isSavingAirbnbBlock, setIsSavingAirbnbBlock] = useState(false);
+  const [serviceToPause, setServiceToPause] = useState<CatalogService | null>(null);
+  const [isPausingService, setIsPausingService] = useState(false);
+  const [editingService, setEditingService] = useState<CatalogService | null>(null);
+  const [isSavingEditService, setIsSavingEditService] = useState(false);
+  const [editServiceForm, setEditServiceForm] = useState<{
+    name: string;
+    category: 'cabalgatas' | 'buceo' | 'trekking' | 'gastronomia' | 'nautica' | 'bienestar';
+    description: string;
+    duration_label: string;
+    price_clp: number;
+    max_pax: number;
+    image_url: string;
+  }>({
+    name: '',
+    category: 'cabalgatas',
+    description: '',
+    duration_label: '',
+    price_clp: 0,
+    max_pax: 6,
+    image_url: '',
+  });
   const [reservationWizardStep, setReservationWizardStep] = useState<1 | 2 | 3 | 4>(1);
   const [guestList, setGuestList] = useState<Array<{ name: string; rut: string; email?: string; phone?: string }>>([
     { name: '', rut: '', email: '', phone: '' },
@@ -1646,6 +1733,79 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
   // Search filter
   const [searchFilter, setSearchFilter] = useState('');
+
+  // Global Escape key listener to close active modals & popups gracefully
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (customAlert?.isOpen) {
+          if (customAlert.onConfirm) customAlert.onConfirm();
+          setCustomAlert(null);
+        } else if (customConfirm?.isOpen) {
+          customConfirm.onCancel?.();
+          setCustomConfirm(null);
+        } else if (departureToDelete && !isDeletingDeparture) {
+          setDepartureToDelete(null);
+        } else if (confirmingPaymentModal && !isProcessingPayment) {
+          setConfirmingPaymentModal(null);
+        } else if (serviceToPause && !isPausingService) {
+          setServiceToPause(null);
+        } else if (editingService && !isSavingEditService) {
+          setEditingService(null);
+        } else if (showNewServiceModal) {
+          setShowNewServiceModal(false);
+        } else if (showLodgePoliciesModal && !isSavingLodgePolicy) {
+          setShowLodgePoliciesModal(false);
+        } else if (showProfileModal) {
+          setShowProfileModal(false);
+        } else if (showBlockModal) {
+          setShowBlockModal(false);
+          setReservationWizardStep(1);
+        } else if (editRoomModal.isOpen && !isSavingRoom) {
+          setEditRoomModal((prev) => ({ ...prev, isOpen: false }));
+        } else if (airbnbConfirmModal?.isOpen && !isSavingAirbnbBlock) {
+          setAirbnbConfirmModal(null);
+        } else if (selectedInstallment) {
+          setSelectedInstallment(null);
+        } else if (selectedBookingForDetail) {
+          setSelectedBookingForDetail(null);
+        } else if (selectedExpeditionForPassenger && !isSubmittingExpPassenger) {
+          setSelectedExpeditionForPassenger(null);
+        } else if (selectedExpeditionForManifest) {
+          setSelectedExpeditionForManifest(null);
+        } else if (editingDeparture) {
+          setEditingDeparture(null);
+        } else if (selectedCustomer) {
+          setSelectedCustomer(null);
+        } else if (editingCustomer) {
+          setEditingCustomer(null);
+        } else if (showNewCustomerModal) {
+          setShowNewCustomerModal(false);
+        } else if (showNewLeadModal) {
+          setShowNewLeadModal(false);
+        } else if (editingLeadNotes) {
+          setEditingLeadNotes(null);
+        } else if (showForgotPasswordModal) {
+          setShowForgotPasswordModal(false);
+        } else if (mobileAdminSidebarOpen) {
+          setMobileAdminSidebarOpen(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    customAlert, customConfirm, departureToDelete, isDeletingDeparture,
+    confirmingPaymentModal, isProcessingPayment, serviceToPause, isPausingService,
+    editingService, isSavingEditService, showNewServiceModal, showLodgePoliciesModal,
+    isSavingLodgePolicy, showProfileModal, showBlockModal, editRoomModal.isOpen,
+    isSavingRoom, airbnbConfirmModal?.isOpen, isSavingAirbnbBlock, selectedInstallment,
+    selectedBookingForDetail, selectedExpeditionForPassenger, isSubmittingExpPassenger,
+    selectedExpeditionForManifest, editingDeparture, selectedCustomer,
+    editingCustomer, showNewCustomerModal, showNewLeadModal,
+    editingLeadNotes, showForgotPasswordModal, mobileAdminSidebarOpen
+  ]);
+
 
   const fetchAllData = useCallback(async () => {
     setLoadingPayments(true);
@@ -3091,13 +3251,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   // ----------------------------------------------------
   const handleOpenEditRoomModal = (room: LodgeRoom) => {
     const maxPax = room.max_pax || 3;
-    const base = room.base_price_clp || 240000;
     const initialRates: Record<number, number> = room.rates_by_pax ? { ...room.rates_by_pax } : {};
+    // La tarifa base corresponde a la capacidad máxima de la habitación (maxPax)
+    const base = initialRates[maxPax] ?? room.base_price_clp ?? 240000;
     for (let p = 1; p <= maxPax; p++) {
       if (!initialRates[p]) {
-        if (p === 1) initialRates[p] = Math.round(base * 0.88 / 1000) * 1000;
-        else if (p === 2) initialRates[p] = base;
-        else initialRates[p] = base + (p - 2) * 40000;
+        if (p === maxPax) initialRates[p] = base;
+        else {
+          const diff = maxPax - p;
+          initialRates[p] = Math.max(10000, Math.round((base - diff * 25000) / 1000) * 1000);
+        }
       }
     }
     setEditRoomModal({
@@ -3105,7 +3268,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       room,
       roomName: room.room_name,
       maxPax,
-      basePrice: base,
+      basePrice: initialRates[maxPax] ?? base,
       ratesByPax: initialRates,
     });
   };
@@ -3115,11 +3278,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     if (!editRoomModal.room || !editRoomModal.roomName.trim()) return;
     setIsSavingRoom(true);
     try {
+      const maxPax = Number(editRoomModal.maxPax);
+      const ratesByPax = { ...editRoomModal.ratesByPax };
+      const finalBasePrice = ratesByPax[maxPax] ?? Number(editRoomModal.basePrice);
+      ratesByPax[maxPax] = finalBasePrice;
+
       await updateRoom(editRoomModal.room.id, {
         room_name: editRoomModal.roomName.trim(),
-        max_pax: Number(editRoomModal.maxPax),
-        base_price_clp: Number(editRoomModal.basePrice),
-        rates_by_pax: editRoomModal.ratesByPax,
+        max_pax: maxPax,
+        base_price_clp: finalBasePrice,
+        rates_by_pax: ratesByPax,
       });
       const updatedName = editRoomModal.roomName.trim();
       const roomNumber = editRoomModal.room.room_number;
@@ -3360,6 +3528,50 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setTimeout(() => setActionMessage(null), 4000);
     } else {
       triggerAlert('Error: ' + res.error, 'error');
+    }
+  };
+
+  const handleOpenEditService = (svc: CatalogService) => {
+    setEditingService(svc);
+    setEditServiceForm({
+      name: svc.name,
+      category: (svc.category as any) || 'cabalgatas',
+      description: svc.description || '',
+      duration_label: svc.duration_label || '',
+      price_clp: svc.price_clp,
+      max_pax: svc.max_pax,
+      image_url: svc.image_url || '',
+    });
+  };
+
+  const handleSaveEditService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingService) return;
+    if (!editServiceForm.name.trim() || !editServiceForm.price_clp) {
+      triggerAlert('Por favor ingrese el nombre y el valor de la experiencia.', 'warning', 'Campos Requeridos');
+      return;
+    }
+    setIsSavingEditService(true);
+    try {
+      const res = await updateService(editingService.id, {
+        name: editServiceForm.name.trim(),
+        category: editServiceForm.category,
+        description: editServiceForm.description.trim(),
+        duration_label: editServiceForm.duration_label.trim(),
+        price_clp: Number(editServiceForm.price_clp),
+        max_pax: Number(editServiceForm.max_pax) || 6,
+        image_url: editServiceForm.image_url.trim() || null,
+      });
+      if (res.success) {
+        setEditingService(null);
+        await refreshServices();
+        setActionMessage(`Experiencia "${editServiceForm.name}" guardada en el backend y actualizada con éxito.`);
+        setTimeout(() => setActionMessage(null), 4000);
+      } else {
+        triggerAlert(res.error || 'Error al actualizar la experiencia en el backend.', 'error', 'Error');
+      }
+    } finally {
+      setIsSavingEditService(false);
     }
   };
 
@@ -4699,8 +4911,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
         {/* MODAL: RECUPERAR CONTRASEÑA */}
         {showForgotPasswordModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-6 text-left">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowForgotPasswordModal(false);
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-6 text-left cursor-default"
+            >
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0b192c]">
@@ -4953,7 +5173,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               >
                 <div className="flex items-center gap-3">
                   <BedDouble className={`w-4 h-4 ${activeTab === 'lodge' ? 'text-sky-300' : 'text-slate-400'}`} />
-                  <span>Lodge Cabo de Hornos</span>
+                  <span>Lodge Rincón</span>
                 </div>
                 {activeTab === 'lodge' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
@@ -7555,8 +7775,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
               {/* 5. MODAL DETALLE DE RESERVA INDIVIDUAL (LUXURY ROUNDED-3XL) */}
               {selectedBookingForDetail && (
-                <div className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
-                  <div className="bg-white rounded-3xl shadow-[0_25px_60px_rgba(11,25,44,0.2)] border border-slate-200/90 max-w-2xl w-full overflow-hidden my-auto animate-scaleIn">
+                <div
+                  className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn cursor-pointer"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) setSelectedBookingForDetail(null);
+                  }}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white rounded-3xl shadow-[0_25px_60px_rgba(11,25,44,0.2)] border border-slate-200/90 max-w-2xl w-full overflow-hidden my-auto animate-scaleIn cursor-default"
+                  >
                     {/* Modal Header */}
                     <div className="px-7 py-5 bg-[#0b192c] text-white flex items-center justify-between">
                       <div className="flex items-center gap-3.5">
@@ -8201,7 +8429,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </div>
 
                     {/* Month Navigator Controls */}
-                    <div className="flex flex-wrap items-center gap-3 self-start lg:self-auto">
+                    <div className="flex items-center gap-2 sm:gap-2.5 self-start lg:self-auto">
                       <div className="flex items-center bg-[#fbfcfd] border border-slate-200/90 rounded-full p-1 shadow-2xs">
                         <button
                           onClick={handleLodgePrevMonth}
@@ -8228,6 +8456,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         className="px-4 py-2 rounded-full border border-slate-200/90 bg-[#fbfcfd] hover:bg-slate-100 text-[#0b192c] text-xs font-semibold transition cursor-pointer shadow-2xs active:scale-95"
                       >
                         Hoy
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenLodgePoliciesModal}
+                        className="w-8 h-8 rounded-full border border-slate-200/90 bg-[#fbfcfd] hover:bg-slate-100 text-[#0b192c] transition cursor-pointer shadow-2xs active:scale-95 flex items-center justify-center relative shrink-0 group"
+                        title="Configurar Políticas del Lodge (PDF de Google Drive)"
+                      >
+                        <FileText className="w-4 h-4 text-slate-600 group-hover:text-[#0b192c] transition-colors" />
+                        {currentLodgePolicyPdf && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 absolute -top-0.5 -right-0.5 ring-2 ring-white" title="PDF Conectado" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -11468,7 +11708,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     <span>Catálogo de Experiencias & Actividades</span>
                   </h3>
                   <p className="text-xs text-slate-500 font-light mt-0.5">
-                    Controla las excursiones guiadas, actividades náuticas, buceo y expediciones del catálogo.
+                    {services.filter((s) => s.is_active).length} activas de {services.length} experiencias en catálogo.
                   </p>
                 </div>
                 <button
@@ -11485,23 +11725,64 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   <div
                     key={svc.id}
                     className={`bg-white border rounded-3xl overflow-hidden flex flex-col justify-between transition-all duration-300 shadow-[0_4px_24px_rgba(11,25,44,0.03)] hover:shadow-md hover:-translate-y-0.5 ${
-                      svc.is_active ? 'border-slate-200/80 hover:border-slate-300' : 'border-slate-200 opacity-60'
+                      svc.is_active ? 'border-slate-200/80 hover:border-slate-300' : 'border-amber-200 bg-amber-50/15'
                     }`}
                   >
-                    {svc.image_url && (
-                      <div className="h-44 w-full relative bg-slate-100 overflow-hidden">
-                        <img src={svc.image_url} alt={svc.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                        <span className="absolute top-3 left-3 bg-[#0b192c]/85 backdrop-blur-md text-white text-[9px] font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-xs">
+                      <div className="h-44 w-full relative bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden flex items-center justify-center">
+                        {svc.image_url ? (
+                          <img
+                            src={svc.image_url}
+                            alt={svc.name}
+                            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                              !svc.is_active ? 'grayscale-[30%] opacity-90' : ''
+                            }`}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-400 gap-1.5">
+                            <ImageIcon className="w-8 h-8 stroke-[1.5]" />
+                            <span className="text-[10px] font-mono">Sin imagen asignada</span>
+                          </div>
+                        )}
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
+                        <span className="bg-[#0b192c]/85 backdrop-blur-md text-white text-[9px] font-mono font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-xs">
                           {svc.category}
                         </span>
+                        {!svc.is_active && (
+                          <span className="bg-amber-500 text-white text-[9px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-xs flex items-center gap-1">
+                            <Pause className="w-2.5 h-2.5 fill-current" />
+                            <span>Pausada</span>
+                          </span>
+                        )}
                       </div>
-                    )}
+
+                      {/* Botón icono de editar en la esquina superior derecha señalada por el usuario */}
+                      <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditService(svc);
+                          }}
+                          className="w-8 h-8 rounded-full bg-white/95 hover:bg-white text-slate-700 hover:text-[#0b192c] shadow-[0_2px_10px_rgba(11,25,44,0.18)] hover:shadow-lg backdrop-blur-md flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-90 hover:scale-105"
+                          title="Editar experiencia"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
 
                     <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
                       <div>
-                        <h4 className="text-sm font-serif font-bold text-[#0b192c] leading-snug">
-                          {svc.name}
-                        </h4>
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-sm font-serif font-bold text-[#0b192c] leading-snug">
+                            {svc.name}
+                          </h4>
+                          {!svc.is_active && (
+                            <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-mono font-bold rounded-md uppercase shrink-0">
+                              Oculta al público
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500 mt-1.5 line-clamp-2 leading-relaxed font-light">
                           {svc.description}
                         </p>
@@ -11518,27 +11799,43 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
+                          {svc.is_active ? (
+                            <button
+                              type="button"
+                              onClick={() => setServiceToPause(svc)}
+                              className="text-xs font-semibold px-3.5 py-1.5 rounded-full transition cursor-pointer active:scale-95 shadow-2xs bg-slate-100 text-slate-700 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200 border border-slate-200 flex items-center gap-1.5"
+                            >
+                              <Pause className="w-3 h-3 text-slate-500" />
+                              <span>Pausar</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setActionMessage(`Experiencia "${svc.name}" reactivada. Ya está visible en la web pública.`);
+                                setTimeout(() => setActionMessage(null), 5000);
+                                const res = await toggleServiceActive(svc.id, true);
+                                if (!res.success) {
+                                  triggerAlert(res.error || 'Error al reactivar en el backend.', 'error', 'Error');
+                                }
+                              }}
+                              className="text-xs font-semibold px-3.5 py-1.5 rounded-full transition cursor-pointer active:scale-95 shadow-2xs bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5"
+                            >
+                              <Play className="w-3 h-3 fill-current" />
+                              <span>Activar</span>
+                            </button>
+                          )}
                           <button
-                            onClick={async () => {
-                              await toggleServiceActive(svc.id, !svc.is_active);
-                              refreshServices();
-                            }}
-                            className={`text-xs font-semibold px-3.5 py-1.5 rounded-full transition cursor-pointer active:scale-95 shadow-2xs ${
-                              svc.is_active
-                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                            }`}
-                          >
-                            {svc.is_active ? 'Pausar' : 'Activar'}
-                          </button>
-                          <button
+                            type="button"
                             onClick={() => {
                               triggerConfirm(
-                                `¿Eliminar ${svc.name}?`,
+                                `¿Eliminar permanentemente "${svc.name}" del catálogo?`,
                                 async () => {
                                   await deleteService(svc.id);
                                   refreshServices();
+                                  setActionMessage(`Servicio "${svc.name}" eliminado del catálogo.`);
+                                  setTimeout(() => setActionMessage(null), 5000);
                                 },
                                 {
                                   title: 'Eliminar Servicio',
@@ -11604,8 +11901,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: CONFIRMAR BLOQUEO AIRBNB */}
       {/* ========================================================================= */}
       {airbnbConfirmModal?.isOpen && airbnbConfirmModal.room && (
-        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.2)] space-y-6 animate-scale-in">
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSavingAirbnbBlock) setAirbnbConfirmModal(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.2)] space-y-6 animate-scale-in cursor-default"
+          >
             {/* Header with Airbnb brand identity */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3.5">
@@ -11702,8 +12007,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: RESERVAR HOSPEDAJE (4-STEP HOTEL RESERVATION WIZARD) */}
       {/* ========================================================================= */}
       {showBlockModal && (
-        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="max-w-xl w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_60px_rgba(11,25,44,0.22)] space-y-5 animate-scale-in my-8">
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowBlockModal(false);
+              setReservationWizardStep(1);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-xl w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_60px_rgba(11,25,44,0.22)] space-y-5 animate-scale-in my-8 cursor-default"
+          >
             
             {/* Header with Title & Close */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -12381,8 +12697,18 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: EDITAR INFORMACIÓN / NOMBRE DE HABITACIÓN */}
       {/* ========================================================================= */}
       {editRoomModal.isOpen && editRoomModal.room && (
-        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.25)] space-y-5 animate-scale-in max-h-[92vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSavingRoom) {
+              setEditRoomModal((prev) => ({ ...prev, isOpen: false }));
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-6 md:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.25)] space-y-5 animate-scale-in max-h-[92vh] overflow-y-auto cursor-default"
+          >
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -12443,7 +12769,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     onChange={(e) => {
                       const newBase = Number(e.target.value);
                       setEditRoomModal((prev) => {
-                        const basePaxKey = prev.maxPax === 1 ? 1 : 2;
+                        const basePaxKey = prev.maxPax;
                         return {
                           ...prev,
                           basePrice: newBase,
@@ -12474,12 +12800,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         const updatedRates = { ...prev.ratesByPax };
                         for (let p = 1; p <= newMax; p++) {
                           if (!updatedRates[p]) {
-                            updatedRates[p] = p === 1 ? Math.round(prev.basePrice * 0.88 / 1000) * 1000 : prev.basePrice;
+                            const diff = newMax - p;
+                            updatedRates[p] = p === newMax ? prev.basePrice : Math.max(10000, Math.round((prev.basePrice - diff * 25000) / 1000) * 1000);
                           }
                         }
+                        const newBasePrice = updatedRates[newMax] ?? prev.basePrice;
                         return {
                           ...prev,
                           maxPax: newMax,
+                          basePrice: newBasePrice,
                           ratesByPax: updatedRates,
                         };
                       });
@@ -12508,7 +12837,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                 <div className="space-y-2 pt-0.5">
                   {Array.from({ length: Math.max(1, editRoomModal.maxPax) }, (_, idx) => idx + 1).map((pax) => {
-                    const isBasePax = pax === (editRoomModal.maxPax === 1 ? 1 : 2);
+                    const isBasePax = pax === editRoomModal.maxPax;
                     return (
                       <div
                         key={pax}
@@ -12532,11 +12861,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             min="10000"
                             step="1000"
                             required
-                            value={editRoomModal.ratesByPax[pax] ?? editRoomModal.basePrice}
+                            value={editRoomModal.ratesByPax[pax] ?? (pax === editRoomModal.maxPax ? editRoomModal.basePrice : 0)}
                             onChange={(e) => {
                               const val = Number(e.target.value);
                               setEditRoomModal((prev) => {
-                                const isBase = pax === (prev.maxPax === 1 ? 1 : 2);
+                                const isBase = pax === prev.maxPax;
                                 return {
                                   ...prev,
                                   ...(isBase ? { basePrice: val } : {}),
@@ -12588,8 +12917,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: CONCILIAR TRANSFERENCIA (LUXURY LIGHT/NAVY THEME) */}
       {/* ========================================================================= */}
       {selectedInstallment && (
-        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-[0_20px_50px_rgba(11,25,44,0.15)] space-y-5 animate-scale-in">
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedInstallment(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-8 shadow-[0_20px_50px_rgba(11,25,44,0.15)] space-y-5 animate-scale-in cursor-default"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
@@ -12687,11 +13024,368 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       )}
 
       {/* ========================================================================= */}
+      {/* MODAL: PAUSAR EXPERIENCIA DEL CATÁLOGO (LUXURY CONFIRMATION DIALOG)       */}
+      {/* ========================================================================= */}
+      {serviceToPause && (
+        <div
+          className="fixed inset-0 z-[120] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isPausingService) setServiceToPause(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_30px_70px_rgba(11,25,44,0.35)] border border-slate-200/90 relative animate-scale-in space-y-5 cursor-default"
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setServiceToPause(null)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-[#0b192c] flex items-center justify-center transition cursor-pointer"
+              title="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Pill & Title */}
+            <div className="space-y-2 pr-8">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200/80 text-[10px] font-mono font-bold uppercase tracking-wider">
+                <PauseCircle className="w-3.5 h-3.5 text-amber-600" />
+                <span>Control de Catálogo Público</span>
+              </div>
+              <h3 className="font-serif text-xl font-bold text-[#0b192c] leading-tight">
+                ¿Deseas pausar esta experiencia?
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed font-light">
+                Al pausarla, se ocultará inmediatamente del sitio web público y los visitantes del Lodge no podrán seleccionarla en sus reservas.
+              </p>
+            </div>
+
+            {/* Experience Mini Preview Card */}
+            <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-3.5 flex items-center gap-3.5 shadow-2xs">
+              {serviceToPause.image_url ? (
+                <img
+                  src={serviceToPause.image_url}
+                  alt={serviceToPause.name}
+                  className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                  <Tag className="w-6 h-6" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1 space-y-1">
+                <span className="inline-block text-[9px] font-mono font-bold uppercase text-sky-800 bg-sky-100/70 px-2 py-0.5 rounded-md">
+                  {serviceToPause.category}
+                </span>
+                <h4 className="font-serif font-bold text-xs text-[#0b192c] truncate">
+                  {serviceToPause.name}
+                </h4>
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {serviceToPause.duration_label || 'Flexible'}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-[#0b192c]">
+                    ${serviceToPause.price_clp.toLocaleString('es-CL')} CLP
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Safe Notice */}
+            <div className="bg-sky-50/60 border border-sky-200/60 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-sky-950">
+              <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                La experiencia se mantendrá guardada con todos sus precios y detalles. Podrás volver a habilitarla cuando quieras pulsando <strong className="text-[#0b192c] font-semibold">"Activar"</strong>.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setServiceToPause(null)}
+                disabled={isPausingService}
+                className="flex-1 py-2.5 px-4 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold uppercase font-mono tracking-wider transition cursor-pointer active:scale-98 text-center"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!serviceToPause) return;
+                  const target = serviceToPause;
+                  // 1. Cerrar el modal de inmediato (0ms)
+                  setServiceToPause(null);
+                  setIsPausingService(false);
+
+                  // 2. Feedback inmediato al usuario
+                  setActionMessage(`La experiencia "${target.name}" ha sido pausada y ya no aparece en el sitio web público ni en reservas.`);
+                  setTimeout(() => setActionMessage(null), 5000);
+
+                  // 3. Persistir en Supabase (con rollback automático en memoria si falla)
+                  const res = await toggleServiceActive(target.id, false);
+                  if (!res.success) {
+                    triggerAlert(res.error || 'Error al pausar la experiencia en el backend.', 'error', 'Error');
+                  }
+                }}
+                className="flex-1 py-2.5 px-4 rounded-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-semibold uppercase font-mono tracking-wider transition shadow-sm hover:shadow-md cursor-pointer active:scale-98 text-center flex items-center justify-center gap-1.5"
+              >
+                <Pause className="w-3.5 h-3.5" />
+                <span>Pausar Experiencia</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDITAR EXPERIENCIA / SERVICIO (LUXURY LIGHT/NAVY THEME) */}
+      {/* ========================================================================= */}
+      {editingService && (
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSavingEditService) setEditingService(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-lg w-full bg-white border border-slate-200/90 rounded-3xl p-7 sm:p-8 shadow-[0_25px_60px_rgba(11,25,44,0.2)] space-y-5 animate-scale-in my-8 cursor-default"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
+                  Catálogo de Experiencias
+                </span>
+                <h4 className="font-serif text-xl font-bold text-[#0b192c]">Editar Experiencia</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingService(null)}
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+
+            {/* PREVISUALIZACIÓN DE IMAGEN */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block">
+                  Previsualización de Imagen
+                </label>
+                {editServiceForm.image_url && (
+                  <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Enlace activo
+                  </span>
+                )}
+              </div>
+              <div className="w-full h-40 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 relative flex items-center justify-center shadow-inner">
+                {editServiceForm.image_url.trim() ? (
+                  <img
+                    src={editServiceForm.image_url.trim()}
+                    alt="Previsualización"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80';
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-slate-400 gap-1.5 p-4 text-center">
+                    <ImageIcon className="w-7 h-7 stroke-[1.5]" />
+                    <span className="text-xs font-medium text-slate-600">Sin imagen definida</span>
+                    <span className="text-[10px] font-mono text-slate-400">Pega un link de imagen abajo para ver la portada</span>
+                  </div>
+                )}
+                <div className="absolute top-2.5 left-2.5">
+                  <span className="bg-[#0b192c]/85 backdrop-blur-md text-white text-[9px] font-mono font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-xs">
+                    {editServiceForm.category}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEditService} className="space-y-4 text-xs">
+              {/* CAMPO 1: NOMBRE DE LA EXPERIENCIA */}
+              <div>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">
+                  Nombre de la Experiencia *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Buceo & Snorkel con Lobo Fino"
+                  value={editServiceForm.name}
+                  onChange={(e) => setEditServiceForm({ ...editServiceForm, name: e.target.value })}
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] font-semibold focus:border-[#0b192c] focus:outline-none transition shadow-2xs text-xs"
+                  required
+                />
+              </div>
+
+              {/* CAMPO 2: VALOR / TARIFA (CLP) Y CATEGORÍA */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block">
+                      Valor / Tarifa (CLP) *
+                    </label>
+                    <span className="text-[10px] font-mono font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                      ${Number(editServiceForm.price_clp || 0).toLocaleString('es-CL')}
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={editServiceForm.price_clp}
+                    onChange={(e) => setEditServiceForm({ ...editServiceForm, price_clp: Number(e.target.value) })}
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-[#0b192c] font-mono font-bold focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">Categoría</label>
+                  <select
+                    value={editServiceForm.category}
+                    onChange={(e) =>
+                      setEditServiceForm({
+                        ...editServiceForm,
+                        category: e.target.value as 'cabalgatas' | 'buceo' | 'trekking' | 'gastronomia' | 'nautica' | 'bienestar',
+                      })
+                    }
+                    className="w-full bg-[#f4f7fb] border border-slate-200/90 rounded-2xl px-3.5 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none cursor-pointer"
+                  >
+                    <option value="cabalgatas">Cabalgatas</option>
+                    <option value="buceo">Buceo / Snorkel</option>
+                    <option value="trekking">Trekking</option>
+                    <option value="gastronomia">Gastronomía</option>
+                    <option value="nautica">Náutica</option>
+                    <option value="bienestar">Bienestar</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* CAMPO 3: LINK DE LA IMAGEN */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] flex items-center gap-1.5">
+                    <Link2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Link de la Imagen</span>
+                  </label>
+                  {editServiceForm.image_url && (
+                    <button
+                      type="button"
+                      onClick={() => setEditServiceForm({ ...editServiceForm, image_url: '' })}
+                      className="text-[10px] text-rose-500 hover:underline cursor-pointer"
+                    >
+                      Quitar link
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="url"
+                  placeholder="https://images.unsplash.com/... o cualquier link de imagen"
+                  value={editServiceForm.image_url}
+                  onChange={(e) => setEditServiceForm({ ...editServiceForm, image_url: e.target.value })}
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs font-mono text-[11px]"
+                />
+                <p className="text-[10px] text-slate-400 mt-1 font-light">
+                  Coloca el link de la imagen pública (JPG, PNG o WebP). Se actualizará al instante en la web pública.
+                </p>
+              </div>
+
+              {/* DURACIÓN Y CAPACIDAD */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">
+                    Duración (Etiqueta)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 3 Horas / Medio Día"
+                    value={editServiceForm.duration_label}
+                    onChange={(e) => setEditServiceForm({ ...editServiceForm, duration_label: e.target.value })}
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">
+                    Capacidad Máxima (Pax)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={editServiceForm.max_pax}
+                    onChange={(e) => setEditServiceForm({ ...editServiceForm, max_pax: Number(e.target.value) })}
+                    className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2 text-[#0b192c] font-mono font-bold focus:border-[#0b192c] focus:outline-none transition shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              {/* DESCRIPCIÓN */}
+              <div>
+                <label className="text-[10px] uppercase font-bold font-mono text-[#0b192c] block mb-1.5">
+                  Descripción
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Detalle o resumen de la actividad..."
+                  value={editServiceForm.description}
+                  onChange={(e) => setEditServiceForm({ ...editServiceForm, description: e.target.value })}
+                  className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-[#0b192c] focus:outline-none transition shadow-2xs leading-relaxed"
+                />
+              </div>
+
+              {/* BOTONES ACCIÓN */}
+              <div className="pt-3 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingService(null)}
+                  disabled={isSavingEditService}
+                  className="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-full font-semibold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEditService}
+                  className="w-1/2 bg-[#0b192c] hover:bg-[#182a44] text-white py-3 rounded-full font-semibold transition shadow-xs cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+                >
+                  {isSavingEditService ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5 text-sky-300" />
+                      <span>Guardar Cambios</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* MODAL: NUEVA EXPERIENCIA / SERVICIO (LUXURY LIGHT/NAVY THEME) */}
       {/* ========================================================================= */}
       {showNewServiceModal && (
-        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-8 shadow-[0_20px_50px_rgba(11,25,44,0.15)] space-y-5 animate-scale-in">
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewServiceModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-8 shadow-[0_20px_50px_rgba(11,25,44,0.15)] space-y-5 animate-scale-in cursor-default"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
@@ -12847,8 +13541,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         const percentOccupied = Math.min(100, Math.round((totalPaxCount / totalMaxPax) * 100));
 
         return (
-          <div className="fixed inset-0 z-50 bg-[#0b192c]/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
-            <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-[0_25px_60px_rgba(11,25,44,0.25)] border border-slate-200/90 overflow-hidden my-auto animate-scaleIn">
+          <div
+            className="fixed inset-0 z-50 bg-[#0b192c]/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn cursor-pointer"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSelectedExpeditionForManifest(null);
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-[0_25px_60px_rgba(11,25,44,0.25)] border border-slate-200/90 overflow-hidden my-auto animate-scaleIn cursor-default"
+            >
               
               {/* Modal Header */}
               <div className="px-6 py-5 bg-[#0b192c] text-white flex items-start justify-between gap-4 shrink-0">
@@ -13257,8 +13959,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80';
 
         return (
-          <div className="fixed inset-0 z-50 bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
-            <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[94vh] flex flex-col lg:flex-row shadow-[0_25px_70px_rgba(11,25,44,0.35)] border border-slate-200/90 overflow-hidden my-auto animate-scaleIn">
+          <div
+            className="fixed inset-0 z-50 bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn cursor-pointer"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isSubmittingExpPassenger) setSelectedExpeditionForPassenger(null);
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl max-w-5xl w-full max-h-[94vh] flex flex-col lg:flex-row shadow-[0_25px_70px_rgba(11,25,44,0.35)] border border-slate-200/90 overflow-hidden my-auto animate-scaleIn cursor-default"
+            >
               
               {/* ================================================================= */}
               {/* COLUMNA IZQUIERDA: IMAGEN DE FONDO COMPLETA & RESUMEN EN TIEMPO REAL */}
@@ -14200,8 +14910,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: EDITAR INFORMACIÓN DE EXPEDICIÓN */}
       {/* ========================================================================= */}
       {editingDeparture && (
-        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+        <div
+          className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingDeparture(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden cursor-default"
+          >
             {/* Modal Header */}
             <div className="px-6 py-4 bg-[#0b192c] text-white flex items-center justify-between border-b border-white/10">
               <div className="flex items-center gap-3 min-w-0">
@@ -15282,8 +16000,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: FICHA DE CLIENTE 360° (CRM DOSSIER) */}
       {/* ========================================================================= */}
       {selectedCustomer && (
-        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+        <div
+          className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedCustomer(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden cursor-default"
+          >
             
             {/* Header del Dossier */}
             <div className="px-8 py-6 bg-[#0b192c] text-white flex flex-wrap items-start justify-between gap-4">
@@ -15863,8 +16589,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: EDITAR DATOS DE CLIENTE (CRM) */}
       {/* ========================================================================= */}
       {editingCustomer && (
-        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-7 max-w-xl w-full shadow-2xl border border-slate-200 space-y-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div
+          className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingCustomer(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-7 max-w-xl w-full shadow-2xl border border-slate-200 space-y-6 max-h-[90vh] overflow-y-auto custom-scrollbar cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0b192c]">
@@ -16045,8 +16779,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: REGISTRAR NUEVO CLIENTE (CRM) */}
       {/* ========================================================================= */}
       {showNewCustomerModal && (
-        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6">
+        <div
+          className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewCustomerModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-[#0b192c]">
@@ -16168,8 +16910,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: REGISTRAR NUEVO LEAD / PROSPECTO */}
       {/* ========================================================================= */}
       {showNewLeadModal && (
-        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6">
+        <div
+          className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowNewLeadModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-800">
@@ -16317,8 +17067,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: EDITAR NOTAS DEL LEAD */}
       {/* ========================================================================= */}
       {editingLeadNotes && (
-        <div className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-7 max-w-md w-full shadow-2xl border border-slate-200 space-y-5">
+        <div
+          className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingLeadNotes(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-7 max-w-md w-full shadow-2xl border border-slate-200 space-y-5 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h4 className="font-serif font-bold text-base text-[#0b192c]">Bitácora de Notas</h4>
@@ -16373,12 +17131,167 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         />
       )}
 
+      {/* MODAL CONFIGURACIÓN POLÍTICAS DEL LODGE (PDF - GOOGLE DRIVE) */}
+      {showLodgePoliciesModal && (
+        <div
+          className="fixed inset-0 z-50 bg-[#060B14]/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSavingLodgePolicy) {
+              setShowLodgePoliciesModal(false);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-xl w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_25px_70px_rgba(11,25,44,0.35)] space-y-6 my-8 animate-scaleIn text-slate-800 cursor-default"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#0b192c] text-white flex items-center justify-center shadow-xs shrink-0">
+                  <FileText className="w-5 h-5 text-sky-400" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-[#0b192c]">
+                    Políticas del Lodge (PDF)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-light">
+                    Lodge Rincón de Navegantes — Documento de Políticas en Google Drive
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLodgePoliciesModal(false)}
+                disabled={isSavingLodgePolicy}
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="space-y-4 text-xs">
+              <p className="text-slate-600 leading-relaxed">
+                Pega el enlace de <strong>Google Drive</strong> (o enlace directo / Dropbox) con el archivo PDF de las políticas de reserva del Lodge. Al configurarlo, los huéspedes visualizarán este documento interactivo dentro del popup de reserva antes de confirmar su estadía.
+              </p>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] uppercase font-bold text-slate-700 tracking-wider">
+                    Enlace del PDF (Google Drive / Web)
+                  </label>
+                  {lodgePolicyPdfInput.trim() && (
+                    <a
+                      href={lodgePolicyPdfInput.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Probar enlace</span>
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="url"
+                  placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                  value={lodgePolicyPdfInput}
+                  onChange={(e) => setLodgePolicyPdfInput(e.target.value)}
+                  className="w-full bg-[#f8fafc] focus:bg-white border border-slate-200 focus:border-[#0b192c] rounded-xl px-4 py-3 text-xs text-slate-800 font-mono outline-none shadow-2xs transition"
+                />
+              </div>
+
+              {/* Instructions Callout */}
+              <div className="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-4 text-[11px] text-sky-900 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sky-950">
+                  <Sparkles className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                  <span>¿Cómo obtener el enlace correcto en Google Drive?</span>
+                </div>
+                <ol className="list-decimal pl-4 space-y-1 text-sky-800 font-light leading-relaxed">
+                  <li>Sube tu documento PDF a Google Drive.</li>
+                  <li>Haz clic derecho sobre el archivo y selecciona <strong>«Compartir» ➔ «Compartir»</strong>.</li>
+                  <li>En Acceso general, selecciona <strong>«Cualquier persona con el enlace»</strong> (modo Lector).</li>
+                  <li>Haz clic en <strong>«Copiar enlace»</strong> y pégalo en el campo superior.</li>
+                </ol>
+              </div>
+
+              {/* Live Preview if valid URL */}
+              {lodgePolicyPdfInput.trim() && (
+                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50">
+                  <div className="px-3.5 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-[11px] text-slate-600 font-semibold">
+                    <span>Vista Previa del Visor PDF</span>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-bold">Activo</span>
+                  </div>
+                  <div className="h-44 w-full">
+                    <iframe
+                      src={getEmbeddablePdfUrl(lodgePolicyPdfInput.trim())}
+                      className="w-full h-full border-0"
+                      title="Vista previa PDF Lodge"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              <div>
+                {currentLodgePolicyPdf && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLodgePolicyPdf}
+                    disabled={isSavingLodgePolicy}
+                    className="text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-3 py-2 rounded-xl transition cursor-pointer font-semibold"
+                  >
+                    Quitar Enlace
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLodgePoliciesModal(false)}
+                  disabled={isSavingLodgePolicy}
+                  className="px-4 py-2.5 text-xs text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition cursor-pointer font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveLodgePolicyPdf}
+                  disabled={isSavingLodgePolicy}
+                  className="px-5 py-2.5 bg-[#0b192c] hover:bg-[#182a44] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition shadow-md shadow-[#0b192c]/15 cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSavingLodgePolicy ? (
+                    <span>Guardando...</span>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Guardar Políticas</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* 9. MODAL: MODIFICAR PERFIL & RESETEAR CONTRASEÑA */}
       {/* ========================================================================= */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(11,25,44,0.25)] space-y-6 animate-scale-in my-8">
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isSavingProfile) setShowProfileModal(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-[0_24px_70px_rgba(11,25,44,0.25)] space-y-6 animate-scale-in my-8 cursor-default"
+          >
             
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -16618,9 +17531,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL DE CONFIRMACIÓN DE PAGO (1er 50% / 2do 50% EN BASE DE DATOS) */}
       {/* ========================================================================= */}
       {confirmingPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b192c]/80 backdrop-blur-sm animate-fadeIn">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b192c]/80 backdrop-blur-sm animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isConfirmingPayment) setConfirmingPaymentModal(null);
+          }}
+        >
           <div
-            className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scaleUp text-slate-700"
+            className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-scaleUp text-slate-700 cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Encabezado Azul Marino Lujoso */}
@@ -16778,8 +17696,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* CUADRO INFORMATIVO / ALERT MODAL PERSONALIZADO (LUXURY YATES CHILE) */}
       {/* ========================================================================= */}
       {customAlert?.isOpen && (
-        <div className="fixed inset-0 z-[100] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative">
+        <div
+          className="fixed inset-0 z-[100] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              if (customAlert.onConfirm) customAlert.onConfirm();
+              setCustomAlert(null);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative cursor-default"
+          >
             <button
               type="button"
               onClick={() => setCustomAlert(null)}
@@ -16839,8 +17768,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL MODERNO: CONFIRMACIÓN PARA ELIMINAR SALIDA DE EXPEDICIÓN           */}
       {/* ========================================================================= */}
       {departureToDelete && (
-        <div className="fixed inset-0 z-[120] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative">
+        <div
+          className="fixed inset-0 z-[120] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeletingDeparture) setDepartureToDelete(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative cursor-default"
+          >
             <button
               type="button"
               disabled={isDeletingDeparture}
@@ -16955,8 +17892,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       {/* MODAL: CONFIRMACIÓN PERSONALIZADA (REEMPLAZA CONFIRM NATIVO)               */}
       {/* ========================================================================= */}
       {customConfirm?.isOpen && (
-        <div className="fixed inset-0 z-[110] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative">
+        <div
+          className="fixed inset-0 z-[110] bg-[#0b192c]/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              customConfirm.onCancel?.();
+              setCustomConfirm(null);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_rgba(11,25,44,0.35)] border border-slate-200/90 space-y-5 animate-scaleIn relative cursor-default"
+          >
             <button
               type="button"
               onClick={() => {

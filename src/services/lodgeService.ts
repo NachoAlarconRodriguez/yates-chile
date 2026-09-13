@@ -186,14 +186,17 @@ export const lodgeService = {
         }
 
         const maxPax = room.max_pax || fallback?.max_pax || 2;
-        const base = Number(room.base_price_clp) || fallback?.base_price_clp || 240000;
+        // Priorizar la tarifa configurada para la capacidad máxima (maxPax)
+        const base = effectiveRates[maxPax] ?? (Number(room.base_price_clp) || fallback?.base_price_clp || 240000);
 
         // Ensure every pax from 1 to maxPax has a rate defined
         for (let p = 1; p <= maxPax; p++) {
           if (!effectiveRates[p]) {
-            if (p === 1) effectiveRates[p] = Math.round((base * 0.88) / 1000) * 1000;
-            else if (p === 2) effectiveRates[p] = base;
-            else effectiveRates[p] = base + (p - 2) * 40000;
+            if (p === maxPax) effectiveRates[p] = base;
+            else {
+              const diff = maxPax - p;
+              effectiveRates[p] = Math.max(10000, Math.round((base - diff * 25000) / 1000) * 1000);
+            }
           }
         }
 
@@ -201,7 +204,7 @@ export const lodgeService = {
           ...fallback,
           ...localRoom,
           ...room,
-          base_price_clp: base,
+          base_price_clp: effectiveRates[maxPax] ?? base,
           rates_by_pax: effectiveRates,
           description: (room as any).description || localRoom?.description || fallback?.description || 'Habitación en Lodge Bahía Cumberland.',
           image_url: (room as any).image_url || localRoom?.image_url || fallback?.image_url || '/rincon-de-navegantes.jpg',
@@ -221,20 +224,28 @@ export const lodgeService = {
     const newId = newRoomData.id || `room-${Date.now()}`;
     const nextNumber = newRoomData.room_number || (current.length > 0 ? Math.max(...current.map(r => r.room_number)) + 1 : 1);
     
+    const mx = newRoomData.max_pax || 2;
+    const bp = Number(newRoomData.base_price_clp) || 220000;
+    const defaultRates: Record<number, number> = {};
+    for (let p = 1; p <= mx; p++) {
+      const diff = mx - p;
+      defaultRates[p] = p === mx ? bp : Math.max(10000, Math.round((bp - diff * 25000) / 1000) * 1000);
+    }
+
     const newRoom: LodgeRoom = {
       id: newId,
       room_number: nextNumber,
       room_name: newRoomData.room_name || `Habitación ${nextNumber}`,
       room_type: newRoomData.room_type || 'doble',
-      max_pax: newRoomData.max_pax || 2,
-      base_price_clp: Number(newRoomData.base_price_clp) || 220000,
+      max_pax: mx,
+      base_price_clp: defaultRates[mx] ?? bp,
       has_ocean_view: newRoomData.has_ocean_view !== undefined ? newRoomData.has_ocean_view : true,
       is_active: newRoomData.is_active !== undefined ? newRoomData.is_active : true,
       created_at: new Date().toISOString(),
       description: newRoomData.description || 'Habitación con vista al mar y baño en suite en Lodge Bahía Cumberland.',
       image_url: newRoomData.image_url || '/rincon-de-navegantes.jpg',
       amenities: newRoomData.amenities || ['Baño privado en suite', 'Vista al mar', 'Starlink WiFi'],
-      rates_by_pax: newRoomData.rates_by_pax || { 1: Math.round(((newRoomData.base_price_clp || 220000) * 0.88) / 1000) * 1000, 2: newRoomData.base_price_clp || 220000 }
+      rates_by_pax: newRoomData.rates_by_pax || defaultRates
     };
 
     const updated = [...current, newRoom].sort((a, b) => a.room_number - b.room_number);
@@ -284,12 +295,23 @@ export const lodgeService = {
 
   async updateRoom(roomId: string, updates: Partial<LodgeRoom>): Promise<{ success: boolean; error?: string }> {
     try {
-      // 1. Update local cache immediately for instant UI responsiveness
       const current = getCachedRooms();
-      const updatedList = current.map((r) => (r.id === roomId ? { ...r, ...updates } : r));
+      const targetRoom = current.find((r) => r.id === roomId);
+      const effectiveMaxPax = updates.max_pax !== undefined ? Number(updates.max_pax) : (targetRoom?.max_pax || 2);
+      let effectiveBasePrice = updates.base_price_clp !== undefined ? Number(updates.base_price_clp) : targetRoom?.base_price_clp;
+      if (updates.rates_by_pax && updates.rates_by_pax[effectiveMaxPax] !== undefined) {
+        effectiveBasePrice = Number(updates.rates_by_pax[effectiveMaxPax]);
+      }
+
+      const enrichedUpdates: Partial<LodgeRoom> = {
+        ...updates,
+        ...(effectiveBasePrice !== undefined ? { base_price_clp: effectiveBasePrice } : {}),
+      };
+
+      // 1. Update local cache immediately for instant UI responsiveness
+      const updatedList = current.map((r) => (r.id === roomId ? { ...r, ...enrichedUpdates } : r));
       saveCachedRooms(updatedList);
 
-      const targetRoom = current.find((r) => r.id === roomId);
       const roomNumber = targetRoom?.room_number ?? updates.room_number;
 
       // 2. Persist columns into public.lodge_rooms
@@ -298,7 +320,7 @@ export const lodgeService = {
       if (updates.room_number !== undefined) dbFields.room_number = updates.room_number;
       if (updates.room_type !== undefined) dbFields.room_type = updates.room_type;
       if (updates.max_pax !== undefined) dbFields.max_pax = Number(updates.max_pax);
-      if (updates.base_price_clp !== undefined) dbFields.base_price_clp = Number(updates.base_price_clp);
+      if (effectiveBasePrice !== undefined) dbFields.base_price_clp = Number(effectiveBasePrice);
       if (updates.has_ocean_view !== undefined) dbFields.has_ocean_view = updates.has_ocean_view;
       if (updates.is_active !== undefined) dbFields.is_active = updates.is_active;
 
