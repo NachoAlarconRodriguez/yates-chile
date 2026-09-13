@@ -34,11 +34,12 @@ export const LodgeConfigTab: React.FC = () => {
   // Form State
   const [formRoomNumber, setFormRoomNumber] = useState<number>(1);
   const [formRoomName, setFormRoomName] = useState('Habitación 1');
-  const [formRoomType, setFormRoomType] = useState<'individual' | 'doble' | 'triple' | 'suite'>('doble');
+  const [formRoomType, setFormRoomType] = useState<string>('doble');
   const [formMaxPax, setFormMaxPax] = useState<number>(2);
-  const [formBasePrice, setFormBasePrice] = useState<number>(180000);
+  const [formBasePriceClp, setFormBasePriceClp] = useState<number>(180000);
+  const [formHasOceanView, setFormHasOceanView] = useState<boolean>(true);
   const [formDescription, setFormDescription] = useState('');
-  const [formMainImage, setFormMainImage] = useState('/rincon-de-navegantes.jpg');
+  const [formImageUrl, setFormImageUrl] = useState('/rincon-de-navegantes.jpg');
   const [formAmenities, setFormAmenities] = useState<string[]>([
     'Baño privado con agua caliente',
     'Vista panorámica al mar',

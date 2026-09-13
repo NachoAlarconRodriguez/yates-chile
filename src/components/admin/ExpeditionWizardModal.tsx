@@ -1977,7 +1977,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
         <div
           className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn cursor-pointer"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !isCreatingVessel) setShowNewVesselModal(false);
+            if (e.target === e.currentTarget) setShowNewVesselModal(false);
           }}
         >
           <div

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { isExpeditionSoldOut, getExpeditionAvailableSpots, type PublicExpedition as Expedition } from '../services/expeditionService';

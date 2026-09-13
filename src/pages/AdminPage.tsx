@@ -17285,7 +17285,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         <div
           className="fixed inset-0 z-50 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn cursor-pointer"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !isSavingProfile) setShowProfileModal(false);
+            if (e.target === e.currentTarget) setShowProfileModal(false);
           }}
         >
           <div
@@ -17534,7 +17534,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b192c]/80 backdrop-blur-sm animate-fadeIn cursor-pointer"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !isConfirmingPayment) setConfirmingPaymentModal(null);
+            if (e.target === e.currentTarget) setConfirmingPaymentModal(null);
           }}
         >
           <div
