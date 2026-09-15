@@ -6,7 +6,6 @@ import {
   Ship,
   BedDouble,
   Compass,
-  Phone,
   Save,
   RotateCcw,
   ExternalLink,
@@ -15,6 +14,8 @@ import {
   X,
   MapPin,
   Mail,
+  Share2,
+  MessageCircle,
   ShieldCheck,
   ArrowRight,
   ArrowLeft,
@@ -46,7 +47,6 @@ import {
 } from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
 import { ExpeditionCalendar } from '../modules/ExpeditionCalendar';
-import { BuildYourJourney } from '../modules/BuildYourJourney';
 import { EXPEDITIONS } from '../modules/ExpeditionCalendar';
 
 interface VisualCmsEditorProps {
@@ -174,7 +174,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   onNavigate,
 }) => {
   // Navigation State
-  const [activePage, setActivePage] = useState<'home' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'contact' | 'logbook'>('home');
+  const [activePage, setActivePage] = useState<'home' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'logbook' | 'footer'>('home');
   const [activeLogbookVessel, setActiveLogbookVessel] = useState<'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook'>('vegvisir_logbook');
   const [activeLogbookEntry, setActiveLogbookEntry] = useState<string>('climatizacion');
 
@@ -270,6 +270,50 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           ...existingMeta,
           ...((prev[vesselKey]?.metadata as any) || {}),
           entries: updatedEntries,
+        },
+      },
+    }));
+  };
+
+  // Footer & Social Channels Helper
+  const getFooterField = (field: 'whatsapp' | 'instagram' | 'email' | 'address'): string => {
+    const draftMeta = (drafts['footer_contact']?.metadata as any) || {};
+    if (draftMeta[field] !== undefined && draftMeta[field] !== null) return draftMeta[field];
+
+    const contentMeta = (content['footer_contact']?.metadata as any) || {};
+    if (contentMeta[field] !== undefined && contentMeta[field] !== null) return contentMeta[field];
+
+    const defMeta = (DEFAULT_CMS_CONTENT['footer_contact']?.metadata as any) || {};
+    if (defMeta[field] !== undefined && defMeta[field] !== null) return defMeta[field];
+
+    if (field === 'whatsapp') return '56981312920';
+    if (field === 'instagram') return 'https://www.instagram.com/vegvisir_sailing';
+    if (field === 'email') return 'concierge@yateschile.com';
+    if (field === 'address') return 'Uberlindo Andaur 222, Isla Robinson Crusoe';
+    return '';
+  };
+
+  const setFooterField = (field: 'whatsapp' | 'instagram' | 'email' | 'address', value: string) => {
+    const existingMeta =
+      (drafts['footer_contact']?.metadata as any) ||
+      (content['footer_contact']?.metadata as any) ||
+      (DEFAULT_CMS_CONTENT['footer_contact']?.metadata as any) ||
+      {};
+
+    setDrafts((prev) => ({
+      ...prev,
+      footer_contact: {
+        section_key: 'footer_contact',
+        title: 'Canales de Contacto & Redes',
+        subtitle: 'Pie de Página Oficial',
+        body_text: '',
+        media_url: '',
+        ...(content['footer_contact'] || DEFAULT_CMS_CONTENT['footer_contact'] || {}),
+        ...prev.footer_contact,
+        metadata: {
+          ...existingMeta,
+          ...((prev.footer_contact?.metadata as any) || {}),
+          [field]: value,
         },
       },
     }));
@@ -386,7 +430,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
           {};
 
-        if (sectionKey === 'vegvisir_logbook' || sectionKey === 'terranova_logbook' || sectionKey === 'lodge_logbook') {
+        if (sectionKey === 'vegvisir_logbook' || sectionKey === 'terranova_logbook' || sectionKey === 'lodge_logbook' || sectionKey === 'footer_contact') {
           finalDrafts[sectionKey] = {
             ...d,
             metadata: existingMeta,
@@ -635,7 +679,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                     ? '/lodge'
                     : activePage === 'expeditions'
                     ? '/expediciones'
-                    : '/contacto';
+                    : '/';
                 if (onNavigate) onNavigate(targetRoute);
                 else window.open('#' + targetRoute, '_blank');
               }}
@@ -658,8 +702,8 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                 { id: 'terranova', label: 'Yate Terranova', icon: Ship },
                 { id: 'lodge', label: 'Lodge Rincón', icon: BedDouble },
                 { id: 'expeditions', label: 'Expediciones', icon: Compass },
-                { id: 'contact', label: 'Contacto & Concierge', icon: Phone },
                 { id: 'logbook', label: 'Bitácoras & Book', icon: BookOpen },
+                { id: 'footer', label: 'Footer & Redes', icon: Share2 },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activePage === tab.id;
@@ -795,9 +839,6 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               </span>
               <span className={`cursor-pointer pb-1 ${activePage === 'expeditions' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('expeditions')}>
                 Expediciones
-              </span>
-              <span className={`cursor-pointer pb-1 ${activePage === 'contact' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('contact')}>
-                Contacto
               </span>
             </nav>
 
@@ -1572,105 +1613,6 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             </div>
           )}
 
-          {/* ======================================================================= */}
-          {/* 6. CONTACTO & CONCIERGE - EXACT REPLICA */}
-          {/* ======================================================================= */}
-          {activePage === 'contact' && (
-            <div className="space-y-0 bg-white">
-              {/* Header Banner */}
-              <section className="bg-slate-900 text-white py-20 relative overflow-hidden border-b border-slate-800 group/hero">
-                {getField('contact_info', 'media_url') && (
-                  <>
-                    <img
-                      src={getField('contact_info', 'media_url')}
-                      alt="Contacto"
-                      className="absolute inset-0 w-full h-full object-cover opacity-25"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent" />
-                  </>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMediaModal({
-                      sectionKey: 'contact_info',
-                      label: 'Fondo del Banner de Contacto',
-                      currentValue: getField('contact_info', 'media_url'),
-                    })
-                  }
-                  className="absolute top-4 right-4 bg-slate-950/80 hover:bg-slate-950 text-white border border-white/20 px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg flex items-center gap-1.5 transition z-30 cursor-pointer backdrop-blur-md"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Cambiar Fondo Banner</span>
-                </button>
-
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-4">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-400/10 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider">
-                    <Anchor className="w-4 h-4 text-blue-400 shrink-0" />
-                    <InlineText
-                      sectionKey="contact_info"
-                      field="subtitle"
-                      tag="span"
-                      fallback="Atención Personalizada 24/7"
-                      className="text-blue-300 font-semibold"
-                    />
-                  </div>
-
-                  <InlineText
-                    sectionKey="contact_info"
-                    field="title"
-                    tag="h1"
-                    fallback="Contacto & Concierge Exclusivo"
-                    className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white block"
-                  />
-
-                  <InlineText
-                    sectionKey="contact_info"
-                    field="body_text"
-                    tag="p"
-                    fallback="Diseña tu itinerario a medida por Cabo de Hornos o cuéntanos tus consultas de navegación."
-                    multiline={true}
-                    className="max-w-2xl mx-auto text-slate-300 text-base sm:text-lg block"
-                  />
-                </div>
-              </section>
-
-              {/* BuildYourJourney Module */}
-              <BuildYourJourney />
-
-              {/* Direct Contact & Locations Section */}
-              <section className="py-16 bg-slate-50 border-t border-slate-200">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  <div className="grid md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-                      <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold">
-                        <Phone className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <h3 className="font-serif text-lg font-bold text-slate-900">Atención Telefónica</h3>
-                      <p className="text-slate-500 text-xs">+56 9 8131 2920</p>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-                      <div className="w-10 h-10 rounded-2xl bg-sky-100 text-sky-800 flex items-center justify-center font-bold">
-                        <Mail className="w-5 h-5 text-sky-600" />
-                      </div>
-                      <h3 className="font-serif text-lg font-bold text-slate-900">Correo Electrónico</h3>
-                      <p className="text-slate-500 text-xs">pagos@yateschile.cl</p>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-                      <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                        <MapPin className="w-5 h-5 text-emerald-600" />
-                      </div>
-                      <h3 className="font-serif text-lg font-bold text-slate-900">Base Operacional</h3>
-                      <p className="text-slate-500 text-xs">Puerto Montt & Isla Robinson Crusoe</p>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            </div>
-          )}
 
           {/* ======================================================================= */}
           {/* 7. GESTOR DE CUADERNOS DE BITÁCORA (VELEROS, YATE & LODGE) */}
@@ -2083,6 +2025,340 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
                 </div>
 
+              </div>
+
+            </div>
+          )}
+
+          {/* ======================================================================= */}
+          {/* 7. PIE DE PÁGINA & CANALES DE CONTACTO (FOOTER) */}
+          {/* ======================================================================= */}
+          {activePage === 'footer' && (
+            <div className="p-6 sm:p-8 space-y-8 bg-slate-100/70">
+              
+              {/* Header Banner */}
+              <div className="bg-[#0f2b48] text-white p-6 sm:p-8 rounded-3xl shadow-xl space-y-4 relative overflow-hidden">
+                <div className="absolute right-0 top-0 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+                  <div className="space-y-1 max-w-2xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-400/20 text-sky-200 text-xs font-bold uppercase tracking-wider border border-sky-400/30">
+                      <Share2 className="w-3.5 h-3.5 text-sky-300" />
+                      <span>Canales de Contacto & Pie de Página</span>
+                    </div>
+                    <h2 className="font-serif text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                      Configuración de Botones del Footer
+                    </h2>
+                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                      Personaliza los 4 enlaces y datos de contacto del pie de página público de Yates Chile: WhatsApp Concierge, perfil de Instagram, correo de reservas y dirección física de la base operacional.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveAll}
+                    disabled={!hasUnsavedChanges || isSaving}
+                    className={`px-5 py-3 rounded-2xl text-xs font-extrabold flex items-center gap-2 transition-all shadow-lg cursor-pointer ${
+                      hasUnsavedChanges
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 scale-105'
+                        : 'bg-white/10 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{hasUnsavedChanges ? `Guardar Cambios (${Object.keys(drafts).length})` : 'Sin Cambios Pendientes'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Grid with 4 Contact Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* 1. WHATSAPP */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                        <MessageCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-base font-bold text-slate-900">WhatsApp Concierge</h3>
+                        <p className="text-slate-500 text-xs">Chat directo con el servicio de concierge</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                      Botón 1
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 block">
+                      Número Telefónico (código internacional sin espacios ni símbolos)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={getFooterField('whatsapp')}
+                        onChange={(e) => setFooterField('whatsapp', e.target.value)}
+                        placeholder="56981312920"
+                        className="w-full bg-slate-50 border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none transition shadow-2xs"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Ej: <span className="font-mono text-slate-600">56981312920</span> (genera <code className="text-[10px] bg-slate-100 px-1 py-0.5 rounded">https://wa.me/{getFooterField('whatsapp').replace(/[^0-9]/g, '')}</code>)
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <a
+                      href={`https://wa.me/${getFooterField('whatsapp').replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 transition"
+                    >
+                      <span>Probar enlace de WhatsApp</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* 2. INSTAGRAM */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-pink-50 border border-pink-200 flex items-center justify-center text-pink-600">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                          <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-base font-bold text-slate-900">Instagram Oficial</h3>
+                        <p className="text-slate-500 text-xs">Perfil público de expediciones y navegación</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono bg-pink-100 text-pink-800 font-bold px-2 py-0.5 rounded-full">
+                      Botón 2
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 block">
+                      URL del Perfil o Usuario de Instagram
+                    </label>
+                    <input
+                      type="text"
+                      value={getFooterField('instagram')}
+                      onChange={(e) => setFooterField('instagram', e.target.value)}
+                      placeholder="https://www.instagram.com/vegvisir_sailing"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none transition shadow-2xs"
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      Ej: <span className="font-mono text-slate-600">https://www.instagram.com/vegvisir_sailing</span> o <span className="font-mono text-slate-600">@vegvisir_sailing</span>
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <a
+                      href={getFooterField('instagram').startsWith('http') ? getFooterField('instagram') : `https://www.instagram.com/${getFooterField('instagram').replace('@', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-pink-700 hover:text-pink-800 font-bold flex items-center gap-1 transition"
+                    >
+                      <span>Visitar perfil de Instagram</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* 3. CORREO ELECTRÓNICO */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                        <Mail className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-base font-bold text-slate-900">Correo Electrónico (Mail Concierge)</h3>
+                        <p className="text-slate-500 text-xs">Atención a clientes y cotizaciones privadas</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                      Botón 3
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 block">
+                      Dirección de Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      value={getFooterField('email')}
+                      onChange={(e) => setFooterField('email', e.target.value)}
+                      placeholder="concierge@yateschile.com"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none transition shadow-2xs"
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      Ej: <span className="font-mono text-slate-600">concierge@yateschile.com</span> o <span className="font-mono text-slate-600">pagos@yateschile.cl</span>
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <a
+                      href={`mailto:${getFooterField('email')}`}
+                      className="text-xs text-blue-700 hover:text-blue-800 font-bold flex items-center gap-1 transition"
+                    >
+                      <span>Probar redacción de correo</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {/* 4. DIRECCIÓN BASE OPERACIONAL */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-serif text-base font-bold text-slate-900">Ubicación (Base Operacional)</h3>
+                        <p className="text-slate-500 text-xs">Texto que aparece en el tooltip del botón de ubicación</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full">
+                      Botón 4
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 block">
+                      Dirección o Descripción de la Base
+                    </label>
+                    <input
+                      type="text"
+                      value={getFooterField('address')}
+                      onChange={(e) => setFooterField('address', e.target.value)}
+                      placeholder="Uberlindo Andaur 222, Isla Robinson Crusoe"
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-medium focus:outline-none transition shadow-2xs"
+                    />
+                    <p className="text-[11px] text-slate-400">
+                      Ej: <span className="font-sans text-slate-600">Uberlindo Andaur 222, Isla Robinson Crusoe</span>
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center">
+                    <span className="text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/80 inline-flex items-center gap-1.5">
+                      <span className="text-rose-600 font-bold">📍 Tooltip:</span>
+                      <span className="italic truncate max-w-xs">{getFooterField('address') || 'Sin dirección asignada'}</span>
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* LIVE REPLICA PREVIEW CARD */}
+              <div className="bg-slate-900 rounded-3xl p-6 sm:p-8 space-y-4 border border-slate-800 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-xs uppercase font-mono font-bold tracking-wider text-slate-300">
+                      Previsualización Interactiva en Vivo del Pie de Página
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                    Pasa el cursor sobre los botones para ver sus efectos
+                  </span>
+                </div>
+
+                <div className="bg-[#0B1528] rounded-2xl p-6 border border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+                  
+                  {/* Left: Brand */}
+                  <div className="flex items-center gap-3">
+                    <img
+                      src="/vegvisir-emblem-white.png"
+                      alt="Logo Vegvisir"
+                      className="w-9 h-9 object-contain drop-shadow-[0_0_6px_rgba(255,255,255,0.25)]"
+                    />
+                    <div className="flex flex-col text-left">
+                      <span className="font-serif text-base font-bold tracking-wider text-white">
+                        YATES CHILE
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-mono tracking-widest uppercase">
+                        Sailing & Lodge
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Center: Simulated links */}
+                  <div className="hidden lg:flex items-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <span>Inicio</span>
+                    <span>La Flota</span>
+                    <span>El Lodge</span>
+                    <span>Expediciones</span>
+                  </div>
+
+                  {/* Right: The 4 buttons with live values */}
+                  <div className="flex items-center gap-3">
+                    {/* SERNATUR Seal */}
+                    <div className="shrink-0 flex items-center justify-center p-1 rounded-xl bg-[#0B1528]">
+                      <img
+                        src="/sernatur-logo.png"
+                        alt="SERNATUR"
+                        className="h-10 w-auto object-contain mix-blend-screen drop-shadow-md"
+                      />
+                    </div>
+
+                    {/* WhatsApp */}
+                    <a
+                      href={`https://wa.me/${getFooterField('whatsapp').replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#25D366] border border-white/10 hover:border-[#25D366]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-110 cursor-pointer shadow-md"
+                      title="WhatsApp Concierge"
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4.5 h-4.5">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.005 5.278 5.286.002 11.793.002c3.148 0 6.112 1.229 8.342 3.46 2.23 2.23 3.456 5.196 3.456 8.349 0 6.518-5.28 11.794-11.785 11.794-1.996 0-3.957-.506-5.702-1.472L0 24zm6.49-4.22c1.688.995 3.328 1.547 5.244 1.547 5.28 0 9.584-4.298 9.584-9.584C21.32 6.46 17.02 2.16 11.74 2.16c-5.28 0-9.58 4.298-9.58 9.58 0 2.052.57 4.02 1.64 5.76l-.99 3.6 3.73-.972zm12.355-6.52c-.27-.135-1.602-.79-1.85-.88-.248-.09-.43-.135-.61.135-.18.27-.7.88-.857 1.06-.158.18-.315.2-.585.065-.27-.135-1.143-.42-2.176-1.34-.805-.718-1.348-1.608-1.507-1.878-.158-.27-.017-.417.118-.552.12-.12.27-.315.405-.47.135-.158.18-.27.27-.45.09-.18.045-.337-.02-.47-.068-.135-.61-1.47-.837-2.013-.22-.53-.442-.46-.61-.468-.16-.008-.344-.01-.527-.01-.18 0-.475.067-.723.337-.248.27-.948.924-.948 2.254 0 1.33.97 2.614 1.103 2.794.135.18 1.9 2.9 4.606 4.066.645.277 1.148.443 1.54.568.647.206 1.238.177 1.705.107.52-.078 1.602-.656 1.83-1.26.226-.605.226-1.125.158-1.235-.068-.11-.248-.18-.518-.315z" />
+                      </svg>
+                    </a>
+
+                    {/* Instagram */}
+                    <a
+                      href={getFooterField('instagram').startsWith('http') ? getFooterField('instagram') : `https://www.instagram.com/${getFooterField('instagram').replace('@', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#E1306C] border border-white/10 hover:border-[#E1306C]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-110 cursor-pointer shadow-md"
+                      title="Instagram"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4.5 h-4.5">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                      </svg>
+                    </a>
+
+                    {/* Email */}
+                    <a
+                      href={`mailto:${getFooterField('email')}`}
+                      className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#1a73e8] border border-white/10 hover:border-[#1a73e8]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-110 cursor-pointer shadow-md"
+                      title="Mail Concierge"
+                    >
+                      <Mail className="w-4.5 h-4.5" />
+                    </a>
+
+                    {/* Location */}
+                    <span
+                      className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#EA4335] border border-white/10 hover:border-[#EA4335]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-110 cursor-help shadow-md relative group/preview-tooltip"
+                      title={getFooterField('address')}
+                    >
+                      <MapPin className="w-4.5 h-4.5" />
+                      <span className="absolute bottom-12 bg-slate-900 border border-white/10 px-3 py-1.5 rounded-md text-[10px] text-slate-300 tracking-wide whitespace-nowrap opacity-0 group-hover/preview-tooltip:opacity-100 transition-opacity duration-300 select-none pointer-events-none shadow-xl z-30">
+                        {getFooterField('address')}
+                      </span>
+                    </span>
+                  </div>
+
+                </div>
               </div>
 
             </div>

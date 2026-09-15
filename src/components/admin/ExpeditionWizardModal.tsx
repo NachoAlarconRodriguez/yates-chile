@@ -32,6 +32,7 @@ import { expeditionService, type DepartureRow } from '../../services/expeditionS
 import { lodgeService, type LodgeRoom, type LodgeBooking } from '../../services/lodgeService';
 import { useCatalogServices } from '../../hooks/useCatalogServices';
 import { useFleet } from '../../hooks/useFleet';
+import { normalizeExternalMediaUrl } from '../../services/cmsService';
 import confetti from 'canvas-confetti';
 
 export interface ExpeditionWizardData {
@@ -1681,7 +1682,14 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                             {/* Service Image */}
                             {svc.image_url ? (
                               <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
-                                <img src={svc.image_url} alt={svc.name} className="w-full h-full object-cover" />
+                                <img
+                                  src={normalizeExternalMediaUrl(svc.image_url)}
+                                  alt={svc.name}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/rincon-de-navegantes.jpg';
+                                  }}
+                                  className="w-full h-full object-cover"
+                                />
                               </div>
                             ) : (
                               <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-400">
@@ -1821,7 +1829,14 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       {selectedServicesList.map((svc) => (
                         <div key={svc.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-150">
                           {svc.image_url ? (
-                            <img src={svc.image_url} alt={svc.name} className="w-9 h-9 rounded-lg object-cover shrink-0 border border-slate-200" />
+                            <img
+                              src={normalizeExternalMediaUrl(svc.image_url)}
+                              alt={svc.name}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/rincon-de-navegantes.jpg';
+                              }}
+                              className="w-9 h-9 rounded-lg object-cover shrink-0 border border-slate-200"
+                            />
                           ) : (
                             <div className="w-9 h-9 rounded-lg bg-[#0b192c] text-white flex items-center justify-center shrink-0">
                               <Sparkles className="w-4 h-4 text-sky-300" />
@@ -2244,7 +2259,14 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                         <div key={svc.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2">
                           <div className="flex items-center gap-2.5">
                             {svc.image_url ? (
-                              <img src={svc.image_url} alt={svc.name} className="w-8 h-8 rounded-xl object-cover shrink-0 border border-slate-200" />
+                              <img
+                                src={normalizeExternalMediaUrl(svc.image_url)}
+                                alt={svc.name}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/rincon-de-navegantes.jpg';
+                                }}
+                                className="w-8 h-8 rounded-xl object-cover shrink-0 border border-slate-200"
+                              />
                             ) : (
                               <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-blue-900 shadow-2xs">
                                 <Sparkles className="w-4 h-4" />

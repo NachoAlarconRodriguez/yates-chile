@@ -326,6 +326,21 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
       },
     },
   },
+
+  // 7. FOOTER & CANALES DE CONTACTO
+  footer_contact: {
+    section_key: 'footer_contact',
+    title: 'Canales de Contacto & Redes',
+    subtitle: 'Pie de Página Oficial',
+    body_text: '',
+    media_url: '',
+    metadata: {
+      whatsapp: '56981312920',
+      instagram: 'https://www.instagram.com/vegvisir_sailing',
+      email: 'concierge@yateschile.com',
+      address: 'Uberlindo Andaur 222, Isla Robinson Crusoe',
+    },
+  },
 };
 
 const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v14';

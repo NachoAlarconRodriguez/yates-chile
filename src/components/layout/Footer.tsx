@@ -2,12 +2,32 @@ import React from 'react';
 import { Mail, MapPin } from 'lucide-react';
 import { PatagoniaLiveCanvas } from '../modules/PatagoniaLiveCanvas';
 import { NewsletterSection } from '../modules/NewsletterSection';
+import { useSiteContent } from '../../hooks/useSiteContent';
+import { DEFAULT_CMS_CONTENT } from '../../services/cmsService';
 
 interface FooterProps {
   onNavigate?: (path: string) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+  const { content } = useSiteContent();
+  const footerSection = content?.footer_contact || DEFAULT_CMS_CONTENT.footer_contact;
+  const footerMeta = (footerSection?.metadata || {}) as {
+    whatsapp?: string;
+    instagram?: string;
+    email?: string;
+    address?: string;
+  };
+
+  const rawWhatsapp = footerMeta.whatsapp || '56981312920';
+  const cleanWhatsapp = rawWhatsapp.replace(/[^0-9]/g, '');
+  const rawInstagram = footerMeta.instagram || 'https://www.instagram.com/vegvisir_sailing';
+  const instagramUrl = rawInstagram.startsWith('http')
+    ? rawInstagram
+    : `https://www.instagram.com/${rawInstagram.replace('@', '')}`;
+  const emailAddress = footerMeta.email || 'concierge@yateschile.com';
+  const addressText = footerMeta.address || 'Uberlindo Andaur 222, Isla Robinson Crusoe';
+
   const handleNavClick = (path: string) => {
     if (onNavigate) {
       onNavigate(path);
@@ -82,7 +102,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
             {/* WhatsApp */}
             <a
-              href="https://wa.me/56981312920"
+              href={`https://wa.me/${cleanWhatsapp}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#25D366] border border-white/10 hover:border-[#25D366]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 cursor-pointer shadow-md"
@@ -95,7 +115,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
             {/* Instagram */}
             <a
-              href="https://www.instagram.com/vegvisir_sailing"
+              href={instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#E1306C] border border-white/10 hover:border-[#E1306C]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 cursor-pointer shadow-md"
@@ -110,22 +130,22 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
             {/* Email */}
             <a
-              href="mailto:concierge@yateschile.com"
+              href={`mailto:${emailAddress}`}
               className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#1a73e8] border border-white/10 hover:border-[#1a73e8]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 cursor-pointer shadow-md"
               title="Mail Concierge"
             >
               <Mail className="w-4.5 h-4.5" />
             </a>
 
-            {/* Location (Uberlindo Andaur 222) */}
+            {/* Location (Dirección Base Operacional) */}
             <span
               className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#EA4335] border border-white/10 hover:border-[#EA4335]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 cursor-help shadow-md relative group/tooltip"
-              title="Uberlindo Andaur 222, Isla Robinson Crusoe"
+              title={addressText}
             >
               <MapPin className="w-4.5 h-4.5" />
               {/* Tooltip */}
               <span className="absolute bottom-12 bg-slate-900 border border-white/10 px-3 py-1.5 rounded-md text-[10px] text-slate-300 tracking-wide whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-300 select-none pointer-events-none shadow-xl z-30">
-                Uberlindo Andaur 222, Isla Robinson Crusoe
+                {addressText}
               </span>
             </span>
 

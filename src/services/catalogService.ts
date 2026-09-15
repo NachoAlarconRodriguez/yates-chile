@@ -1,7 +1,13 @@
 import { supabase } from '../lib/supabase';
 import type { Database } from '../types/database.types';
+import { normalizeExternalMediaUrl } from './cmsService';
 
 export type CatalogService = Database['public']['Tables']['catalog_services']['Row'];
+
+export const normalizeCatalogService = (item: CatalogService): CatalogService => ({
+  ...item,
+  image_url: item.image_url ? normalizeExternalMediaUrl(item.image_url) : item.image_url,
+});
 
 /**
  * UUIDs oficiales sincronizados con la base de datos Supabase en backend
@@ -87,7 +93,8 @@ const getCachedServices = (): CatalogService[] => {
       const map = new Map<string, CatalogService>();
       parsed.forEach((item: CatalogService) => {
         const realId = LEGACY_ID_MAP[item.id] || item.id;
-        map.set(realId, { ...item, id: realId });
+        const normalized = normalizeCatalogService({ ...item, id: realId });
+        map.set(realId, normalized);
       });
       return Array.from(map.values());
     }
@@ -102,7 +109,8 @@ const saveCachedServices = (list: CatalogService[]) => {
     const map = new Map<string, CatalogService>();
     list.forEach((item) => {
       const realId = LEGACY_ID_MAP[item.id] || item.id;
-      map.set(realId, { ...item, id: realId });
+      const normalized = normalizeCatalogService({ ...item, id: realId });
+      map.set(realId, normalized);
     });
     const cleanList = Array.from(map.values());
     localStorage.setItem(LOCAL_STORAGE_SERVICES_KEY, JSON.stringify(cleanList));
@@ -125,8 +133,9 @@ export const catalogService = {
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        saveCachedServices(data);
-        return data;
+        const normalized = data.map(normalizeCatalogService);
+        saveCachedServices(normalized);
+        return normalized;
       }
     } catch (err) {
       console.warn('Fallo consulta Supabase getServices, usando caché local:', err);
@@ -146,8 +155,9 @@ export const catalogService = {
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        saveCachedServices(data);
-        return data;
+        const normalized = data.map(normalizeCatalogService);
+        saveCachedServices(normalized);
+        return normalized;
       }
     } catch (err) {
       console.warn('Fallo consulta Supabase getAllServicesAdmin, usando caché local:', err);
@@ -168,6 +178,7 @@ export const catalogService = {
     image_url?: string;
   }): Promise<{ success: boolean; data?: CatalogService; error?: string }> {
     try {
+      const finalImageUrl = params.image_url ? normalizeExternalMediaUrl(params.image_url) : null;
       const { data, error } = await supabase
         .from('catalog_services')
         .insert({
@@ -177,7 +188,7 @@ export const catalogService = {
           duration_label: params.duration_label,
           price_clp: params.price_clp,
           max_pax: params.max_pax,
-          image_url: params.image_url || null,
+          image_url: finalImageUrl,
           is_active: true,
         })
         .select()
@@ -265,7 +276,9 @@ export const catalogService = {
     if (params.duration_label !== undefined) updatePayload.duration_label = params.duration_label;
     if (params.price_clp !== undefined) updatePayload.price_clp = params.price_clp;
     if (params.max_pax !== undefined) updatePayload.max_pax = params.max_pax;
-    if (params.image_url !== undefined) updatePayload.image_url = params.image_url;
+    if (params.image_url !== undefined) {
+      updatePayload.image_url = params.image_url ? normalizeExternalMediaUrl(params.image_url) : null;
+    }
     if (params.is_active !== undefined) updatePayload.is_active = params.is_active;
 
     try {

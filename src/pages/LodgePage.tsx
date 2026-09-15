@@ -1534,8 +1534,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                             <div className="flex items-start gap-3">
                               {service.image_url && (
                                 <img
-                                  src={service.image_url}
+                                  src={normalizeExternalMediaUrl(service.image_url)}
                                   alt={service.name}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/rincon-de-navegantes.jpg';
+                                  }}
                                   className="w-12 h-12 rounded-lg object-cover shrink-0 border border-slate-200"
                                 />
                               )}

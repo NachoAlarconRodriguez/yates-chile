@@ -11731,8 +11731,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       <div className="h-44 w-full relative bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden flex items-center justify-center">
                         {svc.image_url ? (
                           <img
-                            src={svc.image_url}
+                            src={normalizeExternalMediaUrl(svc.image_url)}
                             alt={svc.name}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/rincon-de-navegantes.jpg';
+                            }}
                             className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
                               !svc.is_active ? 'grayscale-[30%] opacity-90' : ''
                             }`}
@@ -13065,8 +13068,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             <div className="bg-slate-50/90 border border-slate-200/90 rounded-2xl p-3.5 flex items-center gap-3.5 shadow-2xs">
               {serviceToPause.image_url ? (
                 <img
-                  src={serviceToPause.image_url}
+                  src={normalizeExternalMediaUrl(serviceToPause.image_url)}
                   alt={serviceToPause.name}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/rincon-de-navegantes.jpg';
+                  }}
                   className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200"
                 />
               ) : (
@@ -13184,7 +13190,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               <div className="w-full h-40 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 relative flex items-center justify-center shadow-inner">
                 {editServiceForm.image_url.trim() ? (
                   <img
-                    src={editServiceForm.image_url.trim()}
+                    src={normalizeExternalMediaUrl(editServiceForm.image_url.trim())}
                     alt="Previsualización"
                     className="w-full h-full object-cover"
                     onError={(e) => {
