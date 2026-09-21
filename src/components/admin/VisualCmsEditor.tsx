@@ -35,6 +35,11 @@ import {
   Maximize2,
   Minimize2,
   Zap,
+  FileText,
+  Plus,
+  Edit2,
+  Trash2,
+  Check,
 } from 'lucide-react';
 import {
   DEFAULT_CMS_CONTENT,
@@ -43,17 +48,22 @@ import {
   diagnoseMediaUrl,
   getMediaFallbackUrl,
   cmsService,
+  isValidDriveOrDropboxUrl,
   type SiteContent,
+  type HeroBannerConfig,
+  type ExpeditionCategory,
+  DEFAULT_EXPEDITION_CATEGORIES,
 } from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
 import { ExpeditionCalendar } from '../modules/ExpeditionCalendar';
 import { EXPEDITIONS } from '../modules/ExpeditionCalendar';
+import { LuxurySelect, type LuxurySelectOption } from './LuxurySelect';
 
 interface VisualCmsEditorProps {
   content: Record<string, Partial<SiteContent>>;
   onSaveAllSections: (drafts: Record<string, Partial<SiteContent>>) => Promise<{ success: boolean; error?: string }>;
-  onUploadMedia: (file: File) => Promise<{ success: boolean; url?: string; error?: string }>;
-  refreshContent: () => void;
+  onUploadMedia: (file: File) => Promise<{ success?: boolean; url?: string; error?: string }>;
+  refreshContent: () => Promise<void> | void;
   onNavigate?: (path: string) => void;
 }
 
@@ -174,7 +184,8 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   onNavigate,
 }) => {
   // Navigation State
-  const [activePage, setActivePage] = useState<'home' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'logbook' | 'footer'>('home');
+  const [activePage, setActivePage] = useState<'home' | 'hero_carousel' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'logbook' | 'footer'>('home');
+  const [activeHeroBannerIndex, setActiveHeroBannerIndex] = useState<number>(0);
   const [activeLogbookVessel, setActiveLogbookVessel] = useState<'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook'>('vegvisir_logbook');
   const [activeLogbookEntry, setActiveLogbookEntry] = useState<string>('climatizacion');
 
@@ -208,11 +219,27 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
   const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
 
+  // Category management modals
+  const [isCreateCategoryModalOpen, setIsCreateCategoryModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatTag, setNewCatTag] = useState('');
+  const [newCatSubtitle, setNewCatSubtitle] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState<'Compass' | 'Anchor' | 'MapPin' | 'Sailboat' | 'Ship'>('Compass');
+  const [createCatError, setCreateCatError] = useState<string | null>(null);
+
+  const [isManageCategoriesModalOpen, setIsManageCategoriesModalOpen] = useState(false);
+  const [editingCategoryList, setEditingCategoryList] = useState<ExpeditionCategory[]>([]);
+  const [manageSaveSuccess, setManageSaveSuccess] = useState(false);
+
   // ESC key listener to exit Fullscreen or close active modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (mediaModal && !uploadingMedia) {
+        if (isCreateCategoryModalOpen) {
+          setIsCreateCategoryModalOpen(false);
+        } else if (isManageCategoriesModalOpen) {
+          setIsManageCategoriesModalOpen(false);
+        } else if (mediaModal && !uploadingMedia) {
           setMediaModal(null);
         } else if (showApiKeyModal) {
           setShowApiKeyModal(false);
@@ -223,7 +250,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mediaModal, uploadingMedia, showApiKeyModal, isFullscreen]);
+  }, [isCreateCategoryModalOpen, isManageCategoriesModalOpen, mediaModal, uploadingMedia, showApiKeyModal, isFullscreen]);
 
   // Logbook Dynamic Data Helpers
   const getLogbookEntry = (vesselKey: 'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook', entryId: string) => {
@@ -317,6 +344,203 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
         },
       },
     }));
+  };
+
+  // Hero Carousel Banners (3 Max) Helper
+  const getHeroBanners = (): HeroBannerConfig[] => {
+    const draftMeta = drafts['home_hero_banners']?.metadata as any;
+    const contentMeta = content['home_hero_banners']?.metadata as any;
+    const defMeta = DEFAULT_CMS_CONTENT['home_hero_banners']?.metadata as any;
+
+    const list = draftMeta?.banners || contentMeta?.banners || defMeta?.banners;
+    if (Array.isArray(list) && list.length > 0) {
+      return list;
+    }
+    return (DEFAULT_CMS_CONTENT['home_hero_banners']?.metadata as any)?.banners || [];
+  };
+
+  const setHeroBannerField = (bannerIndex: number, field: keyof HeroBannerConfig, value: string) => {
+    const currentBanners = [...getHeroBanners()];
+    if (!currentBanners[bannerIndex]) {
+      currentBanners[bannerIndex] = {
+        id: `banner-${bannerIndex + 1}`,
+        title: '',
+        subtitle: '',
+        description: '',
+        media_url: '',
+        brochure_url: '',
+        expedition_type: 'ruta-juan-fernandez',
+      };
+    }
+    currentBanners[bannerIndex] = {
+      ...currentBanners[bannerIndex],
+      [field]: value,
+    };
+
+    const existingMeta =
+      (drafts['home_hero_banners']?.metadata as any) ||
+      (content['home_hero_banners']?.metadata as any) ||
+      (DEFAULT_CMS_CONTENT['home_hero_banners']?.metadata as any) ||
+      {};
+
+    setDrafts((prev) => ({
+      ...prev,
+      home_hero_banners: {
+        section_key: 'home_hero_banners',
+        title: 'Banners del Carrusel Principal',
+        subtitle: 'VITRINA DE EXPEDICIONES',
+        body_text: 'Configuración de los 3 banners del carrusel.',
+        media_url: '',
+        ...(content['home_hero_banners'] || DEFAULT_CMS_CONTENT['home_hero_banners'] || {}),
+        ...prev.home_hero_banners,
+        metadata: {
+          ...existingMeta,
+          ...((prev.home_hero_banners?.metadata as any) || {}),
+          banners: currentBanners,
+        },
+      },
+    }));
+  };
+
+  // Expedition Categories Helper (with drafts / content fallback)
+  const getExpeditionCategories = (): ExpeditionCategory[] => {
+    const draftMeta = drafts['home_hero_banners']?.metadata as any;
+    const contentMeta = content['home_hero_banners']?.metadata as any;
+    const defMeta = DEFAULT_CMS_CONTENT['home_hero_banners']?.metadata as any;
+
+    const list = draftMeta?.categories || contentMeta?.categories || defMeta?.categories;
+    if (Array.isArray(list) && list.length > 0) {
+      return list;
+    }
+    return DEFAULT_EXPEDITION_CATEGORIES;
+  };
+
+  const saveExpeditionCategories = async (newCategories: ExpeditionCategory[]) => {
+    const existingMeta =
+      (drafts['home_hero_banners']?.metadata as any) ||
+      (content['home_hero_banners']?.metadata as any) ||
+      (DEFAULT_CMS_CONTENT['home_hero_banners']?.metadata as any) ||
+      {};
+
+    const updatedMetadata = {
+      ...existingMeta,
+      ...((drafts['home_hero_banners']?.metadata as any) || {}),
+      categories: newCategories,
+    };
+
+    setDrafts((prev) => ({
+      ...prev,
+      home_hero_banners: {
+        section_key: 'home_hero_banners',
+        title: 'Banners del Carrusel Principal',
+        subtitle: 'VITRINA DE EXPEDICIONES',
+        body_text: 'Configuración de los 3 banners del carrusel.',
+        media_url: '',
+        ...(content['home_hero_banners'] || DEFAULT_CMS_CONTENT['home_hero_banners'] || {}),
+        ...prev.home_hero_banners,
+        metadata: updatedMetadata,
+      },
+    }));
+
+    await cmsService.saveExpeditionCategories(newCategories);
+  };
+
+  const getCategoryIconComponent = (iconName?: string) => {
+    switch (iconName) {
+      case 'Anchor':
+        return Anchor;
+      case 'MapPin':
+        return MapPin;
+      case 'Sailboat':
+        return Sailboat;
+      case 'Ship':
+        return Ship;
+      case 'Compass':
+      default:
+        return Compass;
+    }
+  };
+
+  const handleOpenCreateCategoryModal = () => {
+    setNewCatName('');
+    setNewCatTag('');
+    setNewCatSubtitle('');
+    setNewCatIcon('Compass');
+    setCreateCatError(null);
+    setIsCreateCategoryModalOpen(true);
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) {
+      setCreateCatError('El nombre de la categoría es obligatorio.');
+      return;
+    }
+
+    const currentCats = getExpeditionCategories();
+    const cleanSlug = 'ruta-' + newCatName
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || `ruta-${Date.now()}`;
+
+    let finalId = cleanSlug;
+    let counter = 1;
+    while (currentCats.some((c) => c.id === finalId)) {
+      finalId = `${cleanSlug}-${counter}`;
+      counter++;
+    }
+
+    const newCategory: ExpeditionCategory = {
+      id: finalId,
+      name: newCatName.trim(),
+      tag: newCatTag.trim() || undefined,
+      subtitle: newCatSubtitle.trim() || undefined,
+      icon: newCatIcon,
+    };
+
+    const updated = [...currentCats, newCategory];
+    await saveExpeditionCategories(updated);
+
+    // Auto-select for active hero banner
+    setHeroBannerField(activeHeroBannerIndex, 'expedition_type', finalId);
+
+    setIsCreateCategoryModalOpen(false);
+    setSaveSuccessMsg(`¡Categoría "${newCategory.name}" creada y vinculada al banner!`);
+    setTimeout(() => setSaveSuccessMsg(null), 4000);
+  };
+
+  const handleOpenManageCategoriesModal = () => {
+    setEditingCategoryList(JSON.parse(JSON.stringify(getExpeditionCategories())));
+    setManageSaveSuccess(false);
+    setIsManageCategoriesModalOpen(true);
+  };
+
+  const handleSaveEditedCategories = async () => {
+    const hasEmpty = editingCategoryList.some((c) => !c.name.trim());
+    if (hasEmpty) {
+      alert('Todas las categorías deben tener un nombre válido.');
+      return;
+    }
+
+    await saveExpeditionCategories(editingCategoryList);
+    setManageSaveSuccess(true);
+    setTimeout(() => {
+      setManageSaveSuccess(false);
+      setIsManageCategoriesModalOpen(false);
+    }, 1200);
+  };
+
+  const handleDeleteCategory = (catId: string) => {
+    if (editingCategoryList.length <= 1) {
+      alert('Debe existir al menos una categoría de expedición.');
+      return;
+    }
+    if (confirm('¿Estás seguro de eliminar esta categoría de expedición?')) {
+      const filtered = editingCategoryList.filter((c) => c.id !== catId);
+      setEditingCategoryList(filtered);
+    }
   };
 
   // Get field with draft priority and proper fallback respecting active editorLanguage
@@ -430,7 +654,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
           {};
 
-        if (sectionKey === 'vegvisir_logbook' || sectionKey === 'terranova_logbook' || sectionKey === 'lodge_logbook' || sectionKey === 'footer_contact') {
+        if (sectionKey === 'vegvisir_logbook' || sectionKey === 'terranova_logbook' || sectionKey === 'lodge_logbook' || sectionKey === 'footer_contact' || sectionKey === 'home_hero_banners') {
           finalDrafts[sectionKey] = {
             ...d,
             metadata: existingMeta,
@@ -698,6 +922,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             <div className="p-1 bg-slate-100/90 border border-slate-200/80 rounded-full inline-flex items-center gap-1 shadow-inner min-w-max">
               {[
                 { id: 'home', label: 'Inicio (Home)', icon: Home },
+                { id: 'hero_carousel', label: 'Carrusel Hero (3 Banners)', icon: Sparkles },
                 { id: 'vegvisir', label: 'Velero Vegvisir', icon: Sailboat },
                 { id: 'terranova', label: 'Yate Terranova', icon: Ship },
                 { id: 'lodge', label: 'Lodge Rincón', icon: BedDouble },
@@ -830,6 +1055,9 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-700">
               <span className={`cursor-pointer pb-1 ${activePage === 'home' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('home')}>
                 Inicio
+              </span>
+              <span className={`cursor-pointer pb-1 ${activePage === 'hero_carousel' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('hero_carousel')}>
+                Carrusel Hero
               </span>
               <span className={`cursor-pointer pb-1 ${activePage === 'vegvisir' || activePage === 'terranova' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('vegvisir')}>
                 La Flota ▾
@@ -1168,6 +1396,423 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <ExpeditionCalendar />
             </div>
           )}
+
+          {/* ======================================================================= */}
+          {/* NUEVO: CONFIGURACIÓN CARRUSEL HERO (3 BANNERS VITRINA) */}
+          {/* ======================================================================= */}
+          {activePage === 'hero_carousel' && (() => {
+            const banners = getHeroBanners();
+            const currentBanner: HeroBannerConfig = banners[activeHeroBannerIndex] || {
+              id: `banner-${activeHeroBannerIndex + 1}`,
+              title: '',
+              subtitle: '',
+              description: '',
+              media_url: '',
+              brochure_url: '',
+              expedition_type: 'ruta-juan-fernandez',
+            };
+
+            const isCurrentMediaValid = isValidDriveOrDropboxUrl(currentBanner.media_url);
+            const normalizedMedia = normalizeExternalMediaUrl(currentBanner.media_url);
+            const isVideo = isMediaVideo(currentBanner.media_url);
+
+            const currentCategories = getExpeditionCategories();
+            const expeditionTypeOptions: LuxurySelectOption[] = currentCategories.map((cat, idx) => {
+              const IconComp = getCategoryIconComponent(cat.icon);
+              const badgeColors = [
+                'bg-sky-50 text-sky-800 border-sky-200',
+                'bg-indigo-50 text-indigo-800 border-indigo-200',
+                'bg-emerald-50 text-emerald-800 border-emerald-200',
+                'bg-amber-50 text-amber-800 border-amber-200',
+                'bg-purple-50 text-purple-800 border-purple-200',
+                'bg-teal-50 text-teal-800 border-teal-200',
+              ];
+              const colorClass = badgeColors[idx % badgeColors.length];
+
+              return {
+                value: cat.id,
+                label: cat.name,
+                subtitle: cat.subtitle,
+                icon: IconComp,
+                badge: cat.tag ? { text: cat.tag, className: colorClass } : undefined,
+              };
+            });
+
+            return (
+              <div className="bg-slate-50 min-h-screen py-8 px-4 sm:px-8 space-y-8 max-w-6xl mx-auto">
+                {/* Header informativo */}
+                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200 text-[11px] font-bold tracking-wider uppercase">
+                      <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Vitrina de Marketing • Máximo 3 Banners</span>
+                    </div>
+                    <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#0b192c]">
+                      Configuración del Carrusel Hero
+                    </h2>
+                    <p className="text-slate-500 text-xs sm:text-sm max-w-2xl leading-relaxed">
+                      Personaliza cada uno de los 3 banners que se muestran en el inicio del sitio web. Cada banner incluye imagen o video de fondo (compatible con enlaces compartidos de Google Drive o Dropbox), textos editoriales, su propio brochure descargable y el tipo de expedición asociado para filtrar fechas.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sub-Tabs: Selector de los 3 Banners */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[0, 1, 2].map((idx) => {
+                    const b = banners[idx];
+                    const isActive = activeHeroBannerIndex === idx;
+                    const typeLabel =
+                      b?.expedition_type === 'ruta-cabo-hornos'
+                        ? 'Cabo de Hornos'
+                        : b?.expedition_type === 'ruta-fiordos-glaciares'
+                        ? 'Fiordos'
+                        : 'Juan Fernández';
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveHeroBannerIndex(idx)}
+                        className={`p-4 sm:p-5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between gap-3 ${
+                          isActive
+                            ? 'bg-[#0b192c] text-white border-[#0b192c] shadow-lg scale-[1.01]'
+                            : 'bg-white text-slate-700 border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/50 shadow-2xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-mono font-bold ${
+                            isActive ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            0{idx + 1}
+                          </span>
+                          <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${
+                            isActive ? 'bg-white/10 text-sky-200' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {typeLabel}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="text-xs font-mono uppercase tracking-wider opacity-70 mb-0.5">
+                            Banner 0{idx + 1}
+                          </div>
+                          <div className={`font-bold text-sm truncate ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                            {b?.title || `Banner ${idx + 1}`}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Formulario del Banner Activo */}
+                <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-8 space-y-8">
+                  
+                  {/* 1. Imagen o Video de Fondo */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono uppercase tracking-wider text-slate-700 font-bold flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-sky-600" />
+                        <span>1. Imagen o Video de Fondo (Solo Google Drive / Dropbox)</span>
+                      </label>
+                      {currentBanner.media_url && (
+                        isCurrentMediaValid ? (
+                          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            ✓ Enlace compatible
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            ⚠️ Se recomienda usar enlace de Drive o Dropbox
+                          </span>
+                        )
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={currentBanner.media_url || ''}
+                        onChange={(e) => setHeroBannerField(activeHeroBannerIndex, 'media_url', e.target.value)}
+                        placeholder="https://drive.google.com/file/d/... o https://www.dropbox.com/..."
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                      />
+                    </div>
+
+                    {/* Previsualización en miniatura */}
+                    {currentBanner.media_url && (
+                      <div className="relative h-48 sm:h-56 rounded-2xl overflow-hidden bg-slate-950 border border-slate-200">
+                        {isVideo ? (
+                          <video
+                            src={normalizedMedia}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={normalizedMedia}
+                            alt="Previsualización Banner"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/travesia-robinson.jpg';
+                            }}
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4">
+                          <span className="text-white text-xs font-mono bg-black/50 px-2.5 py-1 rounded-lg backdrop-blur-sm">
+                            Vista previa del fondo: {isVideo ? 'Video' : 'Imagen'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="border-slate-100" />
+
+                  {/* 2. Textos del Banner */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono uppercase tracking-wider text-slate-700 font-bold flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-sky-600" />
+                        <span>2. Textos del Banner {editorLanguage === 'EN' ? '(Versión Inglés)' : '(Versión Español)'}</span>
+                      </label>
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">
+                        Modo: {editorLanguage === 'EN' ? 'Inglés (EN)' : 'Español (ES)'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Eyebrow / Subtitle */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-600 block">
+                          Eyebrow / Etiqueta Superior
+                        </label>
+                        <input
+                          type="text"
+                          value={
+                            editorLanguage === 'EN'
+                              ? (currentBanner.subtitle_en ?? currentBanner.subtitle ?? '')
+                              : (currentBanner.subtitle ?? '')
+                          }
+                          onChange={(e) =>
+                            setHeroBannerField(
+                              activeHeroBannerIndex,
+                              editorLanguage === 'EN' ? 'subtitle_en' : 'subtitle',
+                              e.target.value
+                            )
+                          }
+                          placeholder="Ej: AVENTURA OCEÁNICA & PESCA DEPORTIVA"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+                        />
+                      </div>
+
+                      {/* Título */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-600 block">
+                          Título Principal de la Expedición
+                        </label>
+                        <input
+                          type="text"
+                          value={
+                            editorLanguage === 'EN'
+                              ? (currentBanner.title_en ?? currentBanner.title ?? '')
+                              : (currentBanner.title ?? '')
+                          }
+                          onChange={(e) =>
+                            setHeroBannerField(
+                              activeHeroBannerIndex,
+                              editorLanguage === 'EN' ? 'title_en' : 'title',
+                              e.target.value
+                            )
+                          }
+                          placeholder="Ej: Expedición Archipiélago Juan Fernández"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Descripción */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-600 block">
+                        Descripción o Resumen Editorial
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={
+                          editorLanguage === 'EN'
+                            ? (currentBanner.description_en ?? currentBanner.description ?? '')
+                            : (currentBanner.description ?? '')
+                        }
+                        onChange={(e) =>
+                          setHeroBannerField(
+                            activeHeroBannerIndex,
+                            editorLanguage === 'EN' ? 'description_en' : 'description',
+                            e.target.value
+                          )
+                        }
+                        placeholder="Descripción atractiva de la experiencia..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 leading-relaxed font-normal"
+                      />
+                    </div>
+                  </div>
+
+                  <hr className="border-slate-100" />
+
+                  {/* 3. Brochure PDF Adjunto */}
+                  <div className="space-y-3">
+                    <label className="text-xs font-mono uppercase tracking-wider text-slate-700 font-bold flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-sky-600" />
+                      <span>3. Brochure Oficial (PDF / Google Drive / Dropbox)</span>
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={currentBanner.brochure_url || ''}
+                        onChange={(e) => setHeroBannerField(activeHeroBannerIndex, 'brochure_url', e.target.value)}
+                        placeholder="https://drive.google.com/file/d/... o enlace directo al PDF"
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
+                      />
+                      {currentBanner.brochure_url && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = normalizeExternalMediaUrl(currentBanner.brochure_url);
+                            window.open(url, '_blank');
+                          }}
+                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition shrink-0"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-sky-300" />
+                          <span>Probar Brochure</span>
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Si se deja en blanco, el botón en el banner ofrecerá contactar al Concierge por WhatsApp para solicitarlo.
+                    </p>
+                  </div>
+
+                  <hr className="border-slate-100" />
+
+                  {/* 4. Tipo de Expedición Vinculado (Para el Filtro) */}
+                  <div className="space-y-3 relative z-20">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <label className="text-xs font-mono uppercase tracking-wider text-slate-700 font-bold flex items-center gap-1.5">
+                        <Compass className="w-4 h-4 text-sky-600" />
+                        <span>4. Tipo de Expedición Vinculado (Filtro al hacer clic en "Ver Fechas")</span>
+                      </label>
+
+                      {/* Botones de Gestión de Categorías (Minimalistas & Circulares) */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleOpenCreateCategoryModal}
+                          className="w-8 h-8 rounded-full bg-sky-50 hover:bg-sky-100 text-sky-700 hover:text-sky-800 border border-sky-200/90 shadow-2xs transition flex items-center justify-center cursor-pointer"
+                          title="Nueva Categoría"
+                          aria-label="Nueva Categoría"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleOpenManageCategoriesModal}
+                          className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/90 shadow-2xs transition flex items-center justify-center cursor-pointer"
+                          title="Editar Categorías"
+                          aria-label="Editar Categorías"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="w-full sm:max-w-xl">
+                      <LuxurySelect
+                        value={currentBanner.expedition_type || expeditionTypeOptions[0]?.value || 'ruta-juan-fernandez'}
+                        onChange={(val) => setHeroBannerField(activeHeroBannerIndex, 'expedition_type', val)}
+                        options={expeditionTypeOptions}
+                        placeholder="Seleccionar tipo de expedición..."
+                        onAddNew={handleOpenCreateCategoryModal}
+                        addNewLabel="Crear nueva categoría de expedición..."
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Cuando el visitante pulse <strong>"Ver Fechas & Salidas"</strong> en este banner, será redirigido a la pestaña de Expediciones con este tipo ya filtrado automáticamente.
+                    </p>
+                  </div>
+
+                  <hr className="border-slate-100" />
+
+                  {/* 5. Vista Previa en Vivo del Slide */}
+                  <div className="space-y-3">
+                    <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
+                      Vista Previa en Vivo (Render en el Carrusel)
+                    </div>
+                    
+                    <div className="relative min-h-[380px] rounded-3xl overflow-hidden bg-slate-950 text-white flex flex-col justify-end p-6 sm:p-10 border border-slate-800 shadow-xl">
+                      {/* Media de fondo */}
+                      {isVideo ? (
+                        <video
+                          src={normalizedMedia}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="absolute inset-0 w-full h-full object-cover opacity-70"
+                        />
+                      ) : (
+                        <img
+                          src={normalizedMedia || '/travesia-robinson.jpg'}
+                          alt={currentBanner.title}
+                          className="absolute inset-0 w-full h-full object-cover opacity-70"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/travesia-robinson.jpg';
+                          }}
+                        />
+                      )}
+                      
+                      {/* Gradiente */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+
+                      {/* Contenido */}
+                      <div className="relative z-10 max-w-xl space-y-3">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 border border-white/20 text-white text-[10px] font-bold uppercase tracking-widest backdrop-blur-md">
+                          <Compass className="w-3 h-3 text-sky-400" />
+                          <span>{currentBanner.subtitle || 'AVENTURA OCEÁNICA'}</span>
+                        </div>
+                        
+                        <h3 className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight">
+                          {currentBanner.title || 'Título de la Expedición'}
+                        </h3>
+                        
+                        <p className="text-slate-300 text-xs sm:text-sm line-clamp-3 leading-relaxed">
+                          {currentBanner.description || 'Descripción de la expedición...'}
+                        </p>
+
+                        <div className="pt-2 flex flex-wrap items-center gap-3">
+                          <div className="inline-flex items-center gap-2 bg-white text-slate-950 px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg">
+                            <FileText className="w-4 h-4 text-slate-900" />
+                            <span>Descargar Brochure (PDF)</span>
+                          </div>
+                          <div className="inline-flex items-center gap-2 bg-slate-900/80 text-white border border-white/20 px-4 py-2.5 rounded-xl font-bold text-xs backdrop-blur-md">
+                            <span>Ver Fechas & Salidas</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-white" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Paginador náutico de muestra */}
+                      <div className="absolute bottom-6 right-6 z-10 hidden sm:flex items-center gap-2 text-white/70 text-xs font-mono bg-slate-950/60 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-md">
+                        <span>‹ BABOR</span>
+                        <span className="text-white font-bold">0{activeHeroBannerIndex + 1} / 03</span>
+                        <span>ESTRIBOR ›</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ======================================================================= */}
           {/* 2. VELERO VEGVISIR - EXACT REPLICA */}
@@ -2672,6 +3317,316 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <span className="text-[11px] font-mono text-purple-700 font-semibold block truncate">
                 {translationProgress.label}
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Crear Nueva Categoría de Expedición */}
+      {isCreateCategoryModalOpen && (
+        <div className="fixed inset-0 z-80 bg-[#0a1e34]/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center text-sky-700 shadow-2xs">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-lg text-slate-900">
+                    Nueva Categoría de Expedición
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Define una nueva ruta o tipo de travesía para los banners y filtros del catálogo.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateCategoryModalOpen(false)}
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {createCatError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-2.5 rounded-2xl text-xs flex items-center gap-2">
+                <span>⚠️ {createCatError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Nombre de la Expedición / Categoría <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="ej. Península Antártica & Islas Shetland"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600 block">
+                    Etiqueta / Badge (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newCatTag}
+                    onChange={(e) => setNewCatTag(e.target.value)}
+                    placeholder="ej. Expedición Polar"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600 block">
+                    Ícono Náutico
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    {(['Compass', 'Anchor', 'MapPin', 'Sailboat', 'Ship'] as const).map((ic) => {
+                      const IconC = getCategoryIconComponent(ic);
+                      const isSel = newCatIcon === ic;
+                      return (
+                        <button
+                          key={ic}
+                          type="button"
+                          onClick={() => setNewCatIcon(ic)}
+                          className={`w-9 h-9 rounded-xl border flex items-center justify-center transition cursor-pointer ${
+                            isSel
+                              ? 'bg-sky-600 border-sky-600 text-white shadow-2xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                          }`}
+                          title={ic}
+                        >
+                          <IconC className="w-4 h-4" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-600 block">
+                  Subtítulo / Breve Reseña (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={newCatSubtitle}
+                  onChange={(e) => setNewCatSubtitle(e.target.value)}
+                  placeholder="ej. Navegación extrema en el sexto continente y aguas glaciares"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+
+              {/* Vista Previa */}
+              <div className="pt-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block mb-1.5">
+                  Vista Previa de la Opción
+                </span>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sky-700 shadow-3xs">
+                      {React.createElement(getCategoryIconComponent(newCatIcon), { className: 'w-4 h-4' })}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900 truncate">
+                          {newCatName || 'Nombre de la Expedición'}
+                        </span>
+                        {newCatTag && (
+                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border bg-sky-50 text-sky-800 border-sky-200">
+                            {newCatTag}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {newCatSubtitle || 'Breve descripción de la ruta o zona'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateCategoryModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-[#0b192c] hover:bg-[#142640] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Crear y Vincular al Banner</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Gestionar y Editar Categorías Existentes */}
+      {isManageCategoriesModalOpen && (
+        <div className="fixed inset-0 z-80 bg-[#0a1e34]/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl space-y-6 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 shadow-2xs">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-lg text-slate-900">
+                    Editar Categorías de Expedición
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Modifica el nombre o etiqueta de las categorías existentes. Los cambios se actualizarán en los banners y en el catálogo público.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesModalOpen(false)}
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {manageSaveSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-fadeIn shrink-0">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>¡Categorías actualizadas y guardadas con éxito!</span>
+              </div>
+            )}
+
+            <div className="overflow-y-auto space-y-4 pr-1 flex-1">
+              {editingCategoryList.map((cat, idx) => {
+                const IconComp = getCategoryIconComponent(cat.icon);
+                return (
+                  <div
+                    key={cat.id}
+                    className="border border-slate-200 rounded-2xl p-4 bg-slate-50/60 space-y-3 hover:border-slate-300 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-sky-700 shadow-3xs">
+                          <IconComp className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                          ID: {cat.id}
+                        </span>
+                      </div>
+
+                      {editingCategoryList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          title="Eliminar categoría"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        Nombre de la Expedición <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={cat.name}
+                        onChange={(e) => {
+                          const updated = [...editingCategoryList];
+                          updated[idx] = { ...updated[idx], name: e.target.value };
+                          setEditingCategoryList(updated);
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        placeholder="Nombre de la categoría"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-medium text-slate-600 block">
+                          Etiqueta / Tag (Pill)
+                        </label>
+                        <input
+                          type="text"
+                          value={cat.tag || ''}
+                          onChange={(e) => {
+                            const updated = [...editingCategoryList];
+                            updated[idx] = { ...updated[idx], tag: e.target.value };
+                            setEditingCategoryList(updated);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          placeholder="ej. Aventura Insular"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-medium text-slate-600 block">
+                          Subtítulo Descriptivo
+                        </label>
+                        <input
+                          type="text"
+                          value={cat.subtitle || ''}
+                          onChange={(e) => {
+                            const updated = [...editingCategoryList];
+                            updated[idx] = { ...updated[idx], subtitle: e.target.value };
+                            setEditingCategoryList(updated);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                          placeholder="Breve reseña"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsManageCategoriesModalOpen(false);
+                  handleOpenCreateCategoryModal();
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-sky-700 hover:bg-sky-50 transition border border-sky-200 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Crear Nueva Categoría</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsManageCategoriesModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditedCategories}
+                  className="px-5 py-2.5 rounded-xl bg-[#0b192c] hover:bg-[#142640] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Guardar Nombres y Cambios</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

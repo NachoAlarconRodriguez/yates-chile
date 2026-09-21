@@ -664,6 +664,8 @@ export const expeditionService = {
           const depId = row.section_key.replace('expedition_departure_', '');
           const meta = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
           cloudOverrides[depId] = {
+            routeId: meta.routeId || meta.route_id,
+            route_id: meta.routeId || meta.route_id,
             image: normalizeExternalMediaUrl(row.media_url || meta.image),
             name: meta.name || row.title,
             headline: meta.headline,
@@ -704,7 +706,7 @@ export const expeditionService = {
       }
       return {
         id: e.id,
-        route_id: e.routeId,
+        route_id: cloudOverrides[e.id]?.route_id || cloudOverrides[e.id]?.routeId || e.routeId,
         vessel_id: isTerranova ? 'terranova' : 'vegvisir',
         departure_date: e.departureDate,
         return_date: e.returnDate,
@@ -817,8 +819,11 @@ export const expeditionService = {
             (d as any).is_featured === true ||
             (d as any).isFeatured === true;
 
+          const effectiveRouteId = cloud?.route_id || cloud?.routeId || d.route_id || matchedLocal?.routeId || 'ruta-juan-fernandez';
           return {
             ...d,
+            route_id: effectiveRouteId,
+            routeId: effectiveRouteId,
             available_slots: availSlots,
             total_slots: cloud?.totalSlots !== undefined ? Number(cloud.totalSlots) : (d.total_slots || (isTerranova ? 8 : 6)),
             status: effectiveStatus,
@@ -888,6 +893,8 @@ export const expeditionService = {
           const depId = row.section_key.replace('expedition_departure_', '');
           const meta = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
           cloudOverrides[depId] = {
+            routeId: meta.routeId || meta.route_id,
+            route_id: meta.routeId || meta.route_id,
             image: normalizeExternalMediaUrl(row.media_url || meta.image),
             name: meta.name || row.title,
             headline: meta.headline,
@@ -1017,7 +1024,7 @@ export const expeditionService = {
             priceCharterFullClp: Number(d.price_charter_full_clp) || (isTerranova ? 18800000 : 11700000),
             vessel: vesselName,
             vesselId: vesselId,
-            routeId: d.route_id || 'ruta-juan-fernandez',
+            routeId: cloud?.routeId || cloud?.route_id || d.route_id || matchedLocal?.routeId || 'ruta-juan-fernandez',
             description: cloud?.description || matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
             location: cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández',
             image: cloud?.image || normalizeExternalMediaUrl(matchedLocal?.image) || normalizeExternalMediaUrl(d.image) || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
@@ -1583,14 +1590,30 @@ export const expeditionService = {
 
       // Try Supabase insert
       try {
-        const validRouteId = ['ruta-fiordos-glaciares', 'ruta-cabo-hornos', 'ruta-juan-fernandez', 'ruta-selkirk'].includes(params.routeId)
-          ? params.routeId
-          : 'ruta-juan-fernandez';
+        const client = supabaseAdmin || supabase;
+        if (params.routeId) {
+          // Ensure route exists in expedition_routes to satisfy foreign key constraint
+          const { data: existingRoute } = await client
+            .from('expedition_routes')
+            .select('id')
+            .eq('id', params.routeId)
+            .maybeSingle();
 
-        const { data } = await supabase
+          if (!existingRoute) {
+            await client.from('expedition_routes').upsert({
+              id: params.routeId,
+              title: params.publicName || params.routeId,
+              subtitle: params.publicLocation || 'Ruta de Expedición',
+              duration: '7 Días / 6 Noches',
+              is_active: true,
+            }, { onConflict: 'id' });
+          }
+        }
+
+        const { data, error: insErr } = await client
           .from('expedition_departures')
           .insert({
-            route_id: validRouteId,
+            route_id: params.routeId || 'ruta-juan-fernandez',
             vessel_id: params.vesselId,
             departure_date: params.departureDate,
             return_date: params.returnDate,
@@ -1603,11 +1626,46 @@ export const expeditionService = {
           .select('*, route:expedition_routes(*), vessel:vessels(*)')
           .single();
 
-        if (data) {
+        if (insErr) {
+          console.warn('Supabase createDeparture error:', insErr);
+        } else if (data) {
           newPublicExp.id = data.id;
         }
       } catch (sbErr) {
         console.warn('Supabase createDeparture notice:', sbErr);
+      }
+
+      // Persist metadata to Supabase site_content table
+      try {
+        const client = supabaseAdmin || supabase;
+        await client
+          .from('site_content')
+          .upsert({
+            section_key: `expedition_departure_${newPublicExp.id}`,
+            title: params.publicName || 'Expedición Personalizada',
+            media_url: newPublicExp.image || null,
+            body_text: params.publicDescription || null,
+            metadata: {
+              departureId: newPublicExp.id,
+              routeId: params.routeId,
+              route_id: params.routeId,
+              name: newPublicExp.name,
+              location: newPublicExp.location,
+              description: newPublicExp.description,
+              image: newPublicExp.image,
+              tempEstimate: newPublicExp.tempEstimate,
+              brochureUrl: newPublicExp.brochureUrl,
+              totalSlots: newPublicExp.totalSlots,
+              availableSlots: newPublicExp.availableSlots,
+              status: newPublicExp.status,
+              pricePerPaxClp: newPublicExp.pricePerPaxClp,
+              priceCharterFullClp: newPublicExp.priceCharterFullClp,
+              updated_at: new Date().toISOString(),
+            },
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'section_key' });
+      } catch (contentErr) {
+        console.warn('Could not sync created departure to Supabase site_content:', contentErr);
       }
 
       // Save locally
@@ -1681,6 +1739,26 @@ export const expeditionService = {
 
       // Update Supabase
       try {
+        const client = supabaseAdmin || supabase;
+        if (params.routeId) {
+          // Ensure route exists in expedition_routes to satisfy foreign key constraint
+          const { data: existingRoute } = await client
+            .from('expedition_routes')
+            .select('id')
+            .eq('id', params.routeId)
+            .maybeSingle();
+
+          if (!existingRoute) {
+            await client.from('expedition_routes').upsert({
+              id: params.routeId,
+              title: params.publicName || params.routeId,
+              subtitle: params.publicHeadline || 'Ruta de Expedición',
+              duration: '7 Días / 6 Noches',
+              is_active: true,
+            }, { onConflict: 'id' });
+          }
+        }
+
         const safeTotalSlots = params.totalSlots !== undefined ? Number(params.totalSlots) : undefined;
         const safeAvailSlots = params.availableSlots !== undefined ? Math.max(0, Number(params.availableSlots)) : undefined;
         const isSoldOutDb = safeAvailSlots !== undefined && safeAvailSlots <= 0;
@@ -1698,11 +1776,17 @@ export const expeditionService = {
         if (params.publicBrochureUrl !== undefined) updateData.brochure_url = params.publicBrochureUrl;
         if (effectiveStatus) updateData.status = effectiveStatus;
 
-        await supabase
+        const { error: depUpdateErr } = await client
           .from('expedition_departures')
           .update(updateData)
           .eq('id', departureId);
-      } catch {}
+
+        if (depUpdateErr) {
+          console.warn('Could not update expedition_departures in Supabase:', depUpdateErr);
+        }
+      } catch (err) {
+        console.warn('Exception updating expedition_departures in Supabase:', err);
+      }
 
       // Update localStorage
       const stored = getStoredDepartures();
@@ -1809,6 +1893,10 @@ export const expeditionService = {
           departureId,
           updated_at: new Date().toISOString(),
         };
+        if (params.routeId !== undefined) {
+          metaPayload.routeId = params.routeId;
+          metaPayload.route_id = params.routeId;
+        }
         if (params.publicName !== undefined) metaPayload.name = params.publicName;
         if (params.publicHeadline !== undefined) metaPayload.headline = params.publicHeadline;
         if (params.publicLocation !== undefined) metaPayload.location = params.publicLocation;

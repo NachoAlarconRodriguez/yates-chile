@@ -26,13 +26,17 @@ import {
   ShieldCheck,
   Info,
   FileText,
-  ExternalLink
+  ExternalLink,
+  Compass,
+  Ship,
 } from 'lucide-react';
 import { expeditionService, type DepartureRow } from '../../services/expeditionService';
 import { lodgeService, type LodgeRoom, type LodgeBooking } from '../../services/lodgeService';
 import { useCatalogServices } from '../../hooks/useCatalogServices';
 import { useFleet } from '../../hooks/useFleet';
-import { normalizeExternalMediaUrl } from '../../services/cmsService';
+import { useSiteContent } from '../../hooks/useSiteContent';
+import { cmsService, normalizeExternalMediaUrl } from '../../services/cmsService';
+import { LuxurySelect } from './LuxurySelect';
 import confetti from 'canvas-confetti';
 
 export interface ExpeditionWizardData {
@@ -116,8 +120,53 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  existingDepartures = []
+  existingDepartures = [],
+  initialRouteId,
+  initialVesselId
 }) => {
+  const { content } = useSiteContent();
+
+  const expeditionCategoryOptions = useMemo(() => {
+    const cats = cmsService.getExpeditionCategories(content);
+    return cats.map((cat, idx) => {
+      let IconComp = Compass;
+      if (cat.icon === 'Anchor') IconComp = Anchor;
+      else if (cat.icon === 'MapPin') IconComp = MapPin;
+      else if (cat.icon === 'Sailboat') IconComp = Sailboat;
+      else if (cat.icon === 'Ship') IconComp = Ship;
+
+      const badgeColors = [
+        'bg-sky-50 text-sky-800 border-sky-200',
+        'bg-indigo-50 text-indigo-800 border-indigo-200',
+        'bg-emerald-50 text-emerald-800 border-emerald-200',
+        'bg-amber-50 text-amber-800 border-amber-200',
+        'bg-purple-50 text-purple-800 border-purple-200',
+        'bg-teal-50 text-teal-800 border-teal-200',
+      ];
+      const colorClass = badgeColors[idx % badgeColors.length];
+
+      return {
+        value: cat.id,
+        label: cat.name,
+        subtitle: cat.subtitle,
+        icon: IconComp,
+        badge: cat.tag ? { text: cat.tag, className: colorClass } : undefined,
+      };
+    });
+  }, [content]);
+
+  const [routeId, setRouteId] = useState<string>(() => initialRouteId || 'ruta-juan-fernandez');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialRouteId) {
+        setRouteId(initialRouteId);
+      } else if (!routeId && expeditionCategoryOptions.length > 0) {
+        setRouteId(expeditionCategoryOptions[0].value);
+      }
+    }
+  }, [isOpen, initialRouteId, expeditionCategoryOptions, routeId]);
+
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -592,7 +641,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
 
       const wizardData: ExpeditionWizardData = {
         vesselId,
-        routeId: 'custom-expedition',
+        routeId: routeId || 'ruta-juan-fernandez',
         lodgingType,
         selectedRoomIds,
         selectedServiceIds,
@@ -1478,6 +1527,26 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                 </div>
 
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-5">
+                  {/* Categoría / Tipo de Expedición (Vinculado a Banners del Carrusel y Filtros) */}
+                  <div className="relative z-30">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[10px] font-bold text-[#0f2b48] uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Compass className="w-3.5 h-3.5 text-sky-600" />
+                        <span>Categoría / Tipo de Expedición</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        Conecta con los banners del carrusel y filtros del catálogo
+                      </span>
+                    </div>
+                    <LuxurySelect
+                      singleLine={false}
+                      value={routeId}
+                      onChange={(val) => setRouteId(val)}
+                      options={expeditionCategoryOptions}
+                      placeholder="Seleccionar Categoría..."
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] uppercase font-bold text-[#0f2b48] block mb-1">
@@ -1879,6 +1948,12 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       <img src={publicCoverImage} alt={publicName} className="w-full h-full object-cover" />
                     </div>
                     <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200/60 inline-flex items-center gap-1">
+                          <Compass className="w-3 h-3 text-sky-600" />
+                          {expeditionCategoryOptions.find(c => c.value === routeId)?.label || routeId || 'Expedición'}
+                        </span>
+                      </div>
                       <h5 className="font-serif font-bold text-sm text-[#0f2b48] truncate">{publicName}</h5>
                       <p className="text-xs text-slate-500 font-light truncate">{publicHeadline}</p>
                       <span className="text-[10px] font-mono text-slate-400 block">{publicLocation}</span>

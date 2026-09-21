@@ -1,24 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Anchor, Compass, Sparkles, Calendar, ArrowRight, Clock } from 'lucide-react';
-import { useExpeditions } from '../../hooks/useExpeditions';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Compass, ArrowRight, FileText } from 'lucide-react';
+import { useSiteContent } from '../../hooks/useSiteContent';
 import { useLanguage } from '../../context/LanguageContext';
-import { translationService } from '../../services/translationService';
-import type { PublicExpedition } from '../../services/expeditionService';
-import { ExpeditionBookingModal } from './ExpeditionBookingModal';
-import { isMediaVideo, getMediaFallbackUrl } from '../../services/cmsService';
-
-interface Slide {
-  id: string;
-  badge: string;
-  badgeIcon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  description: string;
-  bgImage: string;
-  expedition: PublicExpedition;
-  isSoldOut: boolean;
-  spots: number;
-}
+import {
+  isMediaVideo,
+  getMediaFallbackUrl,
+  normalizeExternalMediaUrl,
+  DEFAULT_CMS_CONTENT,
+  type HeroBannerConfig,
+} from '../../services/cmsService';
 
 interface HeroCarouselProps {
   onNavigate: (path: string) => void;
@@ -26,67 +16,23 @@ interface HeroCarouselProps {
 
 export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
-  const [selectedExpedition, setSelectedExpedition] = useState<PublicExpedition | null>(null);
-  const { expeditions } = useExpeditions();
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const { getSection } = useSiteContent();
   const { language, t } = useLanguage();
   const isEn = language === 'EN';
 
-  const slides: Slide[] = useMemo(() => {
-    // 1. Prioritize expeditions marked with star (isFeatured: true)
-    const featured = expeditions.filter((e) => e.isFeatured && e.status !== 'cancelled');
+  const bannersSection = getSection('home_hero_banners');
 
-    // 2. If fewer than 3 featured, fill with upcoming departures
-    let selected = [...featured];
-    if (selected.length < 3) {
-      const remaining = expeditions
-        .filter((e) => !selected.some((s) => s.id === e.id) && e.status !== 'cancelled')
-        .sort((a, b) => {
-          const timeA = new Date(a.departureDate || '2099-01-01').getTime();
-          const timeB = new Date(b.departureDate || '2099-01-01').getTime();
-          return timeA - timeB;
-        });
-      selected = [...selected, ...remaining].slice(0, 3);
-    } else {
-      selected = selected.slice(0, 3);
+  const slides: HeroBannerConfig[] = useMemo(() => {
+    const rawBanners =
+      (bannersSection?.metadata as any)?.banners ||
+      (DEFAULT_CMS_CONTENT['home_hero_banners']?.metadata as any)?.banners;
+
+    if (Array.isArray(rawBanners) && rawBanners.length > 0) {
+      return rawBanners.slice(0, 3);
     }
-
-    return selected.map((exp, idx) => {
-      const spots = typeof exp.spotsLeft === 'number' ? exp.spotsLeft : (exp.availableSlots ?? 0);
-      const isSoldOut = spots <= 0 || exp.spotsLeft === 'completo';
-      const spotsText =
-        isSoldOut
-          ? (isEn ? 'SOLD OUT' : 'CUPOS AGOTADOS')
-          : spots === 1
-          ? (isEn ? '1 SPOT AVAILABLE' : '1 CUPO DISPONIBLE')
-          : `${spots} ${isEn ? 'SPOTS AVAILABLE' : 'CUPOS DISPONIBLES'}`;
-
-      let icon = <Compass className="w-3.5 h-3.5 text-amber-400" />;
-      if (exp.vessel.toLowerCase().includes('velero') || exp.vesselId === 'vegvisir') {
-        icon = <Anchor className="w-3.5 h-3.5 text-sky-400" />;
-      } else if (exp.vessel.toLowerCase().includes('lodge') || exp.vesselId === 'lodge') {
-        icon = <Sparkles className="w-3.5 h-3.5 text-emerald-400" />;
-      }
-
-      const vesselName = isEn ? translationService.fallbackTranslate(exp.vessel, 'EN') : exp.vessel;
-      const expName = isEn ? translationService.fallbackTranslate(exp.name, 'EN') : exp.name;
-      const expLocation = isEn ? translationService.fallbackTranslate(exp.location, 'EN') : exp.location;
-      const expDesc = isEn ? translationService.fallbackTranslate(exp.description, 'EN') : exp.description;
-
-      return {
-        id: exp.id || `slide-${idx}`,
-        badge: `${vesselName.toUpperCase()} • ${spotsText}`,
-        badgeIcon: icon,
-        title: expName,
-        subtitle: `${expLocation} • ${exp.startDate} ${isEn ? 'to' : 'al'} ${exp.endDate}`,
-        description: expDesc,
-        bgImage: exp.image || '/travesia-robinson.jpg',
-        expedition: exp,
-        isSoldOut,
-        spots,
-      };
-    });
-  }, [expeditions, isEn]);
+    return (DEFAULT_CMS_CONTENT['home_hero_banners']?.metadata as any)?.banners || [];
+  }, [bannersSection]);
 
   // Reset currentSlide if out of bounds
   useEffect(() => {
@@ -95,14 +41,14 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
     }
   }, [slides.length, currentSlide]);
 
-  // Auto-advance slide every 7 seconds
+  // Auto-advance slide every 7 seconds (resets on slide change, pauses on hover)
   useEffect(() => {
-    if (slides.length <= 1) return;
+    if (slides.length <= 1 || isPaused) return;
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
     }, 7000);
     return () => clearInterval(timer);
-  }, [slides.length]);
+  }, [currentSlide, slides.length, isPaused]);
 
   const handlePrev = () => {
     setCurrentSlide((prev) => (prev === 0 ? slides.length - 1 : prev - 1));
@@ -112,13 +58,8 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
     setCurrentSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
   };
 
-  const handleBookExpedition = (s: Slide) => {
-    setSelectedExpedition(s.expedition);
-    setIsBookingModalOpen(true);
-  };
-
-  const touchStartX = React.useRef<number | null>(null);
-  const touchStartY = React.useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -146,45 +87,73 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
 
   if (slides.length === 0) return null;
 
-  const slide = slides[currentSlide] || slides[0];
+  const currentBanner = slides[currentSlide] || slides[0];
+
+  const bannerTitle = isEn && currentBanner.title_en ? currentBanner.title_en : currentBanner.title;
+  const bannerSubtitle = isEn && currentBanner.subtitle_en ? currentBanner.subtitle_en : currentBanner.subtitle;
+  const bannerDescription = isEn && currentBanner.description_en ? currentBanner.description_en : currentBanner.description;
+
+  const handleDownloadBrochure = () => {
+    if (currentBanner.brochure_url && currentBanner.brochure_url.trim() !== '') {
+      const url = normalizeExternalMediaUrl(currentBanner.brochure_url);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      const msg = encodeURIComponent(
+        `Hola Concierge Yates Chile, quisiera solicitar el brochure/dossier en PDF para la expedición "${bannerTitle}".`
+      );
+      window.open(`https://wa.me/56981312920?text=${msg}`, '_blank');
+    }
+  };
+
+  const handleViewDates = () => {
+    const typeParam = currentBanner.expedition_type || 'ruta-juan-fernandez';
+    onNavigate(`/expediciones?tipo=${typeParam}`);
+  };
 
   return (
     <section
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       className="relative min-h-[500px] sm:h-[520px] flex items-end justify-start bg-slate-950 text-white overflow-hidden border-b border-slate-800 touch-pan-y select-none"
     >
       
       {/* Background Images / Videos with Fade Transition */}
-      {slides.map((s, idx) => (
-        <div
-          key={s.id}
-          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-            idx === currentSlide ? 'opacity-85 z-0' : 'opacity-0 -z-10 pointer-events-none'
-          }`}
-        >
-          {isMediaVideo(s.bgImage) ? (
-            <video
-              src={s.bgImage}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <img
-              src={s.bgImage}
-              alt={s.title}
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = getMediaFallbackUrl(s.bgImage) || '/travesia-robinson.jpg';
-              }}
-            />
-          )}
-        </div>
-      ))}
+      {slides.map((s, idx) => {
+        const mediaUrl = normalizeExternalMediaUrl(s.media_url);
+        const isVideo = isMediaVideo(s.media_url);
+
+        return (
+          <div
+            key={s.id || `banner-${idx}`}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              idx === currentSlide ? 'opacity-85 z-0' : 'opacity-0 -z-10 pointer-events-none'
+            }`}
+          >
+            {isVideo ? (
+              <video
+                src={mediaUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <img
+                src={mediaUrl || '/travesia-robinson.jpg'}
+                alt={s.title}
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = getMediaFallbackUrl(s.media_url) || '/travesia-robinson.jpg';
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
 
       {/* Ultra-Light Overlay Gradient for Readability */}
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent z-0" />
@@ -193,57 +162,41 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
       <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-10">
         <div className="max-w-xl text-left space-y-3 text-white">
           
-          {/* Minimalist Badge with Spots Info */}
+          {/* Eyebrow / Categoría */}
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/70 border border-white/20 text-white text-[11px] font-semibold tracking-wider backdrop-blur-md shadow-md">
-            {slide.badgeIcon}
-            <span>{slide.badge}</span>
+            <Compass className="w-3.5 h-3.5 text-sky-400" />
+            <span className="uppercase">{bannerSubtitle || 'AVENTURA OCEÁNICA'}</span>
           </div>
 
           {/* Expedition Title */}
           <div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold tracking-tight text-white leading-tight drop-shadow-md">
-              {slide.title}
+              {bannerTitle}
             </h1>
-            <p className="text-xs sm:text-sm font-medium text-amber-200/90 tracking-wide mt-1 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>{slide.subtitle}</span>
-            </p>
           </div>
 
           {/* Description */}
           <p className="text-slate-200 text-xs sm:text-sm font-normal leading-relaxed text-shadow max-w-lg opacity-90 line-clamp-2 sm:line-clamp-3">
-            {slide.description}
+            {bannerDescription}
           </p>
 
           {/* Action CTAs */}
           <div className="pt-2 flex items-center gap-2.5 sm:gap-3 flex-wrap pb-10 sm:pb-0">
-            {slide.isSoldOut ? (
-              <a
-                href={`https://wa.me/56981312920?text=${encodeURIComponent(
-                  `Hola Concierge Yates Chile, quisiera consultar por la lista de espera para la expedición "${slide.expedition.name}" (${slide.expedition.startDate} al ${slide.expedition.endDate}).`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 bg-slate-900/90 hover:bg-slate-900 text-amber-300 hover:text-amber-200 font-extrabold px-4 sm:px-5 py-3 rounded-xl transition-all shadow-lg text-xs min-h-[46px] border border-amber-400/40 cursor-pointer active:scale-95 backdrop-blur-sm"
-              >
-                <Clock className="w-4 h-4 text-amber-300 shrink-0" />
-                <span>{t('Salida Completa • Lista de Espera', 'Sold Out • Join Waitlist')}</span>
-              </a>
-            ) : (
-              <button
-                onClick={() => handleBookExpedition(slide)}
-                className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-4 sm:px-5 py-3 rounded-xl transition-all shadow-lg text-xs min-h-[46px] border border-white/90 cursor-pointer active:scale-95"
-              >
-                <Compass className="w-4 h-4 text-slate-950" />
-                <span>{t('Reservar Cupo en esta Expedición', 'Book Spot on this Expedition')}</span>
-              </button>
-            )}
-
+            {/* CTA 1: Descargar Brochure (PDF) */}
             <button
-              onClick={() => onNavigate('/expediciones')}
+              onClick={handleDownloadBrochure}
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-5 py-3 rounded-xl transition-all shadow-lg text-xs min-h-[46px] border border-white/90 cursor-pointer active:scale-95"
+            >
+              <FileText className="w-4 h-4 text-slate-900" />
+              <span>{t('Descargar Brochure (PDF)', 'Download Brochure (PDF)')}</span>
+            </button>
+
+            {/* CTA 2: Ver Fechas & Salidas Filtradas */}
+            <button
+              onClick={handleViewDates}
               className="inline-flex items-center justify-center gap-1.5 bg-slate-900/80 hover:bg-slate-900 text-white font-semibold px-4 py-3 rounded-xl transition-all border border-white/20 text-xs min-h-[46px] backdrop-blur-sm cursor-pointer hover:text-amber-200 active:scale-95"
             >
-              <span>{t('Ver Calendario Completo', 'View Full Calendar')}</span>
+              <span>{t('Ver Fechas & Salidas', 'View Dates & Departures')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -284,13 +237,6 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
         </button>
 
       </div>
-
-      {/* Expedition Booking Modal */}
-      <ExpeditionBookingModal
-        isOpen={isBookingModalOpen}
-        onClose={() => setIsBookingModalOpen(false)}
-        expedition={selectedExpedition}
-      />
 
     </section>
   );

@@ -3,8 +3,113 @@ import type { Database } from '../types/database.types';
 
 export type SiteContent = Database['public']['Tables']['site_content']['Row'];
 
+export interface HeroBannerConfig {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  media_url: string;
+  brochure_url: string;
+  expedition_type: string; // 'ruta-juan-fernandez' | 'ruta-cabo-hornos' | 'ruta-fiordos-glaciares'
+  title_en?: string;
+  subtitle_en?: string;
+  description_en?: string;
+}
+
+export interface ExpeditionCategory {
+  id: string;
+  name: string;
+  tag?: string;
+  subtitle?: string;
+  icon?: 'Compass' | 'Anchor' | 'MapPin' | 'Sailboat' | 'Ship';
+  [key: string]: any;
+}
+
+export const DEFAULT_EXPEDITION_CATEGORIES: ExpeditionCategory[] = [
+  {
+    id: 'ruta-juan-fernandez',
+    name: 'Archipiélago Juan Fernández & Robinson Crusoe',
+    tag: 'Aventura Insular',
+    subtitle: 'Aventura oceánica & pesca de altura en el Pacífico salvaje',
+    icon: 'Compass',
+  },
+  {
+    id: 'ruta-cabo-hornos',
+    name: 'Cabo de Hornos & Canal Beagle',
+    tag: 'Patagonia Austral',
+    subtitle: 'Navegación extrema en el fin del mundo y glaciares fueguinos',
+    icon: 'Anchor',
+  },
+  {
+    id: 'ruta-fiordos-glaciares',
+    name: 'Fiordos Secretos & Glaciares Milenarios',
+    tag: 'Canales & Glaciares',
+    subtitle: 'Canales patagónicos, murallas de hielo y naturaleza virgen',
+    icon: 'MapPin',
+  },
+];
+
+export const isValidDriveOrDropboxUrl = (url?: string | null): boolean => {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim().toLowerCase();
+  if (trimmed.startsWith('/') || trimmed.startsWith('data:')) return true; // Local asset fallbacks
+  return (
+    trimmed.includes('drive.google.com') ||
+    trimmed.includes('lh3.googleusercontent.com') ||
+    trimmed.includes('dropbox.com') ||
+    trimmed.includes('dropboxusercontent.com')
+  );
+};
+
 export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
   // 1. INICIO / HOME
+  home_hero_banners: {
+    section_key: 'home_hero_banners',
+    title: 'Banners del Carrusel Principal',
+    subtitle: 'VITRINA DE EXPEDICIONES',
+    body_text: 'Configuración de los 3 banners de alta gama para la vitrina de expediciones.',
+    metadata: {
+      banners: [
+        {
+          id: 'banner-1',
+          title: 'Expedición Archipiélago Juan Fernández',
+          subtitle: 'AVENTURA OCEÁNICA & PESCA DEPORTIVA',
+          description: 'La expedición insular por excelencia hacia uno de los ecosistemas con mayor endemismo del planeta. Una experiencia náutica genuina a bordo del velero de expedición Vegvisir.',
+          media_url: '/travesia-robinson.jpg',
+          brochure_url: '',
+          expedition_type: 'ruta-juan-fernandez',
+          title_en: 'Juan Fernández Archipelago Expedition',
+          subtitle_en: 'OCEANIC ADVENTURE & SPORT FISHING',
+          description_en: 'The quintessential insular expedition to one of the planet\'s most endemic ecosystems. A genuine nautical experience aboard the Vegvisir expedition sailboat.',
+        },
+        {
+          id: 'banner-2',
+          title: 'Expedición Cabo de Hornos Exclusiva',
+          subtitle: 'PATAGONIA AUSTRAL & CANAL BEAGLE',
+          description: 'La cima de la aventura náutica mundial: circunvalar el mítico Cabo de Hornos en condiciones de máxima seguridad y confort a vela y motor.',
+          media_url: '/cabo-de-hornos.png',
+          brochure_url: '',
+          expedition_type: 'ruta-cabo-hornos',
+          title_en: 'Exclusive Cape Horn Expedition',
+          subtitle_en: 'AUSTRAL PATAGONIA & BEAGLE CHANNEL',
+          description_en: 'The pinnacle of world nautical adventure: circumnavigating mythical Cape Horn under maximum safety and comfort conditions.',
+        },
+        {
+          id: 'banner-3',
+          title: 'Fiordos Secretos & Glaciares Milenarios',
+          subtitle: 'CHILOÉ • VENTISQUERO PÍO XI • CANALES AUSTRALES',
+          description: 'Una travesía inolvidable ingresando por fiordos inexplorados donde las paredes de roca caen directo al mar turquesa y las aguas termales abrazan la naturaleza.',
+          media_url: '/zarpe-archipielago.jpg',
+          brochure_url: '',
+          expedition_type: 'ruta-fiordos-glaciares',
+          title_en: 'Secret Fjords & Ancient Glaciers',
+          subtitle_en: 'CHILOÉ • PÍO XI GLACIER • AUSTRAL CHANNELS',
+          description_en: 'An unforgettable voyage through unexplored fjords where sheer rock walls drop directly into turquoise waters and hot springs embrace wild nature.',
+        },
+      ],
+      categories: DEFAULT_EXPEDITION_CATEGORIES,
+    },
+  },
   home_hero: {
     section_key: 'home_hero',
     title: 'EXPEDICIONES PATAGONIA & JUAN FERNÁNDEZ',
@@ -574,6 +679,28 @@ export const cmsService = {
       return { success: true };
     }
   },
+
+  getExpeditionCategories(contentMap?: Record<string, Partial<SiteContent>>): ExpeditionCategory[] {
+    const raw = contentMap?.home_hero_banners || this.getCachedContentSync()?.home_hero_banners;
+    const meta = (raw?.metadata as Record<string, any>) || {};
+    if (Array.isArray(meta.categories) && meta.categories.length > 0) {
+      return meta.categories;
+    }
+    return DEFAULT_EXPEDITION_CATEGORIES;
+  },
+
+  async saveExpeditionCategories(categories: ExpeditionCategory[]): Promise<{ success: boolean; error?: string }> {
+    const localCache = getLocalCmsCache();
+    const existing = localCache['home_hero_banners'] || DEFAULT_CMS_CONTENT['home_hero_banners'] || {};
+    const existingMeta = (existing.metadata as Record<string, any>) || {};
+    return this.updateContent('home_hero_banners', {
+      metadata: {
+        ...existingMeta,
+        categories,
+      },
+    });
+  },
+
 
   async uploadMedia(file: File): Promise<{ success: boolean; url?: string; error?: string }> {
     try {

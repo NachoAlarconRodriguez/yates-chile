@@ -66,7 +66,6 @@ import {
   Printer,
   MoreVertical,
   Save,
-  Star,
   Menu,
   Image as ImageIcon,
   Link2,
@@ -938,6 +937,35 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [isUploadingPolicyPdf, setIsUploadingPolicyPdf] = useState(false);
   const policyPdfFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const expeditionCategoryOptions = useMemo(() => {
+    const cats = cmsService.getExpeditionCategories(content);
+    return cats.map((cat, idx) => {
+      let IconComp = Compass;
+      if (cat.icon === 'Anchor') IconComp = Anchor;
+      else if (cat.icon === 'MapPin') IconComp = MapPin;
+      else if (cat.icon === 'Sailboat') IconComp = Sailboat;
+      else if (cat.icon === 'Ship') IconComp = Ship;
+
+      const badgeColors = [
+        'bg-sky-50 text-sky-800 border-sky-200',
+        'bg-indigo-50 text-indigo-800 border-indigo-200',
+        'bg-emerald-50 text-emerald-800 border-emerald-200',
+        'bg-amber-50 text-amber-800 border-amber-200',
+        'bg-purple-50 text-purple-800 border-purple-200',
+        'bg-teal-50 text-teal-800 border-teal-200',
+      ];
+      const colorClass = badgeColors[idx % badgeColors.length];
+
+      return {
+        value: cat.id,
+        label: cat.name,
+        subtitle: cat.subtitle,
+        icon: IconComp,
+        badge: cat.tag ? { text: cat.tag, className: colorClass } : undefined,
+      };
+    });
+  }, [content]);
+
   const handleOpenEditDeparture = useCallback((dep: any) => {
     const vId = ((dep.vessel_id || dep.vesselName || '') as string).toLowerCase().includes('terranova')
       ? 'terranova'
@@ -1105,6 +1133,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
     setEditingDeparture({
       ...dep,
+      route_id: dep.route_id || dep.routeId || 'ruta-juan-fernandez',
+      routeId: dep.route_id || dep.routeId || 'ruta-juan-fernandez',
       available_slots: effectiveAvail,
       headline: effectiveHeadline,
       description: effectiveDescription,
@@ -3754,6 +3784,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       : (editingDeparture.status as any);
 
     const res = await expeditionService.updateDeparture(editingDeparture.id, {
+      routeId: editingDeparture.route_id || (editingDeparture as any).routeId,
       publicName: editingDeparture.name,
       publicHeadline: editingDeparture.headline,
       vesselId: editingDeparture.vessel_id,
@@ -9342,39 +9373,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   </div>
                                 </div>
 
-                                {/* Top-Right Star (Carrusel Inicio), Edit & Delete */}
+                                {/* Actions: Edit & Delete */}
                                 <div className="flex items-center gap-1 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      const res = await expeditionService.toggleFeaturedDeparture(dep.id);
-                                      if (!res.success) {
-                                        triggerAlert(res.error || 'No se pudo destacar la expedición.', 'warning');
-                                      } else {
-                                        await fetchAllData();
-                                        setActionMessage(
-                                          res.isFeatured
-                                            ? `⭐ "${routeTitle}" destacada en el carrusel de inicio.`
-                                            : `"${routeTitle}" removida del carrusel de inicio.`
-                                        );
-                                        setTimeout(() => setActionMessage(null), 4000);
-                                      }
-                                    }}
-                                    className={`w-7 h-7 rounded-full flex items-center justify-center transition cursor-pointer ${
-                                      dep.isFeatured
-                                        ? 'text-amber-500 bg-amber-50 hover:bg-amber-100 ring-1 ring-amber-300 shadow-2xs'
-                                        : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50/50'
-                                    }`}
-                                    title={
-                                      dep.isFeatured
-                                        ? '⭐ Destacada en el Carrusel de Inicio (Clic para desactivar)'
-                                        : 'Hacer clic para destacar en el Carrusel de Inicio (Máximo 3)'
-                                    }
-                                  >
-                                    <Star className={`w-3.5 h-3.5 ${dep.isFeatured ? 'fill-amber-400 text-amber-400' : ''}`} />
-                                  </button>
-
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEditDeparture(dep)}
@@ -9875,36 +9875,6 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <div className="flex items-center justify-end gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        const res = await expeditionService.toggleFeaturedDeparture(dep.id);
-                                        if (!res.success) {
-                                          triggerAlert(res.error || 'No se pudo destacar la expedición.', 'warning');
-                                        } else {
-                                          await fetchAllData();
-                                          setActionMessage(
-                                            res.isFeatured
-                                              ? `⭐ "${routeTitle}" destacada en el carrusel de inicio.`
-                                              : `"${routeTitle}" removida del carrusel de inicio.`
-                                          );
-                                          setTimeout(() => setActionMessage(null), 4000);
-                                        }
-                                      }}
-                                      className={`w-7 h-7 rounded-full flex items-center justify-center transition cursor-pointer ${
-                                        dep.isFeatured
-                                          ? 'text-amber-500 bg-amber-50 hover:bg-amber-100 ring-1 ring-amber-300 shadow-2xs'
-                                          : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50/50'
-                                      }`}
-                                      title={
-                                        dep.isFeatured
-                                          ? '⭐ Destacada en el Carrusel de Inicio (Clic para desactivar)'
-                                          : 'Hacer clic para destacar en el Carrusel de Inicio (Máximo 3)'
-                                      }
-                                    >
-                                      <Star className={`w-3.5 h-3.5 ${dep.isFeatured ? 'fill-amber-400 text-amber-400' : ''}`} />
-                                    </button>
                                     {!isSoldOut && (
                                       <button
                                         type="button"
@@ -15026,6 +14996,26 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       onChange={(e) => setEditingDeparture({ ...editingDeparture, name: e.target.value })}
                       placeholder="Ej: Expedición Robinson Crusoe — Selkirk"
                       className="w-full px-4 py-2.5 bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl font-bold text-[#0b192c] text-sm focus:outline-none focus:border-[#0b192c] transition shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Categoría / Tipo de Expedición (Vinculado a Banners del Carrusel) */}
+                  <div className="relative z-40">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Compass className="w-3.5 h-3.5 text-sky-600" />
+                        <span>Categoría / Tipo de Expedición</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        Conecta con los banners del carrusel y filtros
+                      </span>
+                    </div>
+                    <LuxurySelect
+                      singleLine={false}
+                      value={editingDeparture.route_id || (editingDeparture as any).routeId || expeditionCategoryOptions[0]?.value || 'ruta-juan-fernandez'}
+                      onChange={(val) => setEditingDeparture({ ...editingDeparture, route_id: val, routeId: val } as any)}
+                      options={expeditionCategoryOptions}
+                      placeholder="Seleccionar Categoría..."
                     />
                   </div>
 

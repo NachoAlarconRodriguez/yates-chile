@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Plus } from 'lucide-react';
 
 export interface LuxurySelectOption<T extends string = string> {
   value: T;
@@ -23,6 +23,8 @@ export interface LuxurySelectProps<T extends string = string> {
   id?: string;
   dropdownClassName?: string;
   singleLine?: boolean;
+  onAddNew?: () => void;
+  addNewLabel?: string;
 }
 
 export function LuxurySelect<T extends string = string>({
@@ -35,6 +37,8 @@ export function LuxurySelect<T extends string = string>({
   id,
   dropdownClassName = '',
   singleLine = false,
+  onAddNew,
+  addNewLabel,
 }: LuxurySelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -183,6 +187,23 @@ export function LuxurySelect<T extends string = string>({
               </div>
             );
           })}
+
+          {onAddNew && (
+            <div className="pt-1.5 mt-1 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  onAddNew();
+                }}
+                className="w-full px-3 py-2 rounded-xl flex items-center gap-2 text-xs font-bold text-sky-700 hover:bg-sky-50 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{addNewLabel || 'Crear nueva categoría...'}</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

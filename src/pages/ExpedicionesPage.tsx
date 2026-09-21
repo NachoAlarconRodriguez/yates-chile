@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { isExpeditionSoldOut, getExpeditionAvailableSpots, type PublicExpedition as Expedition } from '../services/expeditionService';
-import { normalizeExternalMediaUrl } from '../services/cmsService';
+import { normalizeExternalMediaUrl, type ExpeditionCategory, DEFAULT_EXPEDITION_CATEGORIES } from '../services/cmsService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { leadService } from '../services/leadService';
@@ -27,6 +27,7 @@ import {
 
 interface ExpedicionesPageProps {
   onNavigate: (path: string) => void;
+  currentPath?: string;
 }
 
 interface ExpeditionPillar {
@@ -207,7 +208,7 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
   return overview;
 };
 
-export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate }) => {
+export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate, currentPath }) => {
   const { expeditions, loading } = useExpeditions();
   const { t } = useLanguage();
   const [downloadEmail, setDownloadEmail] = useState('');
@@ -217,8 +218,81 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
   const [bookingModalInitialStep, setBookingModalInitialStep] = useState<0 | 1>(0);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
+  // Filter by Expedition Type
+  const [selectedType, setSelectedType] = useState<string>('todos');
+
+  useEffect(() => {
+    const searchStr = typeof window !== 'undefined' ? window.location.search : '';
+    const pathStr = currentPath || '';
+    const query = new URLSearchParams(searchStr || (pathStr.includes('?') ? pathStr.split('?')[1] : ''));
+    const tipo = query.get('tipo');
+    if (tipo && tipo.trim() !== '') {
+      setSelectedType(tipo);
+      setTimeout(() => {
+        const el = document.getElementById('grid-expediciones');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
+    }
+  }, [currentPath]);
+
   const { getSection } = useSiteContent();
   const expHero = getSection('expeditions_hero');
+  const heroBannersContent = getSection('home_hero_banners');
+
+  const cmsCategories: ExpeditionCategory[] = useMemo(() => {
+    const meta = (heroBannersContent?.metadata as Record<string, any>) || {};
+    if (Array.isArray(meta.categories) && meta.categories.length > 0) {
+      return meta.categories;
+    }
+    return DEFAULT_EXPEDITION_CATEGORIES;
+  }, [heroBannersContent]);
+
+  const filteredExpeditions = useMemo(() => {
+    if (selectedType === 'todos') return expeditions;
+    return expeditions.filter((exp) => {
+      if (exp.routeId === selectedType) return true;
+      if (selectedType === 'ruta-juan-fernandez') {
+        return (
+          exp.routeId === 'ruta-juan-fernandez' ||
+          exp.name.toLowerCase().includes('robinson') ||
+          exp.location.toLowerCase().includes('fernández') ||
+          exp.location.toLowerCase().includes('fernandez')
+        );
+      }
+      if (selectedType === 'ruta-cabo-hornos') {
+        return (
+          exp.routeId === 'ruta-cabo-hornos' ||
+          exp.name.toLowerCase().includes('cabo de hornos') ||
+          exp.location.toLowerCase().includes('hornos')
+        );
+      }
+      if (selectedType === 'ruta-fiordos-glaciares') {
+        return (
+          exp.routeId === 'ruta-fiordos-glaciares' ||
+          exp.routeId === 'ruta-selkirk' ||
+          exp.name.toLowerCase().includes('fiordo') ||
+          exp.location.toLowerCase().includes('glaciar')
+        );
+      }
+
+      // Dynamic match for any newly created or edited category
+      const matchedCat = cmsCategories.find((c) => c.id === selectedType);
+      if (matchedCat) {
+        const catNameLower = matchedCat.name.toLowerCase();
+        const catTagLower = (matchedCat.tag || '').toLowerCase();
+        const expNameLower = exp.name.toLowerCase();
+        const expLocLower = exp.location.toLowerCase();
+        return (
+          exp.routeId === matchedCat.id ||
+          (catNameLower && (expNameLower.includes(catNameLower) || expLocLower.includes(catNameLower))) ||
+          (catTagLower && (expNameLower.includes(catTagLower) || expLocLower.includes(catTagLower)))
+        );
+      }
+      return false;
+    });
+  }, [expeditions, selectedType, cmsCategories]);
 
   const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition, t) : null;
 
@@ -347,23 +421,57 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
             </p>
           </div>
 
+          {/* Filter Pills por Tipo de Expedición */}
+          <div className="flex flex-wrap items-center justify-center gap-2 max-w-4xl mx-auto mb-12">
+            {[
+              { id: 'todos', label: t('Todas las Travesías', 'All Expeditions') },
+              ...cmsCategories.map((c) => ({
+                id: c.id,
+                label: c.tag ? `${c.name} (${c.tag})` : c.name,
+              })),
+            ].map((tab) => {
+              const isActive = selectedType === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedType(tab.id)}
+                  className={`px-4 sm:px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 select-none ${
+                    isActive
+                      ? 'bg-[#0b192c] text-white shadow-md scale-105 ring-2 ring-sky-400/40'
+                      : 'bg-white text-slate-600 hover:text-slate-950 hover:bg-slate-100 border border-slate-200 shadow-2xs'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           {loading && expeditions.length === 0 ? (
             <ExpeditionsLoadingState />
-          ) : expeditions.length === 0 ? (
+          ) : filteredExpeditions.length === 0 ? (
             <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 max-w-xl mx-auto space-y-4 shadow-xs">
               <Compass className="w-10 h-10 text-slate-400 mx-auto" />
               <h3 className="font-serif text-lg font-bold text-slate-800">
-                {t('No hay expediciones disponibles para este período', 'No expeditions available for this period')}
+                {t('No hay expediciones disponibles para este tipo de travesía', 'No expeditions available for this type')}
               </h3>
               <p className="text-slate-500 text-xs leading-relaxed">
-                {t('Estamos planificando nuevas fechas y derrotas australes. Si deseas organizar un chárter privado a tu medida, contáctanos.', 'We are planning new dates and austral voyages. If you want to organize a custom private charter, contact us.')}
+                {t('No encontramos salidas programadas con este filtro. Puedes ver el calendario completo o coordinar una salida privada a tu medida.', 'We did not find scheduled departures for this filter. You can view the full calendar or coordinate a custom private charter.')}
               </p>
-              <button
-                onClick={handleOpenGeneralBooking}
-                className="mt-2 inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-900 text-white text-xs font-semibold uppercase tracking-wider hover:bg-slate-800 transition cursor-pointer"
-              >
-                {t('Contactar Concierge', 'Contact Concierge')}
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setSelectedType('todos')}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-sky-50 text-sky-900 border border-sky-200 text-xs font-bold hover:bg-sky-100 transition cursor-pointer"
+                >
+                  <span>{t('Ver Todas las Travesías', 'View All Expeditions')}</span>
+                </button>
+                <button
+                  onClick={handleOpenGeneralBooking}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition cursor-pointer"
+                >
+                  {t('Contactar Concierge', 'Contact Concierge')}
+                </button>
+              </div>
             </div>
           ) : (
             <motion.div
@@ -372,7 +480,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
               transition={{ duration: 0.4 }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
             >
-              {expeditions.map((exp) => {
+              {filteredExpeditions.map((exp) => {
                 const isSoldOut = isExpeditionSoldOut(exp);
                 const isBlocked = exp.spotsLeft === 'bloqueado';
                 const isUnavailable = isSoldOut || isBlocked;

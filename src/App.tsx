@@ -125,8 +125,10 @@ export function App() {
   };
 
   // Dynamic SEO, GEO & AEO metadata per route
+  const baseRoute = currentPath.split('?')[0];
+
   const renderSEO = () => {
-    switch (currentPath) {
+    switch (baseRoute) {
       case '/expediciones':
         return (
           <SEOHead
@@ -237,31 +239,31 @@ export function App() {
       {!showSplash && (
         <>
           {/* Main Header Navigation (hidden in Admin) */}
-          {currentPath !== '/admin' && <Header currentPath={currentPath} onNavigate={navigate} />}
+          {baseRoute !== '/admin' && <Header currentPath={baseRoute} onNavigate={navigate} />}
 
           {/* Multi-Page View Container */}
           <main className="flex-1">
             <Suspense fallback={<PageLoaderFallback />}>
-              {currentPath === '/' && <HomePage onNavigate={navigate} />}
-              {currentPath === '/flota' && <FlotaPage onNavigate={navigate} />}
-              {currentPath === '/lodge' && <LodgePage onNavigate={navigate} />}
-              {currentPath === '/expediciones' && <ExpedicionesPage onNavigate={navigate} />}
-              {currentPath === '/contacto' && <ContactoPage />}
-              {currentPath === '/admin' && <AdminPage onNavigate={navigate} />}
-              {(currentPath === '/velero-vegvisir' || currentPath === '/flota/vegvisir') && (
+              {baseRoute === '/' && <HomePage onNavigate={navigate} />}
+              {baseRoute === '/flota' && <FlotaPage onNavigate={navigate} />}
+              {baseRoute === '/lodge' && <LodgePage onNavigate={navigate} />}
+              {baseRoute === '/expediciones' && <ExpedicionesPage onNavigate={navigate} currentPath={currentPath} />}
+              {baseRoute === '/contacto' && <ContactoPage />}
+              {baseRoute === '/admin' && <AdminPage onNavigate={navigate} />}
+              {(baseRoute === '/velero-vegvisir' || baseRoute === '/flota/vegvisir') && (
                 <VegvisirDetailPage onNavigate={navigate} />
               )}
-              {(currentPath === '/yate-terranova' || currentPath === '/flota/terranova') && (
+              {(baseRoute === '/yate-terranova' || baseRoute === '/flota/terranova') && (
                 <TerranovaDetailPage onNavigate={navigate} />
               )}
             </Suspense>
           </main>
 
           {/* Footer (hidden in Admin) */}
-          {currentPath !== '/admin' && <Footer onNavigate={navigate} />}
+          {baseRoute !== '/admin' && <Footer onNavigate={navigate} />}
 
           {/* Persistent Concierge WhatsApp Button (hidden in Admin) */}
-          {currentPath !== '/admin' && <FloatingConcierge />}
+          {baseRoute !== '/admin' && <FloatingConcierge />}
         </>
       )}
 
