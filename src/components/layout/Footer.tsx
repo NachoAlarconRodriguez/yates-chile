@@ -71,14 +71,14 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <a href="#/" onClick={(e) => { e.preventDefault(); handleNavClick('/'); }} className="hover:text-blue-400 transition">
               Inicio
             </a>
+            <a href="#/expediciones" onClick={(e) => { e.preventDefault(); handleNavClick('/expediciones'); }} className="hover:text-blue-400 transition">
+              Expediciones
+            </a>
             <a href="#/flota" onClick={(e) => { e.preventDefault(); handleNavClick('/flota'); }} className="hover:text-blue-400 transition">
               La Flota
             </a>
             <a href="#/lodge" onClick={(e) => { e.preventDefault(); handleNavClick('/lodge'); }} className="hover:text-blue-400 transition">
               El Lodge
-            </a>
-            <a href="#/expediciones" onClick={(e) => { e.preventDefault(); handleNavClick('/expediciones'); }} className="hover:text-blue-400 transition">
-              Expediciones
             </a>
             <a href="#/admin" onClick={(e) => { e.preventDefault(); handleNavClick('/admin'); }} className="hover:text-blue-400 transition">
               Administrador

@@ -6,6 +6,7 @@ import {
   isMediaVideo,
   getMediaFallbackUrl,
   normalizeExternalMediaUrl,
+  normalizeBrochureUrl,
   DEFAULT_CMS_CONTENT,
   type HeroBannerConfig,
 } from '../../services/cmsService';
@@ -95,7 +96,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
 
   const handleDownloadBrochure = () => {
     if (currentBanner.brochure_url && currentBanner.brochure_url.trim() !== '') {
-      const url = normalizeExternalMediaUrl(currentBanner.brochure_url);
+      const url = normalizeBrochureUrl(currentBanner.brochure_url);
       window.open(url, '_blank', 'noopener,noreferrer');
     } else {
       const msg = encodeURIComponent(

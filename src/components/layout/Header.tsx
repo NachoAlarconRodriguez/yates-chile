@@ -46,10 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
     };
   }, []);
 
-  const navLinks = [
-    { label: t('El Lodge', 'The Lodge'), path: '/lodge' },
-    { label: t('Expediciones', 'Expeditions'), path: '/expediciones' },
-  ];
+
 
   const handleNavClick = (path: string) => {
     setMobileMenuOpen(false);
@@ -109,6 +106,19 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
               {t('Inicio', 'Home')}
             </a>
 
+            {/* Expediciones */}
+            <a
+              href="#/expediciones"
+              onClick={(e) => { e.preventDefault(); handleNavClick('/expediciones'); }}
+              className={`text-sm font-semibold transition-colors py-2 border-b-2 min-h-[48px] flex items-center ${
+                currentPath === '/expediciones'
+                  ? 'text-slate-950 border-slate-950 font-extrabold'
+                  : 'text-slate-700 border-transparent hover:text-slate-950 hover:border-slate-400'
+              }`}
+            >
+              {t('Expediciones', 'Expeditions')}
+            </a>
+
             {/* La Flota Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -148,24 +158,18 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
               )}
             </div>
 
-            {/* Other links */}
-            {navLinks.map((link) => {
-              const isActive = currentPath === link.path;
-              return (
-                <a
-                  key={link.path}
-                  href={`#${link.path}`}
-                  onClick={(e) => { e.preventDefault(); handleNavClick(link.path); }}
-                  className={`text-sm font-semibold transition-colors py-2 border-b-2 min-h-[48px] flex items-center ${
-                    isActive
-                      ? 'text-slate-950 border-slate-950 font-extrabold'
-                      : 'text-slate-700 border-transparent hover:text-slate-950 hover:border-slate-400'
-                  }`}
-                >
-                  {link.label}
-                </a>
-              );
-            })}
+            {/* El Lodge */}
+            <a
+              href="#/lodge"
+              onClick={(e) => { e.preventDefault(); handleNavClick('/lodge'); }}
+              className={`text-sm font-semibold transition-colors py-2 border-b-2 min-h-[48px] flex items-center ${
+                currentPath === '/lodge'
+                  ? 'text-slate-950 border-slate-950 font-extrabold'
+                  : 'text-slate-700 border-transparent hover:text-slate-950 hover:border-slate-400'
+              }`}
+            >
+              {t('El Lodge', 'The Lodge')}
+            </a>
           </nav>
 
           {/* Right Actions: Language Switcher Only */}
@@ -214,7 +218,20 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                 : 'text-slate-800 hover:bg-slate-50'
             }`}
           >
-            Inicio
+            {t('Inicio', 'Home')}
+          </a>
+
+          {/* Expediciones */}
+          <a
+            href="#/expediciones"
+            onClick={(e) => { e.preventDefault(); handleNavClick('/expediciones'); }}
+            className={`block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center ${
+              currentPath === '/expediciones'
+                ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
+                : 'text-slate-800 hover:bg-slate-50'
+            }`}
+          >
+            {t('Expediciones', 'Expeditions')}
           </a>
 
           {/* La Flota Mobile Accordion */}
@@ -227,7 +244,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                   : 'text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <span>La Flota</span>
+              <span>{t('La Flota', 'The Fleet')}</span>
               <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${fleetMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
             </button>
 
@@ -240,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                     currentPath === '/velero-vegvisir' ? 'text-blue-900 font-bold bg-blue-50/20' : 'text-slate-650 hover:bg-slate-50'
                   }`}
                 >
-                  Velero Vegvisir
+                  {t('Velero Vegvisir', 'Vegvisir Sailboat')}
                 </a>
                 <a
                   href="#/yate-terranova"
@@ -249,30 +266,24 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                     currentPath === '/yate-terranova' ? 'text-blue-900 font-bold bg-blue-50/20' : 'text-slate-650 hover:bg-slate-50'
                   }`}
                 >
-                  Yate Terranova
+                  {t('Yate Terranova', 'Terranova Yacht')}
                 </a>
               </div>
             )}
           </div>
 
-          {/* Other links */}
-          {navLinks.map((link) => {
-            const isActive = currentPath === link.path;
-            return (
-              <a
-                key={link.path}
-                href={`#${link.path}`}
-                onClick={(e) => { e.preventDefault(); handleNavClick(link.path); }}
-                className={`block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center ${
-                  isActive
-                    ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
-                    : 'text-slate-800 hover:bg-slate-50'
-                }`}
-              >
-                {link.label}
-              </a>
-            );
-          })}
+          {/* El Lodge */}
+          <a
+            href="#/lodge"
+            onClick={(e) => { e.preventDefault(); handleNavClick('/lodge'); }}
+            className={`block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center ${
+              currentPath === '/lodge'
+                ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
+                : 'text-slate-800 hover:bg-slate-50'
+            }`}
+          >
+            {t('El Lodge', 'The Lodge')}
+          </a>
 
           <div className="pt-4 border-t border-slate-200">
             <a

@@ -970,3 +970,48 @@ export const normalizeExternalMediaUrl = (url?: string | null): string => {
   return trimmed;
 };
 
+/**
+ * Normaliza enlaces de documentos y brochures (PDF, Google Drive, Dropbox)
+ * Asegura que los enlaces de Google Drive abran el visor interactivo de documentos
+ * con soporte para múltiples páginas, scroll, zoom y descarga, en vez de miniaturas de imagen.
+ */
+export const normalizeBrochureUrl = (url?: string | null): string => {
+  if (!url || typeof url !== 'string') return '';
+  let trimmed = url.trim();
+  if (!trimmed) return '';
+
+  // Asegurar protocolo
+  if (
+    trimmed.startsWith('www.dropbox.com') ||
+    trimmed.startsWith('dropbox.com') ||
+    trimmed.startsWith('drive.google.com')
+  ) {
+    trimmed = `https://${trimmed}`;
+  }
+
+  // Revertir miniatura Fife CDN si se guardó previamente como imagen
+  const lh3Match = trimmed.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+  if (lh3Match && lh3Match[1]) {
+    return `https://drive.google.com/file/d/${lh3Match[1]}/view?usp=sharing`;
+  }
+
+  // Google Drive: convertir cualquier variante (open?id=, uc?id=, etc.) al visor oficial de documentos
+  const driveMatch = trimmed.match(
+    /drive\.google\.com\/(?:file\/(?:u\/\d+\/)?d\/|open\?id=|uc\?(?:export=(?:view|download)&)?id=)([a-zA-Z0-9_-]+)/
+  );
+  if (driveMatch && driveMatch[1]) {
+    const fileId = driveMatch[1];
+    return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+  }
+
+  // Dropbox: asegurar enlace accesible
+  if (/dropbox\.com/.test(trimmed)) {
+    if (trimmed.includes('dl=1')) {
+      return trimmed.replace(/([?&])dl=1/g, '$1dl=0');
+    }
+    return trimmed;
+  }
+
+  return trimmed;
+};
+

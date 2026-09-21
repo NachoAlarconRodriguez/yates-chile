@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useExpeditions } from '../hooks/useExpeditions';
 import { isExpeditionSoldOut, getExpeditionAvailableSpots, type PublicExpedition as Expedition } from '../services/expeditionService';
-import { normalizeExternalMediaUrl, type ExpeditionCategory, DEFAULT_EXPEDITION_CATEGORIES } from '../services/cmsService';
+import { normalizeExternalMediaUrl, normalizeBrochureUrl, type ExpeditionCategory, DEFAULT_EXPEDITION_CATEGORIES } from '../services/cmsService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { leadService } from '../services/leadService';
@@ -343,17 +343,10 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
   };
 
   const handleDownloadExpeditionBrochure = (exp: Expedition) => {
-    const brochureUrl = (exp as any).brochureUrl || (exp as any).brochure_url;
-    if (brochureUrl) {
-      const link = document.createElement('a');
-      link.href = brochureUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      const cleanName = exp.name.replace(/[^a-zA-Z0-9_-]/g, '_');
-      link.setAttribute('download', `Dossier_${cleanName}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    const rawUrl = (exp as any).brochureUrl || (exp as any).brochure_url;
+    if (rawUrl) {
+      const finalUrl = normalizeBrochureUrl(rawUrl);
+      window.open(finalUrl, '_blank', 'noopener,noreferrer');
     } else {
       const confirmWhatsapp = window.confirm(
         t(
@@ -409,7 +402,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
       {/* Grid of Expeditions */}
       <section id="grid-expediciones" className="py-20 bg-slate-50/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16 space-y-2">
+          <div className="text-center max-w-3xl mx-auto mb-8 space-y-2">
             <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 font-mono">
               {t('Salidas Programadas 2026/2027', 'Scheduled Departures 2026/2027')}
             </span>
@@ -421,30 +414,32 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
             </p>
           </div>
 
-          {/* Filter Pills por Tipo de Expedición */}
-          <div className="flex flex-wrap items-center justify-center gap-2 max-w-4xl mx-auto mb-12">
-            {[
-              { id: 'todos', label: t('Todas las Travesías', 'All Expeditions') },
-              ...cmsCategories.map((c) => ({
-                id: c.id,
-                label: c.tag ? `${c.name} (${c.tag})` : c.name,
-              })),
-            ].map((tab) => {
-              const isActive = selectedType === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setSelectedType(tab.id)}
-                  className={`px-4 sm:px-5 py-2.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2 select-none ${
-                    isActive
-                      ? 'bg-[#0b192c] text-white shadow-md scale-105 ring-2 ring-sky-400/40'
-                      : 'bg-white text-slate-600 hover:text-slate-950 hover:bg-slate-100 border border-slate-200 shadow-2xs'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+          {/* Filter Pills por Tipo de Expedición (Una sola línea compacta) */}
+          <div className="w-full overflow-x-auto no-scrollbar py-1 mb-8">
+            <div className="flex items-center justify-start sm:justify-center gap-2 min-w-max mx-auto px-4">
+              {[
+                { id: 'todos', label: t('Todas las Travesías', 'All Expeditions') },
+                ...cmsCategories.map((c) => ({
+                  id: c.id,
+                  label: c.name,
+                })),
+              ].map((tab) => {
+                const isActive = selectedType === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSelectedType(tab.id)}
+                    className={`px-4 py-1.5 rounded-full text-xs whitespace-nowrap transition-all duration-200 cursor-pointer flex items-center gap-1.5 select-none shrink-0 ${
+                      isActive
+                        ? 'bg-[#0b192c] text-white shadow-xs font-semibold ring-1 ring-[#0b192c]'
+                        : 'bg-white text-slate-600 hover:text-slate-950 hover:bg-slate-50 border border-slate-200/90 shadow-2xs font-medium'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {loading && expeditions.length === 0 ? (
