@@ -164,8 +164,11 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
       } else if (!routeId && expeditionCategoryOptions.length > 0) {
         setRouteId(expeditionCategoryOptions[0].value);
       }
+      if (initialVesselId) {
+        setVesselId(initialVesselId);
+      }
     }
-  }, [isOpen, initialRouteId, expeditionCategoryOptions, routeId]);
+  }, [isOpen, initialRouteId, initialVesselId, expeditionCategoryOptions, routeId]);
 
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -208,7 +211,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   });
 
   // Step 2: Embarcación
-  const [vesselId, setVesselId] = useState<string>('vegvisir');
+  const [vesselId, setVesselId] = useState<string>(() => initialVesselId || 'vegvisir');
 
   // Step 3: Hospedaje (A Bordo vs En el Lodge)
   const [lodgingType, setLodgingType] = useState<'onboard' | 'lodge' | 'mixed'>('onboard');
