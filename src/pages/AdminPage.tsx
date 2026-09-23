@@ -89,6 +89,7 @@ import { VisualCmsEditor } from '../components/admin/VisualCmsEditor';
 import { VesselsConfigTab } from '../components/admin/VesselsConfigTab';
 import { LodgeConfigTab } from '../components/admin/LodgeConfigTab';
 import { AccessRequestsTab } from '../components/admin/AccessRequestsTab';
+import { PoliciesConfigTab } from '../components/admin/PoliciesConfigTab';
 import { useAccessRequests } from '../hooks/useAccessRequests';
 import {
   expeditionService,
@@ -753,8 +754,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Active Tab: 'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests'>('dashboard');
+  // Active Tab: 'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests' | 'policies'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'bookings' | 'analytics' | 'lodge' | 'expeditions' | 'payments' | 'services' | 'cms' | 'config-vessels' | 'config-lodge' | 'access-requests' | 'policies'>('dashboard');
   const [mobileAdminSidebarOpen, setMobileAdminSidebarOpen] = useState(false);
 
   // Estados de Solicitud de Acceso en Login
@@ -796,7 +797,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [forgotSent, setForgotSent] = useState(false);
 
   // Hooks & Data
-  const { rooms, bookings: lodgeBookings, refreshLodge, createBooking, adminBlockRoom, deleteBookingOrBlock, isRoomBookedForRange, updateRoom } = useLodge();
+  const { rooms, bookings: lodgeBookings, refreshLodge, createBooking, updateBookingStatus, adminBlockRoom, deleteBookingOrBlock, isRoomBookedForRange, updateRoom } = useLodge();
   const { services, refreshServices, createService, updateService, toggleServiceActive, deleteService } = useCatalogServices({ admin: true });
   const { content, refreshContent } = useSiteContent();
 
@@ -967,9 +968,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   }, [content]);
 
   const handleOpenEditDeparture = useCallback((dep: any) => {
-    const vId = ((dep.vessel_id || dep.vesselName || '') as string).toLowerCase().includes('terranova')
+    const rawVId = String(dep.vessel_id || dep.vesselId || (typeof dep.vessel === 'object' ? dep.vessel?.id : undefined) || '').toLowerCase();
+    const rawVName = String(dep.vesselName || (typeof dep.vessel === 'object' ? dep.vessel?.name : dep.vessel) || '').toLowerCase();
+    const vId = (rawVId.includes('terranova') || rawVName.includes('terranova'))
       ? 'terranova'
-      : ((dep.vessel_id || dep.vesselName || '') as string).toLowerCase().includes('lodge')
+      : (rawVId.includes('lodge') || rawVName.includes('lodge'))
       ? 'lodge'
       : 'vegvisir';
 
@@ -1133,6 +1136,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
 
     setEditingDeparture({
       ...dep,
+      vessel_id: dep.vessel_id || dep.vesselId || vId,
+      vesselId: dep.vessel_id || dep.vesselId || vId,
       route_id: dep.route_id || dep.routeId || 'ruta-juan-fernandez',
       routeId: dep.route_id || dep.routeId || 'ruta-juan-fernandez',
       available_slots: effectiveAvail,
@@ -2950,13 +2955,15 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     if (departures && departures.length > 0) {
       return departures.map((dep) => {
         const route = expRoutes.find((r) => r.id === dep.route_id);
-        const vessel = vessels.find((v) => v.id === dep.vessel_id);
+        const depVesselId = dep.vessel_id || dep.vesselId || (typeof dep.vessel === 'object' ? dep.vessel?.id : undefined);
+        const vessel = vessels.find((v) => v.id === depVesselId);
 
-        // Strictly Velero Vegvisir or Yate Terranova
-        const rawVName = (vessel?.name || dep.vessel_id || dep.name || '').toLowerCase();
-        const isTerranova = dep.vessel_id === 'terranova' || rawVName.includes('terranova');
-        const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
-        const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
+        // Strictly Velero Vegvisir or Yate Terranova or Lodge
+        const rawVName = (vessel?.name || depVesselId || dep.name || '').toLowerCase();
+        const isTerranova = depVesselId === 'terranova' || rawVName.includes('terranova');
+        const isLodge = depVesselId === 'lodge' || rawVName.includes('lodge');
+        const vesselName = vessel?.name || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
+        const vesselType = isTerranova ? 'Hatteras 65ft LRC' : isLodge ? 'Refugio Boutique' : 'Dufour 52.5 ft Francés';
 
         // Full unabbreviated route title
         let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
@@ -2979,16 +2986,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           }
           return false;
         });
-        const realPaxCount = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+        const isConfirmedBooking = (st?: string | null) =>
+          st === 'approved' || st === 'partial' || st === 'paid' || st === 'completed';
+        const isPendingBooking = (st?: string | null) =>
+          st === 'pending_transfer' || st === 'pending';
+
+        const confirmedBookings = depBookings.filter((b: any) => isConfirmedBooking(b.status));
+        const pendingBookings = depBookings.filter((b: any) => isPendingBooking(b.status));
+
+        const realPaxCount = confirmedBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+        const pendingPaxCount = pendingBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
         const maxPax = dep.total_slots || (isTerranova ? 8 : 6);
-        const configuredAvail = (dep.available_slots !== undefined && dep.available_slots !== null && String(dep.available_slots).trim() !== '')
-          ? Number(dep.available_slots)
-          : undefined;
         const calculatedAvail = Math.max(0, maxPax - realPaxCount);
-        const availablePax = configuredAvail !== undefined
-          ? Math.min(configuredAvail, calculatedAvail)
-          : calculatedAvail;
-        const isSoldOut = availablePax <= 0 || (configuredAvail !== undefined && configuredAvail <= 0) || realPaxCount >= maxPax;
+        const availablePax = calculatedAvail;
+        const isSoldOut = availablePax <= 0 || realPaxCount >= maxPax;
         const bookedPax = isSoldOut ? maxPax : realPaxCount;
 
         const depDateFormatted = formatDateDDMMYYYY(dep.departure_date);
@@ -3014,6 +3025,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           maxPax,
           bookedPax,
           availablePax,
+          pendingPax: pendingPaxCount,
           pricePerPaxClp: numericPrice,
           priceFormatted,
           pricePerPax: `${priceFormatted} CLP`,
@@ -3047,7 +3059,16 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         }
         return false;
       });
-      const realPaxCount = expBookingsList.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+      const isConfirmedBooking = (st?: string | null) =>
+        st === 'approved' || st === 'partial' || st === 'paid' || st === 'completed';
+      const isPendingBooking = (st?: string | null) =>
+        st === 'pending_transfer' || st === 'pending';
+
+      const confirmedBookings = expBookingsList.filter((b: any) => isConfirmedBooking(b.status));
+      const pendingBookings = expBookingsList.filter((b: any) => isPendingBooking(b.status));
+
+      const realPaxCount = confirmedBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+      const pendingPaxCount = pendingBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
       const maxPax = exp.totalSlots || 6;
       const bookedPax = realPaxCount;
       const availablePax = Math.max(0, maxPax - bookedPax);
@@ -3072,6 +3093,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         maxPax,
         bookedPax,
         availablePax,
+        pendingPax: pendingPaxCount,
         pricePerPaxClp: numericPrice,
         priceFormatted,
         pricePerPax: `${priceFormatted} CLP`,
@@ -3089,10 +3111,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   const filteredDepartures = useMemo(() => {
     const list = departures.filter((dep) => {
       if (expeditionsAssetFilter === 'all') return true;
-      const vessel = vessels.find((v) => v.id === dep.vessel_id);
-      const vName = (vessel?.name || dep.vessel_id || '').toLowerCase();
-      if (expeditionsAssetFilter === 'vegvisir') return dep.vessel_id === 'vegvisir' || vName.includes('vegvisir');
-      if (expeditionsAssetFilter === 'terranova') return dep.vessel_id === 'terranova' || vName.includes('terranova');
+      const depVesselId = dep.vessel_id || dep.vesselId || (typeof dep.vessel === 'object' ? dep.vessel?.id : undefined);
+      const vessel = vessels.find((v) => v.id === depVesselId);
+      const vName = (vessel?.name || depVesselId || '').toLowerCase();
+      if (expeditionsAssetFilter === 'vegvisir') return depVesselId === 'vegvisir' || vName.includes('vegvisir');
+      if (expeditionsAssetFilter === 'terranova') return depVesselId === 'terranova' || vName.includes('terranova');
       return true;
     });
 
@@ -3928,6 +3951,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     );
 
     const res = await expeditionService.updateBookingStatus(bookingId, dbStatus as any);
+    if (!res.success) {
+      triggerAlert(res.error || 'No fue posible actualizar el estado del pago.', 'warning', 'Atención Cupos');
+      fetchAllData();
+      return;
+    }
 
     // Sincronizar de inmediato el pago en el CRM de Clientes
     const targetBooking = expBookings.find(
@@ -5344,6 +5372,22 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
                 {activeTab === 'cms' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
               </button>
+
+              {/* Políticas & Documentos */}
+              <button
+                onClick={() => handleTabClick('policies')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  activeTab === 'policies'
+                    ? 'bg-[#0b192c] text-white shadow-sm shadow-[#0b192c]/20'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-slate-50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className={`w-4 h-4 ${activeTab === 'policies' ? 'text-sky-300' : 'text-slate-400'}`} />
+                  <span>Políticas & Documentos</span>
+                </div>
+                {activeTab === 'policies' && <div className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
+              </button>
             </div>
           </nav>
         </div>
@@ -5441,6 +5485,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               {activeTab === 'config-vessels' && <Sailboat className="w-4.5 h-4.5 text-[#0b192c]" />}
               {activeTab === 'config-lodge' && <BedDouble className="w-4.5 h-4.5 text-[#0b192c]" />}
               {activeTab === 'cms' && <Sparkles className="w-4.5 h-4.5 text-[#0b192c]" />}
+              {activeTab === 'policies' && <FileText className="w-4.5 h-4.5 text-[#0b192c]" />}
               {activeTab === 'access-requests' && <UserPlus className="w-4.5 h-4.5 text-[#0b192c]" />}
             </div>
             <div>
@@ -5465,6 +5510,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   ? 'Configuración del Lodge & Habitaciones'
                   : activeTab === 'cms'
                   ? 'CMS Web'
+                  : activeTab === 'policies'
+                  ? 'Políticas & Documentos Legales'
                   : 'Solicitudes de Acceso Administrativo'}
               </h2>
               <span className="text-[11px] text-slate-400 font-light block">
@@ -5486,6 +5533,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                   ? `${services.length} experiencias activas en catálogo`
                   : activeTab === 'cms'
                   ? 'Editor de portada y contenidos públicos'
+                  : activeTab === 'policies'
+                  ? 'Gestión centralizada de PDFs y condiciones de reserva'
                   : activeTab === 'config-vessels'
                   ? 'Gestión de barcos, fichas técnicas, aforos y fotos de flota'
                   : activeTab === 'config-lodge'
@@ -7548,19 +7597,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 {uStatus === 'confirmed' && (
                                   <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200">
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    <span>Confirmada</span>
+                                    <span>{b.type === 'lodge' ? 'Habitación Asegurada' : 'Confirmada'}</span>
                                   </span>
                                 )}
                                 {uStatus === 'reserved' && (
                                   <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 bg-amber-50 text-amber-800 border border-amber-200">
                                     <Clock className="w-3 h-3 text-amber-600" />
-                                    <span>Reservada (50%)</span>
+                                    <span>{b.type === 'lodge' ? 'Asegurada (50%)' : 'Reservada (50%)'}</span>
                                   </span>
                                 )}
                                 {uStatus === 'scheduled' && (
                                   <span className="text-[10px] font-bold font-mono px-2.5 py-1 rounded-full uppercase inline-flex items-center gap-1.5 bg-sky-50 text-sky-800 border border-sky-200">
                                     <Clock className="w-3 h-3 text-sky-600" />
-                                    <span>Agendada (0%)</span>
+                                    <span>{b.type === 'lodge' ? 'En Espera de Abono' : 'Agendada (0%)'}</span>
                                   </span>
                                 )}
                                 {uStatus === 'blocked' && (
@@ -7705,17 +7754,17 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             </div>
                             {uStatus === 'confirmed' && (
                               <span className="text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                Confirmada
+                                {b.type === 'lodge' ? 'Habitación Asegurada' : 'Confirmada'}
                               </span>
                             )}
                             {uStatus === 'reserved' && (
                               <span className="text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase bg-amber-50 text-amber-800 border border-amber-200">
-                                Reservada (50%)
+                                {b.type === 'lodge' ? 'Asegurada (50%)' : 'Reservada (50%)'}
                               </span>
                             )}
                             {uStatus === 'scheduled' && (
                               <span className="text-[9px] font-bold font-mono px-2.5 py-1 rounded-full uppercase bg-sky-50 text-sky-800 border border-sky-200">
-                                Agendada (0%)
+                                {b.type === 'lodge' ? 'En Espera de Abono' : 'Agendada (0%)'}
                               </span>
                             )}
                             {uStatus === 'blocked' && (
@@ -8377,7 +8426,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             rooms.forEach((r) => {
               daysArray.forEach((d) => {
                 const isBooked = lodgeBookings.some(
-                  (b) => b.status !== 'cancelled' && b.room_id === r.id && b.check_in <= d.dateStr && d.dateStr < b.check_out
+                  (b) => (b.status === 'approved' || b.status === 'blocked') && b.room_id === r.id && b.check_in <= d.dateStr && d.dateStr < b.check_out
                 );
                 if (isBooked) bookedNightsCount++;
               });
@@ -8768,12 +8817,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                                   : isBlocked
                                                   ? 'bg-slate-500/20 text-slate-300 border border-slate-500/30'
                                                   : isPending
-                                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                                  ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40'
                                                   : isWhatsApp
                                                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                                                   : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
                                               }`}>
-                                                {channelLabel}
+                                                {isPending ? 'En espera de abono' : channelLabel}
                                               </span>
                                               <span className="text-[10px] font-mono text-sky-200/80 font-bold">
                                                 {spanDays} {spanDays === 1 ? 'noche' : 'noches'}
@@ -8784,6 +8833,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                             <div className="font-serif font-bold text-xs text-white truncate">
                                               {getCleanLodgeDetail(b)}
                                             </div>
+
+                                            {isPending && (
+                                              <div className="text-[10px] text-amber-300/90 font-medium">
+                                                (Noche disponible para venta hasta validar abono 50%)
+                                              </div>
+                                            )}
 
                                             {/* Dates & Range */}
                                             <div className="flex items-center gap-1.5 text-[10px] text-slate-300 font-mono">
@@ -8836,7 +8891,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                                     ? 'bg-emerald-100 text-emerald-800'
                                                     : 'bg-blue-100 text-blue-900'
                                                 }`}>
-                                                  {channelLabel}
+                                                  {isPending ? 'En espera de abono' : channelLabel}
                                                 </span>
                                                 <span className="text-[10px] font-mono text-slate-400 font-bold">
                                                   {b.booking_code}
@@ -8886,6 +8941,29 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
                                           {/* Contact & Actions list */}
                                           <div className="space-y-2 pt-1">
+                                            {/* Validar Abono y Bloquear Habitación */}
+                                            {isPending && (
+                                              <button
+                                                type="button"
+                                                onClick={async (e) => {
+                                                  e.stopPropagation();
+                                                  setActiveLodgeResMenuId(null);
+                                                  const res = await updateBookingStatus(b.id, 'approved');
+                                                  if (res.success) {
+                                                    setActionMessage(`✓ Habitación confirmada y bloqueada exitosamente para ${b.guest_name || b.booking_code}.`);
+                                                    setTimeout(() => setActionMessage(null), 4000);
+                                                    refreshLodge();
+                                                    fetchAllData();
+                                                  } else {
+                                                    triggerAlert(res.error || 'No fue posible confirmar la reserva.', 'warning', 'Atención Conflicto');
+                                                  }
+                                                }}
+                                                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition cursor-pointer shadow-sm active:scale-95"
+                                              >
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                <span>Aprobar Abono y Bloquear</span>
+                                              </button>
+                                            )}
                                             {/* WhatsApp Button */}
                                             {b.guest_phone && (
                                               <a
@@ -9289,9 +9367,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     {filteredDepartures.length > 0 ? (
                       filteredDepartures.map((dep) => {
                         const route = expRoutes.find(r => r.id === dep.route_id);
-                        const vessel = vessels.find(v => v.id === dep.vessel_id);
-                        const isTerranova = dep.vessel_id === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
-                        const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+                        const depVesselId = dep.vessel_id || dep.vesselId || (typeof dep.vessel === 'object' ? dep.vessel?.id : undefined);
+                        const vessel = vessels.find(v => v.id === depVesselId);
+                        const isTerranova = depVesselId === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
+                        const isLodge = depVesselId === 'lodge' || (vessel?.name && vessel.name.toLowerCase().includes('lodge')) || (dep.name && dep.name.toLowerCase().includes('lodge'));
+                        const vesselName = vessel?.name || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
                         let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
                         if (routeTitle.startsWith('JF ')) {
                           routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
@@ -9311,20 +9391,24 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           }
                           return false;
                         });
-                        const realBookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                        const isConfirmedBooking = (st?: string | null) =>
+                          st === 'approved' || st === 'partial' || st === 'paid' || st === 'completed';
+                        const isPendingBooking = (st?: string | null) =>
+                          st === 'pending_transfer' || st === 'pending';
+
+                        const confirmedBookings = depBookings.filter((b: any) => isConfirmedBooking(b.status));
+                        const pendingBookings = depBookings.filter((b: any) => isPendingBooking(b.status));
+
+                        const realBookedPax = confirmedBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                        const pendingPax = pendingBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
                         const maxSlots = dep.total_slots || 10;
-                        const configuredAvail = (dep.available_slots !== undefined && dep.available_slots !== null && String(dep.available_slots).trim() !== '')
-                          ? Number(dep.available_slots)
-                          : undefined;
                         const calculatedAvailable = Math.max(0, maxSlots - realBookedPax);
-                        const remainingSlots = configuredAvail !== undefined
-                          ? Math.min(configuredAvail, calculatedAvailable)
-                          : calculatedAvailable;
+                        const remainingSlots = calculatedAvailable;
                         const isClosedOrCompleted = dep.status === 'completed' || dep.status === 'cancelled' || (dep as any).is_closed === true;
-                        const isAgotado = isClosedOrCompleted || remainingSlots <= 0 || (configuredAvail !== undefined && configuredAvail <= 0) || realBookedPax >= maxSlots;
+                        const isAgotado = isClosedOrCompleted || remainingSlots <= 0 || realBookedPax >= maxSlots;
                         const bookedPax = isAgotado ? maxSlots : realBookedPax;
                         const percent = isAgotado ? 100 : Math.min(100, Math.round((bookedPax / maxSlots) * 100));
-                        const VesselIcon = isTerranova ? Ship : Sailboat;
+                        const VesselIcon = isTerranova ? Ship : isLodge ? BedDouble : Sailboat;
                         const calcDaysUntil = (dateStr?: string) => {
                           if (!dateStr) return 999;
                           const target = new Date(dateStr);
@@ -9437,6 +9521,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                   </span>
                                 )}
                               </div>
+
+                              {pendingPax > 0 && !isAgotado && (
+                                <div className="text-[10px] font-mono text-amber-600 font-medium">
+                                  +{pendingPax} en espera de abono
+                                </div>
+                              )}
 
                               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                                 <div
@@ -9627,9 +9717,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         {filteredDepartures.length > 0 ? (
                           filteredDepartures.map((dep, depIndex) => {
                             const route = expRoutes.find(r => r.id === dep.route_id);
-                            const vessel = vessels.find(v => v.id === dep.vessel_id);
-                            const isTerranova = dep.vessel_id === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
-                            const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
+                            const depVesselId = dep.vessel_id || dep.vesselId || (typeof dep.vessel === 'object' ? dep.vessel?.id : undefined);
+                            const vessel = vessels.find(v => v.id === depVesselId);
+                            const isTerranova = depVesselId === 'terranova' || (vessel?.name && vessel.name.toLowerCase().includes('terranova')) || (dep.name && dep.name.toLowerCase().includes('terranova'));
+                            const isLodge = depVesselId === 'lodge' || (vessel?.name && vessel.name.toLowerCase().includes('lodge')) || (dep.name && dep.name.toLowerCase().includes('lodge'));
+                            const vesselName = vessel?.name || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
                             let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
                             if (routeTitle.startsWith('JF ')) {
                               routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
@@ -9649,20 +9741,24 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                               }
                               return false;
                             });
-                            const realBookedPax = depBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                            const isConfirmedBooking = (st?: string | null) =>
+                              st === 'approved' || st === 'partial' || st === 'paid' || st === 'completed';
+                            const isPendingBooking = (st?: string | null) =>
+                              st === 'pending_transfer' || st === 'pending';
+
+                            const confirmedDepBookings = depBookings.filter((b: any) => isConfirmedBooking(b.status));
+                            const pendingDepBookings = depBookings.filter((b: any) => isPendingBooking(b.status));
+
+                            const realBookedPax = confirmedDepBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
+                            const pendingPax = pendingDepBookings.reduce((sum: number, b: any) => sum + (Number(b.pax_count) || 1), 0);
                             const maxSlots = dep.total_slots || 10;
-                            const configuredAvail = (dep.available_slots !== undefined && dep.available_slots !== null && String(dep.available_slots).trim() !== '')
-                              ? Number(dep.available_slots)
-                              : undefined;
                             const calculatedAvailable = Math.max(0, maxSlots - realBookedPax);
-                            const availablePax = configuredAvail !== undefined
-                              ? Math.min(configuredAvail, calculatedAvailable)
-                              : calculatedAvailable;
+                            const availablePax = calculatedAvailable;
                             const isClosedOrCompleted = dep.status === 'completed' || dep.status === 'cancelled' || (dep as any).is_closed === true;
-                            const isSoldOut = isClosedOrCompleted || availablePax <= 0 || (configuredAvail !== undefined && configuredAvail <= 0) || realBookedPax >= maxSlots;
+                            const isSoldOut = isClosedOrCompleted || availablePax <= 0 || realBookedPax >= maxSlots;
                             const bookedPax = isSoldOut ? maxSlots : realBookedPax;
                             const percent = isSoldOut ? 100 : Math.round((bookedPax / maxSlots) * 100);
-                            const VesselIcon = isTerranova ? Ship : Sailboat;
+                            const VesselIcon = isTerranova ? Ship : isLodge ? BedDouble : Sailboat;
 
                             return (
                               <tr key={dep.id} className="hover:bg-slate-50/80 transition-colors">
@@ -9702,6 +9798,11 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         {isSoldOut ? 'Completo' : `${availablePax} libres`}
                                       </strong>
                                     </div>
+                                    {pendingPax > 0 && !isSoldOut && (
+                                      <div className="text-[9px] font-mono text-amber-600 font-medium tracking-tight">
+                                        +{pendingPax} en espera de abono
+                                      </div>
+                                    )}
                                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                       <div
                                         className={`h-full rounded-full transition-all duration-500 ${
@@ -10109,8 +10210,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 const route = expRoutes.find((r) => r.id === dep.route_id);
                                 let routeTitle = dep.name || route?.title || 'Expedición Robinson Crusoe';
                                 if (routeTitle.startsWith('JF ')) routeTitle = routeTitle.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
-                                const isTerranova = dep.vessel_id === 'terranova' || (dep.name && dep.name.toLowerCase().includes('terranova'));
-                                const vesselName = isTerranova ? 'Yate Terranova' : dep.vessel_id === 'lodge' ? 'Lodge Bahía Cumberland' : 'Velero Vegvisir';
+                                const depVesselId = dep.vessel_id || dep.vesselId || (typeof dep.vessel === 'object' ? dep.vessel?.id : undefined);
+                                const isTerranova = depVesselId === 'terranova' || (dep.name && dep.name.toLowerCase().includes('terranova'));
+                                const vesselName = isTerranova ? 'Yate Terranova' : depVesselId === 'lodge' ? 'Lodge Bahía Cumberland' : 'Velero Vegvisir';
                                 const paxCount = expBookings.filter((b) => {
                                   if (b.departure_id) return b.departure_id === dep.id || String(b.departure_id) === String(dep.id);
                                   const bDate = String((b as any).departure_date || '').split('T')[0].trim();
@@ -11866,6 +11968,13 @@ ${cust.notes || 'Sin notas adicionales.'}`;
           {/* ========================================================================= */}
           {activeTab === 'access-requests' && (
             <AccessRequestsTab />
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 8: POLÍTICAS & DOCUMENTOS CENTRALIZADOS */}
+          {/* ========================================================================= */}
+          {activeTab === 'policies' && (
+            <PoliciesConfigTab />
           )}
         </main>
       </div>
@@ -13755,8 +13864,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     <span className="font-mono font-bold text-xs text-[#0b192c] whitespace-nowrap">
                                       ${pax.amountPaid.toLocaleString('es-CL')} CLP
                                     </span>
-                                    <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap shrink-0">
-                                      {isFullyPaid ? '100% Pagado' : isPartial ? '50% Abono' : '0% Pendiente'}
+                                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0 ${
+                                      isFullyPaid
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : isPartial
+                                        ? 'bg-sky-100 text-sky-800 border border-sky-300'
+                                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    }`}>
+                                      {isFullyPaid ? 'Cupo Asegurado (100%)' : isPartial ? 'Cupo Asegurado (50%)' : 'Sin Cupo (Espera Abono)'}
                                     </span>
                                   </div>
 

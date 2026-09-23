@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, PhoneCall, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { PoliciesModal } from '../modules/PoliciesModal';
 
 interface HeaderProps {
   currentPath?: string;
@@ -9,6 +10,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [policiesModalOpen, setPoliciesModalOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
   const [fleetMenuOpen, setFleetMenuOpen] = useState(false);
@@ -170,6 +172,15 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
             >
               {t('El Lodge', 'The Lodge')}
             </a>
+
+            {/* Políticas */}
+            <button
+              type="button"
+              onClick={() => setPoliciesModalOpen(true)}
+              className="text-sm font-semibold transition-colors py-2 border-b-2 min-h-[48px] flex items-center text-slate-700 border-transparent hover:text-slate-950 hover:border-slate-400 cursor-pointer"
+            >
+              {t('Políticas', 'Policies')}
+            </button>
           </nav>
 
           {/* Right Actions: Language Switcher Only */}
@@ -285,6 +296,18 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
             {t('El Lodge', 'The Lodge')}
           </a>
 
+          {/* Políticas */}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setPoliciesModalOpen(true);
+            }}
+            className="w-full text-left px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center text-slate-800 hover:bg-slate-50 cursor-pointer"
+          >
+            {t('Políticas', 'Policies')}
+          </button>
+
           <div className="pt-4 border-t border-slate-200">
             <a
               href="https://wa.me/56981312920"
@@ -298,6 +321,12 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
           </div>
         </div>
       )}
+
+      {/* Global Policies Modal */}
+      <PoliciesModal
+        isOpen={policiesModalOpen}
+        onClose={() => setPoliciesModalOpen(false)}
+      />
     </header>
   );
 };

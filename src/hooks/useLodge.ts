@@ -29,7 +29,7 @@ export function useLodge() {
   const isDateBookedForRoom = (roomId: string, dateStr: string) => {
     return bookings.some((b) => {
       if (b.room_id !== roomId) return false;
-      if (!['pending_transfer', 'approved', 'blocked'].includes(b.status)) return false;
+      if (!['approved', 'blocked'].includes(b.status)) return false;
       return dateStr >= b.check_in && dateStr < b.check_out;
     });
   };
@@ -38,7 +38,7 @@ export function useLodge() {
     if (!checkIn || !checkOut) return false;
     return bookings.some((b) => {
       if (b.room_id !== roomId) return false;
-      if (!['pending_transfer', 'approved', 'blocked'].includes(b.status)) return false;
+      if (!['approved', 'blocked'].includes(b.status)) return false;
       return b.check_in < checkOut && b.check_out > checkIn;
     });
   };
@@ -55,6 +55,15 @@ export function useLodge() {
     if (res.success) {
       await fetchData();
     }
+    return res;
+  };
+
+  const updateBookingStatus = async (
+    bookingId: string,
+    newStatus: 'approved' | 'pending_transfer' | 'cancelled' | 'completed' | 'blocked'
+  ) => {
+    const res = await lodgeService.updateBookingStatus(bookingId, newStatus);
+    await fetchData();
     return res;
   };
 
@@ -79,6 +88,7 @@ export function useLodge() {
     isRoomBookedForRange,
     isDateFullyBooked,
     createBooking,
+    updateBookingStatus,
     adminBlockRoom,
     deleteBookingOrBlock,
     createRoom: async (newRoom: Partial<LodgeRoom>) => {

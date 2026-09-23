@@ -29,6 +29,7 @@ import {
   type PublicExpedition, 
   type ExpeditionPolicySection 
 } from '../../services/expeditionService';
+import { cmsService } from '../../services/cmsService';
 
 export const getExpeditionAvailableSpots = (exp?: PublicExpedition | null): number => {
   if (!exp) return 0;
@@ -208,6 +209,10 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
           }
         } catch {}
       }
+    }
+    if (!url) {
+      const globalPolicies = cmsService.getGlobalPoliciesSync();
+      url = globalPolicies.expeditions_policy_url || '';
     }
     return url;
   }, [currentActiveExp, liveExpFromList]);
@@ -1119,8 +1124,8 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                         <span className="text-xs">Abono Inicial Requerido (50% Pie):</span>
                         <span className="font-mono font-bold text-sm text-slate-950">${depositAmount.toLocaleString('es-CL')} CLP</span>
                       </div>
-                      <div className="text-[10px] text-slate-400 font-light">
-                        * El 50% de saldo restante se cancela 30 días antes de la fecha de zarpe.
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        * El cupo queda formalmente reservado al momento de realizar el abono del 50%. El 50% de saldo restante se cancela 30 días antes del zarpe.
                       </div>
                     </div>
 
@@ -1276,8 +1281,11 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
               <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-light">
                 Tu expedición para <strong className="font-semibold text-white">{currentActiveExp.name}</strong> ({paxCount} {paxCount === 1 ? 'pasajero' : 'pasajeros'}) ha sido procesada con éxito.
               </p>
-              <p className="text-[11px] text-slate-400 font-light leading-relaxed pt-0.5">
-                Transfiere el abono del 50% ($<strong>{depositAmount.toLocaleString('es-CL')} CLP</strong>) y envía el comprobante por WhatsApp o a <strong>reservas@yateschile.cl</strong>.
+              <p className="text-[11px] text-amber-300 font-medium leading-relaxed pt-1">
+                Tu cupo quedará formalmente reservado al momento de realizar el abono del 50% ($<strong>{depositAmount.toLocaleString('es-CL')} CLP</strong>).
+              </p>
+              <p className="text-[10px] text-slate-400 font-light leading-relaxed">
+                Envía el comprobante por WhatsApp o a <strong>reservas@yateschile.cl</strong> para validar tu abono.
               </p>
             </div>
 

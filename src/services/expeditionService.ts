@@ -6,6 +6,9 @@ import { normalizeExternalMediaUrl } from './cmsService';
 export type ExpeditionRouteRow = Database['public']['Tables']['expedition_routes']['Row'];
 export type VesselRow = Database['public']['Tables']['vessels']['Row'];
 export type DepartureRow = Database['public']['Tables']['expedition_departures']['Row'] & {
+  vesselId?: string;
+  vesselName?: string;
+  routeId?: string;
   name?: string;
   headline?: string;
   location?: string;
@@ -23,6 +26,8 @@ export type DepartureRow = Database['public']['Tables']['expedition_departures']
   highlights?: string;
   includedServices?: string;
   policies?: ExpeditionPolicySection[] | string;
+  pending_pax?: number;
+  pendingPax?: number;
 };
 export type ExpeditionBookingRow = Database['public']['Tables']['expedition_bookings']['Row'];
 
@@ -141,6 +146,7 @@ export interface PublicExpedition {
   highlights?: string;
   includedServices?: string;
   policies?: ExpeditionPolicySection[] | string;
+  pendingPax?: number;
 }
 
 export const getExpeditionAvailableSpots = (exp?: Partial<PublicExpedition> | any | null): number => {
@@ -664,6 +670,9 @@ export const expeditionService = {
           const depId = row.section_key.replace('expedition_departure_', '');
           const meta = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
           cloudOverrides[depId] = {
+            vesselId: meta.vesselId || meta.vessel_id,
+            vessel_id: meta.vesselId || meta.vessel_id,
+            vessel: meta.vessel,
             routeId: meta.routeId || meta.route_id,
             route_id: meta.routeId || meta.route_id,
             image: normalizeExternalMediaUrl(row.media_url || meta.image),
@@ -697,47 +706,50 @@ export const expeditionService = {
     );
 
     const mapLocalToRow = (e: PublicExpedition): DepartureRow => {
-      const isTerranova = e.vessel.toLowerCase().includes('terranova') || e.vesselId === 'terranova';
-      const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
-      const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
-      let name = e.name;
+      const cloud = cloudOverrides[e.id];
+      const targetVesselId = cloud?.vesselId || cloud?.vessel_id || e.vesselId || (e.vessel.toLowerCase().includes('terranova') ? 'terranova' : 'vegvisir');
+      const isTerranova = targetVesselId === 'terranova' || e.vessel.toLowerCase().includes('terranova');
+      const isLodge = targetVesselId === 'lodge' || e.vessel.toLowerCase().includes('lodge');
+      const vesselName = cloud?.vessel || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
+      const vesselType = isTerranova ? 'Hatteras 65ft LRC' : isLodge ? 'Refugio Boutique' : 'Dufour 52.5 ft Francés';
+      let name = cloud?.name || e.name;
       if (name.startsWith('JF ')) {
         name = name.replace(/^JF\s*/i, 'Expedición Juan Fernández — ');
       }
       return {
         id: e.id,
-        route_id: cloudOverrides[e.id]?.route_id || cloudOverrides[e.id]?.routeId || e.routeId,
-        vessel_id: isTerranova ? 'terranova' : 'vegvisir',
+        route_id: cloud?.route_id || cloud?.routeId || e.routeId,
+        vessel_id: targetVesselId,
         departure_date: e.departureDate,
         return_date: e.returnDate,
-        total_slots: e.totalSlots,
-        available_slots: e.availableSlots,
-        price_per_pax_clp: e.pricePerPaxClp,
+        total_slots: cloud?.totalSlots !== undefined ? Number(cloud.totalSlots) : e.totalSlots,
+        available_slots: cloud?.availableSlots !== undefined ? Number(cloud.availableSlots) : e.availableSlots,
+        price_per_pax_clp: cloud?.pricePerPaxClp !== undefined ? Number(cloud.pricePerPaxClp) : e.pricePerPaxClp,
         price_charter_full_clp: e.priceCharterFullClp,
-        status: e.status,
+        status: (cloud?.status as any) || e.status,
         created_at: new Date().toISOString(),
         name: name,
-        location: e.location,
-        image: e.image,
-        description: e.description,
-        tempEstimate: e.tempEstimate,
-        brochureUrl: e.brochureUrl || (e as any).brochure_url,
-        brochure_url: e.brochureUrl || (e as any).brochure_url,
-        policyUrl: cloudOverrides[e.id]?.policyUrl || e.policyUrl || (e as any).policy_url,
-        policy_url: cloudOverrides[e.id]?.policyUrl || e.policyUrl || (e as any).policy_url,
+        location: cloud?.location || e.location,
+        image: cloud?.image || e.image,
+        description: cloud?.description || e.description,
+        tempEstimate: cloud?.tempEstimate || e.tempEstimate,
+        brochureUrl: cloud?.brochureUrl || e.brochureUrl || (e as any).brochure_url,
+        brochure_url: cloud?.brochureUrl || e.brochureUrl || (e as any).brochure_url,
+        policyUrl: cloud?.policyUrl || e.policyUrl || (e as any).policy_url,
+        policy_url: cloud?.policyUrl || e.policyUrl || (e as any).policy_url,
         bestViewTime: e.bestViewTime,
-        isFeatured: effectiveFeaturedSet.has(e.id) || cloudOverrides[e.id]?.isFeatured === true || e.isFeatured === true,
-        highlights: e.highlights,
-        includedServices: e.includedServices,
-        policies: e.policies || DEFAULT_EXPEDITION_POLICIES,
-        route: EXPEDITION_ROUTES.find((r) => r.id === e.routeId) || {
-          id: e.routeId,
+        isFeatured: effectiveFeaturedSet.has(e.id) || cloud?.isFeatured === true || e.isFeatured === true,
+        highlights: cloud?.highlights || e.highlights,
+        includedServices: cloud?.includedServices || e.includedServices,
+        policies: cloud?.policies || e.policies || DEFAULT_EXPEDITION_POLICIES,
+        route: EXPEDITION_ROUTES.find((r) => r.id === (cloud?.route_id || cloud?.routeId || e.routeId)) || {
+          id: cloud?.route_id || cloud?.routeId || e.routeId,
           title: name,
-          subtitle: e.location,
+          subtitle: cloud?.location || e.location,
           duration: `${e.startDate} - ${e.endDate}`,
         },
         vessel: {
-          id: isTerranova ? 'terranova' : 'vegvisir',
+          id: targetVesselId,
           name: vesselName,
           type: vesselType,
         },
@@ -767,9 +779,11 @@ export const expeditionService = {
         const mappedDb = (data as any[]).map((d) => {
           const matchedLocal = local.find((l) => l.id === d.id);
           const cloud = cloudOverrides[d.id];
-          const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
-          const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
-          const vesselType = isTerranova ? 'Hatteras 65ft LRC' : 'Dufour 52.5 ft Francés';
+          const targetVesselId = cloud?.vesselId || cloud?.vessel_id || d.vessel_id || matchedLocal?.vesselId || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova') ? 'terranova' : 'vegvisir');
+          const isTerranova = targetVesselId === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
+          const isLodge = targetVesselId === 'lodge' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('lodge')) || (d.name && d.name.toLowerCase().includes('lodge'));
+          const vesselName = cloud?.vessel || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : (d.vessel?.name || 'Velero Vegvisir'));
+          const vesselType = isTerranova ? 'Hatteras 65ft LRC' : isLodge ? 'Refugio Boutique' : (d.vessel?.type || 'Dufour 52.5 ft Francés');
           const routeName = cloud?.name || formatRouteDepartureTitle(d, matchedLocal);
           const routeLoc = cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández';
           const routeImg = cloud?.image || matchedLocal?.image || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg');
@@ -788,7 +802,19 @@ export const expeditionService = {
             }
           });
 
-          const realBookedPax = allDepBookings.reduce(
+          const isConfirmedBooking = (st?: string | null) =>
+            st === 'approved' || st === 'partial' || st === 'paid' || st === 'completed';
+          const isPendingBooking = (st?: string | null) =>
+            st === 'pending_transfer' || st === 'pending';
+
+          const confirmedDepBookings = allDepBookings.filter((b: any) => isConfirmedBooking(b.status));
+          const pendingDepBookings = allDepBookings.filter((b: any) => isPendingBooking(b.status));
+
+          const realBookedPax = confirmedDepBookings.reduce(
+            (sum: number, b: any) => sum + (Number(b.pax_count) || 1),
+            0
+          );
+          const pendingPax = pendingDepBookings.reduce(
             (sum: number, b: any) => sum + (Number(b.pax_count) || 1),
             0
           );
@@ -799,7 +825,7 @@ export const expeditionService = {
 
           const configuredRaw = cloud?.availableSlots !== undefined
             ? cloud.availableSlots
-            : (d.available_slots !== undefined && d.available_slots !== null ? d.available_slots : matchedLocal?.availableSlots);
+            : undefined;
           const configuredAvail = configuredRaw !== undefined && configuredRaw !== null && String(configuredRaw).trim() !== ''
             ? Math.max(0, Number(configuredRaw))
             : undefined;
@@ -827,6 +853,8 @@ export const expeditionService = {
             available_slots: availSlots,
             total_slots: cloud?.totalSlots !== undefined ? Number(cloud.totalSlots) : (d.total_slots || (isTerranova ? 8 : 6)),
             status: effectiveStatus,
+            pending_pax: pendingPax,
+            pendingPax: pendingPax,
             name: routeName,
             location: routeLoc,
             image: routeImg,
@@ -841,9 +869,9 @@ export const expeditionService = {
             policies: cloud?.policies || matchedLocal?.policies || DEFAULT_EXPEDITION_POLICIES,
             policyUrl: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
             policy_url: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
-            vessel_id: isTerranova ? 'terranova' : 'vegvisir',
+            vessel_id: targetVesselId,
             vessel: {
-              id: isTerranova ? 'terranova' : 'vegvisir',
+              id: targetVesselId,
               name: vesselName,
               type: vesselType,
             },
@@ -893,6 +921,9 @@ export const expeditionService = {
           const depId = row.section_key.replace('expedition_departure_', '');
           const meta = (row.metadata && typeof row.metadata === 'object') ? row.metadata : {};
           cloudOverrides[depId] = {
+            vesselId: meta.vesselId || meta.vessel_id,
+            vessel_id: meta.vesselId || meta.vessel_id,
+            vessel: meta.vessel,
             routeId: meta.routeId || meta.route_id,
             route_id: meta.routeId || meta.route_id,
             image: normalizeExternalMediaUrl(row.media_url || meta.image),
@@ -950,9 +981,11 @@ export const expeditionService = {
         const mapped: PublicExpedition[] = data.map((d: any) => {
           const matchedLocal = local.find((l) => l.id === d.id);
           const cloud = cloudOverrides[d.id];
-          const isTerranova = d.vessel_id === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
-          const vesselName = isTerranova ? 'Yate Terranova' : 'Velero Vegvisir';
-          const vesselId = isTerranova ? 'terranova' : 'vegvisir';
+          const targetVesselId = cloud?.vesselId || cloud?.vessel_id || d.vessel_id || matchedLocal?.vesselId || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova') ? 'terranova' : 'vegvisir');
+          const isTerranova = targetVesselId === 'terranova' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('terranova')) || (d.name && d.name.toLowerCase().includes('terranova'));
+          const isLodge = targetVesselId === 'lodge' || (d.vessel?.name && d.vessel.name.toLowerCase().includes('lodge')) || (d.name && d.name.toLowerCase().includes('lodge'));
+          const vesselName = cloud?.vessel || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : (d.vessel?.name || 'Velero Vegvisir'));
+          const vesselId = targetVesselId;
           const routeTitle = cloud?.name || formatRouteDepartureTitle(d, matchedLocal);
           const depYear = parseInt(d.departure_date?.split('-')[0] || '2026', 10);
           const months = getMonthsFromDates(d.departure_date, d.return_date);
@@ -971,7 +1004,19 @@ export const expeditionService = {
             }
           });
 
-          const realBookedPax = allDepBookings.reduce(
+          const isConfirmedBooking = (st?: string | null) =>
+            st === 'approved' || st === 'partial' || st === 'paid' || st === 'completed';
+          const isPendingBooking = (st?: string | null) =>
+            st === 'pending_transfer' || st === 'pending';
+
+          const confirmedDepBookings = allDepBookings.filter((b: any) => isConfirmedBooking(b.status));
+          const pendingDepBookings = allDepBookings.filter((b: any) => isPendingBooking(b.status));
+
+          const realBookedPax = confirmedDepBookings.reduce(
+            (sum: number, b: any) => sum + (Number(b.pax_count) || 1),
+            0
+          );
+          const pendingPax = pendingDepBookings.reduce(
             (sum: number, b: any) => sum + (Number(b.pax_count) || 1),
             0
           );
@@ -982,7 +1027,7 @@ export const expeditionService = {
 
           const configuredRaw = cloud?.availableSlots !== undefined
             ? cloud.availableSlots
-            : (d.available_slots !== undefined && d.available_slots !== null ? d.available_slots : matchedLocal?.availableSlots);
+            : undefined;
           const configuredAvail = configuredRaw !== undefined && configuredRaw !== null && String(configuredRaw).trim() !== ''
             ? Math.max(0, Number(configuredRaw))
             : undefined;
@@ -1020,6 +1065,7 @@ export const expeditionService = {
             spotsLeft: spots,
             totalSlots: cloud?.totalSlots !== undefined ? Number(cloud.totalSlots) : (d.total_slots || (isTerranova ? 8 : 6)),
             availableSlots: availSlots,
+            pendingPax: pendingPax,
             pricePerPaxClp: cloud?.pricePerPaxClp !== undefined ? Number(cloud.pricePerPaxClp) : (Number(d.price_per_pax_clp) || (isTerranova ? 2350000 : 1950000)),
             priceCharterFullClp: Number(d.price_charter_full_clp) || (isTerranova ? 18800000 : 11700000),
             vessel: vesselName,
@@ -1044,10 +1090,19 @@ export const expeditionService = {
 
         const extraLocal = local
           .filter((l) => !l.id.startsWith('exp-') && !data.some((d: any) => d.id === l.id))
-          .map((l) => ({
-            ...l,
-            isFeatured: effectiveFeaturedSet.has(l.id) || cloudOverrides[l.id]?.isFeatured === true || l.isFeatured === true,
-          }));
+          .map((l) => {
+            const cloud = cloudOverrides[l.id];
+            const targetVesselId = cloud?.vesselId || cloud?.vessel_id || l.vesselId || (l.vessel.toLowerCase().includes('terranova') ? 'terranova' : 'vegvisir');
+            const isTerranova = targetVesselId === 'terranova' || l.vessel.toLowerCase().includes('terranova');
+            const isLodge = targetVesselId === 'lodge' || l.vessel.toLowerCase().includes('lodge');
+            const vName = cloud?.vessel || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
+            return {
+              ...l,
+              vessel: vName,
+              vesselId: targetVesselId,
+              isFeatured: effectiveFeaturedSet.has(l.id) || cloud?.isFeatured === true || l.isFeatured === true,
+            };
+          });
         const allPublic = [...mapped, ...extraLocal];
         try {
           if (typeof window !== 'undefined') {
@@ -1060,18 +1115,36 @@ export const expeditionService = {
 
     const cached = getCachedPublicExpeditions();
     if (cached.length > 0) {
-      return cached.map((c) => ({
-        ...c,
-        isFeatured: effectiveFeaturedSet.has(c.id) || cloudOverrides[c.id]?.isFeatured === true || c.isFeatured === true,
-        policies: c.policies || DEFAULT_EXPEDITION_POLICIES,
-      }));
+      return cached.map((c) => {
+        const cloud = cloudOverrides[c.id];
+        const targetVesselId = cloud?.vesselId || cloud?.vessel_id || c.vesselId || (c.vessel.toLowerCase().includes('terranova') ? 'terranova' : 'vegvisir');
+        const isTerranova = targetVesselId === 'terranova' || c.vessel.toLowerCase().includes('terranova');
+        const isLodge = targetVesselId === 'lodge' || c.vessel.toLowerCase().includes('lodge');
+        const vName = cloud?.vessel || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : c.vessel);
+        return {
+          ...c,
+          vessel: vName,
+          vesselId: targetVesselId,
+          isFeatured: effectiveFeaturedSet.has(c.id) || cloud?.isFeatured === true || c.isFeatured === true,
+          policies: c.policies || DEFAULT_EXPEDITION_POLICIES,
+        };
+      });
     }
-    return local.map((l) => ({
-      ...l,
-      isFeatured: effectiveFeaturedSet.has(l.id) || cloudOverrides[l.id]?.isFeatured === true || l.isFeatured === true,
-      image: normalizeExternalMediaUrl(l.image),
-      policies: l.policies || DEFAULT_EXPEDITION_POLICIES,
-    }));
+    return local.map((l) => {
+      const cloud = cloudOverrides[l.id];
+      const targetVesselId = cloud?.vesselId || cloud?.vessel_id || l.vesselId || (l.vessel.toLowerCase().includes('terranova') ? 'terranova' : 'vegvisir');
+      const isTerranova = targetVesselId === 'terranova' || l.vessel.toLowerCase().includes('terranova');
+      const isLodge = targetVesselId === 'lodge' || l.vessel.toLowerCase().includes('lodge');
+      const vName = cloud?.vessel || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
+      return {
+        ...l,
+        vessel: vName,
+        vesselId: targetVesselId,
+        isFeatured: effectiveFeaturedSet.has(l.id) || cloud?.isFeatured === true || l.isFeatured === true,
+        image: normalizeExternalMediaUrl(l.image),
+        policies: l.policies || DEFAULT_EXPEDITION_POLICIES,
+      };
+    });
   },
 
   async getAllBookings(): Promise<ExpeditionBookingRow[]> {
@@ -1345,8 +1418,10 @@ export const expeditionService = {
             },
           ]);
 
-          // Deduct spots in Supabase departure row
-          if (validDepartureId) {
+          const shouldDeductSpots = (params.status === 'approved' || params.status === 'paid' || params.status === 'completed' || params.status === 'partial');
+
+          // Deduct spots in Supabase departure row ONLY if confirmed with payment
+          if (shouldDeductSpots && validDepartureId) {
             const { data: depData } = await supabase
               .from('expedition_departures')
               .select('available_slots, total_slots')
@@ -1400,8 +1475,9 @@ export const expeditionService = {
         console.warn('Supabase booking insert notice:', sbErr);
       }
 
-      // 2. Always deduct spots in local storage departures
-      if (params.departureId) {
+      // 2. Deduct spots in local storage departures ONLY if confirmed with payment
+      const shouldDeductSpots = (params.status === 'approved' || params.status === 'paid' || params.status === 'completed' || params.status === 'partial');
+      if (shouldDeductSpots && params.departureId) {
         const stored = getStoredDepartures();
         const updated = stored.map((e) => {
           if (e.id === params.departureId) {
@@ -1897,6 +1973,11 @@ export const expeditionService = {
           metaPayload.routeId = params.routeId;
           metaPayload.route_id = params.routeId;
         }
+        if (params.vesselId !== undefined) {
+          metaPayload.vesselId = params.vesselId;
+          metaPayload.vessel_id = params.vesselId;
+          metaPayload.vessel = vesselName;
+        }
         if (params.publicName !== undefined) metaPayload.name = params.publicName;
         if (params.publicHeadline !== undefined) metaPayload.headline = params.publicHeadline;
         if (params.publicLocation !== undefined) metaPayload.location = params.publicLocation;
@@ -1982,9 +2063,23 @@ export const expeditionService = {
         }
       } catch {}
 
+      const updatedFound = updated.find((e) => e.id === departureId);
+      const isTerranova = (params.vesselId || updatedFound?.vesselId) === 'terranova';
+      const isLodge = (params.vesselId || updatedFound?.vesselId) === 'lodge';
+      const vesselType = isTerranova ? 'Hatteras 65ft LRC' : isLodge ? 'Refugio Boutique' : 'Dufour 52.5 ft Francés';
+
       return { 
         success: true,
-        data: updated.find((e) => e.id === departureId) as any
+        data: {
+          ...updatedFound,
+          vessel_id: params.vesselId || updatedFound?.vesselId,
+          vesselId: params.vesselId || updatedFound?.vesselId,
+          vessel: {
+            id: params.vesselId || updatedFound?.vesselId,
+            name: vesselName,
+            type: vesselType,
+          },
+        } as any
       };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
@@ -2107,6 +2202,46 @@ export const expeditionService = {
     status: 'approved' | 'cancelled' | 'completed' | 'partial' | 'pending_transfer'
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      // 1. Fetch current booking to check if transition needs spot validation
+      let bookingData: any = null;
+      try {
+        const { data: bRow } = await supabase
+          .from('expedition_bookings')
+          .select('departure_id, pax_count, status')
+          .eq('id', bookingId)
+          .maybeSingle();
+        if (bRow) bookingData = bRow;
+      } catch {}
+
+      if (!bookingData && typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('yates_bookings');
+          if (stored) {
+            const list = JSON.parse(stored);
+            bookingData = list.find((b: any) => b.id === bookingId || b.booking_code === bookingId || b.code === bookingId);
+          }
+        } catch {}
+      }
+
+      const isNowConfirmed = status === 'approved' || status === 'completed' || status === 'partial';
+      const wasConfirmed = (bookingData?.status as string) === 'approved' || (bookingData?.status as string) === 'partial' || (bookingData?.status as string) === 'completed';
+
+      // If transitioning from unconfirmed -> confirmed, ensure departure has enough available slots
+      if (isNowConfirmed && !wasConfirmed && bookingData?.departure_id) {
+        const departures = await expeditionService.getDepartures();
+        const targetDep = departures.find((d) => d.id === bookingData.departure_id);
+        if (targetDep) {
+          const currentAvail = typeof targetDep.available_slots === 'number' ? targetDep.available_slots : (targetDep.total_slots || 6);
+          const requestedPax = Number(bookingData.pax_count) || 1;
+          if (currentAvail < requestedPax) {
+            return {
+              success: false,
+              error: `No hay cupos suficientes disponibles (${currentAvail} disponibles, ${requestedPax} solicitados). No es posible confirmar el cupo.`,
+            };
+          }
+        }
+      }
+
       const sbStatus: 'pending_transfer' | 'approved' | 'cancelled' | 'completed' =
         (status === 'approved' || status === 'completed' || status === 'partial')
           ? 'approved'
@@ -2207,18 +2342,20 @@ export const expeditionService = {
     try {
       let targetDepartureId: string | null = null;
       let paxCountToRestore = 1;
+      let wasBookingConfirmed = false;
 
       // 1. Try finding booking details from Supabase or localStorage
       try {
         const { data: bData } = await supabase
           .from('expedition_bookings')
-          .select('departure_id, pax_count')
+          .select('departure_id, pax_count, status')
           .eq('id', bookingId)
           .maybeSingle();
 
         if (bData) {
           targetDepartureId = bData.departure_id;
           paxCountToRestore = bData.pax_count || 1;
+          wasBookingConfirmed = (bData.status as string) === 'approved' || (bData.status as string) === 'partial' || (bData.status as string) === 'completed';
         }
       } catch {}
 
@@ -2233,6 +2370,7 @@ export const expeditionService = {
             if (found) {
               targetDepartureId = found.departure_id || found.departureId;
               paxCountToRestore = found.pax_count || found.paxCount || 1;
+              wasBookingConfirmed = found.status === 'approved' || found.status === 'partial' || found.status === 'completed';
             }
           }
         } catch {}
@@ -2262,8 +2400,8 @@ export const expeditionService = {
         }
       } catch (_) {}
 
-      // 4. Restore available slots on departure
-      if (targetDepartureId) {
+      // 4. Restore available slots on departure ONLY if the booking was confirmed with payment
+      if (wasBookingConfirmed && targetDepartureId) {
         try {
           const storedDeps = getStoredDepartures();
           const updatedDeps = storedDeps.map((d) => {

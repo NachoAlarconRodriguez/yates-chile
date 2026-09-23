@@ -25,6 +25,50 @@ export interface ExpeditionCategory {
   [key: string]: any;
 }
 
+export interface GlobalPoliciesConfig {
+  expeditions_policy_url: string;
+  lodge_policy_url: string;
+}
+
+export interface LodgePolicySection {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export const DEFAULT_LODGE_POLICIES: LodgePolicySection[] = [
+  {
+    id: 'lodge-pol-1',
+    title: '1. Garantía y Abono de Reserva (Pie)',
+    content: 'Para confirmar y asegurar su reserva en el lodge, se solicita el abono del 50% del total presupuestado vía transferencia bancaria. La habitación queda formalmente bloqueada y reservada una vez validado dicho abono por nuestro equipo.',
+  },
+  {
+    id: 'lodge-pol-2',
+    title: '2. Saldo Restante y Liquidación',
+    content: 'El 50% restante del valor de la estadía y excursiones contratadas deberá ser cancelado antes de su llegada o directamente durante el Check-in en las dependencias del Lodge.',
+  },
+  {
+    id: 'lodge-pol-3',
+    title: '3. Horarios de Check-in & Check-out',
+    content: '• Check-in: Desde las 15:00 hrs.\n• Check-out: Hasta las 11:00 hrs.\nEn caso de requerir horarios especiales por itinerario de vuelos o navegación por el Canal Beagle, se deberá coordinar previamente con nuestro equipo de Concierge.',
+  },
+  {
+    id: 'lodge-pol-4',
+    title: '4. Políticas de Cancelación y Reprogramación',
+    content: '• Más de 15 días antes del ingreso: Permite reprogramar la estadía sin penalización dentro de la misma temporada, o solicitar reembolso con un cargo administrativo del 15%.\n• Menos de 15 días o No-show: El abono inicial (50%) no es reembolsable debido a los costos logísticos y al bloqueo exclusivo de habitaciones en territorio austral.',
+  },
+  {
+    id: 'lodge-pol-5',
+    title: '5. Excursiones y Condiciones Meteorológicas',
+    content: 'Dada la naturaleza geográfica y climática de la Región de Magallanes y Cabo de Hornos, las excursiones marítimas y terrestres están supeditadas a las directrices de la Autoridad Marítima (DIRECTEMAR) y criterios de seguridad náutica. En caso de suspensión por condiciones climáticas adversas, la actividad será reprogramada o sustituida por otra experiencia equivalente.',
+  },
+  {
+    id: 'lodge-pol-6',
+    title: '6. Conservación del Territorio Austral',
+    content: 'Exigimos un estricto compromiso con el cuidado de los ecosistemas prístinos australes, respetando senderos habilitados y la fauna y flora nativa de la reserva.',
+  },
+];
+
 export const DEFAULT_EXPEDITION_CATEGORIES: ExpeditionCategory[] = [
   {
     id: 'ruta-juan-fernandez',
@@ -446,6 +490,18 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
       address: 'Uberlindo Andaur 222, Isla Robinson Crusoe',
     },
   },
+
+  // 8. POLÍTICAS GLOBALES Y DOCUMENTOS LEGALES
+  general_policies: {
+    section_key: 'general_policies',
+    title: 'Políticas y Documentos Oficiales',
+    subtitle: 'POLÍTICAS DE RESERVA LODGE Y EXPEDICIONES',
+    body_text: 'Enlaces y documentos centralizados para las reservas y el sitio web público.',
+    metadata: {
+      expeditions_policy_url: 'https://drive.google.com/file/d/1XPI2uMtRvusGR_11OqpYBKTRiQgDqs0m/view?usp=sharing',
+      lodge_policy_url: 'https://drive.google.com/file/d/13_JMKK0XXhbqv82hBrKzpWBq1wvVS46x/view?usp=sharing',
+    },
+  },
 };
 
 const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v14';
@@ -742,6 +798,109 @@ export const cmsService = {
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
     }
+  },
+
+  getGlobalPoliciesSync(): GlobalPoliciesConfig {
+    const content = this.getCachedContentSync();
+    const meta = (content['general_policies']?.metadata as any) || {};
+    let lodgePdf = meta.lodge_policy_url || meta.lodgePolicyUrl || '';
+    if (!lodgePdf && typeof window !== 'undefined') {
+      lodgePdf = localStorage.getItem('yates_lodge_policy_pdf_url') || '';
+    }
+    if (!lodgePdf) {
+      lodgePdf = (content['lodge_info']?.metadata as any)?.policy_pdf_url || '';
+    }
+    if (!lodgePdf) {
+      lodgePdf = 'https://drive.google.com/file/d/13_JMKK0XXhbqv82hBrKzpWBq1wvVS46x/view?usp=sharing';
+    }
+
+    let expPdf = meta.expeditions_policy_url || meta.expeditionsPolicyUrl || '';
+    if (!expPdf && typeof window !== 'undefined') {
+      expPdf = localStorage.getItem('yates_expeditions_policy_pdf_url') || '';
+    }
+    if (!expPdf) {
+      expPdf = 'https://drive.google.com/file/d/1XPI2uMtRvusGR_11OqpYBKTRiQgDqs0m/view?usp=sharing';
+    }
+
+    return {
+      expeditions_policy_url: expPdf,
+      lodge_policy_url: lodgePdf,
+    };
+  },
+
+  async getGlobalPolicies(): Promise<GlobalPoliciesConfig> {
+    const item = await this.getContent('general_policies');
+    const meta = (item?.metadata as any) || {};
+    let lodgePdf = meta.lodge_policy_url || meta.lodgePolicyUrl || '';
+    if (!lodgePdf && typeof window !== 'undefined') {
+      lodgePdf = localStorage.getItem('yates_lodge_policy_pdf_url') || '';
+    }
+    if (!lodgePdf) {
+      lodgePdf = (item?.metadata as any)?.policy_pdf_url || '';
+    }
+    if (!lodgePdf) {
+      lodgePdf = 'https://drive.google.com/file/d/13_JMKK0XXhbqv82hBrKzpWBq1wvVS46x/view?usp=sharing';
+    }
+
+    let expPdf = meta.expeditions_policy_url || meta.expeditionsPolicyUrl || '';
+    if (!expPdf && typeof window !== 'undefined') {
+      expPdf = localStorage.getItem('yates_expeditions_policy_pdf_url') || '';
+    }
+    if (!expPdf) {
+      expPdf = 'https://drive.google.com/file/d/1XPI2uMtRvusGR_11OqpYBKTRiQgDqs0m/view?usp=sharing';
+    }
+
+    return {
+      expeditions_policy_url: expPdf,
+      lodge_policy_url: lodgePdf,
+    };
+  },
+
+  async saveGlobalPolicies(policies: { expeditions_policy_url?: string; lodge_policy_url?: string }): Promise<{ success: boolean; error?: string }> {
+    const current = await this.getGlobalPolicies();
+    const newMeta = {
+      expeditions_policy_url: policies.expeditions_policy_url !== undefined ? policies.expeditions_policy_url.trim() : current.expeditions_policy_url,
+      lodge_policy_url: policies.lodge_policy_url !== undefined ? policies.lodge_policy_url.trim() : current.lodge_policy_url,
+    };
+    if (typeof window !== 'undefined') {
+      if (newMeta.lodge_policy_url) {
+        localStorage.setItem('yates_lodge_policy_pdf_url', newMeta.lodge_policy_url);
+      }
+      if (newMeta.expeditions_policy_url) {
+        localStorage.setItem('yates_expeditions_policy_pdf_url', newMeta.expeditions_policy_url);
+      }
+      window.dispatchEvent(new CustomEvent('yates_policies_updated', { detail: newMeta }));
+      window.dispatchEvent(new Event('storage'));
+    }
+    return this.updateContent('general_policies', {
+      title: 'Políticas y Documentos Oficiales',
+      metadata: newMeta,
+    });
+  },
+
+  async uploadPolicyPdf(file: File, type: 'expeditions' | 'lodge'): Promise<{ success: boolean; url?: string; error?: string }> {
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      return { success: false, error: 'El archivo seleccionado debe ser un documento en formato PDF (.pdf).' };
+    }
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const path = `policies/${type}_${Date.now()}_${sanitizedName}`;
+    try {
+      const { data, error } = await supabase.storage
+        .from('site-media')
+        .upload(path, file, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' });
+      if (!error && data) {
+        const { data: publicData } = supabase.storage.from('site-media').getPublicUrl(data.path);
+        return { success: true, url: publicData.publicUrl };
+      }
+    } catch (err) {
+      console.warn('Supabase storage upload error, using fallback:', err);
+    }
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ success: true, url: reader.result as string });
+      reader.onerror = () => resolve({ success: false, error: 'No se pudo leer el archivo PDF localmente.' });
+      reader.readAsDataURL(file);
+    });
   },
 };
 

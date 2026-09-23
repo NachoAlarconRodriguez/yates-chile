@@ -571,7 +571,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       const totalRooms = (rooms && rooms.length > 0 ? rooms.length : (lodgeRooms && lodgeRooms.length > 0 ? lodgeRooms.length : 4));
       
       const bookedRoomsOnDate = (lodgeBookings || []).filter((b) => {
-        if (!['pending_transfer', 'approved', 'blocked'].includes(b.status)) return false;
+        if (!['approved', 'blocked'].includes(b.status)) return false;
         return dateIso >= b.check_in && dateIso < b.check_out;
       }).length;
 
@@ -622,7 +622,7 @@ export const BookingWizardModal: React.FC<BookingWizardModalProps> = ({
       while (curr < e) {
         const iso = curr.toISOString().split('T')[0];
         const bookedCount = (lodgeBookings || []).filter((b) => {
-          if (!['pending_transfer', 'approved', 'blocked'].includes(b.status)) return false;
+          if (!['approved', 'blocked'].includes(b.status)) return false;
           return iso >= b.check_in && iso < b.check_out;
         }).length;
 

@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Database } from '../types/database.types';
+import { expeditionService } from './expeditionService';
+import { lodgeService } from './lodgeService';
 
 export type PaymentInstallment = Database['public']['Tables']['payment_installments']['Row'];
 
@@ -134,6 +136,38 @@ export const paymentService = {
         } catch {}
       }
 
+      if (installment) {
+        const bookingId = installment.booking_id;
+        try {
+          if (installment.booking_type === 'lodge') {
+            const lodgeRes = await lodgeService.updateBookingStatus(bookingId, 'approved');
+            if (!lodgeRes.success) {
+              return {
+                success: false,
+                error: lodgeRes.error || 'Conflicto de fechas: La habitación ya se encuentra confirmada o bloqueada por otra reserva en esas fechas.',
+              };
+            }
+          } else if (installment.booking_type === 'expedition') {
+            let allApproved = false;
+            try {
+              const { data: allInst } = await supabase
+                .from('payment_installments')
+                .select('id, status')
+                .eq('booking_id', bookingId);
+              allApproved = (allInst || []).every((i) => (i.id === installmentId ? true : i.status === 'approved'));
+            } catch {}
+            const nextStatus = allApproved ? 'approved' : 'partial';
+            const expRes = await expeditionService.updateBookingStatus(bookingId, nextStatus);
+            if (!expRes.success) {
+              return {
+                success: false,
+                error: expRes.error || 'No hay cupos disponibles suficientes para confirmar esta reserva.',
+              };
+            }
+          }
+        } catch {}
+      }
+
       // Update installment in Supabase
       try {
         await supabase
@@ -166,37 +200,6 @@ export const paymentService = {
           localStorage.setItem('yates_installments', JSON.stringify(updated));
         }
       } catch {}
-
-      if (installment) {
-        // Check if all installments for this booking are approved
-        const bookingId = installment.booking_id;
-        try {
-          const { data: allInst } = await supabase
-            .from('payment_installments')
-            .select('status')
-            .eq('booking_id', bookingId);
-
-          const allApproved = allInst && allInst.length > 0 && allInst.every((i) => i.status === 'approved');
-
-          if (installment.booking_type === 'lodge') {
-            await supabase
-              .from('lodge_bookings')
-              .update({
-                status: allApproved ? 'approved' : 'approved',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', bookingId);
-          } else if (installment.booking_type === 'expedition') {
-            await supabase
-              .from('expedition_bookings')
-              .update({
-                status: allApproved ? 'approved' : 'approved',
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', bookingId);
-          }
-        } catch {}
-      }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('yates_installments_updated'));

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Compass, Users, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle, Plus, Trash2, ArrowRight, ShieldCheck, Loader2, ExternalLink, Download } from 'lucide-react';
+import { ArrowLeft, Compass, Users, Maximize2, ChevronLeft, ChevronRight, X, Home, MapPin, FileText, Sun, UtensilsCrossed, BedDouble, CheckCircle2, AlertCircle, Plus, Trash2, ArrowRight, ShieldCheck, Loader2, ExternalLink, Download, Clock } from 'lucide-react';
 import { useLodge } from '../hooks/useLodge';
 import { useCatalogServices } from '../hooks/useCatalogServices';
 import { useSiteContent } from '../hooks/useSiteContent';
@@ -41,7 +41,11 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
   const lodgeInfo = getSection('lodge_info');
   const lodgeDining = getSection('lodge_dining');
   
+  const generalPolicies = getSection('general_policies');
+  const globalLodgePolicyUrl = (generalPolicies?.metadata as any)?.lodge_policy_url;
+
   const lodgePolicyPdfUrl =
+    globalLodgePolicyUrl ||
     (lodgeInfo?.metadata as any)?.policy_pdf_url ||
     (typeof window !== 'undefined' ? localStorage.getItem('yates_lodge_policy_pdf_url') : '') ||
     '';
@@ -1252,6 +1256,16 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                 <div className="bg-white p-3.5 rounded-xl font-mono text-[#0B192C] text-xs border border-slate-200 shadow-sm">
                   Código de Reserva: <strong className="text-[#0B192C] text-sm tracking-wider font-bold">{bookingSuccess.code}</strong>
                 </div>
+
+                <div className="bg-amber-50 border border-amber-200/90 rounded-xl p-3.5 text-left text-xs text-amber-950 space-y-1 shadow-2xs">
+                  <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Habitación sujeta a confirmación de abono (50%)</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-amber-800 font-normal">
+                    Tu solicitud ha quedado registrada en espera de pago. La habitación <strong>solo quedará formalmente asegurada y bloqueada en el calendario</strong> una vez recibido y conciliado el <strong>abono del 50%</strong>.
+                  </p>
+                </div>
                 
                 {/* Breakdown */}
                 <div className="text-left bg-white p-4 rounded-xl space-y-2 text-xs text-slate-700 border border-slate-200 shadow-2xs">
@@ -1906,7 +1920,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                     1. Garantía y Abono de Reserva (Pie)
                   </h4>
                   <p>
-                    Para confirmar y bloquear su reserva en el lodge, se solicita el abono del <strong>50% del total presupuestado</strong> dentro de las 24 horas siguientes a la emisión de la solicitud vía transferencia bancaria. El cupo queda sujeto a la validación de dicho abono.
+                    Para confirmar y asegurar su reserva en el lodge, se solicita el abono del <strong>50% del total presupuestado</strong> vía transferencia bancaria. La habitación queda formalmente bloqueada y reservada una vez validado dicho abono por nuestro equipo.
                   </p>
                 </div>
 

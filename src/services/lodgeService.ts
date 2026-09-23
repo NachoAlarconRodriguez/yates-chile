@@ -404,12 +404,14 @@ export const lodgeService = {
     }
   },
 
-  async checkAvailability(roomId: string, checkIn: string, checkOut: string): Promise<boolean> {
+  async checkAvailability(roomId: string, checkIn: string, checkOut: string, excludeBookingId?: string): Promise<boolean> {
     try {
       const allBookings = await this.getBookingsAndBlocks();
       const hasConflict = allBookings.some((b) => {
         if (b.room_id !== roomId) return false;
-        if (!['pending_transfer', 'approved', 'blocked'].includes(b.status)) return false;
+        if (excludeBookingId && (b.id === excludeBookingId || b.booking_code === excludeBookingId)) return false;
+        // Solo las reservas aprobadas o bloqueos operativos firmes impiden nuevas reservas
+        if (!['approved', 'blocked'].includes(b.status)) return false;
         return b.check_in < checkOut && b.check_out > checkIn;
       });
       return !hasConflict;
@@ -583,6 +585,72 @@ export const lodgeService = {
       return { success: true };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
+    }
+  },
+
+  async updateBookingStatus(
+    bookingId: string,
+    newStatus: 'approved' | 'pending_transfer' | 'cancelled' | 'completed' | 'blocked'
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const currentCached = getCachedBookings();
+      let target = currentCached.find((b) => b.id === bookingId || b.booking_code === bookingId);
+
+      if (!target) {
+        try {
+          const { data } = await supabase
+            .from('lodge_bookings')
+            .select('*')
+            .or(`id.eq.${bookingId},booking_code.eq.${bookingId}`)
+            .maybeSingle();
+          if (data) target = data;
+        } catch {}
+      }
+
+      // Si se desea confirmar/bloquear la reserva, verificar que la habitación no haya sido tomada por otra reserva aprobada
+      if (newStatus === 'approved' && target && target.room_id) {
+        const isStillAvailable = await this.checkAvailability(
+          target.room_id,
+          target.check_in,
+          target.check_out,
+          target.id
+        );
+        if (!isStillAvailable) {
+          return {
+            success: false,
+            error: 'Conflicto de fechas: La habitación ya se encuentra confirmada o bloqueada por otra reserva en este rango de fechas.',
+          };
+        }
+      }
+
+      // Actualizar caché local
+      const updatedList = currentCached.map((b) =>
+        b.id === bookingId || b.booking_code === bookingId
+          ? { ...b, status: newStatus, updated_at: new Date().toISOString() }
+          : b
+      );
+      saveCachedBookings(updatedList);
+
+      // Persistir en Supabase
+      try {
+        const { error } = await supabase
+          .from('lodge_bookings')
+          .update({
+            status: newStatus,
+            updated_at: new Date().toISOString(),
+          })
+          .or(`id.eq.${bookingId},booking_code.eq.${bookingId}`);
+
+        if (error) {
+          console.warn('Supabase lodge booking update notice:', error.message);
+        }
+      } catch (dbErr) {
+        console.warn('Supabase DB error, using local persistence:', dbErr);
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message || 'Error al actualizar estado de la reserva.' };
     }
   },
 
