@@ -15,6 +15,12 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
   const { language, t } = useLanguage();
   const isEn = language === 'EN';
   const terranovaCms = getSection('flota_terranova');
+  const meta = (terranovaCms?.metadata as Record<string, any>) || {};
+  const getCmsSpec = (field: string, fallback: string): string => {
+    if (isEn && meta[`${field}_en`]) return meta[`${field}_en`];
+    if (meta[field]) return meta[field];
+    return fallback;
+  };
 
   const [showExpeditionsModal, setShowExpeditionsModal] = React.useState(false);
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
@@ -348,9 +354,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Maximize2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">Hatteras 65ft LRC • {t('Americano', 'American')}</h4>
-                    <span className="text-[11px] text-slate-500 font-mono">PMO 6128 • Eslora 20m</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_norte_title', `Hatteras 65ft LRC • ${t('Americano', 'American')}`)}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">{getCmsSpec('spec_norte_sub', 'PMO 6128 • Eslora 20m')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -378,9 +384,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('OESTE / CUBIERTAS', 'WEST / DECKS')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">{t('3 Cubiertas', '3 Decks')} • 20 PAX</h4>
-                    <span className="text-[11px] text-slate-500">{t('4 Cabinas / 4 Baños en suite', '4 Cabins / 4 En-suite baths')}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_oeste_badge', t('OESTE / CUBIERTAS', 'WEST / DECKS'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_oeste_title', `${t('3 Cubiertas', '3 Decks')} • 20 PAX`)}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_oeste_sub', t('4 Cabinas / 4 Baños en suite', '4 Cabins / 4 En-suite baths'))}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -419,9 +425,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Gauge className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('SUR / PROPULSIÓN', 'SOUTH / PROPULSION')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">2 Detroit 450 HP</h4>
-                    <span className="text-[11px] text-slate-500">10.000L • 3.000 Millas Autonomía</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_sur_badge', t('SUR / PROPULSIÓN', 'SOUTH / PROPULSION'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_sur_title', '2 Detroit 450 HP')}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_sur_sub', '10.000L • 3.000 Millas Autonomía')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -449,9 +455,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Radio className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('ESTE / EQUIPAMIENTO', 'EAST / EQUIPMENT')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">Raymarine + Garmin</h4>
-                    <span className="text-[11px] text-slate-500">Starlink 24/7 • Cocina Full</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_este_badge', t('ESTE / EQUIPAMIENTO', 'EAST / EQUIPMENT'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_este_title', 'Raymarine + Garmin')}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_este_sub', 'Starlink 24/7 • Cocina Full')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -507,9 +513,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Hatteras 65ft LRC</span>
-                    <span className="text-slate-500 text-[10px] block">{t('Americano • PMO 6128', 'American • PMO 6128')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_norte_title', 'Hatteras 65ft LRC')}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_norte_sub', t('Americano • PMO 6128', 'American • PMO 6128'))}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -555,9 +561,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('OESTE / CUBIERTAS', 'WEST / DECKS')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{t('3 Cubiertas', '3 Decks')}</span>
-                    <span className="text-slate-500 text-[10px] block">{t('20 PAX • 4 Cab / 4 Baños', '20 GUESTS • 4 Cab / 4 Baths')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_oeste_badge', t('OESTE / CUBIERTAS', 'WEST / DECKS'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_oeste_title', t('3 Cubiertas', '3 Decks'))}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_oeste_sub', t('20 PAX • 4 Cab / 4 Baños', '20 GUESTS • 4 Cab / 4 Baths'))}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -619,9 +625,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('SUR / PROPULSIÓN', 'SOUTH / PROPULSION')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{t('2 Motores Detroit', '2 Detroit Engines')}</span>
-                    <span className="text-slate-500 text-[10px] block">{t('450 HP c/u • 10.000L Diésel', '450 HP each • 10,000L Diesel')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_sur_badge', t('SUR / PROPULSIÓN', 'SOUTH / PROPULSION'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_sur_title', t('2 Motores Detroit', '2 Detroit Engines'))}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_sur_sub', t('450 HP c/u • 10.000L Diésel', '450 HP each • 10,000L Diesel'))}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -667,9 +673,9 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                     <Ship className="w-9 h-9 text-blue-900/10 absolute animate-[pulse_3s_infinite]" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('ESTE / EQUIPAMIENTO', 'EAST / EQUIPMENT')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Raymarine + Garmin</span>
-                    <span className="text-slate-500 text-[10px] block">{t('Starlink 24/7 • Cocina Full', 'Starlink 24/7 • Full Galley')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_este_badge', t('ESTE / EQUIPAMIENTO', 'EAST / EQUIPMENT'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_este_title', 'Raymarine + Garmin')}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_este_sub', t('Starlink 24/7 • Cocina Full', 'Starlink 24/7 • Full Galley'))}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>

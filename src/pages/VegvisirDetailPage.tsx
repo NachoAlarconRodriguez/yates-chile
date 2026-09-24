@@ -16,6 +16,12 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
   const { language, t } = useLanguage();
   const isEn = language === 'EN';
   const vegvisirCms = getSection('flota_vegvisir');
+  const meta = (vegvisirCms?.metadata as Record<string, any>) || {};
+  const getCmsSpec = (field: string, fallback: string): string => {
+    if (isEn && meta[`${field}_en`]) return meta[`${field}_en`];
+    if (meta[field]) return meta[field];
+    return fallback;
+  };
 
   const [showExpeditionsModal, setShowExpeditionsModal] = React.useState(false);
   const [flipped, setFlipped] = React.useState<Record<string, boolean>>({});
@@ -358,9 +364,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Maximize2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">Dufour 52.5 ft • {t('Francés', 'French')}</h4>
-                    <span className="text-[11px] text-slate-500 font-mono">QUI 2718</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_norte_title', `Dufour 52.5 ft • ${t('Francés', 'French')}`)}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">{getCmsSpec('spec_norte_sub', 'QUI 2718')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -388,9 +394,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('OESTE / CAPACIDAD', 'WEST / CAPACITY')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">12 PAX • {t('5 Cabinas / 5 Baños', '5 Cabins / 5 Baths')}</h4>
-                    <span className="text-[11px] text-slate-500">{t('Salón central & Cocina completa', 'Central salon & Full galley')}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_oeste_badge', t('OESTE / CAPACIDAD', 'WEST / CAPACITY'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_oeste_title', `12 PAX • ${t('5 Cabinas / 5 Baños', '5 Cabins / 5 Baths')}`)}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_oeste_sub', t('Salón central & Cocina completa', 'Central salon & Full galley'))}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -418,9 +424,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Radio className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">Starlink 24/7 • Raymarine</h4>
-                    <span className="text-[11px] text-slate-500">{t('Electrónica oceánica de precisión', 'Precision oceanic electronics')}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_sur_badge', t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_sur_title', 'Starlink 24/7 • Raymarine')}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_sur_sub', t('Electrónica oceánica de precisión', 'Precision oceanic electronics'))}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -459,9 +465,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Droplets className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('ESTE / AUTONOMÍA', 'EAST / AUTONOMY')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">140 Ltrs/hr • Perkins 90 HP</h4>
-                    <span className="text-[11px] text-slate-500">Zodiac 4.3m / 15hp</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_este_badge', t('ESTE / DESEMBARCO', 'EAST / LANDING'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_este_title', '140 Ltrs/hr • Perkins 90 HP')}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_este_sub', 'Zodiac 4.3m / 15hp')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -529,9 +535,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">Dufour 52.5 ft</span>
-                    <span className="text-slate-500 text-[10px] block">{t('Francés • QUI 2718', 'French • QUI 2718')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_norte_title', 'Dufour 52.5 ft')}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_norte_sub', t('Francés • QUI 2718', 'French • QUI 2718'))}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -577,9 +583,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('OESTE / CAPACIDAD', 'WEST / CAPACITY')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">12 PAX</span>
-                    <span className="text-slate-500 text-[10px] block">{t('5 Cabinas / 5 Baños', '5 Cabins / 5 Baths')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_oeste_badge', t('OESTE / CAPACIDAD', 'WEST / CAPACITY'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_oeste_title', '12 PAX')}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_oeste_sub', t('5 Cabinas / 5 Baños', '5 Cabins / 5 Baths'))}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -625,11 +631,11 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_sur_badge', t('SUR / TECNOLOGÍA', 'SOUTH / TECHNOLOGY'))}</span>
                     <span className="text-xs sm:text-[13px] font-bold text-slate-900 block mt-0.5 leading-tight max-w-[160px] mx-auto">
-                      {t('Sistema de Navegación de Última Generación', 'Next-Generation Navigation System')}
+                      {getCmsSpec('spec_sur_title', t('Starlink 24/7', 'Starlink 24/7'))}
                     </span>
-                    <span className="text-slate-500 text-[10px] block mt-0.5">Starlink 24/7</span>
+                    <span className="text-slate-500 text-[10px] block mt-0.5">{getCmsSpec('spec_sur_sub', 'Raymarine + 140L Desalinizador')}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -691,9 +697,9 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('ESTE / AUTONOMÍA', 'EAST / AUTONOMY')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">140 Ltrs/hr</span>
-                    <span className="text-slate-500 text-[10px] block">Zodiac 4.3m / 15hp</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_este_badge', t('ESTE / DESEMBARCO', 'EAST / LANDING'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_este_title', 'Zodiac Mercury 4T')}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_este_sub', 'Motor 15hp Auxiliar')}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>

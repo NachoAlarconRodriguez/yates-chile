@@ -70,8 +70,8 @@ interface VisualCmsEditorProps {
 }
 
 const CmsContext = React.createContext<{
-  getField: (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url') => string;
-  setField: (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url', value: string) => void;
+  getField: (sectionKey: string, field: string) => string;
+  setField: (sectionKey: string, field: string, value: string) => void;
 }>({
   getField: () => '',
   setField: () => {},
@@ -82,8 +82,8 @@ const CmsContext = React.createContext<{
 // =========================================================================
 const InlineText: React.FC<{
   sectionKey: string;
-  field: 'title' | 'subtitle' | 'body_text';
-  tag?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span' | 'div';
+  field: string;
+  tag?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span' | 'div' | 'strong';
   className?: string;
   fallback?: string;
   multiline?: boolean;
@@ -644,7 +644,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   };
 
   // Get field with draft priority and proper fallback respecting active editorLanguage
-  const getField = (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url'): string => {
+  const getField = (sectionKey: string, field: string): string => {
     const vesselMatch = findVesselForSectionKey(sectionKey);
 
     if (field === 'media_url') {
@@ -658,6 +658,8 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       if (vesselMatch?.mainImage) return vesselMatch.mainImage;
       return '';
     }
+
+    const isMetadataField = !['title', 'subtitle', 'body_text'].includes(field);
 
     // When editing in English mode:
     if (editorLanguage === 'EN') {
@@ -674,8 +676,15 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       if (defMeta[enField] !== undefined && defMeta[enField] !== null) {
         return defMeta[enField] as string;
       }
+      // If it's a custom metadata field (like spec_*), fallback to Spanish metadata value if no English yet
+      if (isMetadataField) {
+        if (draftMeta[field] !== undefined && draftMeta[field] !== null) return draftMeta[field] as string;
+        if (secMeta[field] !== undefined && secMeta[field] !== null && secMeta[field] !== '') return secMeta[field] as string;
+        if (defMeta[field] !== undefined && defMeta[field] !== null) return defMeta[field] as string;
+        return '';
+      }
       // Fallback to Spanish field if no English exists yet
-      const baseVal = (content[sectionKey]?.[field] || DEFAULT_CMS_CONTENT[sectionKey]?.[field] || '') as string;
+      const baseVal = (content[sectionKey]?.[field as 'title' | 'subtitle' | 'body_text'] || DEFAULT_CMS_CONTENT[sectionKey]?.[field as 'title' | 'subtitle' | 'body_text'] || '') as string;
       if (baseVal) return baseVal;
       if (vesselMatch) {
         if (field === 'title') return vesselMatch.name;
@@ -686,16 +695,32 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     }
 
     // When editing in Spanish mode:
-    if (drafts[sectionKey] && drafts[sectionKey]![field] !== undefined && drafts[sectionKey]![field] !== null) {
-      return drafts[sectionKey]![field] as string;
+    if (isMetadataField) {
+      const draftMeta = (drafts[sectionKey]?.metadata as Record<string, any>) || {};
+      if (draftMeta[field] !== undefined && draftMeta[field] !== null) {
+        return draftMeta[field] as string;
+      }
+      const secMeta = (content[sectionKey]?.metadata as Record<string, any>) || {};
+      if (secMeta[field] !== undefined && secMeta[field] !== null && secMeta[field] !== '') {
+        return secMeta[field] as string;
+      }
+      const defMeta = (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) || {};
+      if (defMeta[field] !== undefined && defMeta[field] !== null) {
+        return defMeta[field] as string;
+      }
+      return '';
+    }
+
+    if (drafts[sectionKey] && (drafts[sectionKey] as any)[field] !== undefined && (drafts[sectionKey] as any)[field] !== null) {
+      return (drafts[sectionKey] as any)[field] as string;
     }
     const sec = content[sectionKey];
-    if (sec && sec[field] !== undefined && sec[field] !== null && sec[field] !== '') {
-      return sec[field] as string;
+    if (sec && (sec as any)[field] !== undefined && (sec as any)[field] !== null && (sec as any)[field] !== '') {
+      return (sec as any)[field] as string;
     }
     const def = DEFAULT_CMS_CONTENT[sectionKey];
-    if (def && def[field] !== undefined && def[field] !== null) {
-      return def[field] as string;
+    if (def && (def as any)[field] !== undefined && (def as any)[field] !== null) {
+      return (def as any)[field] as string;
     }
     if (vesselMatch) {
       if (field === 'title') return vesselMatch.name;
@@ -706,7 +731,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   };
 
   // Set draft field respecting active editorLanguage
-  const setField = (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url', value: string) => {
+  const setField = (sectionKey: string, field: string, value: string) => {
     if (field === 'media_url') {
       setDrafts((prev) => ({
         ...prev,
@@ -718,13 +743,15 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       return;
     }
 
+    const isMetadataField = !['title', 'subtitle', 'body_text'].includes(field);
+
     if (editorLanguage === 'EN') {
       const enField = `${field}_en`;
       const currentMeta =
-        (drafts[sectionKey]?.metadata as Record<string, any>) ||
         (content[sectionKey]?.metadata as Record<string, any>) ||
         (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
         {};
+      const draftMeta = (drafts[sectionKey]?.metadata as Record<string, any>) || {};
 
       setDrafts((prev) => ({
         ...prev,
@@ -732,7 +759,29 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           ...prev[sectionKey],
           metadata: {
             ...currentMeta,
+            ...draftMeta,
             [enField]: value,
+          },
+        },
+      }));
+      return;
+    }
+
+    if (isMetadataField) {
+      const currentMeta =
+        (content[sectionKey]?.metadata as Record<string, any>) ||
+        (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
+        {};
+      const draftMeta = (drafts[sectionKey]?.metadata as Record<string, any>) || {};
+
+      setDrafts((prev) => ({
+        ...prev,
+        [sectionKey]: {
+          ...prev[sectionKey],
+          metadata: {
+            ...currentMeta,
+            ...draftMeta,
+            [field]: value,
           },
         },
       }));
@@ -743,7 +792,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       ...prev,
       [sectionKey]: {
         ...prev[sectionKey],
-        [field]: value,
+        [field as 'title' | 'subtitle' | 'body_text']: value,
       },
     }));
   };
@@ -764,16 +813,17 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       // If saving from Spanish mode, auto-generate English translations with AI
       for (const sectionKey of Object.keys(finalDrafts)) {
         const d = finalDrafts[sectionKey];
-        const existingMeta =
-          (d.metadata as Record<string, any>) ||
+        const existingContentMeta =
           (content[sectionKey]?.metadata as Record<string, any>) ||
           (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
           {};
+        const draftMeta = (d.metadata as Record<string, any>) || {};
+        const combinedMeta = { ...existingContentMeta, ...draftMeta };
 
         if (sectionKey.endsWith('_logbook') || sectionKey === 'footer_contact' || sectionKey === 'home_hero_banners') {
           finalDrafts[sectionKey] = {
             ...d,
-            metadata: existingMeta,
+            metadata: combinedMeta,
           };
           continue;
         }
@@ -792,11 +842,11 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
         finalDrafts[sectionKey] = {
           ...d,
           metadata: {
-            ...existingMeta,
+            ...combinedMeta,
             // Only overwrite English if not manually edited in draft
-            title_en: existingMeta.title_en && editorLanguage === 'EN' ? existingMeta.title_en : translated.title_en,
-            subtitle_en: existingMeta.subtitle_en && editorLanguage === 'EN' ? existingMeta.subtitle_en : translated.subtitle_en,
-            body_text_en: existingMeta.body_text_en && editorLanguage === 'EN' ? existingMeta.body_text_en : translated.body_text_en,
+            title_en: combinedMeta.title_en && editorLanguage === 'EN' ? combinedMeta.title_en : (translated.title_en || combinedMeta.title_en),
+            subtitle_en: combinedMeta.subtitle_en && editorLanguage === 'EN' ? combinedMeta.subtitle_en : (translated.subtitle_en || combinedMeta.subtitle_en),
+            body_text_en: combinedMeta.body_text_en && editorLanguage === 'EN' ? combinedMeta.body_text_en : (translated.body_text_en || combinedMeta.body_text_en),
           },
         };
       }
@@ -2107,15 +2157,64 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <section className="py-12 bg-white">
                 <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { title: 'Dufour 52.5 ft', sub: 'Francés • QUI 2718', badge: 'NORTE / ASTILLERO' },
-                    { title: '12 Pasajeros', sub: '5 Cabinas • 5 Baños', badge: 'OESTE / CAPACIDAD' },
-                    { title: 'Starlink 24/7', sub: 'Raymarine + 140L Desalinizador', badge: 'SUR / TECNOLOGÍA' },
-                    { title: 'Zodiac Mercury 4T', sub: 'Motor 15hp Auxiliar', badge: 'ESTE / DESEMBARCO' },
+                    {
+                      badgeField: 'spec_norte_badge',
+                      titleField: 'spec_norte_title',
+                      subField: 'spec_norte_sub',
+                      defaultBadge: 'NORTE / ASTILLERO',
+                      defaultTitle: 'Dufour 52.5 ft',
+                      defaultSub: 'Francés • QUI 2718',
+                    },
+                    {
+                      badgeField: 'spec_oeste_badge',
+                      titleField: 'spec_oeste_title',
+                      subField: 'spec_oeste_sub',
+                      defaultBadge: 'OESTE / CAPACIDAD',
+                      defaultTitle: '12 Pasajeros',
+                      defaultSub: '5 Cabinas • 5 Baños',
+                    },
+                    {
+                      badgeField: 'spec_sur_badge',
+                      titleField: 'spec_sur_title',
+                      subField: 'spec_sur_sub',
+                      defaultBadge: 'SUR / TECNOLOGÍA',
+                      defaultTitle: 'Starlink 24/7',
+                      defaultSub: 'Raymarine + 140L Desalinizador',
+                    },
+                    {
+                      badgeField: 'spec_este_badge',
+                      titleField: 'spec_este_title',
+                      subField: 'spec_este_sub',
+                      defaultBadge: 'ESTE / DESEMBARCO',
+                      defaultTitle: 'Zodiac Mercury 4T',
+                      defaultSub: 'Motor 15hp Auxiliar',
+                    },
                   ].map((c, i) => (
                     <div key={i} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl text-center space-y-1">
-                      <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">{c.badge}</span>
-                      <strong className="text-sm font-bold text-slate-900 block">{c.title}</strong>
-                      <span className="text-[11px] text-slate-500 block">{c.sub}</span>
+                      <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">
+                        <InlineText
+                          sectionKey="flota_vegvisir"
+                          field={c.badgeField}
+                          fallback={c.defaultBadge}
+                          className="text-slate-400 font-mono font-bold"
+                        />
+                      </span>
+                      <strong className="text-sm font-bold text-slate-900 block">
+                        <InlineText
+                          sectionKey="flota_vegvisir"
+                          field={c.titleField}
+                          fallback={c.defaultTitle}
+                          className="text-slate-900 font-bold"
+                        />
+                      </strong>
+                      <span className="text-[11px] text-slate-500 block">
+                        <InlineText
+                          sectionKey="flota_vegvisir"
+                          field={c.subField}
+                          fallback={c.defaultSub}
+                          className="text-slate-500 text-[11px]"
+                        />
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -2213,15 +2312,64 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <section className="py-12 bg-white">
                 <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { title: 'Hatteras 65ft LRC', sub: 'Americano • PMO 6128', badge: 'NORTE / ASTILLERO' },
-                    { title: '20 Pasajeros', sub: '3 Cubiertas • 5 Cabinas / 5 Baños', badge: 'OESTE / CAPACIDAD' },
-                    { title: '3.000 MN Autonomía', sub: '2x Detroit 450hp • 10.000L Diésel', badge: 'SUR / PROPULSIÓN' },
-                    { title: 'Zodiac Yamaha 70hp', sub: 'Grúa de 1 Tonelada en Flybridge', badge: 'ESTE / AUXILIAR' },
+                    {
+                      badgeField: 'spec_norte_badge',
+                      titleField: 'spec_norte_title',
+                      subField: 'spec_norte_sub',
+                      defaultBadge: 'NORTE / ASTILLERO',
+                      defaultTitle: 'Hatteras 65ft LRC',
+                      defaultSub: 'Americano • PMO 6128',
+                    },
+                    {
+                      badgeField: 'spec_oeste_badge',
+                      titleField: 'spec_oeste_title',
+                      subField: 'spec_oeste_sub',
+                      defaultBadge: 'OESTE / CAPACIDAD',
+                      defaultTitle: '20 Pasajeros',
+                      defaultSub: '3 Cubiertas • 5 Cabinas / 5 Baños',
+                    },
+                    {
+                      badgeField: 'spec_sur_badge',
+                      titleField: 'spec_sur_title',
+                      subField: 'spec_sur_sub',
+                      defaultBadge: 'SUR / PROPULSIÓN',
+                      defaultTitle: '3.000 MN Autonomía',
+                      defaultSub: '2x Detroit 450hp • 10.000L Diésel',
+                    },
+                    {
+                      badgeField: 'spec_este_badge',
+                      titleField: 'spec_este_title',
+                      subField: 'spec_este_sub',
+                      defaultBadge: 'ESTE / AUXILIAR',
+                      defaultTitle: 'Zodiac Yamaha 70hp',
+                      defaultSub: 'Grúa de 1 Tonelada en Flybridge',
+                    },
                   ].map((c, i) => (
                     <div key={i} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl text-center space-y-1">
-                      <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">{c.badge}</span>
-                      <strong className="text-sm font-bold text-slate-900 block">{c.title}</strong>
-                      <span className="text-[11px] text-slate-500 block">{c.sub}</span>
+                      <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">
+                        <InlineText
+                          sectionKey="flota_terranova"
+                          field={c.badgeField}
+                          fallback={c.defaultBadge}
+                          className="text-slate-400 font-mono font-bold"
+                        />
+                      </span>
+                      <strong className="text-sm font-bold text-slate-900 block">
+                        <InlineText
+                          sectionKey="flota_terranova"
+                          field={c.titleField}
+                          fallback={c.defaultTitle}
+                          className="text-slate-900 font-bold"
+                        />
+                      </strong>
+                      <span className="text-[11px] text-slate-500 block">
+                        <InlineText
+                          sectionKey="flota_terranova"
+                          field={c.subField}
+                          fallback={c.defaultSub}
+                          className="text-slate-500 text-[11px]"
+                        />
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -2323,30 +2471,63 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                 <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
                     {
-                      title: activeCustomVessel.builder || activeCustomVessel.length || 'Astillero Naval',
-                      sub: activeCustomVessel.registration ? `Matrícula ${activeCustomVessel.registration}` : activeCustomVessel.type,
-                      badge: 'NORTE / ASTILLERO',
+                      badgeField: 'spec_norte_badge',
+                      titleField: 'spec_norte_title',
+                      subField: 'spec_norte_sub',
+                      defaultBadge: 'NORTE / ASTILLERO',
+                      defaultTitle: activeCustomVessel.builder || activeCustomVessel.length || 'Astillero Naval',
+                      defaultSub: activeCustomVessel.registration ? `Matrícula ${activeCustomVessel.registration}` : activeCustomVessel.type,
                     },
                     {
-                      title: `${activeCustomVessel.maxPax || 8} Pasajeros`,
-                      sub: `${activeCustomVessel.cabins || '4 Cabinas'} • ${activeCustomVessel.bathrooms || '4 Baños'}`,
-                      badge: 'OESTE / CAPACIDAD',
+                      badgeField: 'spec_oeste_badge',
+                      titleField: 'spec_oeste_title',
+                      subField: 'spec_oeste_sub',
+                      defaultBadge: 'OESTE / CAPACIDAD',
+                      defaultTitle: `${activeCustomVessel.maxPax || 8} Pasajeros`,
+                      defaultSub: `${activeCustomVessel.cabins || '4 Cabinas'} • ${activeCustomVessel.bathrooms || '4 Baños'}`,
                     },
                     {
-                      title: 'Starlink 24/7',
-                      sub: 'Conexión Satelital & Navegación',
-                      badge: 'SUR / TECNOLOGÍA',
+                      badgeField: 'spec_sur_badge',
+                      titleField: 'spec_sur_title',
+                      subField: 'spec_sur_sub',
+                      defaultBadge: 'SUR / TECNOLOGÍA',
+                      defaultTitle: 'Starlink 24/7',
+                      defaultSub: 'Conexión Satelital & Navegación',
                     },
                     {
-                      title: activeCustomVessel.crew || 'Patrón + Tripulación',
-                      sub: 'Servicio & Seguridad de Bordo',
-                      badge: 'ESTE / SERVICIO',
+                      badgeField: 'spec_este_badge',
+                      titleField: 'spec_este_title',
+                      subField: 'spec_este_sub',
+                      defaultBadge: 'ESTE / SERVICIO',
+                      defaultTitle: activeCustomVessel.crew || 'Patrón + Tripulación',
+                      defaultSub: 'Servicio & Seguridad de Bordo',
                     },
                   ].map((c, i) => (
                     <div key={i} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl text-center space-y-1">
-                      <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">{c.badge}</span>
-                      <strong className="text-sm font-bold text-slate-900 block">{c.title}</strong>
-                      <span className="text-[11px] text-slate-500 block">{c.sub}</span>
+                      <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">
+                        <InlineText
+                          sectionKey={`flota_${activeCustomVessel.id}`}
+                          field={c.badgeField}
+                          fallback={c.defaultBadge}
+                          className="text-slate-400 font-mono font-bold"
+                        />
+                      </span>
+                      <strong className="text-sm font-bold text-slate-900 block">
+                        <InlineText
+                          sectionKey={`flota_${activeCustomVessel.id}`}
+                          field={c.titleField}
+                          fallback={c.defaultTitle}
+                          className="text-slate-900 font-bold"
+                        />
+                      </strong>
+                      <span className="text-[11px] text-slate-500 block">
+                        <InlineText
+                          sectionKey={`flota_${activeCustomVessel.id}`}
+                          field={c.subField}
+                          fallback={c.defaultSub}
+                          className="text-slate-500 text-[11px]"
+                        />
+                      </span>
                     </div>
                   ))}
                 </div>

@@ -54,6 +54,13 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
     ? (vesselCms as any).metadata.body_text_en
     : (vesselCms?.body_text || vessel?.description || vessel?.tagline || '');
 
+  const meta = (vesselCms?.metadata as Record<string, any>) || {};
+  const getCmsSpec = (field: string, fallback: string): string => {
+    if (isEn && meta[`${field}_en`]) return meta[`${field}_en`];
+    if (meta[field]) return meta[field];
+    return fallback;
+  };
+
   // Curated photo gallery images
   const images = useMemo(() => {
     const vesselName = vessel?.name || 'Embarcación';
@@ -467,9 +474,9 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Maximize2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">{vessel.length || 'Eslora Oceánica'} • {vessel.builder || vessel.name}</h4>
-                    <span className="text-[11px] text-slate-500 font-mono">{vessel.registration || 'DIRECTEMAR'}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_norte_title', `${vessel?.length || 'Eslora Oceánica'} • ${vessel?.builder || vessel?.name || ''}`)}</h4>
+                    <span className="text-[11px] text-slate-500 font-mono">{getCmsSpec('spec_norte_sub', vessel?.registration || 'DIRECTEMAR')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -497,9 +504,9 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('OESTE / CAPACIDAD', 'WEST / CAPACITY')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">{vessel.capacity || `${vessel.maxPax || 10} PAX`}</h4>
-                    <span className="text-[11px] text-slate-500">{vessel.cabins || 'Cabinas privadas'} • {vessel.bathrooms || 'Baños en suite'}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_oeste_badge', t('OESTE / CAPACIDAD', 'WEST / CAPACITY'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_oeste_title', vessel?.capacity || `${vessel?.maxPax || 10} PAX`)}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_oeste_sub', `${vessel?.cabins || 'Cabinas privadas'} • ${vessel?.bathrooms || 'Baños en suite'}`)}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -510,7 +517,7 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                 <div className="mt-3 pt-3 border-t border-slate-100 animate-fadeIn">
                   <span className="text-blue-900 text-[10px] font-bold uppercase tracking-wider block mb-1">{t('Habitabilidad & Confort', 'Habitability & Comfort')}</span>
                   <p className="text-slate-600 text-xs leading-relaxed">
-                    {t(`Alojamiento de alto nivel con ${vessel.cabins || 'cabinas privadas'} y ${vessel.bathrooms || 'baños en suite'}, amplio salón y cocina completamente equipada.`, `High-end accommodation with ${vessel.cabins || 'private cabins'} and ${vessel.bathrooms || 'en-suite bathrooms'}, spacious salon and fully equipped galley.`)}
+                    {t(`Alojamiento de alto nivel con ${vessel?.cabins || 'cabinas privadas'} y ${vessel?.bathrooms || 'baños en suite'}, amplio salón y cocina completamente equipada.`, `High-end accommodation with ${vessel?.cabins || 'private cabins'} and ${vessel?.bathrooms || 'en-suite bathrooms'}, spacious salon and fully equipped galley.`)}
                   </p>
                 </div>
               )}
@@ -527,9 +534,9 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Radio className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">Starlink 24/7 • Electrónica Marina</h4>
-                    <span className="text-[11px] text-slate-500">{t('Instrumental oceánico de precisión', 'Precision oceanic electronics')}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_sur_badge', t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_sur_title', 'Starlink 24/7 • Electrónica Marina')}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_sur_sub', t('Instrumental oceánico de precisión', 'Precision oceanic electronics'))}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -568,9 +575,9 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Droplets className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{t('ESTE / AUTONOMÍA', 'EAST / AUTONOMY')}</span>
-                    <h4 className="font-bold text-slate-900 text-sm">140 Ltrs/hr • Bote Zodiac</h4>
-                    <span className="text-[11px] text-slate-500">Agua dulce y desembarco auxiliar</span>
+                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block">{getCmsSpec('spec_este_badge', t('ESTE / SERVICIO', 'EAST / SERVICE'))}</span>
+                    <h4 className="font-bold text-slate-900 text-sm">{getCmsSpec('spec_este_title', vessel?.crew || '140 Ltrs/hr • Bote Zodiac')}</h4>
+                    <span className="text-[11px] text-slate-500">{getCmsSpec('spec_este_sub', 'Servicio & Seguridad de Bordo')}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-blue-900 text-xs font-semibold shrink-0">
@@ -625,9 +632,9 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('NORTE / ASTILLERO', 'NORTH / SHIPYARD')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{vessel.length || 'Eslora Oceánica'}</span>
-                    <span className="text-slate-500 text-[10px] block">{vessel.builder || vessel.name} • {vessel.registration || 'DIRECTEMAR'}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_norte_title', vessel?.length || 'Eslora Oceánica')}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_norte_sub', `${vessel?.builder || vessel?.name || ''} • ${vessel?.registration || 'DIRECTEMAR'}`)}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -673,9 +680,9 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('OESTE / CAPACIDAD', 'WEST / CAPACITY')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{vessel.capacity || `${vessel.maxPax || 10} PAX`}</span>
-                    <span className="text-slate-500 text-[10px] block">{vessel.cabins || 'Cabinas privadas'} • {vessel.bathrooms || 'Baños en suite'}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_oeste_badge', t('OESTE / CAPACIDAD', 'WEST / CAPACITY'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_oeste_title', vessel?.capacity || `${vessel?.maxPax || 10} PAX`)}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_oeste_sub', `${vessel?.cabins || 'Cabinas privadas'} • ${vessel?.bathrooms || 'Baños en suite'}`)}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -690,7 +697,7 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                 >
                   <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">{t('Habitabilidad', 'Habitability')}</span>
                   <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    {t(`Alojamiento distribuido en ${vessel.cabins || 'cabinas privadas'} con ${vessel.bathrooms || 'baños en suite'}, amplio salón central y cocina para navegación oceánica prolongada.`, `Accommodation laid out across ${vessel.cabins || 'private cabins'} with ${vessel.bathrooms || 'en-suite bathrooms'}, spacious central salon and galley for extended voyages.`)}
+                    {t(`Alojamiento distribuido en ${vessel?.cabins || 'cabinas privadas'} con ${vessel?.bathrooms || 'baños en suite'}, amplio salón central y cocina para navegación oceánica prolongada.`, `Accommodation laid out across ${vessel?.cabins || 'private cabins'} with ${vessel?.bathrooms || 'en-suite bathrooms'}, spacious central salon and galley for extended voyages.`)}
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
@@ -721,11 +728,11 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('SUR / NAVEGACIÓN', 'SOUTH / NAVIGATION')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_sur_badge', t('SUR / TECNOLOGÍA', 'SOUTH / TECHNOLOGY'))}</span>
                     <span className="text-xs sm:text-[13px] font-bold text-slate-900 block mt-0.5 leading-tight max-w-[160px] mx-auto">
-                      {t('Sistema de Navegación de Última Generación', 'Next-Generation Navigation System')}
+                      {getCmsSpec('spec_sur_title', t('Starlink 24/7', 'Starlink 24/7'))}
                     </span>
-                    <span className="text-slate-500 text-[10px] block mt-0.5">Starlink 24/7</span>
+                    <span className="text-slate-500 text-[10px] block mt-0.5">{getCmsSpec('spec_sur_sub', t('Conexión Satelital & Navegación', 'Satellite Connection & Navigation'))}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -787,9 +794,9 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{t('ESTE / AUTONOMÍA', 'EAST / AUTONOMY')}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">140 Ltrs/hr</span>
-                    <span className="text-slate-500 text-[10px] block">Zodiac Semirrígido</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_este_badge', t('ESTE / SERVICIO', 'EAST / SERVICE'))}</span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_este_title', vessel?.crew || 'Patrón + Tripulación')}</span>
+                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_este_sub', 'Servicio & Seguridad de Bordo')}</span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
