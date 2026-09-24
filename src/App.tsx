@@ -4,7 +4,16 @@ import { Footer } from './components/layout/Footer';
 import { FloatingConcierge } from './components/layout/FloatingConcierge';
 import { WelcomeSplash } from './components/modules/WelcomeSplash';
 import { LoadingScreen } from './components/modules/LoadingScreen';
+import { MaintenanceScreen } from './components/modules/MaintenanceScreen';
 import { analyticsService } from './services/analyticsService';
+
+// =========================================================================
+// INTERRUPTOR DE MODO MANTENCIÓN:
+// - Poner en `true` para activar la pantalla de mantención con el video de Vegvisir.
+// - Poner en `false` para restaurar todo el sitio web exactamente a su estado normal.
+// =========================================================================
+export const IS_MAINTENANCE_MODE = true;
+
 import {
   SEOHead,
   EXPEDITIONS_FAQ_SCHEMA,
@@ -222,6 +231,31 @@ export function App() {
         );
     }
   };
+
+  // Modo mantención: bloquea el sitio público y muestra la pantalla con el video de Vegvisir
+  if (IS_MAINTENANCE_MODE) {
+    if (baseRoute === '/admin') {
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
+          <Suspense fallback={<PageLoaderFallback />}>
+            <AdminPage onNavigate={navigate} />
+          </Suspense>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-white font-sans">
+        <SEOHead
+          title="Sitio en Mantención — Yates Chile"
+          description="Estamos renovando nuestra experiencia digital de navegación y expediciones marítimas de ultralujo. Volveremos muy pronto."
+          canonicalPath="/"
+          ogImage="https://yateschile.cl/expediciones-hero.jpg"
+        />
+        <MaintenanceScreen onBypass={() => navigate('/admin')} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans selection:bg-amber-400 selection:text-slate-950">
