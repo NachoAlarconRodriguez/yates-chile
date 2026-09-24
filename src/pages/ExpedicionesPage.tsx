@@ -5,7 +5,6 @@ import { isExpeditionSoldOut, getExpeditionAvailableSpots, type PublicExpedition
 import { normalizeExternalMediaUrl, normalizeBrochureUrl, type ExpeditionCategory, DEFAULT_EXPEDITION_CATEGORIES } from '../services/cmsService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
-import { leadService } from '../services/leadService';
 import { ExpeditionBookingModal } from '../components/modules/ExpeditionBookingModal';
 import { ExpeditionsLoadingState } from '../components/modules/ExpeditionsLoadingState';
 import { 
@@ -13,16 +12,13 @@ import {
   Download, 
   Clock, 
   ArrowRight, 
-  Check, 
   X, 
   MapPin, 
   Sparkles, 
   Utensils, 
   Waves, 
   CloudSun, 
-  ShieldCheck, 
-  Anchor, 
-  Footprints
+  Anchor
 } from 'lucide-react';
 
 interface ExpedicionesPageProps {
@@ -47,6 +43,41 @@ interface ExpeditionOverview {
 const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => string): ExpeditionOverview => {
   const v = exp.vessel.toLowerCase();
 
+  const unifiedPillars: ExpeditionPillar[] = [
+    {
+      icon: <Anchor className="w-5 h-5 text-blue-900" />,
+      title: t('Velerismo Oceánico de Altura', 'Oceanic Offshore Sailing'),
+      desc: t(
+        'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.',
+        'Offshore sailing with certified master, night watches, sail trimming, and nautical charting.'
+      )
+    },
+    {
+      icon: <Utensils className="w-5 h-5 text-blue-900" />,
+      title: t('Alojamiento en Rincón de Navegantes', 'Accommodation in Rincón de Navegantes'),
+      desc: t(
+        'Un lodge inspirado en quienes navegan, exploran y llevan el mar por dentro. Madera, calma y tradición navegante en la costa de Robinson Crusoe, frente a una bahía donde cada ventana mira al océano.',
+        'A lodge inspired by those who sail, explore, and carry the sea within. Wood, tranquility, and sailing tradition on the coast of Robinson Crusoe, facing a bay where every window looks out to the ocean.'
+      )
+    },
+    {
+      icon: <Compass className="w-5 h-5 text-blue-900" />,
+      title: t('Exploración', 'Exploration'),
+      desc: t(
+        'Actividades terrestres y náuticas, cabalgata, trekking, snorkeling.',
+        'Land and nautical activities, horseback riding, trekking, snorkeling.'
+      )
+    },
+    {
+      icon: <Waves className="w-5 h-5 text-blue-900" />,
+      title: t('Autonomía Total & Starlink 24/7', 'Total Autonomy & 24/7 Starlink'),
+      desc: t(
+        '5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.',
+        '5 cabins with 5 en-suite heads, hydronic heating, 140 l/h watermaker, and continuous satellite link.'
+      )
+    }
+  ];
+
   let overview: ExpeditionOverview;
 
   if (v.includes('lodge')) {
@@ -56,28 +87,7 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
         `${exp.description} Tu experiencia combina el descanso en nuestro refugio frente al mar en Bahía Cumberland (Uberlindo Andaur 222) con salidas guiadas por expertos locales, contemplando atardeceres únicos en el océano y explorando la naturaleza prístina de la isla.`,
         `${exp.description} Your experience combines relaxation at our oceanfront refuge in Cumberland Bay (Uberlindo Andaur 222) with excursions guided by local experts, watching unique oceanic sunsets and discovering pristine island nature.`
       ),
-      pillars: [
-        {
-          icon: <Anchor className="w-5 h-5 text-blue-900" />,
-          title: t('Refugio Náutico Frente al Mar', 'Oceanfront Nautical Refuge'),
-          desc: t('Alojamiento en cabinas independientes con baño privado y vista panorámica al océano, terraza y amplio quincho para compartir.', 'Accommodation in private en-suite cabins with panoramic ocean views, terrace, and spacious gathering quincho.')
-        },
-        {
-          icon: <Footprints className="w-5 h-5 text-blue-900" />,
-          title: t('Senderismo & Ecosistemas Endémicos', 'Trekking & Endemic Ecosystems'),
-          desc: t('Caminatas guiadas por bosques de helechos gigantes, senderos históricos hacia el Mirador Alexander Selkirk y avistamiento del picaflor rojo.', 'Guided hikes through giant fern forests, historical trails to Alexander Selkirk Lookout, and hummingbird watching.')
-        },
-        {
-          icon: <Utensils className="w-5 h-5 text-blue-900" />,
-          title: t('Gastronomía de Isla & Quincho', 'Island Gastronomy & Quincho'),
-          desc: t('Degustación de langosta fresca de Juan Fernández cocida en agua de mar, pescados locales de roca (vidriola) y asados en el quincho.', 'Juan Fernández fresh lobster boiled in sea water, local yellowtail rockfish, and outdoor grilled feasts.')
-        },
-        {
-          icon: <Waves className="w-5 h-5 text-blue-900" />,
-          title: t('Santuarios Marinos & Snorkel', 'Marine Sanctuaries & Snorkeling'),
-          desc: t('Navegaciones costeras hacia farellones y loberías protegidas con sesiones de snorkel junto a los amigables lobos marinos de dos pelos.', 'Coastal boat tours to sea lion colonies and protected reefs with snorkeling sessions alongside fur seals.')
-        }
-      ],
+      pillars: unifiedPillars,
       included: [
         t('Hospedaje boutique en cabina privada con baño en suite', 'Boutique lodging in private en-suite cabin'),
         t('Pensión completa con gastronomía local y cenas en quincho', 'Full board with local gastronomy and quincho dinners'),
@@ -94,28 +104,7 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
         `${exp.description} Una experiencia náutica genuina a bordo del velero de expedición Vegvisir (Dufour 52.5 ft francés), donde vivirás la auténtica pasión del mar abierto, el trabajo en equipo de guardia y la llegada a caletas insulares remotas.`,
         `${exp.description} A genuine nautical experience aboard the Vegvisir expedition sailboat (French Dufour 52.5 ft), where you will experience open ocean passion, watch shifts, and landfalls at remote island coves.`
       ),
-      pillars: [
-        {
-          icon: <Anchor className="w-5 h-5 text-blue-900" />,
-          title: t('Velerismo Oceánico de Altura', 'Oceanic Offshore Sailing'),
-          desc: t('Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.', 'Offshore sailing with certified master, night watches, sail trimming, and nautical charting.')
-        },
-        {
-          icon: <Utensils className="w-5 h-5 text-blue-900" />,
-          title: t('Pesca de Altura (Trolling) & Menú a Bordo', 'Offshore Trolling & Gourmet Menu'),
-          desc: t('Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.', 'Trolling lines for yellowtail and tuna, fresh sashimi preparations, and hot gourmet meals.')
-        },
-        {
-          icon: <Compass className="w-5 h-5 text-blue-900" />,
-          title: t('Recaladas en Bahías Míticas', 'Landfalls at Mythic Coves'),
-          desc: t('Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.', 'Protected anchorages at Cumberland Bay and Puerto Español with Zodiac landings.')
-        },
-        {
-          icon: <Waves className="w-5 h-5 text-blue-900" />,
-          title: t('Autonomía Total & Starlink 24/7', 'Total Autonomy & 24/7 Starlink'),
-          desc: t('5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.', '5 cabins with 5 en-suite heads, hydronic heating, 140 l/h watermaker, and continuous satellite link.')
-        }
-      ],
+      pillars: unifiedPillars,
       included: [
         t('Pensión completa gourmet preparada por tripulación / chef', 'Full gourmet board prepared by crew / chef'),
         t('Instrucción náutica, bitácora y participación en maniobras', 'Nautical instruction, logbook logging, and maneuvers participation'),
@@ -133,28 +122,7 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
         `${exp.description} A bordo del Yate Terranova (Hatteras 65ft LRC de 3 cubiertas), experimentarás una navegación rápida, potente y confortable, accediendo a los rincones más inaccesibles con la máxima sofisticación y servicio a bordo.`,
         `${exp.description} Aboard the Terranova Yacht (3-deck Hatteras 65ft LRC), experience fast, powerful, and comfortable cruising to remote corners with sophisticated service.`
       ),
-      pillars: [
-        {
-          icon: <Anchor className="w-5 h-5 text-blue-900" />,
-          title: t('Navegación Rápida & 3 Cubiertas', 'Fast Cruising & 3 Decks'),
-          desc: t('Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.', 'Hydraulic roll stabilizers, twin helm bridges, 5 en-suite cabins, and expansive panoramic decks.')
-        },
-        {
-          icon: <Utensils className="w-5 h-5 text-blue-900" />,
-          title: t('Deck Superior & Gastronomía de Autor', 'Upper Deck & Signature Dining'),
-          desc: t('Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.', 'Open-air top deck grill, fresh seafood paired with select fine wines by our executive chef.')
-        },
-        {
-          icon: <Waves className="w-5 h-5 text-blue-900" />,
-          title: t('Desembarcos Asistidos con Zodiac 70 HP', 'Assisted Landings with 70 HP Zodiac'),
-          desc: t('Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.', '1-ton crane and powerful tender to explore remote fjords, sea caves, and volcanic beaches.')
-        },
-        {
-          icon: <Compass className="w-5 h-5 text-blue-900" />,
-          title: t('Pesca Deportiva de Altura & Fauna Pelágica', 'Sportfishing & Pelagic Wildlife'),
-          desc: t('Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.', 'Top-tier trolling gear and marine radar for spotting cetaceans, seals, and pelagic seabirds.')
-        }
-      ],
+      pillars: unifiedPillars,
       included: [
         t('Tripulación profesional completa y chef ejecutivo a bordo', 'Full professional crew and executive chef on board'),
         t('Todas las comidas gourmet, tablas y barra de autor', 'All gourmet meals, tasting boards, and open signature bar'),
@@ -174,36 +142,8 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
     overview.summary = exp.description;
   }
 
-  // Custom highlights / pillars enhancement if present
-  if (exp.highlights && exp.highlights.trim()) {
-    try {
-      const parsed = JSON.parse(exp.highlights);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        overview.pillars = parsed.slice(0, 4).map((p: any, idx: number) => ({
-          icon: overview.pillars[idx]?.icon || <Compass className="w-5 h-5 text-blue-900" />,
-          title: typeof p === 'string' ? p : p.title || '',
-          desc: typeof p === 'string' ? (overview.pillars[idx]?.desc || '') : p.desc || ''
-        }));
-      }
-    } catch {
-      const customHls = exp.highlights.split(/[•\n]/).map((s) => s.trim()).filter(Boolean);
-      if (customHls.length > 0) {
-        overview.pillars = customHls.slice(0, 4).map((hl, idx) => ({
-          icon: overview.pillars[idx]?.icon || <Compass className="w-5 h-5 text-blue-900" />,
-          title: hl,
-          desc: overview.pillars[idx]?.desc || t('Hito principal y experiencia programada de esta expedición.', 'Main milestone and featured activity of this expedition.')
-        }));
-      }
-    }
-  }
-
-  // Custom included services enhancement if present
-  if (exp.includedServices && exp.includedServices.trim()) {
-    const customInc = exp.includedServices.split(/[•\n]/).map((s) => s.trim()).filter(Boolean);
-    if (customInc.length > 0) {
-      overview.included = customInc;
-    }
-  }
+  // Ensure pillars remain strictly the unified standard set for all expeditions
+  overview.pillars = unifiedPillars;
 
   return overview;
 };
@@ -211,8 +151,6 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
 export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate, currentPath }) => {
   const { expeditions, loading } = useExpeditions();
   const { t } = useLanguage();
-  const [downloadEmail, setDownloadEmail] = useState('');
-  const [downloadSent, setDownloadSent] = useState(false);
   const [selectedExpedition, setSelectedExpedition] = useState<Expedition | null>(null);
   const [bookingModalExpedition, setBookingModalExpedition] = useState<Expedition | null>(null);
   const [bookingModalInitialStep, setBookingModalInitialStep] = useState<0 | 1>(0);
@@ -295,30 +233,6 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
   }, [expeditions, selectedType, cmsCategories]);
 
   const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition, t) : null;
-
-  const handleBrochureDownload = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!downloadEmail) return;
-    setDownloadSent(true);
-
-    // Register lead in CRM
-    leadService.createLead({
-      fullName: downloadEmail.split('@')[0],
-      email: downloadEmail,
-      phone: '',
-      origin: 'brochure',
-      originDetails: 'Descarga Brochure Travesías 2026/2027',
-      interestType: 'expediciones',
-      notes: 'Solicitó descarga del Brochure PDF oficial desde la página de Expediciones.',
-    }).catch(() => {});
-
-    setTimeout(() => {
-      const link = document.createElement('a');
-      link.href = '#';
-      link.setAttribute('download', 'YatesChile_Brochure_2026.pdf');
-      document.body.appendChild(link);
-    }, 500);
-  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -767,21 +681,6 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                   </div>
                 </div>
 
-                {/* Included Services Checklist */}
-                <div className="space-y-2.5 pt-1">
-                  <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
-                    {t('Servicios & Equipamiento Incluido', 'Included Services & Equipment')}
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {overview.included.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-xs text-slate-700 font-light">
-                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
               </div>
             </div>
 
@@ -825,46 +724,6 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
           </div>
         </div>
       )}
-
-      {/* Instant PDF Brochure Download Banner */}
-      <section className="py-16 bg-slate-900 text-white border-t border-slate-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-          <div className="w-14 h-14 bg-blue-400/10 text-blue-400 rounded-2xl flex items-center justify-center mx-auto border border-blue-400/30">
-            <Download className="w-7 h-7" />
-          </div>
-
-          <h3 className="font-serif text-3xl font-bold text-white">
-            {t('Descarga el Brochure Oficial de Expediciones 2026/2027', 'Download Official 2026/2027 Expeditions Brochure')}
-          </h3>
-          <p className="text-slate-350 text-sm max-w-xl mx-auto leading-relaxed">
-            {t('Obtén en formato PDF el detalle completo de expediciones, especificaciones técnicas, gastronomía y equipamiento de seguridad de la flota.', 'Get complete expedition details, technical specifications, gastronomy, and safety fleet equipment in PDF format.')}
-          </p>
-
-          {!downloadSent ? (
-            <form onSubmit={handleBrochureDownload} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <input
-                type="email"
-                required
-                placeholder={t('Ingresa tu correo electrónico', 'Enter your email address')}
-                value={downloadEmail}
-                onChange={(e) => setDownloadEmail(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:border-blue-400 focus:outline-none min-h-[48px]"
-              />
-              <button
-                type="submit"
-                className="bg-blue-900 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-xl transition text-sm min-h-[48px] shrink-0 cursor-pointer"
-              >
-                {t('Descargar Brochure PDF', 'Download PDF Brochure')}
-              </button>
-            </form>
-          ) : (
-            <div className="bg-emerald-500/20 text-emerald-300 p-4 rounded-xl border border-emerald-400/40 inline-flex items-center gap-2 text-sm font-semibold">
-              <Check className="w-5 h-5 text-emerald-400" />
-              <span>{t('Brochure despachado con éxito a tu correo. ¡Descarga iniciada!', 'Brochure dispatched successfully to your email. Download initiated!')}</span>
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Expedition Booking Modal */}
       <ExpeditionBookingModal

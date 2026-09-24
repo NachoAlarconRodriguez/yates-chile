@@ -141,7 +141,7 @@ export const EXPEDITIONS_FAQ_SCHEMA = {
       'name': '¿Cuál es la política de reserva y abono para asegurar un cupo?',
       'acceptedAnswer': {
         '@type': 'Answer',
-        'text': 'Para bloquear y garantizar un cupo en la expedición seleccionada, se requiere un abono inicial correspondiente al 50% del valor total mediante transferencia bancaria. El 50% restante se liquida hasta 30 días antes del zarpe.'
+        'text': 'Para bloquear y garantizar un cupo en la expedición seleccionada, se requiere un abono inicial correspondiente al 50% del valor total mediante transferencia bancaria. El 50% restante se liquida hasta 60 días antes del zarpe.'
       }
     }
   ]

@@ -23,6 +23,7 @@ const ContactoPage = lazy(() => import('./pages/ContactoPage').then((m) => ({ de
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 const VegvisirDetailPage = lazy(() => import('./pages/VegvisirDetailPage').then((m) => ({ default: m.VegvisirDetailPage })));
 const TerranovaDetailPage = lazy(() => import('./pages/TerranovaDetailPage').then((m) => ({ default: m.TerranovaDetailPage })));
+const VesselDetailPage = lazy(() => import('./pages/VesselDetailPage').then((m) => ({ default: m.VesselDetailPage })));
 
 const PageLoaderFallback = () => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
@@ -200,6 +201,17 @@ export function App() {
           />
         );
       default:
+        if (baseRoute.startsWith('/flota/')) {
+          const rawParam = baseRoute.replace('/flota/', '');
+          const formattedName = rawParam.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+          return (
+            <SEOHead
+              title={`${formattedName} — Flota de Expedición Yates Chile`}
+              description={`Conoce los detalles, características técnicas y reservas para navegar a bordo de ${formattedName} en la Patagonia y Archipiélago Juan Fernández.`}
+              canonicalPath={baseRoute}
+            />
+          );
+        }
         return (
           <SEOHead
             title="Expediciones Marítimas de Ultralujo & Lodge"
@@ -255,6 +267,16 @@ export function App() {
               )}
               {(baseRoute === '/yate-terranova' || baseRoute === '/flota/terranova') && (
                 <TerranovaDetailPage onNavigate={navigate} />
+              )}
+              {baseRoute.startsWith('/flota/') && baseRoute !== '/flota/vegvisir' && baseRoute !== '/flota/terranova' && (
+                <VesselDetailPage vesselIdOrSlug={baseRoute.replace('/flota/', '')} onNavigate={navigate} />
+              )}
+              {/* Dynamic slug route fallback like /velero-punta-sur */}
+              {!['/', '/flota', '/lodge', '/expediciones', '/contacto', '/admin', '/welcome', '/intro'].includes(baseRoute) &&
+                !baseRoute.startsWith('/flota/') &&
+                baseRoute !== '/velero-vegvisir' &&
+                baseRoute !== '/yate-terranova' && (
+                  <VesselDetailPage vesselIdOrSlug={baseRoute.replace(/^\//, '')} onNavigate={navigate} />
               )}
             </Suspense>
           </main>

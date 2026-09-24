@@ -1125,7 +1125,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                         <span className="font-mono font-bold text-sm text-slate-950">${depositAmount.toLocaleString('es-CL')} CLP</span>
                       </div>
                       <div className="text-[10px] text-slate-500 font-medium">
-                        * El cupo queda formalmente reservado al momento de realizar el abono del 50%. El 50% de saldo restante se cancela 30 días antes del zarpe.
+                        * El cupo queda formalmente reservado al momento de realizar el abono del 50%. El 50% de saldo restante se cancela 60 días antes del zarpe.
                       </div>
                     </div>
 

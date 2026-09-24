@@ -28,8 +28,6 @@ import {
   BookOpen,
   Wind,
   Thermometer,
-  Gauge,
-  Layers,
   UtensilsCrossed,
   Sun,
   Maximize2,
@@ -56,6 +54,9 @@ import {
   DEFAULT_EXPEDITION_CATEGORIES,
 } from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
+import { useFleet } from '../../hooks/useFleet';
+import { getVesselSlug, getVesselPath } from '../../services/fleetService';
+import type { Vessel } from '../../types';
 import { ExpeditionCalendar } from '../modules/ExpeditionCalendar';
 import { EXPEDITIONS } from '../modules/ExpeditionCalendar';
 import { LuxurySelect, type LuxurySelectOption } from './LuxurySelect';
@@ -184,11 +185,49 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   refreshContent,
   onNavigate,
 }) => {
+  // Fleet data for dynamic vessel pages & visual editing
+  const { vessels, activeVessels } = useFleet();
+
   // Navigation State
-  const [activePage, setActivePage] = useState<'home' | 'hero_carousel' | 'vegvisir' | 'terranova' | 'lodge' | 'expeditions' | 'logbook' | 'footer'>('home');
+  const [activePage, setActivePage] = useState<string>('home');
   const [activeHeroBannerIndex, setActiveHeroBannerIndex] = useState<number>(0);
-  const [activeLogbookVessel, setActiveLogbookVessel] = useState<'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook'>('vegvisir_logbook');
+  const [activeLogbookVessel, setActiveLogbookVessel] = useState<string>('vegvisir_logbook');
   const [activeLogbookEntry, setActiveLogbookEntry] = useState<string>('climatizacion');
+
+  const otherActiveVessels = useMemo(() => {
+    return activeVessels.filter((v) => {
+      const id = v.id.toLowerCase();
+      const name = (v.name || '').toLowerCase();
+      return id !== 'vegvisir' && id !== 'terranova' && !name.includes('vegvisir') && !name.includes('terranova');
+    });
+  }, [activeVessels]);
+
+  const activeLogbookVesselData = useMemo(() => {
+    if (activeLogbookVessel === 'vegvisir_logbook') {
+      return vessels.find((v) => v.id === 'vegvisir' || v.name.toLowerCase().includes('vegvisir')) || null;
+    }
+    if (activeLogbookVessel === 'terranova_logbook') {
+      return vessels.find((v) => v.id === 'terranova' || v.name.toLowerCase().includes('terranova')) || null;
+    }
+    if (activeLogbookVessel === 'lodge_logbook') return null;
+    const cleanSlug = activeLogbookVessel.replace('_logbook', '');
+    return vessels.find((v) => v.id === cleanSlug || getVesselSlug(v) === cleanSlug) || null;
+  }, [activeLogbookVessel, vessels]);
+
+  const activeCustomVessel = useMemo(() => {
+    if (activePage === 'vegvisir' || activePage === 'terranova') return null;
+    if (activePage.startsWith('flota_')) {
+      const rawId = activePage.replace('flota_', '');
+      return vessels.find((v) => v.id === rawId || getVesselSlug(v) === rawId) || null;
+    }
+    return vessels.find((v) => v.id === activePage || getVesselSlug(v) === activePage) || null;
+  }, [activePage, vessels]);
+
+  const findVesselForSectionKey = (secKey: string): Vessel | null => {
+    if (!secKey.startsWith('flota_')) return null;
+    const cleanId = secKey.replace('flota_', '');
+    return vessels.find((v) => v.id === cleanId || getVesselSlug(v) === cleanId) || null;
+  };
 
   // Language Mode: 'ES' (Spanish base) or 'EN' (English AI review/edit)
   const [editorLanguage, setEditorLanguage] = useState<'ES' | 'EN'>('ES');
@@ -254,20 +293,79 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   }, [isCreateCategoryModalOpen, isManageCategoriesModalOpen, mediaModal, uploadingMedia, showApiKeyModal, isFullscreen]);
 
   // Logbook Dynamic Data Helpers
-  const getLogbookEntry = (vesselKey: 'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook', entryId: string) => {
+  const getLogbookEntry = (vesselKey: string, entryId: string) => {
     const draftMeta = drafts[vesselKey]?.metadata as any;
     const contentMeta = content[vesselKey]?.metadata as any;
     const defaultMeta = DEFAULT_CMS_CONTENT[vesselKey]?.metadata as any;
-    return (
+    const existing =
       draftMeta?.entries?.[entryId] ||
       contentMeta?.entries?.[entryId] ||
-      defaultMeta?.entries?.[entryId] ||
-      {}
-    );
+      defaultMeta?.entries?.[entryId];
+
+    if (existing) return existing;
+
+    // Smart fallback for dynamic vessels if not yet saved in Supabase
+    if (vesselKey !== 'lodge_logbook') {
+      const cleanSlug = vesselKey.replace('_logbook', '');
+      const currentVessel = vessels.find((v) => v.id === cleanSlug || getVesselSlug(v) === cleanSlug);
+      const vesselName = currentVessel?.name || 'Embarcación';
+      const vesselImg = currentVessel?.mainImage || '/velero-vegvisir.jpg';
+
+      const dynamicFallbacks: Record<string, any> = {
+        climatizacion: {
+          nav_title: 'Climatización & Confort Térmico',
+          nav_description: 'Sistema de calefacción marina controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.',
+          day: 'Día 12 de Travesía',
+          location: 'Canal Sarmiento',
+          coordinates: "51°52' S, 73°40' W",
+          wind: 'W 32 Nudos',
+          temp: '2°C Ext',
+          text: `El frío antártico cala hondo en cubierta, pero el ${vesselName} nos abraza en su interior. La climatización mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa mientras contemplamos la ventisca desde el ventanal templado.`,
+          image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
+        },
+        gastronomia: {
+          nav_title: 'Gastronomía Oceánica',
+          nav_description: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica.',
+          day: 'Día 15 de Travesía',
+          location: 'Seno Ventisquero',
+          coordinates: "54°30' S, 69°12' W",
+          wind: 'Calma',
+          temp: '4°C Ext',
+          text: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+          image: '/flota/vegvisir/vegvisir-gastronomia.jpg',
+        },
+        casco: {
+          nav_title: 'Casco Reforzado',
+          nav_description: 'Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hasta los fiordos australes.',
+          day: 'Día 18 de Travesía',
+          location: 'Paso del Indio',
+          coordinates: "49°02' S, 74°24' W",
+          wind: 'NW 45 Nudos',
+          temp: '1°C Ext',
+          text: `Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado del ${vesselName} infunde total confianza cuando el hielo roza suavemente la estructura.`,
+          image: vesselImg,
+        },
+        desembarcos: {
+          nav_title: 'Desembarcos Seguros',
+          nav_description: 'Equipado con bote auxiliar semirrígido de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores sin muelles portuarios.',
+          day: 'Día 20 de Travesía',
+          location: 'Bahía Ainsworth',
+          coordinates: "54°22' S, 69°38' W",
+          wind: 'SW 15 Nudos',
+          temp: '5°C Ext',
+          text: 'Alistamos el bote auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos.',
+          image: '/flota/vegvisir/vegvisir-desembarcos.jpg',
+        },
+      };
+
+      if (dynamicFallbacks[entryId]) return dynamicFallbacks[entryId];
+    }
+
+    return {};
   };
 
   const setLogbookEntryField = (
-    vesselKey: 'vegvisir_logbook' | 'terranova_logbook' | 'lodge_logbook',
+    vesselKey: string,
     entryId: string,
     field: string,
     value: string
@@ -278,7 +376,8 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       (DEFAULT_CMS_CONTENT[vesselKey]?.metadata as any) ||
       {};
     const currentEntries = existingMeta.entries || {};
-    const targetEntry = currentEntries[entryId] || {};
+    const fallbackEntry = getLogbookEntry(vesselKey, entryId);
+    const targetEntry = currentEntries[entryId] || fallbackEntry || {};
 
     const updatedEntries = {
       ...currentEntries,
@@ -546,6 +645,8 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
   // Get field with draft priority and proper fallback respecting active editorLanguage
   const getField = (sectionKey: string, field: 'title' | 'subtitle' | 'body_text' | 'media_url'): string => {
+    const vesselMatch = findVesselForSectionKey(sectionKey);
+
     if (field === 'media_url') {
       if (drafts[sectionKey]?.media_url !== undefined && drafts[sectionKey]?.media_url !== null) {
         return drafts[sectionKey]!.media_url as string;
@@ -553,7 +654,9 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       const sec = content[sectionKey];
       if (sec?.media_url) return sec.media_url;
       const def = DEFAULT_CMS_CONTENT[sectionKey];
-      return def?.media_url || '';
+      if (def?.media_url) return def.media_url;
+      if (vesselMatch?.mainImage) return vesselMatch.mainImage;
+      return '';
     }
 
     // When editing in English mode:
@@ -572,7 +675,14 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
         return defMeta[enField] as string;
       }
       // Fallback to Spanish field if no English exists yet
-      return (content[sectionKey]?.[field] || DEFAULT_CMS_CONTENT[sectionKey]?.[field] || '') as string;
+      const baseVal = (content[sectionKey]?.[field] || DEFAULT_CMS_CONTENT[sectionKey]?.[field] || '') as string;
+      if (baseVal) return baseVal;
+      if (vesselMatch) {
+        if (field === 'title') return vesselMatch.name;
+        if (field === 'subtitle') return `${vesselMatch.builder || vesselMatch.type} • ${vesselMatch.capacity || `${vesselMatch.maxPax || 10} Pasajeros`}`;
+        if (field === 'body_text') return vesselMatch.description || vesselMatch.tagline || '';
+      }
+      return '';
     }
 
     // When editing in Spanish mode:
@@ -586,6 +696,11 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     const def = DEFAULT_CMS_CONTENT[sectionKey];
     if (def && def[field] !== undefined && def[field] !== null) {
       return def[field] as string;
+    }
+    if (vesselMatch) {
+      if (field === 'title') return vesselMatch.name;
+      if (field === 'subtitle') return `${vesselMatch.builder || vesselMatch.type} • ${vesselMatch.capacity || `${vesselMatch.maxPax || 10} Pasajeros`}`;
+      if (field === 'body_text') return vesselMatch.description || vesselMatch.tagline || '';
     }
     return '';
   };
@@ -655,7 +770,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           (DEFAULT_CMS_CONTENT[sectionKey]?.metadata as Record<string, any>) ||
           {};
 
-        if (sectionKey === 'vegvisir_logbook' || sectionKey === 'terranova_logbook' || sectionKey === 'lodge_logbook' || sectionKey === 'footer_contact' || sectionKey === 'home_hero_banners') {
+        if (sectionKey.endsWith('_logbook') || sectionKey === 'footer_contact' || sectionKey === 'home_hero_banners') {
           finalDrafts[sectionKey] = {
             ...d,
             metadata: existingMeta,
@@ -712,6 +827,10 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       { key: 'home_intro', label: 'Portada: Introducción a la Experiencia' },
       { key: 'flota_vegvisir', label: 'Flota: Velero Vegvisir' },
       { key: 'flota_terranova', label: 'Flota: Yate Terranova' },
+      ...otherActiveVessels.map((v) => ({
+        key: `flota_${v.id}`,
+        label: `Flota: ${v.name}`,
+      })),
       { key: 'lodge_info', label: 'Lodge: Información & Estadía' },
       { key: 'lodge_dining', label: 'Lodge: Gastronomía & Quincho' },
       { key: 'expeditions_hero', label: 'Expediciones: Travesías Australes' },
@@ -720,6 +839,11 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       { key: 'bank_details', label: 'Contacto: Datos Bancarios' },
       { key: 'vegvisir_logbook', label: 'Bitácora Náutica: Velero Vegvisir', isLogbook: true },
       { key: 'terranova_logbook', label: 'Bitácora Náutica: Yate Terranova', isLogbook: true },
+      ...otherActiveVessels.map((v) => ({
+        key: `${getVesselSlug(v)}_logbook`,
+        label: `Bitácora Náutica: ${v.name}`,
+        isLogbook: true,
+      })),
       { key: 'lodge_logbook', label: 'Bitácora & Diseño: Lodge Rincón', isLogbook: true },
     ];
 
@@ -752,9 +876,9 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             },
           };
         } else {
-          const titleEs = (newDrafts[key]?.title ?? currentSec.title ?? '') as string;
-          const subtitleEs = (newDrafts[key]?.subtitle ?? currentSec.subtitle ?? '') as string;
-          const bodyEs = (newDrafts[key]?.body_text ?? currentSec.body_text ?? '') as string;
+          const titleEs = (newDrafts[key]?.title ?? currentSec.title ?? getField(key, 'title') ?? '') as string;
+          const subtitleEs = (newDrafts[key]?.subtitle ?? currentSec.subtitle ?? getField(key, 'subtitle') ?? '') as string;
+          const bodyEs = (newDrafts[key]?.body_text ?? currentSec.body_text ?? getField(key, 'body_text') ?? '') as string;
 
           const trans = await translationService.translateSection({
             title: titleEs,
@@ -904,6 +1028,8 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                     ? '/lodge'
                     : activePage === 'expeditions'
                     ? '/expediciones'
+                    : activeCustomVessel
+                    ? getVesselPath(activeCustomVessel)
                     : '/';
                 if (onNavigate) onNavigate(targetRoute);
                 else window.open('#' + targetRoute, '_blank');
@@ -926,6 +1052,11 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                 { id: 'hero_carousel', label: 'Carrusel Hero (3 Banners)', icon: Sparkles },
                 { id: 'vegvisir', label: 'Velero Vegvisir', icon: Sailboat },
                 { id: 'terranova', label: 'Yate Terranova', icon: Ship },
+                ...otherActiveVessels.map((v) => ({
+                  id: `flota_${v.id}`,
+                  label: v.name,
+                  icon: v.type?.toLowerCase().includes('velero') ? Sailboat : Ship,
+                })),
                 { id: 'lodge', label: 'Lodge Rincón', icon: BedDouble },
                 { id: 'expeditions', label: 'Expediciones', icon: Compass },
                 { id: 'logbook', label: 'Bitácoras & Book', icon: BookOpen },
@@ -1060,7 +1191,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               <span className={`cursor-pointer pb-1 ${activePage === 'hero_carousel' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('hero_carousel')}>
                 Carrusel Hero
               </span>
-              <span className={`cursor-pointer pb-1 ${activePage === 'vegvisir' || activePage === 'terranova' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('vegvisir')}>
+              <span className={`cursor-pointer pb-1 ${activePage === 'vegvisir' || activePage === 'terranova' || activePage.startsWith('flota_') ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('vegvisir')}>
                 La Flota ▾
               </span>
               <span className={`cursor-pointer pb-1 ${activePage === 'lodge' ? 'text-slate-900 border-b-2 border-slate-900 font-bold' : 'hover:text-slate-900'}`} onClick={() => setActivePage('lodge')}>
@@ -1243,7 +1374,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     
                     {/* Card 1: Velero Vegvisir */}
                     <div className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1">
@@ -1340,6 +1471,63 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                         </div>
                       </div>
                     </div>
+
+                    {/* Cards dinámicas para otras embarcaciones activas (ej: Velero Punta Sur) */}
+                    {otherActiveVessels.map((v) => {
+                      const secKey = `flota_${v.id}`;
+                      const vesselType = v.type?.toLowerCase().includes('velero') ? 'Velero' : 'Embarcación';
+                      return (
+                        <div key={v.id} className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1">
+                          <img
+                            src={getField(secKey, 'media_url') || v.mainImage || '/velero-vegvisir.jpg'}
+                            alt={v.name}
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = getMediaFallbackUrl(getField(secKey, 'media_url')) || v.mainImage || '/velero-vegvisir.jpg';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+                          
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMediaModal({
+                                sectionKey: secKey,
+                                label: `Foto de ${v.name}`,
+                                currentValue: getField(secKey, 'media_url') || v.mainImage || '',
+                              })
+                            }
+                            className="absolute top-4 right-4 bg-slate-950/70 hover:bg-slate-950 text-white p-2 rounded-xl text-xs z-20 cursor-pointer border border-white/20 backdrop-blur-xs"
+                          >
+                            <ImageIcon className="w-3.5 h-3.5 text-sky-300" />
+                          </button>
+
+                          <div className="relative z-10 h-[140px] flex flex-col justify-between">
+                            <div className="space-y-1.5">
+                              <InlineText
+                                sectionKey={secKey}
+                                field="title"
+                                tag="h3"
+                                fallback={v.name}
+                                className="font-serif text-xl font-bold text-white block"
+                              />
+                              <InlineText
+                                sectionKey={secKey}
+                                field="body_text"
+                                tag="p"
+                                fallback={v.description || v.tagline || ''}
+                                multiline={true}
+                                className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3 block"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
+                              <span>Explorar {vesselType}</span>
+                              <ArrowRight className="w-4 h-4 text-white" />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
 
                     {/* Card 3: Lodge Rincón de Navegantes */}
                     <div className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1">
@@ -2042,6 +2230,131 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           )}
 
           {/* ======================================================================= */}
+          {/* DYNAMIC VESSEL - EXACT LUXURY REPLICA (Velero Punta Sur & created fleet) */}
+          {/* ======================================================================= */}
+          {activeCustomVessel && (
+            <div className="bg-white text-slate-900 min-h-screen">
+              {/* HERO SECTION */}
+              <section className="relative h-[65vh] sm:h-[75vh] flex items-end justify-start overflow-hidden group/hero">
+                {isMediaVideo(getField(`flota_${activeCustomVessel.id}`, 'media_url')) ? (
+                  <video
+                    src={normalizeExternalMediaUrl(getField(`flota_${activeCustomVessel.id}`, 'media_url'))}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={normalizeExternalMediaUrl(getField(`flota_${activeCustomVessel.id}`, 'media_url')) || activeCustomVessel.mainImage || "/velero-vegvisir.jpg"}
+                    alt={activeCustomVessel.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getMediaFallbackUrl(getField(`flota_${activeCustomVessel.id}`, 'media_url')) || activeCustomVessel.mainImage || '/velero-vegvisir.jpg';
+                    }}
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent" />
+                
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMediaModal({
+                      sectionKey: `flota_${activeCustomVessel.id}`,
+                      label: `Fotografía o Video de Fondo de ${activeCustomVessel.name}`,
+                      currentValue: getField(`flota_${activeCustomVessel.id}`, 'media_url') || activeCustomVessel.mainImage || '',
+                    })
+                  }
+                  className="absolute top-6 right-6 bg-slate-950/80 hover:bg-slate-950 text-white border border-white/20 px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg flex items-center gap-1.5 transition z-30 cursor-pointer backdrop-blur-md"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Cambiar Foto / Video Embarcación</span>
+                </button>
+
+                <div className="absolute top-6 left-6 sm:left-10 z-20">
+                  <span 
+                    onClick={() => setActivePage('home')}
+                    className="inline-flex items-center gap-2 bg-slate-950/60 hover:bg-slate-950/90 text-white font-semibold px-4 py-2.5 rounded-xl border border-white/10 text-xs cursor-pointer transition"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-white" />
+                    <span>Volver a Inicio</span>
+                  </span>
+                </div>
+
+                <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    <div className="bg-blue-900/80 backdrop-blur-md border border-blue-400/30 text-white font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider">
+                      <InlineText
+                        sectionKey={`flota_${activeCustomVessel.id}`}
+                        field="subtitle"
+                        tag="span"
+                        fallback={`${activeCustomVessel.builder || activeCustomVessel.type} • ${activeCustomVessel.capacity || `${activeCustomVessel.maxPax || 10} Pasajeros`}`}
+                        className="text-white font-bold"
+                      />
+                    </div>
+                    <span className="bg-slate-900/80 backdrop-blur-md border border-white/20 text-emerald-300 font-mono text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase font-bold tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Starlink 24/7
+                    </span>
+                  </div>
+
+                  <InlineText
+                    sectionKey={`flota_${activeCustomVessel.id}`}
+                    field="title"
+                    tag="h1"
+                    fallback={activeCustomVessel.name}
+                    className="font-serif text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight block"
+                  />
+
+                  <InlineText
+                    sectionKey={`flota_${activeCustomVessel.id}`}
+                    field="body_text"
+                    tag="p"
+                    fallback={activeCustomVessel.description || activeCustomVessel.tagline || ''}
+                    multiline={true}
+                    className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-2xl block"
+                  />
+                </div>
+              </section>
+
+              {/* TECH SPECS GRID */}
+              <section className="py-12 bg-white">
+                <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    {
+                      title: activeCustomVessel.builder || activeCustomVessel.length || 'Astillero Naval',
+                      sub: activeCustomVessel.registration ? `Matrícula ${activeCustomVessel.registration}` : activeCustomVessel.type,
+                      badge: 'NORTE / ASTILLERO',
+                    },
+                    {
+                      title: `${activeCustomVessel.maxPax || 8} Pasajeros`,
+                      sub: `${activeCustomVessel.cabins || '4 Cabinas'} • ${activeCustomVessel.bathrooms || '4 Baños'}`,
+                      badge: 'OESTE / CAPACIDAD',
+                    },
+                    {
+                      title: 'Starlink 24/7',
+                      sub: 'Conexión Satelital & Navegación',
+                      badge: 'SUR / TECNOLOGÍA',
+                    },
+                    {
+                      title: activeCustomVessel.crew || 'Patrón + Tripulación',
+                      sub: 'Servicio & Seguridad de Bordo',
+                      badge: 'ESTE / SERVICIO',
+                    },
+                  ].map((c, i) => (
+                    <div key={i} className="bg-slate-50 border border-slate-200 p-5 rounded-2xl text-center space-y-1">
+                      <span className="text-[9px] uppercase font-mono font-bold text-slate-400 block">{c.badge}</span>
+                      <strong className="text-sm font-bold text-slate-900 block">{c.title}</strong>
+                      <span className="text-[11px] text-slate-500 block">{c.sub}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* ======================================================================= */}
           {/* 4. LODGE RINCÓN DE NAVEGANTES - EXACT REPLICA */}
           {/* ======================================================================= */}
           {activePage === 'lodge' && (
@@ -2314,10 +2627,16 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
                 {/* Vessel Selector Capsules (Centered & Modern) */}
                 <div className="pt-4 border-t border-white/10 flex justify-center">
-                  <div className="p-1.5 bg-black/25 border border-white/15 rounded-full flex flex-wrap items-center justify-center gap-1.5 shadow-inner backdrop-blur-md">
+                  <div className="p-1.5 bg-black/25 border border-white/15 rounded-full flex flex-wrap items-center justify-center gap-1.5 shadow-inner backdrop-blur-md max-w-full overflow-x-auto">
                     {[
                       { id: 'vegvisir_logbook', label: 'Velero Vegvisir (52.5 ft)', icon: Sailboat, defaultEntry: 'climatizacion' },
                       { id: 'terranova_logbook', label: 'Yate Terranova (65ft LRC)', icon: Ship, defaultEntry: 'climatizacion' },
+                      ...otherActiveVessels.map((v) => ({
+                        id: `${getVesselSlug(v)}_logbook`,
+                        label: `${v.name} (${v.length || 'Eslora'})`,
+                        icon: Sailboat,
+                        defaultEntry: 'climatizacion',
+                      })),
                       { id: 'lodge_logbook', label: 'Lodge Rincón de Navegantes', icon: BedDouble, defaultEntry: 'arquitectura' },
                     ].map((v) => {
                       const Icon = v.icon;
@@ -2327,7 +2646,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                           key={v.id}
                           type="button"
                           onClick={() => {
-                            setActiveLogbookVessel(v.id as any);
+                            setActiveLogbookVessel(v.id);
                             setActiveLogbookEntry(v.defaultEntry);
                           }}
                           className={`px-5 py-2.5 rounded-full text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer ${
@@ -2362,17 +2681,19 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                       ? '⛵ Velero Vegvisir'
                       : activeLogbookVessel === 'terranova_logbook'
                       ? '🚢 Yate Terranova'
-                      : '🏡 Lodge Rincón'}
+                      : activeLogbookVessel === 'lodge_logbook'
+                      ? '🏡 Lodge Rincón'
+                      : `⛵ ${activeLogbookVesselData?.name || 'Embarcación'}`}
                   </span>
                 </div>
 
                 {/* 4 Cards arranged horizontally in a single row */}
                 <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xl">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {activeLogbookVessel === 'vegvisir_logbook' && (
+                    {activeLogbookVessel !== 'lodge_logbook' ? (
                       <>
                         {['climatizacion', 'gastronomia', 'casco', 'desembarcos'].map((key) => {
-                          const eData = getLogbookEntry('vegvisir_logbook', key);
+                          const eData = getLogbookEntry(activeLogbookVessel, key);
                           const isSelected = activeLogbookEntry === key;
                           return (
                             <div
@@ -2404,46 +2725,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                           );
                         })}
                       </>
-                    )}
-
-                    {activeLogbookVessel === 'terranova_logbook' && (
-                      <>
-                        {['climatizacion', 'gastronomia', 'casco', 'desembarcos'].map((key) => {
-                          const eData = getLogbookEntry('terranova_logbook', key);
-                          const isSelected = activeLogbookEntry === key;
-                          return (
-                            <div
-                              key={key}
-                              onClick={() => setActiveLogbookEntry(key)}
-                              className={`p-5 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between gap-3 text-left ${
-                                isSelected
-                                  ? 'border-blue-900 bg-blue-50/25 shadow-md -translate-y-1 ring-2 ring-blue-900/20'
-                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
-                                  isSelected ? 'bg-blue-900 text-white' : 'bg-slate-50 text-slate-600'
-                                }`}>
-                                  {key === 'climatizacion' ? <Layers className="w-5 h-5" /> : key === 'gastronomia' ? <Sparkles className="w-5 h-5" /> : key === 'casco' ? <Gauge className="w-5 h-5" /> : <Anchor className="w-5 h-5" />}
-                                </div>
-                                {isSelected && (
-                                  <span className="text-[10px] font-bold text-blue-900 bg-blue-100/90 px-2.5 py-0.5 rounded-full">
-                                    Editando
-                                  </span>
-                                )}
-                              </div>
-                              <div className="space-y-1">
-                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">{eData.nav_title || key}</h4>
-                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">{eData.nav_description || 'Descripción...'}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
-
-                    {activeLogbookVessel === 'lodge_logbook' && (
+                    ) : (
                       <>
                         {['arquitectura', 'quincho', 'exploraciones', 'atardeceres'].map((key) => {
                           const eData = getLogbookEntry('lodge_logbook', key);

@@ -12,8 +12,11 @@ import {
   Layers,
   Users,
   Shield,
-  Power
+  Power,
+  ExternalLink
 } from 'lucide-react';
+import { getVesselPath } from '../../services/fleetService';
+import { normalizeExternalMediaUrl } from '../../services/cmsService';
 
 const PHOTO_PRESETS = [
   { label: 'Velero Vegvisir', url: '/velero-vegvisir.jpg' },
@@ -151,7 +154,7 @@ export const VesselsConfigTab: React.FC = () => {
           registration: formRegistration.trim(),
           builder: formBuilder.trim(),
           crew: formCrew.trim(),
-          mainImage: formMainImage.trim(),
+          mainImage: normalizeExternalMediaUrl(formMainImage.trim()) || formMainImage.trim(),
           features: formFeatures,
           isActive: formIsActive
         });
@@ -172,7 +175,7 @@ export const VesselsConfigTab: React.FC = () => {
           registration: formRegistration.trim(),
           builder: formBuilder.trim(),
           crew: formCrew.trim(),
-          mainImage: formMainImage.trim() || '/velero-vegvisir.jpg',
+          mainImage: normalizeExternalMediaUrl(formMainImage.trim()) || formMainImage.trim() || '/velero-vegvisir.jpg',
           features: formFeatures,
           isActive: formIsActive
         });
@@ -306,7 +309,7 @@ export const VesselsConfigTab: React.FC = () => {
                 {/* Image & Badges */}
                 <div className="relative h-48 w-full bg-slate-900 overflow-hidden">
                   <img
-                    src={vessel.mainImage || '/velero-vegvisir.jpg'}
+                    src={normalizeExternalMediaUrl(vessel.mainImage) || '/velero-vegvisir.jpg'}
                     alt={vessel.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                   />
@@ -377,40 +380,58 @@ export const VesselsConfigTab: React.FC = () => {
               </div>
 
               {/* Card Footer Actions */}
-              <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="p-3.5 bg-slate-50/80 border-t border-slate-100 flex flex-col gap-2">
+                {/* Primary Actions: Ver Ficha & Editar Ficha */}
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={`#${getVesselPath(vessel)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 border border-sky-200/60 shadow-2xs group/btn"
+                    title="Ver ficha pública en el sitio"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-sky-600 transition-transform group-hover/btn:translate-x-0.5" />
+                    <span>Ver Ficha</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(vessel)}
+                    className="py-2 px-2.5 rounded-xl bg-[#0b192c] hover:bg-[#182a44] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Edit className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Editar Ficha</span>
+                  </button>
+                </div>
+
+                {/* Secondary / Admin Controls: Pausar / Activar + Eliminar */}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => handleToggleActive(vessel)}
-                    className={`p-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                      isActive ? 'bg-slate-200 hover:bg-slate-300 text-slate-700' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                    className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      isActive
+                        ? 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'
+                        : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
                     }`}
                     title={isActive ? 'Pausar embarcación' : 'Activar embarcación'}
                   >
                     <Power className="w-3.5 h-3.5" />
                     <span>{isActive ? 'Pausar' : 'Activar'}</span>
                   </button>
-                  
+
                   {vessel.id !== 'vegvisir' && vessel.id !== 'terranova' && (
                     <button
                       type="button"
                       onClick={() => setDeleteConfirmVessel(vessel)}
-                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition cursor-pointer"
+                      className="py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition cursor-pointer border border-rose-200/70 flex items-center justify-center gap-1.5"
                       title="Eliminar embarcación"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Eliminar</span>
                     </button>
                   )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => openEditModal(vessel)}
-                  className="px-3.5 py-2 rounded-xl bg-[#0b192c] hover:bg-[#182a44] text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Edit className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Editar Ficha</span>
-                </button>
               </div>
             </div>
           );
@@ -577,19 +598,27 @@ export const VesselsConfigTab: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Ruta local (/velero-vegvisir.jpg) o URL externa"
+                    placeholder="Ruta local (/velero-vegvisir.jpg), enlace Google Drive o URL externa"
                     value={formMainImage}
                     onChange={(e) => setFormMainImage(e.target.value)}
-                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:border-[#0b192c] focus:outline-none"
+                    className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-3.5 py-2 text-slate-900 font-mono text-xs focus:border-[#0b192c] focus:outline-none"
                   />
                   {formMainImage && (
                     <img
-                      src={formMainImage}
+                      src={normalizeExternalMediaUrl(formMainImage) || formMainImage}
                       alt="Preview"
                       className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
                     />
                   )}
                 </div>
+
+                {/* Google Drive / External link optimization feedback */}
+                {formMainImage && (formMainImage.includes('drive.google.com') || formMainImage.includes('dropbox.com')) && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1.5 rounded-xl">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Enlace de {formMainImage.includes('drive.google.com') ? 'Google Drive' : 'Dropbox'} detectado y optimizado automáticamente para visualización directa</span>
+                  </div>
+                )}
                 
                 {/* Preset suggestions */}
                 <div className="flex flex-wrap gap-1.5 pt-1">

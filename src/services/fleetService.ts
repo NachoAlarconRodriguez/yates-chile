@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { FLEET_DATA } from '../lib/constants';
 import type { Vessel } from '../types';
+import { normalizeExternalMediaUrl } from './cmsService';
 
 const LOCAL_STORAGE_FLEET_KEY = 'yates_fleet_v2';
 
@@ -23,7 +24,7 @@ const mapRowToVessel = (row: any): Vessel => {
     builder: row.builder || fallback.builder,
     crew: row.crew || fallback.crew,
     badge: row.badge || fallback.badge,
-    mainImage: row.main_image || fallback.mainImage,
+    mainImage: normalizeExternalMediaUrl(row.main_image) || fallback.mainImage,
     gallery: fallback.gallery || [],
     features: Array.isArray(row.features) && row.features.length > 0 ? row.features : fallback.features,
     hotspots: Array.isArray(row.hotspots) && row.hotspots.length > 0 ? row.hotspots : fallback.hotspots,
@@ -46,7 +47,7 @@ const mapVesselToRow = (v: Partial<Vessel>): Record<string, any> => {
   if (v.builder !== undefined) row.builder = v.builder;
   if (v.crew !== undefined) row.crew = v.crew;
   if (v.badge !== undefined) row.badge = v.badge;
-  if (v.mainImage !== undefined) row.main_image = v.mainImage;
+  if (v.mainImage !== undefined) row.main_image = normalizeExternalMediaUrl(v.mainImage) || v.mainImage;
   if (v.features !== undefined) row.features = v.features;
   if (v.hotspots !== undefined) row.hotspots = v.hotspots;
   if (v.isActive !== undefined) row.is_active = v.isActive;
@@ -121,6 +122,7 @@ export const fleetService = {
     const fallback: Vessel = {
       ...vessel,
       id: newId,
+      mainImage: normalizeExternalMediaUrl(vessel.mainImage) || vessel.mainImage || '/velero-vegvisir.jpg',
       isActive: vessel.isActive !== undefined ? vessel.isActive : true,
       features: vessel.features && vessel.features.length > 0 ? vessel.features : [
         `${vessel.length || '50 ft'} de eslora`,
@@ -170,3 +172,63 @@ export const fleetService = {
     return { success: true };
   }
 };
+
+export const getVesselSlug = (vessel: { id: string; name?: string }): string => {
+  if (vessel.id === 'vegvisir') return 'vegvisir';
+  if (vessel.id === 'terranova') return 'terranova';
+  const n = (vessel.name || '').toLowerCase();
+  if (n.includes('vegvisir')) return 'vegvisir';
+  if (n.includes('terranova')) return 'terranova';
+
+  return (vessel.name || vessel.id)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '') || vessel.id;
+};
+
+export const getVesselPath = (vessel: { id: string; name?: string }): string => {
+  const slug = getVesselSlug(vessel);
+  if (slug === 'vegvisir') return '/velero-vegvisir';
+  if (slug === 'terranova') return '/yate-terranova';
+  return `/flota/${slug}`;
+};
+
+export const findVesselByParam = (vessels: Vessel[], param: string): Vessel | undefined => {
+  if (!param) return undefined;
+  const cleanParam = param.toLowerCase().trim().replace(/^flota\//, '').replace(/^\//, '');
+
+  // 1. Direct match with id or exact slug
+  const directMatch = vessels.find((v) => {
+    if (v.id.toLowerCase() === cleanParam) return true;
+    const slug = getVesselSlug(v);
+    if (slug === cleanParam) return true;
+    const nameClean = (v.name || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+    return nameClean === cleanParam;
+  });
+  if (directMatch) return directMatch;
+
+  // 2. Fuzzy match stripping prefixes like 'velero-', 'yate-', etc.
+  const strippedParam = cleanParam.replace(/^(velero|yate|catamaran|lancha)-/, '');
+  return vessels.find((v) => {
+    const slug = getVesselSlug(v);
+    const strippedSlug = slug.replace(/^(velero|yate|catamaran|lancha)-/, '');
+    if (slug === strippedParam || strippedSlug === strippedParam || strippedSlug === cleanParam) return true;
+
+    const nameClean = (v.name || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+    const strippedName = nameClean.replace(/^(velero|yate|catamaran|lancha)-/, '');
+    return nameClean === strippedParam || strippedName === strippedParam || strippedName === cleanParam;
+  });
+};
+

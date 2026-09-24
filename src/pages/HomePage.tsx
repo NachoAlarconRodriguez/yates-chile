@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { HeroCarousel } from '../components/modules/HeroCarousel';
 import { ExpeditionCalendar } from '../components/modules/ExpeditionCalendar';
 import { ArrowRight } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { translationService } from '../services/translationService';
+import { useFleet } from '../hooks/useFleet';
+import { getVesselPath, getVesselSlug } from '../services/fleetService';
+import { normalizeExternalMediaUrl } from '../services/cmsService';
 
 interface HomePageProps {
   onNavigate: (path: string) => void;
@@ -13,15 +16,28 @@ interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { getSection } = useSiteContent();
   const { language, t } = useLanguage();
+  const { activeVessels } = useFleet();
   const isEn = language === 'EN';
+
+  const otherActiveVessels = useMemo(() => {
+    return activeVessels.filter((v) => {
+      const id = v.id.toLowerCase();
+      const name = (v.name || '').toLowerCase();
+      return id !== 'vegvisir' && id !== 'terranova' && !name.includes('vegvisir') && !name.includes('terranova');
+    });
+  }, [activeVessels]);
 
   const introSection = getSection('home_intro');
   const vegvisirSec = getSection('flota_vegvisir');
   const terranovaSec = getSection('flota_terranova');
   const lodgeSec = getSection('lodge_info');
 
+  const defaultIntroTitle = otherActiveVessels.length > 0 
+    ? 'Nuestras Formas de Vivir la Aventura Austral' 
+    : 'Tres Formas de Vivir la Aventura Austral';
+
   const introSubtitle = isEn && (introSection as any)?.subtitle_en ? (introSection as any).subtitle_en : (isEn && introSection?.subtitle ? translationService.fallbackTranslate(introSection.subtitle, 'EN') : (introSection?.subtitle || 'AVENTURA EN TERRITORIOS INEXPLORADOS & PRÍSTINOS'));
-  const introTitle = isEn && (introSection as any)?.title_en ? (introSection as any).title_en : (isEn && introSection?.title ? translationService.fallbackTranslate(introSection.title, 'EN') : (introSection?.title || 'Tres Formas de Vivir la Aventura Austral'));
+  const introTitle = isEn && (introSection as any)?.title_en ? (introSection as any).title_en : (isEn && introSection?.title ? translationService.fallbackTranslate(introSection.title, 'EN') : (introSection?.title || defaultIntroTitle));
   const introBody = isEn && (introSection as any)?.body_text_en ? (introSection as any).body_text_en : (isEn && introSection?.body_text ? translationService.fallbackTranslate(introSection.body_text, 'EN') : (introSection?.body_text || 'Explora el Archipiélago Juan Fernández, Isla Alejandro Selkirk y los fiordos del Cabo de Hornos a través de nuestras tres experiencias exclusivas.'));
 
   const vegvisirTitle = isEn && (vegvisirSec as any)?.title_en ? (vegvisirSec as any).title_en : (isEn && vegvisirSec?.title ? translationService.fallbackTranslate(vegvisirSec.title, 'EN') : (vegvisirSec?.title ? vegvisirSec.title.replace(/Vegvisiri/gi, 'Vegvisir').split('(')[0].trim() : 'Velero Vegvisir'));
@@ -55,7 +71,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             
             {/* Card 1: Velero Vegvisir */}
             <div
@@ -116,6 +132,47 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 </div>
               </div>
             </div>
+
+            {/* Cards dinámicas para otras embarcaciones activas (ej: Velero Punta Sur) */}
+            {otherActiveVessels.map((vessel) => {
+              const vSec = getSection(`flota_${vessel.id}`) || getSection(`flota_${getVesselSlug(vessel)}`);
+              const vTitle = isEn && (vSec as any)?.title_en ? (vSec as any).title_en : (isEn && vSec?.title ? translationService.fallbackTranslate(vSec.title, 'EN') : (vSec?.title || vessel.name));
+              const vBody = isEn && (vSec as any)?.body_text_en ? (vSec as any).body_text_en : (isEn && vSec?.body_text ? translationService.fallbackTranslate(vSec.body_text, 'EN') : (vSec?.body_text || vessel.description || vessel.tagline || ''));
+              const vImg = normalizeExternalMediaUrl(vSec?.media_url && !vSec.media_url.includes('images.unsplash.com') ? vSec.media_url : (vessel.mainImage || '/velero-vegvisir.jpg'));
+              const vType = vessel.type?.toLowerCase().includes('velero') ? t('Explorar Velero', 'Explore Sailboat') : t('Explorar Embarcación', 'Explore Vessel');
+
+              return (
+                <div
+                  key={vessel.id}
+                  onClick={() => onNavigate(getVesselPath(vessel))}
+                  className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
+                >
+                  <img
+                    src={vImg}
+                    alt={vessel.name}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+                  
+                  <div className="relative z-10 h-[140px] flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <h3 className="font-serif text-xl font-bold text-white group-hover:text-stone-200 transition-colors w-fit">
+                        <span className="relative pb-1 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-stone-200 after:transition-all after:duration-500 group-hover:after:w-full">
+                          {vTitle}
+                        </span>
+                      </h3>
+                      <p className="text-slate-300 text-xs leading-relaxed opacity-95 line-clamp-3">
+                        {vBody}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-white font-bold text-xs uppercase tracking-wider">
+                      <span>{vType}</span>
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform text-white" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
 
             {/* Card 3: Lodge Rincón de Navegantes */}
             <div

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, PhoneCall, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { PoliciesModal } from '../modules/PoliciesModal';
+import { useFleet } from '../../hooks/useFleet';
+import { getVesselPath } from '../../services/fleetService';
 
 interface HeaderProps {
   currentPath?: string;
@@ -12,6 +14,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [policiesModalOpen, setPoliciesModalOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
+  const { activeVessels } = useFleet();
   const [isScrolled, setIsScrolled] = useState(false);
   const [fleetMenuOpen, setFleetMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -126,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
               <button
                 onClick={() => setFleetMenuOpen(!fleetMenuOpen)}
                 className={`text-sm font-semibold transition-colors py-2 border-b-2 min-h-[48px] flex items-center gap-1 cursor-pointer focus:outline-none ${
-                  currentPath === '/flota' || currentPath === '/velero-vegvisir' || currentPath === '/yate-terranova'
+                  currentPath.startsWith('/flota') || currentPath === '/velero-vegvisir' || currentPath === '/yate-terranova'
                     ? 'text-slate-950 border-slate-950 font-extrabold'
                     : 'text-slate-700 border-transparent hover:text-slate-950 hover:border-slate-400'
                 }`}
@@ -137,25 +140,34 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
 
               {/* Dropdown Menu */}
               {fleetMenuOpen && (
-                <div className="absolute left-0 mt-2 w-56 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl py-2 z-50 animate-[fadeIn_0.2s_ease-out]">
-                  <a
-                    href="#/velero-vegvisir"
-                    onClick={(e) => { e.preventDefault(); handleNavClick('/velero-vegvisir'); }}
-                    className={`block px-4 py-2.5 text-sm transition-colors font-medium ${
-                      currentPath === '/velero-vegvisir' ? 'text-blue-900 bg-blue-50/50' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
-                    }`}
-                  >
-                    {t('Velero Vegvisir', 'Vegvisir Sailboat')}
-                  </a>
-                  <a
-                    href="#/yate-terranova"
-                    onClick={(e) => { e.preventDefault(); handleNavClick('/yate-terranova'); }}
-                    className={`block px-4 py-2.5 text-sm transition-colors font-medium ${
-                      currentPath === '/yate-terranova' ? 'text-blue-900 bg-blue-50/50' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
-                    }`}
-                  >
-                    {t('Yate Terranova', 'Terranova Yacht')}
-                  </a>
+                <div className="absolute left-0 mt-2 w-60 rounded-2xl bg-white/98 backdrop-blur-md border border-slate-200 shadow-xl py-2 z-50 animate-[fadeIn_0.2s_ease-out]">
+                  {activeVessels.map((v) => {
+                    const vPath = getVesselPath(v);
+                    const isActive = currentPath === vPath;
+                    return (
+                      <a
+                        key={v.id}
+                        href={`#${vPath}`}
+                        onClick={(e) => { e.preventDefault(); handleNavClick(vPath); }}
+                        className={`block px-4 py-2.5 text-sm transition-colors font-medium ${
+                          isActive ? 'text-blue-900 bg-blue-50/70 font-bold' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
+                        }`}
+                      >
+                        {v.name}
+                      </a>
+                    );
+                  })}
+                  <div className="border-t border-slate-150 mt-1 pt-1">
+                    <a
+                      href="#/flota"
+                      onClick={(e) => { e.preventDefault(); handleNavClick('/flota'); }}
+                      className={`block px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
+                        currentPath === '/flota' ? 'text-blue-900 font-bold' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      {t('Ver Toda la Flota ➔', 'View All Fleet ➔')}
+                    </a>
+                  </div>
                 </div>
               )}
             </div>
@@ -250,7 +262,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
             <button
               onClick={() => setFleetMenuOpen(!fleetMenuOpen)}
               className={`w-full block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center justify-between focus:outline-none ${
-                currentPath === '/flota' || currentPath === '/velero-vegvisir' || currentPath === '/yate-terranova'
+                currentPath.startsWith('/flota') || currentPath === '/velero-vegvisir' || currentPath === '/yate-terranova'
                   ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
                   : 'text-slate-800 hover:bg-slate-50'
               }`}
@@ -261,23 +273,30 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
 
             {fleetMenuOpen && (
               <div className="pl-6 space-y-1 py-1">
+                {activeVessels.map((v) => {
+                  const vPath = getVesselPath(v);
+                  const isActive = currentPath === vPath;
+                  return (
+                    <a
+                      key={v.id}
+                      href={`#${vPath}`}
+                      onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); handleNavClick(vPath); }}
+                      className={`block px-4 py-2.5 rounded-xl text-sm transition-colors min-h-[40px] flex items-center ${
+                        isActive ? 'text-blue-900 font-bold bg-blue-50/40' : 'text-slate-650 hover:bg-slate-50'
+                      }`}
+                    >
+                      {v.name}
+                    </a>
+                  );
+                })}
                 <a
-                  href="#/velero-vegvisir"
-                  onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); handleNavClick('/velero-vegvisir'); }}
-                  className={`block px-4 py-2.5 rounded-xl text-sm transition-colors min-h-[40px] flex items-center ${
-                    currentPath === '/velero-vegvisir' ? 'text-blue-900 font-bold bg-blue-50/20' : 'text-slate-650 hover:bg-slate-50'
+                  href="#/flota"
+                  onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); handleNavClick('/flota'); }}
+                  className={`block px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
+                    currentPath === '/flota' ? 'text-blue-900' : 'text-slate-500 hover:bg-slate-50'
                   }`}
                 >
-                  {t('Velero Vegvisir', 'Vegvisir Sailboat')}
-                </a>
-                <a
-                  href="#/yate-terranova"
-                  onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); handleNavClick('/yate-terranova'); }}
-                  className={`block px-4 py-2.5 rounded-xl text-sm transition-colors min-h-[40px] flex items-center ${
-                    currentPath === '/yate-terranova' ? 'text-blue-900 font-bold bg-blue-50/20' : 'text-slate-650 hover:bg-slate-50'
-                  }`}
-                >
-                  {t('Yate Terranova', 'Terranova Yacht')}
+                  {t('Ver Toda la Flota ➔', 'View All Fleet ➔')}
                 </a>
               </div>
             )}

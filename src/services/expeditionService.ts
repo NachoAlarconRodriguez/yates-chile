@@ -41,7 +41,7 @@ export const DEFAULT_EXPEDITION_POLICIES: ExpeditionPolicySection[] = [
   {
     id: 'policy-1',
     title: '1. Modalidad de Reserva y Pagos',
-    content: 'Para garantizar y bloquear los cupos en la expedición seleccionada, se requiere un abono correspondiente al 50% del valor total mediante transferencia bancaria. El 50% restante deberá ser cancelado a más tardar 30 días antes de la fecha fijada de zarpe o check-in.',
+    content: 'Para garantizar y bloquear los cupos en la expedición seleccionada, se requiere un abono correspondiente al 50% del valor total mediante transferencia bancaria. El 50% restante deberá ser cancelado a más tardar 60 días antes de la fecha fijada de zarpe o check-in.',
   },
   {
     id: 'policy-2',
