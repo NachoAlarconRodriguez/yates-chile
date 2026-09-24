@@ -1032,7 +1032,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                     ? getVesselPath(activeCustomVessel)
                     : '/';
                 if (onNavigate) onNavigate(targetRoute);
-                else window.open('#' + targetRoute, '_blank');
+                else window.open(targetRoute, '_blank');
               }}
               className="bg-slate-50 hover:bg-slate-100 text-[#0f2b48] font-bold py-2 px-3 rounded-xl text-xs transition border border-slate-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
             >

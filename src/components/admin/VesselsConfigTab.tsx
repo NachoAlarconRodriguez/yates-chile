@@ -309,9 +309,16 @@ export const VesselsConfigTab: React.FC = () => {
                 {/* Image & Badges */}
                 <div className="relative h-48 w-full bg-slate-900 overflow-hidden">
                   <img
-                    src={normalizeExternalMediaUrl(vessel.mainImage) || '/velero-vegvisir.jpg'}
+                    src={normalizeExternalMediaUrl(vessel.mainImage) || (vessel.id === 'terranova' ? '/yate-terranova.jpg' : '/velero-vegvisir.jpg')}
                     alt={vessel.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      const fallback = vessel.id === 'terranova' ? '/yate-terranova.jpg' : '/velero-vegvisir.jpg';
+                      if (img.src !== fallback && !img.src.endsWith(fallback)) {
+                        img.src = fallback;
+                      }
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30" />
                   
@@ -384,7 +391,7 @@ export const VesselsConfigTab: React.FC = () => {
                 {/* Primary Actions: Ver Ficha & Editar Ficha */}
                 <div className="grid grid-cols-2 gap-2">
                   <a
-                    href={`#${getVesselPath(vessel)}`}
+                    href={getVesselPath(vessel)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="py-2 px-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 border border-sky-200/60 shadow-2xs group/btn"
@@ -608,6 +615,12 @@ export const VesselsConfigTab: React.FC = () => {
                       src={normalizeExternalMediaUrl(formMainImage) || formMainImage}
                       alt="Preview"
                       className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        if (img.src !== '/velero-vegvisir.jpg' && !img.src.endsWith('/velero-vegvisir.jpg')) {
+                          img.src = '/velero-vegvisir.jpg';
+                        }
+                      }}
                     />
                   )}
                 </div>
