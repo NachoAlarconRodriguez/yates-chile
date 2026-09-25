@@ -358,11 +358,23 @@ export const ExpeditionCalendar: React.FC = () => {
                             </span>
                           )}
 
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                            isActive ? 'bg-blue-900 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'
-                          }`}>
-                            <ArrowRight className="w-4 h-4" />
-                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveExpeditionId(exp.id);
+                              setIsModalOpen(true);
+                            }}
+                            title={t('Ver detalles y reservar expedición', 'View details and book expedition')}
+                            aria-label={`Ver y reservar ${exp.name}`}
+                            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm cursor-pointer shrink-0 ${
+                              isActive
+                                ? 'bg-blue-900 text-white hover:bg-blue-800 hover:scale-110 active:scale-95 shadow-blue-950/20'
+                                : 'bg-slate-100 text-slate-500 hover:bg-blue-900 hover:text-white hover:scale-110 active:scale-95'
+                            }`}
+                          >
+                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                          </button>
                         </div>
                       </div>
                     );

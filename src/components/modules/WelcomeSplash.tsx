@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Wind, Waves, MapPin, Anchor, Ship, Home } from 'lucide-react';
 import { WEATHER_LOCATIONS, weatherService, type WeatherLocationOption } from '../../services/weatherService';
+import { useFleet } from '../../hooks/useFleet';
+import { getVesselPath } from '../../services/fleetService';
 import type { WeatherData } from '../../types';
 
 interface WelcomeSplashProps {
@@ -9,6 +11,13 @@ interface WelcomeSplashProps {
 }
 
 export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVideoLoaded }) => {
+  const { activeVessels } = useFleet();
+  const otherActiveVessels = (activeVessels || []).filter((v) => {
+    const id = v.id.toLowerCase();
+    const name = (v.name || '').toLowerCase();
+    return id !== 'vegvisir' && id !== 'terranova' && !name.includes('vegvisir') && !name.includes('terranova');
+  });
+
   // Direct raw video streaming URL converted from Dropbox link
   const videoUrl =
     'https://www.dropbox.com/scl/fo/41kyrrmy9bhbmj4ra8ge2/ALRTDepuSRu5og3r8hMrXqs/Videos/GX010369.MOV?rlkey=dydsj8rbegl4ga5x2062vycj6&st=eewane53&raw=1';
@@ -156,7 +165,7 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           </h1>
 
           <p className="text-slate-200 text-[11px] sm:text-xs font-normal leading-relaxed text-shadow max-w-lg opacity-95">
-            Expediciones marítimas privadas a bordo del velero <strong className="text-white font-semibold">Vegvisir</strong> y el yate <strong className="text-white font-semibold">Terranova</strong> hacia el Archipiélago Juan Fernández, Parque Marino Francisco Coloane, Canal Beagle y Cabo de Hornos.
+            Expediciones marítimas privadas a bordo del velero <strong className="text-white font-semibold">Vegvisir</strong>, el yate <strong className="text-white font-semibold">Terranova</strong> y el velero <strong className="text-white font-semibold">Punta Sur</strong> hacia el Archipiélago Juan Fernández, Parque Marino Francisco Coloane, Canal Beagle y Cabo de Hornos.
           </p>
 
           <div className="pt-1">
@@ -170,13 +179,13 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           </div>
         </div>
 
-        {/* Bottom-Right: 3 Subtle Luxury Quick Options */}
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 bg-slate-950/60 backdrop-blur-md p-2 rounded-2xl border border-white/15 shadow-2xl shrink-0">
+        {/* Bottom-Right: Subtle Luxury Quick Options */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 bg-slate-950/60 backdrop-blur-md p-2 rounded-2xl border border-white/15 shadow-2xl shrink-0 max-w-full sm:max-w-xl justify-end">
           
           {/* Option 1: Vegvisir */}
           <button
             onClick={() => onEnterSite('/velero-vegvisir')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-blue-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-blue-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
           >
             <Anchor className="w-3.5 h-3.5 text-blue-300 group-hover:scale-110 transition-transform" />
             <span>Velero Vegvisir</span>
@@ -185,16 +194,38 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           {/* Option 2: Terranova */}
           <button
             onClick={() => onEnterSite('/yate-terranova')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-sky-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-sky-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
           >
             <Ship className="w-3.5 h-3.5 text-sky-300 group-hover:scale-110 transition-transform" />
             <span>Yate Terranova</span>
           </button>
 
-          {/* Option 3: El Lodge */}
+          {/* Option 3: Velero Punta Sur (& new fleet vessels) */}
+          {otherActiveVessels.length > 0 ? (
+            otherActiveVessels.map((vessel) => (
+              <button
+                key={vessel.id}
+                onClick={() => onEnterSite(getVesselPath(vessel))}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-amber-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+              >
+                <Anchor className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
+                <span>{vessel.name || 'Velero Punta Sur'}</span>
+              </button>
+            ))
+          ) : (
+            <button
+              onClick={() => onEnterSite('/flota/punta-sur')}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-amber-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+            >
+              <Anchor className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
+              <span>Velero Punta Sur</span>
+            </button>
+          )}
+
+          {/* Option 4: El Lodge */}
           <button
             onClick={() => onEnterSite('/lodge')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-emerald-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-emerald-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
           >
             <Home className="w-3.5 h-3.5 text-emerald-300 group-hover:scale-110 transition-transform" />
             <span>El Lodge</span>

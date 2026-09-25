@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { HeroCarousel } from '../components/modules/HeroCarousel';
 import { ExpeditionCalendar } from '../components/modules/ExpeditionCalendar';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
 import { translationService } from '../services/translationService';
@@ -18,6 +18,46 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const { language, t } = useLanguage();
   const { activeVessels } = useFleet();
   const isEn = language === 'EN';
+
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
+  const [canScrollRight, setCanScrollRight] = useState<boolean>(true);
+
+  const checkScroll = useCallback(() => {
+    if (carouselRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll, activeVessels]);
+
+  const handleScrollLeft = () => {
+    if (carouselRef.current) {
+      const card = carouselRef.current.firstElementChild as HTMLElement;
+      const step = card ? card.offsetWidth + 20 : 380;
+      carouselRef.current.scrollBy({ left: -step, behavior: 'smooth' });
+    }
+  };
+
+  const handleScrollRight = () => {
+    if (carouselRef.current) {
+      const card = carouselRef.current.firstElementChild as HTMLElement;
+      const step = card ? card.offsetWidth + 20 : 380;
+      carouselRef.current.scrollBy({ left: step, behavior: 'smooth' });
+    }
+  };
 
   const otherActiveVessels = useMemo(() => {
     return activeVessels.filter((v) => {
@@ -55,15 +95,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       {/* HERO CAROUSEL SECTION */}
       <HeroCarousel onNavigate={onNavigate} />
 
-      {/* GRID INMERSIVO: 3 CARDS (VEGVISIR, TERRANOVA & LODGE) */}
-      <section className="py-20 bg-slate-50 border-b border-slate-200">
+      {/* EXPERIENCIAS: FLOTA & LODGE (CARRUSEL INMERSIVO CON FLECHAS DE NAVEGACIÓN) */}
+      <section className="py-20 bg-slate-50 border-b border-slate-200 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
-            <span className="text-slate-600 font-bold text-xs uppercase tracking-widest bg-slate-200/80 px-3 py-1 rounded-full border border-slate-300">
+          {/* Header con Título y Subtítulo */}
+          <div className="text-center max-w-3xl mx-auto mb-14 space-y-3">
+            <span className="text-slate-600 font-bold text-xs uppercase tracking-widest bg-slate-200/80 px-3 py-1 rounded-full border border-slate-300 inline-block">
               {introSubtitle}
             </span>
-            <h2 className="font-serif text-3xl sm:text-5xl font-bold text-slate-900">
+            <h2 className="font-serif text-3xl sm:text-5xl font-bold text-slate-900 leading-tight">
               {introTitle}
             </h2>
             <p className="text-slate-600 text-base sm:text-lg">
@@ -71,12 +112,48 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Wrapper Relativo con Flechas de Navegación Laterales Flotantes */}
+          <div className="relative group/carousel">
+            
+            {/* Flecha Lateral Izquierda Flotante */}
+            <button
+              onClick={handleScrollLeft}
+              disabled={!canScrollLeft}
+              aria-label="Deslizar a la izquierda"
+              className={`absolute -left-3 sm:-left-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/95 hover:bg-white text-slate-900 border border-slate-200 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all duration-300 ${
+                !canScrollLeft
+                  ? 'opacity-30 cursor-not-allowed scale-90'
+                  : 'opacity-95 hover:opacity-100 hover:scale-110 active:scale-95 shadow-slate-950/25 cursor-pointer'
+              }`}
+            >
+              <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7 -translate-x-0.5 text-slate-900" />
+            </button>
+
+            {/* Flecha Lateral Derecha Flotante */}
+            <button
+              onClick={handleScrollRight}
+              disabled={!canScrollRight}
+              aria-label="Deslizar a la derecha"
+              className={`absolute -right-3 sm:-right-6 top-1/2 -translate-y-1/2 z-20 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/95 hover:bg-white text-slate-900 border border-slate-200 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all duration-300 ${
+                !canScrollRight
+                  ? 'opacity-30 cursor-not-allowed scale-90'
+                  : 'opacity-95 hover:opacity-100 hover:scale-110 active:scale-95 shadow-slate-950/25 cursor-pointer'
+              }`}
+            >
+              <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7 translate-x-0.5 text-slate-900" />
+            </button>
+
+            {/* Carrusel en Una Sola Fila */}
+            <div
+              ref={carouselRef}
+              className="flex items-stretch gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none pb-4 pt-1 px-1 -mx-1"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
             
             {/* Card 1: Velero Vegvisir */}
             <div
               onClick={() => onNavigate('/velero-vegvisir')}
-              className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
+              className="shrink-0 w-[85vw] sm:w-[360px] lg:w-[calc((100%-2.5rem)/3)] snap-start group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[460px] flex flex-col justify-end px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
                 src={vegvisirSec.media_url && !vegvisirSec.media_url.includes('images.unsplash.com') ? vegvisirSec.media_url : "/velero-vegvisir.jpg"}
@@ -106,7 +183,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             {/* Card 2: Yate Terranova */}
             <div
               onClick={() => onNavigate('/yate-terranova')}
-              className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
+              className="shrink-0 w-[85vw] sm:w-[360px] lg:w-[calc((100%-2.5rem)/3)] snap-start group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[460px] flex flex-col justify-end px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
                 src={terranovaSec.media_url && !terranovaSec.media_url.includes('images.unsplash.com') ? terranovaSec.media_url : "/yate-terranova.jpg"}
@@ -145,7 +222,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                 <div
                   key={vessel.id}
                   onClick={() => onNavigate(getVesselPath(vessel))}
-                  className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
+                  className="shrink-0 w-[85vw] sm:w-[360px] lg:w-[calc((100%-2.5rem)/3)] snap-start group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[460px] flex flex-col justify-end px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
                 >
                   <img
                     src={vImg}
@@ -174,10 +251,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               );
             })}
 
-            {/* Card 3: Lodge Rincón de Navegantes */}
+            {/* Card: Lodge Rincón de Navegantes */}
             <div
               onClick={() => onNavigate('/lodge')}
-              className="group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[440px] flex flex-col justify-end px-4 sm:px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
+              className="shrink-0 w-[85vw] sm:w-[360px] lg:w-[calc((100%-2.5rem)/3)] snap-start group relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 cursor-pointer min-h-[460px] flex flex-col justify-end px-5 py-8 text-white transition-all duration-500 hover:-translate-y-1"
             >
               <img
                 src={lodgeSec.media_url && !lodgeSec.media_url.includes('images.unsplash.com') ? lodgeSec.media_url : "/rincon-de-navegantes.jpg"}
@@ -205,8 +282,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </div>
 
           </div>
+
         </div>
-      </section>
+      </div>
+    </section>
 
       {/* EXPEDITION CALENDAR MODULE */}
       <ExpeditionCalendar />

@@ -852,6 +852,8 @@ export const expeditionService = {
             routeId: effectiveRouteId,
             available_slots: availSlots,
             total_slots: cloud?.totalSlots !== undefined ? Number(cloud.totalSlots) : (d.total_slots || (isTerranova ? 8 : 6)),
+            price_per_pax_clp: cloud?.pricePerPaxClp !== undefined ? Number(cloud.pricePerPaxClp) : Number(d.price_per_pax_clp),
+            price_charter_full_clp: cloud?.priceCharterFullClp !== undefined ? Number(cloud.priceCharterFullClp) : Number(d.price_charter_full_clp),
             status: effectiveStatus,
             pending_pax: pendingPax,
             pendingPax: pendingPax,
@@ -1849,7 +1851,6 @@ export const expeditionService = {
         if (safeAvailSlots !== undefined) updateData.available_slots = safeAvailSlots;
         if (params.pricePerPaxClp !== undefined) updateData.price_per_pax_clp = Number(params.pricePerPaxClp);
         if (params.priceCharterFullClp !== undefined) updateData.price_charter_full_clp = Number(params.priceCharterFullClp);
-        if (params.publicBrochureUrl !== undefined) updateData.brochure_url = params.publicBrochureUrl;
         if (effectiveStatus) updateData.status = effectiveStatus;
 
         const { error: depUpdateErr } = await client

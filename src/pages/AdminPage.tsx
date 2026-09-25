@@ -937,6 +937,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const brochureFileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploadingPolicyPdf, setIsUploadingPolicyPdf] = useState(false);
   const policyPdfFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isSavingDeparture, setIsSavingDeparture] = useState(false);
 
   const expeditionCategoryOptions = useMemo(() => {
     const cats = cmsService.getExpeditionCategories(content);
@@ -1808,7 +1809,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
           setSelectedExpeditionForPassenger(null);
         } else if (selectedExpeditionForManifest) {
           setSelectedExpeditionForManifest(null);
-        } else if (editingDeparture) {
+        } else if (editingDeparture && !isSavingDeparture) {
           setEditingDeparture(null);
         } else if (selectedCustomer) {
           setSelectedCustomer(null);
@@ -1836,7 +1837,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     isSavingLodgePolicy, showProfileModal, showBlockModal, editRoomModal.isOpen,
     isSavingRoom, airbnbConfirmModal?.isOpen, isSavingAirbnbBlock, selectedInstallment,
     selectedBookingForDetail, selectedExpeditionForPassenger, isSubmittingExpPassenger,
-    selectedExpeditionForManifest, editingDeparture, selectedCustomer,
+    selectedExpeditionForManifest, editingDeparture, isSavingDeparture, selectedCustomer,
     editingCustomer, showNewCustomerModal, showNewLeadModal,
     editingLeadNotes, showForgotPasswordModal, mobileAdminSidebarOpen
   ]);
@@ -3800,7 +3801,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
 
   const handleSaveEditedDeparture = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingDeparture) return;
+    if (!editingDeparture || isSavingDeparture) return;
+    setIsSavingDeparture(true);
+    try {
     const rawAvail = editingDeparture.available_slots;
     const availSlots = (rawAvail !== undefined && rawAvail !== null && String(rawAvail).trim() !== '')
       ? Math.max(0, parseInt(String(rawAvail), 10) || 0)
@@ -3853,6 +3856,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       }
     } else {
       triggerAlert('Error al actualizar la expedición: ' + (res.error || 'Error desconocido'), 'error');
+    }
+    } finally {
+      setIsSavingDeparture(false);
     }
   };
 
@@ -15007,7 +15013,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         <div
           className="fixed inset-0 bg-[#0b192c]/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn cursor-pointer"
           onClick={(e) => {
-            if (e.target === e.currentTarget) setEditingDeparture(null);
+            if (e.target === e.currentTarget && !isSavingDeparture) setEditingDeparture(null);
           }}
         >
           <div
@@ -15031,11 +15037,14 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </div>
               <button
                 type="button"
+                disabled={isSavingDeparture}
                 onClick={() => {
-                  setEditingDeparture(null);
-                  setEditDepartureTab('general');
+                  if (!isSavingDeparture) {
+                    setEditingDeparture(null);
+                    setEditDepartureTab('general');
+                  }
                 }}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-2"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -16088,20 +16097,33 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 <div className="flex items-center gap-2.5">
                   <button
                     type="button"
+                    disabled={isSavingDeparture}
                     onClick={() => {
-                      setEditingDeparture(null);
-                      setEditDepartureTab('general');
+                      if (!isSavingDeparture) {
+                        setEditingDeparture(null);
+                        setEditDepartureTab('general');
+                      }
                     }}
-                    className="px-4 sm:px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition cursor-pointer text-xs"
+                    className="px-4 sm:px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition cursor-pointer text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-5 sm:px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold transition shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5 text-xs"
+                    disabled={isSavingDeparture}
+                    className="px-5 sm:px-6 py-2.5 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white font-semibold transition shadow-xs cursor-pointer active:scale-95 flex items-center gap-2 text-xs disabled:opacity-80 disabled:cursor-not-allowed"
                   >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Guardar Cambios</span>
+                    {isSavingDeparture ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-400" />
+                        <span>Guardando cambios...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Guardar Cambios</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

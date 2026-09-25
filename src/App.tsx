@@ -14,6 +14,43 @@ import { analyticsService } from './services/analyticsService';
 // =========================================================================
 export const IS_MAINTENANCE_MODE = true;
 
+// Claves secretas autorizadas para vista previa privada del cliente:
+// Permite ingresar mediante: https://yateschile.cl/?preview=yates2026 (o ?preview=cliente)
+export const CLIENT_PREVIEW_KEYS = ['yates2026', 'cliente', 'vip'];
+export const PREVIEW_STORAGE_KEY = 'yates_client_preview_access';
+
+export function checkClientPreviewAccess(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const searchVal = searchParams.get('preview')?.toLowerCase().trim();
+
+    let hashVal: string | null = null;
+    if (window.location.hash && window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1];
+      hashVal = new URLSearchParams(hashQuery).get('preview')?.toLowerCase().trim() || null;
+    }
+
+    const previewParam = searchVal || hashVal;
+
+    if (previewParam) {
+      if (previewParam === 'exit' || previewParam === 'lock' || previewParam === 'false') {
+        localStorage.removeItem(PREVIEW_STORAGE_KEY);
+        return false;
+      }
+      if (CLIENT_PREVIEW_KEYS.includes(previewParam)) {
+        localStorage.setItem(PREVIEW_STORAGE_KEY, 'true');
+        return true;
+      }
+    }
+
+    return localStorage.getItem(PREVIEW_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+
 import {
   SEOHead,
   EXPEDITIONS_FAQ_SCHEMA,
@@ -46,6 +83,13 @@ const PageLoaderFallback = () => (
 export function App() {
   const [appLoading, setAppLoading] = useState<boolean>(true);
   const [isVideoReady, setIsVideoReady] = useState<boolean>(false);
+  const [hasPreviewAccess, setHasPreviewAccess] = useState<boolean>(() => checkClientPreviewAccess());
+
+  useEffect(() => {
+    if (checkClientPreviewAccess()) {
+      setHasPreviewAccess(true);
+    }
+  }, []);
 
   // Determine initial path from URL pathname or hash (supporting clean SEO URLs and legacy hash links)
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -233,7 +277,10 @@ export function App() {
   };
 
   // Modo mantención: bloquea el sitio público y muestra la pantalla con el video de Vegvisir
-  if (IS_MAINTENANCE_MODE) {
+  // Se desbloquea automáticamente si el usuario ingresa con la clave de vista previa (?preview=yates2026)
+  const isMaintenanceActive = IS_MAINTENANCE_MODE && !hasPreviewAccess;
+
+  if (isMaintenanceActive) {
     if (baseRoute === '/admin') {
       return (
         <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
@@ -323,6 +370,13 @@ export function App() {
         </>
       )}
 
+      {/* Indicador discreto de vista previa privada durante mantención */}
+      {IS_MAINTENANCE_MODE && hasPreviewAccess && (
+        <div className="fixed bottom-4 left-4 z-50 bg-[#0b192c]/90 text-white text-[11px] font-mono px-3.5 py-1.5 rounded-full border border-sky-400/40 shadow-xl backdrop-blur-md flex items-center gap-2 pointer-events-auto select-none">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-slate-200">Vista Previa Privada</span>
+        </div>
+      )}
     </div>
   );
 }
