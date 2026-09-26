@@ -1054,10 +1054,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     }
 
     let initialPillars: Array<{ title: string; desc: string }> = [];
-    if (dep.highlights) {
+    let hasExplicitPillarsConfig = false;
+    if (dep.highlights !== undefined && dep.highlights !== null) {
       try {
         const parsed = JSON.parse(dep.highlights);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
+          hasExplicitPillarsConfig = true;
           initialPillars = parsed.map((p: any) => ({
             title: typeof p === 'string' ? p : p.title || '',
             desc: typeof p === 'string' ? '' : p.desc || ''
@@ -1066,15 +1068,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       } catch {
         const items = dep.highlights.split(/[•\n]/).map((s: string) => s.trim()).filter(Boolean);
         if (items.length > 0) {
+          hasExplicitPillarsConfig = true;
           initialPillars = items.slice(0, 4).map((title: string, idx: number) => ({
             title,
             desc: defaultPillars[vId][idx]?.desc || 'Hito principal y experiencia programada.'
           }));
+        } else if (dep.highlights.trim() === '[]') {
+          hasExplicitPillarsConfig = true;
+          initialPillars = [];
         }
       }
     }
 
-    if (initialPillars.length === 0) {
+    if (!hasExplicitPillarsConfig) {
       initialPillars = defaultPillars[vId].map(p => ({ ...p }));
     }
 
@@ -3702,8 +3708,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         publicDescription: wizardData.publicDescription,
         publicTempEstimate: wizardData.publicTempEstimate,
         publicBrochureUrl: wizardData.publicBrochureUrl,
-        publicPolicyUrl: wizardData.publicPolicyUrl || wizardData.publicWeatherPolicy,
-        publicHighlights: wizardData.publicPillars ? JSON.stringify(wizardData.publicPillars) : undefined,
+        publicHighlights: wizardData.publicPillars && wizardData.publicPillars.length > 0 ? JSON.stringify(wizardData.publicPillars) : '[]',
         publicIncludedServices: wizardData.publicIncluded ? wizardData.publicIncluded.join(' • ') : undefined,
       });
 
@@ -15405,87 +15410,109 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                           Edita el título y detalle de las 4 tarjetas que se muestran en la web pública
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const vId = ((editingDeparture.vessel_id || '') as string).toLowerCase().includes('terranova')
-                            ? 'terranova'
-                            : ((editingDeparture.vessel_id || '') as string).toLowerCase().includes('lodge')
-                            ? 'lodge'
-                            : 'vegvisir';
-                          const defaultPillars: Record<'vegvisir' | 'terranova' | 'lodge', Array<{ title: string; desc: string }>> = {
-                            vegvisir: [
-                              { title: 'Velerismo Oceánico de Altura', desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.' },
-                              { title: 'Pesca de Altura (Trolling) & Menú a Bordo', desc: 'Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.' },
-                              { title: 'Recaladas en Bahías Míticas', desc: 'Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.' },
-                              { title: 'Autonomía Total & Starlink 24/7', desc: '5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.' }
-                            ],
-                            terranova: [
-                              { title: 'Navegación Rápida & 3 Cubiertas', desc: 'Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.' },
-                              { title: 'Deck Superior & Gastronomía de Autor', desc: 'Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.' },
-                              { title: 'Desembarcos Asistidos con Zodiac 70 HP', desc: 'Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.' },
-                              { title: 'Pesca Deportiva de Altura & Fauna Pelágica', desc: 'Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.' }
-                            ],
-                            lodge: [
-                              { title: 'Hospedaje Boutique Frente al Mar', desc: 'Habitaciones privadas con vista a los fiordos, calefacción a leña y arquitectura bioclimática integrada al entorno salvaje.' },
-                              { title: 'Gastronomía Fueguina & Cenas en Quincho', desc: 'Centolla fresca, cordero al palo y cocina con ingredientes recolectados en los bosques y costas patagónicas.' },
-                              { title: 'Senderismo & Miradores Glaciares', desc: 'Trekks guiados a turberas milenarias, bosques de lenga y cumbres con vistas panorámicas al archipiélago fueguino.' },
-                              { title: 'Santuarios Marinos & Snorkel', desc: 'Navegaciones costeras hacia farellones y loberías protegidas con sesiones de snorkel junto a los amigables lobos marinos de dos pelos.' }
-                            ]
-                          };
-                          setEditPillars(defaultPillars[vId].map(p => ({ ...p })));
-                        }}
-                        className="text-[10px] text-sky-700 font-mono font-medium hover:underline cursor-pointer"
-                      >
-                        ↺ Restablecer sugeridos
-                      </button>
+                      {editPillars.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditPillars([])}
+                          className="text-[10px] text-rose-600 hover:text-rose-800 font-mono font-medium hover:underline cursor-pointer flex items-center gap-1 transition"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Eliminar tarjetas</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const vId = ((editingDeparture.vessel_id || '') as string).toLowerCase().includes('terranova')
+                              ? 'terranova'
+                              : ((editingDeparture.vessel_id || '') as string).toLowerCase().includes('lodge')
+                              ? 'lodge'
+                              : 'vegvisir';
+                            const defaultPillars: Record<'vegvisir' | 'terranova' | 'lodge', Array<{ title: string; desc: string }>> = {
+                              vegvisir: [
+                                { title: 'Velerismo Oceánico de Altura', desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.' },
+                                { title: 'Pesca de Altura (Trolling) & Menú a Bordo', desc: 'Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.' },
+                                { title: 'Recaladas en Bahías Míticas', desc: 'Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.' },
+                                { title: 'Autonomía Total & Starlink 24/7', desc: '5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.' }
+                              ],
+                              terranova: [
+                                { title: 'Navegación Rápida & 3 Cubiertas', desc: 'Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.' },
+                                { title: 'Deck Superior & Gastronomía de Autor', desc: 'Parrilla al aire libre en la cubierta superior, pescados y mariscos frescos, maridados con vinos selectos por nuestro chef ejecutivo.' },
+                                { title: 'Desembarcos Asistidos con Zodiac 70 HP', desc: 'Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.' },
+                                { title: 'Pesca Deportiva de Altura & Fauna Pelágica', desc: 'Equipamiento de trolling de alta gama y radares para avistamiento de cetáceos, lobos marinos y aves pelágicas.' }
+                              ],
+                              lodge: [
+                                { title: 'Hospedaje Boutique Frente al Mar', desc: 'Habitaciones privadas con vista a los fiordos, calefacción a leña y arquitectura bioclimática integrada al entorno salvaje.' },
+                                { title: 'Gastronomía Fueguina & Cenas en Quincho', desc: 'Centolla fresca, cordero al palo y cocina con ingredientes recolectados en los bosques y costas patagónicas.' },
+                                { title: 'Senderismo & Miradores Glaciares', desc: 'Trekks guiados a turberas milenarias, bosques de lenga y cumbres con vistas panorámicas al archipiélago fueguino.' },
+                                { title: 'Santuarios Marinos & Snorkel', desc: 'Navegaciones costeras hacia farellones y loberías protegidas con sesiones de snorkel junto a los amigables lobos marinos de dos pelos.' }
+                              ]
+                            };
+                            setEditPillars(defaultPillars[vId].map(p => ({ ...p })));
+                          }}
+                          className="text-[10px] text-sky-700 hover:text-sky-900 font-mono font-medium hover:underline cursor-pointer flex items-center gap-1 transition"
+                        >
+                          <span>↺ Restaurar sugeridos</span>
+                        </button>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-                      {editPillars.slice(0, 4).map((pillar, idx) => {
-                        const icons = [Anchor, Utensils, Compass, Waves];
-                        const IconComp = icons[idx % icons.length];
-                        return (
-                          <div key={idx} className="bg-[#f8fafc] border border-slate-200/90 rounded-2xl p-2.5 space-y-1.5 shadow-3xs">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-3xs">
-                                <IconComp className="w-3.5 h-3.5 text-sky-700" />
+                    {editPillars.length === 0 ? (
+                      <div className="bg-[#f8fafc] border border-dashed border-slate-300 rounded-2xl p-5 text-center space-y-1.5 animate-fadeIn">
+                        <p className="text-xs font-semibold text-slate-700">
+                          Tarjetas eliminadas para esta expedición
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-light max-w-sm mx-auto">
+                          Al guardar, esta sección no se mostrará a los visitantes en el modal de la web pública.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                        {editPillars.slice(0, 4).map((pillar, idx) => {
+                          const icons = [Anchor, Utensils, Compass, Waves];
+                          const IconComp = icons[idx % icons.length];
+                          return (
+                            <div key={idx} className="bg-[#f8fafc] border border-slate-200/90 rounded-2xl p-2.5 space-y-1.5 shadow-3xs">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-3xs">
+                                  <IconComp className="w-3.5 h-3.5 text-sky-700" />
+                                </div>
+                                <input
+                                  type="text"
+                                  value={pillar.title}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditPillars(prev => {
+                                      const next = [...prev];
+                                      if (!next[idx]) next[idx] = { title: '', desc: '' };
+                                      next[idx] = { ...next[idx], title: val };
+                                      return next;
+                                    });
+                                  }}
+                                  placeholder={`Título Tarjeta ${idx + 1}`}
+                                  className="w-full bg-white border border-slate-200/90 rounded-xl px-2.5 py-1 text-xs font-bold text-[#0b192c] focus:outline-none focus:border-[#0b192c]"
+                                />
                               </div>
-                              <input
-                                type="text"
-                                value={pillar.title}
+                              <textarea
+                                rows={2}
+                                value={pillar.desc}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setEditPillars(prev => {
                                     const next = [...prev];
                                     if (!next[idx]) next[idx] = { title: '', desc: '' };
-                                    next[idx] = { ...next[idx], title: val };
+                                    next[idx] = { ...next[idx], desc: val };
                                     return next;
                                   });
                                 }}
-                                placeholder={`Título Tarjeta ${idx + 1}`}
-                                className="w-full bg-white border border-slate-200/90 rounded-xl px-2.5 py-1 text-xs font-bold text-[#0b192c] focus:outline-none focus:border-[#0b192c]"
+                                placeholder="Descripción detallada de la experiencia..."
+                                className="w-full bg-white border border-slate-200/90 rounded-xl p-2 text-[11px] text-slate-700 leading-snug focus:outline-none focus:border-[#0b192c] resize-none"
                               />
                             </div>
-                            <textarea
-                              rows={2}
-                              value={pillar.desc}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setEditPillars(prev => {
-                                  const next = [...prev];
-                                  if (!next[idx]) next[idx] = { title: '', desc: '' };
-                                  next[idx] = { ...next[idx], desc: val };
-                                  return next;
-                                });
-                              }}
-                              placeholder="Descripción detallada de la experiencia..."
-                              className="w-full bg-white border border-slate-200/90 rounded-xl p-2 text-[11px] text-slate-700 leading-snug focus:outline-none focus:border-[#0b192c] resize-none"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   {/* Servicios Incluidos & Clima */}

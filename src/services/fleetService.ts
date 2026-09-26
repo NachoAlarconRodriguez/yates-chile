@@ -78,7 +78,12 @@ export const fleetService = {
       const raw = localStorage.getItem(LOCAL_STORAGE_FLEET_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: any) => ({
+            ...item,
+            mainImage: normalizeExternalMediaUrl(item.mainImage || item.main_image) || item.mainImage,
+          }));
+        }
       }
     } catch {}
 

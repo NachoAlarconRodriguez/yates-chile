@@ -143,43 +143,45 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
   }
 
   // Reflect custom pillars/experiences configured uniquely for this expedition in the admin panel
-  if (exp.highlights) {
+  if (exp.highlights !== undefined && exp.highlights !== null) {
     try {
       const parsed = typeof exp.highlights === 'string' ? JSON.parse(exp.highlights) : exp.highlights;
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const defaultIcons = [
-          <Anchor className="w-5 h-5 text-blue-900" />,
-          <Utensils className="w-5 h-5 text-blue-900" />,
-          <Compass className="w-5 h-5 text-blue-900" />,
-          <Waves className="w-5 h-5 text-blue-900" />,
-        ];
+      if (Array.isArray(parsed)) {
+        if (parsed.length === 0) {
+          overview.pillars = [];
+        } else {
+          const defaultIcons = [
+            <Anchor className="w-5 h-5 text-blue-900" />,
+            <Utensils className="w-5 h-5 text-blue-900" />,
+            <Compass className="w-5 h-5 text-blue-900" />,
+            <Waves className="w-5 h-5 text-blue-900" />,
+          ];
 
-        const customPillars: ExpeditionPillar[] = parsed
-          .filter((p: any) => p && (typeof p === 'string' ? p.trim() : (p.title && p.title.trim())))
-          .map((p: any, idx: number) => {
-            const title = typeof p === 'string' ? p.trim() : (p.title || '').trim();
-            const desc = typeof p === 'string' ? '' : (p.desc || '').trim();
-            const tLower = title.toLowerCase();
+          const customPillars: ExpeditionPillar[] = parsed
+            .filter((p: any) => p && (typeof p === 'string' ? p.trim() : (p.title && p.title.trim())))
+            .map((p: any, idx: number) => {
+              const title = typeof p === 'string' ? p.trim() : (p.title || '').trim();
+              const desc = typeof p === 'string' ? '' : (p.desc || '').trim();
+              const tLower = title.toLowerCase();
 
-            let icon = defaultIcons[idx % defaultIcons.length];
-            if (tLower.includes('vela') || tLower.includes('navega') || tLower.includes('altamar') || tLower.includes('cubierta') || tLower.includes('barco') || tLower.includes('lrc') || tLower.includes('patrón')) {
-              icon = <Anchor className="w-5 h-5 text-blue-900" />;
-            } else if (tLower.includes('lodge') || tLower.includes('alojamiento') || tLower.includes('quincho') || tLower.includes('gastronom') || tLower.includes('menú') || tLower.includes('comida') || tLower.includes('chef') || tLower.includes('cena')) {
-              icon = <Utensils className="w-5 h-5 text-blue-900" />;
-            } else if (tLower.includes('explora') || tLower.includes('trek') || tLower.includes('sender') || tLower.includes('cabalgata') || tLower.includes('hito') || tLower.includes('mirador') || tLower.includes('ruta') || tLower.includes('recalada')) {
-              icon = <Compass className="w-5 h-5 text-blue-900" />;
-            } else if (tLower.includes('starlink') || tLower.includes('satelit') || tLower.includes('autonom') || tLower.includes('zodiac') || tLower.includes('desembarco') || tLower.includes('agua') || tLower.includes('mar') || tLower.includes('pesca') || tLower.includes('fauna')) {
-              icon = <Waves className="w-5 h-5 text-blue-900" />;
-            }
+              let icon = defaultIcons[idx % defaultIcons.length];
+              if (tLower.includes('vela') || tLower.includes('navega') || tLower.includes('altamar') || tLower.includes('cubierta') || tLower.includes('barco') || tLower.includes('lrc') || tLower.includes('patrón')) {
+                icon = <Anchor className="w-5 h-5 text-blue-900" />;
+              } else if (tLower.includes('lodge') || tLower.includes('alojamiento') || tLower.includes('quincho') || tLower.includes('gastronom') || tLower.includes('menú') || tLower.includes('comida') || tLower.includes('chef') || tLower.includes('cena')) {
+                icon = <Utensils className="w-5 h-5 text-blue-900" />;
+              } else if (tLower.includes('explora') || tLower.includes('trek') || tLower.includes('sender') || tLower.includes('cabalgata') || tLower.includes('hito') || tLower.includes('mirador') || tLower.includes('ruta') || tLower.includes('recalada')) {
+                icon = <Compass className="w-5 h-5 text-blue-900" />;
+              } else if (tLower.includes('starlink') || tLower.includes('satelit') || tLower.includes('autonom') || tLower.includes('zodiac') || tLower.includes('desembarco') || tLower.includes('agua') || tLower.includes('mar') || tLower.includes('pesca') || tLower.includes('fauna')) {
+                icon = <Waves className="w-5 h-5 text-blue-900" />;
+              }
 
-            return {
-              icon,
-              title,
-              desc,
-            };
-          });
+              return {
+                icon,
+                title,
+                desc,
+              };
+            });
 
-        if (customPillars.length > 0) {
           overview.pillars = customPillars.slice(0, 4);
         }
       }
@@ -198,6 +200,8 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
             title,
             desc: unifiedPillars[idx]?.desc || '',
           }));
+        } else if (exp.highlights.trim() === '[]') {
+          overview.pillars = [];
         }
       }
     }
@@ -674,28 +678,30 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 </div>
 
                 {/* Core Experience Pillars (2x2 Grid) */}
-                <div className="space-y-3">
-                  <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
-                    {t('Pilares & Experiencias de la Expedición', 'Expedition Pillars & Experiences')}
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {overview.pillars.map((pillar, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2 hover:bg-slate-50/80 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
-                            {pillar.icon}
+                {overview.pillars && overview.pillars.length > 0 && (
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
+                      {t('Pilares & Experiencias de la Expedición', 'Expedition Pillars & Experiences')}
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {overview.pillars.map((pillar, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2 hover:bg-slate-50/80 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
+                              {pillar.icon}
+                            </div>
+                            <h4 className="font-serif font-bold text-xs sm:text-sm text-slate-900 leading-tight">
+                              {pillar.title}
+                            </h4>
                           </div>
-                          <h4 className="font-serif font-bold text-xs sm:text-sm text-slate-900 leading-tight">
-                            {pillar.title}
-                          </h4>
+                          <p className="text-slate-600 text-xs leading-relaxed font-light">
+                            {pillar.desc}
+                          </p>
                         </div>
-                        <p className="text-slate-600 text-xs leading-relaxed font-light">
-                          {pillar.desc}
-                        </p>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Weather & Adaptive Dynamic Callout Alert */}
                 <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-start gap-3.5">

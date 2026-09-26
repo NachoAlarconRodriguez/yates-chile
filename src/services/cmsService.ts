@@ -1088,22 +1088,21 @@ export const normalizeExternalMediaUrl = (url?: string | null): string => {
 
   const isVideo = isMediaVideo(trimmed);
 
-  // 1. Google Drive handling
+  // 1. Google Drive & Google Fife CDN handling
   const driveMatch = trimmed.match(/drive\.google\.com\/(?:file\/(?:u\/\d+\/)?d\/|open\?id=|uc\?(?:export=view&)?id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
     const fileId = driveMatch[1];
     if (isVideo) {
       return `https://drive.google.com/uc?export=download&id=${fileId}`;
     }
-    // High-performance Google Fife CDN WebP URL (auto-resizes to max 1920px width & serves modern WebP)
-    return `https://lh3.googleusercontent.com/d/${fileId}=w1920-rw`;
+    // High-performance Cloudflare Edge proxy over Google Fife CDN (bypasses 429 rate-limiting, caches WebP)
+    const fifeUrl = `https://lh3.googleusercontent.com/d/${fileId}=w1920-rw`;
+    return `https://wsrv.nl/?url=${encodeURIComponent(fifeUrl)}&w=1920&q=82&output=webp`;
   }
 
   if (trimmed.includes('lh3.googleusercontent.com/d/')) {
-    if (!trimmed.includes('=')) {
-      return `${trimmed}=w1920-rw`;
-    }
-    return trimmed;
+    const fifeUrl = trimmed.includes('=') ? trimmed : `${trimmed}=w1920-rw`;
+    return `https://wsrv.nl/?url=${encodeURIComponent(fifeUrl)}&w=1920&q=82&output=webp`;
   }
 
   // 2. Dropbox handling

@@ -29,6 +29,7 @@ import {
   ExternalLink,
   Compass,
   Ship,
+  Trash2,
 } from 'lucide-react';
 import { expeditionService, type DepartureRow } from '../../services/expeditionService';
 import { lodgeService, type LodgeRoom, type LodgeBooking } from '../../services/lodgeService';
@@ -247,28 +248,9 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   );
   const [publicBrochureUrl, setPublicBrochureUrl] = useState<string>('');
   const [publicTempEstimate] = useState<string>('12°C – 18°C');
-  const [publicPillars] = useState<Array<{ title: string; desc: string; iconKey: 'sail' | 'food' | 'anchor' | 'waves' | 'compass' | 'footprints' }>>([
-    {
-      title: 'Velerismo Oceánico de Altura',
-      desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.',
-      iconKey: 'sail'
-    },
-    {
-      title: 'Pesca de Altura (Trolling) & Menú a Bordo',
-      desc: 'Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.',
-      iconKey: 'food'
-    },
-    {
-      title: 'Recaladas en Bahías Míticas',
-      desc: 'Fondeos protegidos en caletas históricas como Bahía Cumberland y Puerto Español, con desembarcos en bote Zodiac semirrígido.',
-      iconKey: 'anchor'
-    },
-    {
-      title: 'Autonomía Total & Starlink 24/7',
-      desc: 'Cabinas con baños privados, climatización, desalinizador, instrumental de navegación y conexión satelital continua.',
-      iconKey: 'waves'
-    }
-  ]);
+  // User-configured experience cards (starts with 0, max 4)
+  const [customPillars, setCustomPillars] = useState<Array<{ title: string; desc: string }>>([]);
+  const [showCardSelector, setShowCardSelector] = useState<boolean>(false);
   const [publicIncluded] = useState<string[]>([
     'Pensión completa gourmet preparada por tripulación / chef',
     'Instrucción náutica, bitácora y participación en maniobras',
@@ -313,6 +295,8 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     );
     setPublicBrochureUrl('');
     setPublicWeatherPolicy('');
+    setCustomPillars([]);
+    setShowCardSelector(false);
     if (catalogServices.length > 0) {
       setSelectedServiceIds(catalogServices.filter(s => s.is_active !== false).map(s => s.id));
     }
@@ -425,7 +409,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
       maxPax: v.maxPax || (v.id === 'vegvisir' ? 12 : 20),
       cabins: v.cabins || '5 Cabinas',
       bathrooms: v.bathrooms || '5 Baños',
-      image: v.mainImage || (v.id === 'vegvisir' ? '/velero-vegvisir.jpg' : '/yate-terranova.jpg'),
+      image: normalizeExternalMediaUrl(v.mainImage) || (v.id === 'vegvisir' ? '/velero-vegvisir.jpg' : '/yate-terranova.jpg'),
       isCustom: v.id !== 'vegvisir' && v.id !== 'terranova',
     }));
   }, [activeVessels]);
@@ -474,16 +458,200 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     return catalogServices.filter(s => s.is_active !== false && selectedServiceIds.includes(s.id));
   }, [catalogServices, selectedServiceIds]);
 
-  const activePillars = useMemo(() => {
-    if (selectedServicesList.length > 0) {
-      return selectedServicesList.map(s => ({
-        title: s.name,
-        desc: s.description || '',
-        iconKey: (s.category === 'buceo' ? 'waves' : s.category === 'gastronomia' ? 'food' : s.category === 'cabalgatas' || s.category === 'trekking' ? 'footprints' : 'sail') as any
-      }));
+  // Helper to normalize strings for deduplication comparison
+  const normalizeCardKey = (str: string) => {
+    return (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const isDuplicateCard = (
+    titleA: string,
+    descA: string,
+    titleB: string,
+    descB: string
+  ): boolean => {
+    const keyA = normalizeCardKey(titleA);
+    const keyB = normalizeCardKey(titleB);
+
+    if (!keyA || !keyB) return false;
+
+    // 1. Exact normalized title match
+    if (keyA === keyB) return true;
+
+    // 2. One title starts with or contains the other (if at least 10 chars)
+    if (keyA.length >= 10 && keyB.length >= 10) {
+      if (keyA.startsWith(keyB) || keyB.startsWith(keyA)) return true;
     }
-    return publicPillars;
-  }, [selectedServicesList, publicPillars]);
+
+    // 3. Significant root words match (first 2 words like "deck superior", "pesca deportiva", "alojamiento rincon")
+    const wordsA = keyA.split(' ').filter(w => w.length > 2);
+    const wordsB = keyB.split(' ').filter(w => w.length > 2);
+    if (wordsA.length >= 2 && wordsB.length >= 2) {
+      if (wordsA[0] === wordsB[0] && wordsA[1] === wordsB[1]) {
+        return true;
+      }
+    }
+
+    // 4. Description similarity: if non-empty and start identically (first 25 normalized chars)
+    const normDescA = normalizeCardKey(descA).slice(0, 25);
+    const normDescB = normalizeCardKey(descB).slice(0, 25);
+    if (normDescA.length >= 15 && normDescB.length >= 15 && normDescA === normDescB) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Dynamic library of existing cards (from other departures + system default presets) with strict deduplication
+  const existingCardLibrary = useMemo(() => {
+    interface LibraryCardItem {
+      title: string;
+      desc: string;
+      source: string;
+      sources: string[];
+    }
+    const list: LibraryCardItem[] = [];
+
+    const addCard = (title: string, desc: string, source: string) => {
+      const cleanTitle = title.trim();
+      const cleanDesc = desc.trim();
+      if (!cleanTitle) return;
+
+      // Check if this card matches any already existing card in the library
+      const existingMatch = list.find((item) =>
+        isDuplicateCard(cleanTitle, cleanDesc, item.title, item.desc)
+      );
+
+      if (existingMatch) {
+        // Unify and record multiple origins without creating a duplicate
+        if (!existingMatch.sources.includes(source)) {
+          existingMatch.sources.push(source);
+          existingMatch.source = `Usada en ${existingMatch.sources.length} expediciones`;
+        }
+        // Retain the longer, more complete description if available
+        if (cleanDesc.length > existingMatch.desc.length) {
+          existingMatch.desc = cleanDesc;
+        }
+        return;
+      }
+
+      list.push({
+        title: cleanTitle,
+        desc: cleanDesc,
+        source,
+        sources: [source],
+      });
+    };
+
+    // 1. Gather cards from other expeditions
+    dbDepartures.forEach((dep) => {
+      if (!dep.highlights) return;
+      try {
+        const parsed = JSON.parse(dep.highlights);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((item: any) => {
+            if (item && typeof item === 'object' && item.title) {
+              addCard(item.title, item.desc || '', dep.name || 'Expedición existente');
+            } else if (typeof item === 'string' && item.trim()) {
+              addCard(item.trim(), '', dep.name || 'Expedición existente');
+            }
+          });
+        }
+      } catch {
+        const bullets = dep.highlights.split(/[•\n]/).map(s => s.trim()).filter(Boolean);
+        bullets.forEach(b => addCard(b, '', dep.name || 'Expedición existente'));
+      }
+    });
+
+    // 2. System default presets
+    const systemPresets = [
+      {
+        title: 'Velerismo Oceánico de Altura',
+        desc: 'Navegación a vela con patrón de ultramar, guardias astronómicas, trimado táctico de jarcia y cartas náuticas en mar abierto.',
+        source: 'Sugerencia: Vela'
+      },
+      {
+        title: 'Alojamiento en Rincón de Navegantes',
+        desc: 'Un lodge inspirado en quienes navegan, exploran y llevan el mar por dentro. Madera, calma y tradición navegante en Bahía Cumberland.',
+        source: 'Sugerencia: Lodge'
+      },
+      {
+        title: 'Exploración & Trekking Insular',
+        desc: 'Actividades terrestres y náuticas, cabalgatas a miradores históricos, senderismo por bosques y snorkel en caletas vírgenes.',
+        source: 'Sugerencia: Aventura'
+      },
+      {
+        title: 'Autonomía Total & Starlink 24/7',
+        desc: '5 cabinas con 5 baños, climatización hidrónica, desalinizador de 140 l/h, instrumental Raymarine y conexión satelital continua.',
+        source: 'Sugerencia: Confort'
+      },
+      {
+        title: 'Pesca de Altura (Trolling) & Menú a Bordo',
+        desc: 'Líneas de pesca en arrastre para vidriola y atún, con preparaciones de sashimi fresco y cocina gourmet caliente durante las guardias.',
+        source: 'Sugerencia: Gastronomía'
+      },
+      {
+        title: 'Navegación Rápida & 3 Cubiertas',
+        desc: 'Estabilizadores hidráulicos que eliminan el balanceo, doble puente de mando, 5 cabinas en suite y amplias terrazas panorámicas.',
+        source: 'Sugerencia: Yate'
+      },
+      {
+        title: 'Desembarcos Asistidos con Zodiac',
+        desc: 'Pluma/grúa de 1 ton y lancha semirrígida potente para internarse en fiordos, cuevas marinas y playas volcánicas inaccesibles.',
+        source: 'Sugerencia: Expedición'
+      },
+      {
+        title: 'Gastronomía Fueguina & Cenas en Quincho',
+        desc: 'Centolla fresca, cordero al palo y cocina con ingredientes recolectados en los bosques y costas patagónicas.',
+        source: 'Sugerencia: Quincho'
+      },
+    ];
+
+    systemPresets.forEach(p => addCard(p.title, p.desc, p.source));
+    return list;
+  }, [dbDepartures]);
+
+  const handleAddBlankCard = () => {
+    if (customPillars.length >= 4) return;
+    setCustomPillars(prev => [...prev, { title: '', desc: '' }]);
+    setShowCardSelector(false);
+  };
+
+  const handleSelectExistingCard = (card: { title: string; desc: string }) => {
+    if (customPillars.length >= 4) return;
+    setCustomPillars(prev => [...prev, { title: card.title, desc: card.desc }]);
+    setShowCardSelector(false);
+  };
+
+  const handleRemoveCard = (index: number) => {
+    setCustomPillars(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUpdateCard = (index: number, field: 'title' | 'desc', value: string) => {
+    setCustomPillars(prev => {
+      const next = [...prev];
+      if (next[index]) {
+        next[index] = { ...next[index], [field]: value };
+      }
+      return next;
+    });
+  };
+
+  const activePillars = useMemo(() => {
+    return customPillars.map((p, idx) => {
+      const defaultIcons = ['sail', 'food', 'anchor', 'waves'] as const;
+      return {
+        title: p.title,
+        desc: p.desc,
+        iconKey: defaultIcons[idx % defaultIcons.length]
+      };
+    });
+  }, [customPillars]);
 
   // Update defaults when changing vessel
   const handleVesselChange = (newVesselId: string) => {
@@ -616,7 +784,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     if (currentStep === 2) {
       const conflict = checkVesselConflict(vesselId);
       if (conflict.hasConflict) {
-        alert(`La embarcación seleccionada tiene un conflicto de fechas: "${conflict.conflictName}" (${conflict.startDate} al ${conflict.endDate}). Por favor selecciona otra embarcación o ajusta las fechas.`);
+        alert(`La embarcación seleccionada tiene un conflicto de fechas: "${conflict.conflictName}" (${formatDateDDMMYYYY(conflict.startDate)} al ${formatDateDDMMYYYY(conflict.endDate)}). Por favor selecciona otra embarcación o ajusta las fechas.`);
         return;
       }
     }
@@ -1115,9 +1283,21 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       >
                         <div className="relative h-40 rounded-xl overflow-hidden mb-3 bg-slate-100">
                           <img
-                            src={vessel.image}
+                            src={normalizeExternalMediaUrl(vessel.image) || vessel.image}
                             alt={vessel.name}
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (!target.dataset.triedFallback) {
+                                target.dataset.triedFallback = '1';
+                                if (target.src.includes('lh3.googleusercontent.com')) {
+                                  target.src = `https://wsrv.nl/?url=${encodeURIComponent(target.src)}&w=1200&output=webp`;
+                                  return;
+                                }
+                              }
+                              target.src = vessel.id === 'terranova' ? '/yate-terranova.jpg' : '/velero-vegvisir.jpg';
+                            }}
                           />
                           <div className="absolute top-2.5 left-2.5 bg-slate-950/80 backdrop-blur-xs text-white text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-white/20">
                             {vessel.length} • {vessel.type}
@@ -1167,7 +1347,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                             {isBusy ? (
                               <span className="text-[10px] font-mono text-rose-700 font-bold flex items-center gap-1">
                                 <AlertCircle className="w-3 h-3" />
-                                Ocupado: {conflict.conflictName} ({conflict.startDate} - {conflict.endDate})
+                                Ocupado: {conflict.conflictName} ({formatDateDDMMYYYY(conflict.startDate)} - {formatDateDDMMYYYY(conflict.endDate)})
                               </span>
                             ) : (
                               <span className="text-[10px] font-mono text-emerald-700 font-bold flex items-center gap-1">
@@ -1690,6 +1870,191 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                     </div>
                   </div>
 
+                  {/* TARJETAS DE EXPERIENCIAS & PILARES (MÁXIMO 4) */}
+                  <div className="space-y-3 pt-4 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[#0f2b48]" />
+                          <label className="text-xs font-bold text-[#0f2b48] uppercase tracking-wider">
+                            Tarjetas de Experiencias & Pilares
+                          </label>
+                          <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                            customPillars.length === 4
+                              ? 'bg-amber-50 text-amber-800 border-amber-300'
+                              : customPillars.length > 0
+                              ? 'bg-sky-50 text-sky-800 border-sky-200'
+                              : 'bg-slate-100 text-slate-500 border-slate-200'
+                          }`}>
+                            {customPillars.length} de 4 configuradas {customPillars.length === 4 ? '(Máximo alcanzado)' : ''}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-light mt-0.5">
+                          Configura hasta 4 tarjetas destacadas para la web pública. Si no agregas ninguna, la sección no se mostrará.
+                        </p>
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div className="flex items-center gap-2">
+                        {customPillars.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomPillars([])}
+                            className="text-[10px] font-mono text-rose-600 hover:text-rose-800 font-semibold hover:underline cursor-pointer flex items-center gap-1 transition"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Vaciar todas</span>
+                          </button>
+                        )}
+
+                        {customPillars.length < 4 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowCardSelector(!showCardSelector)}
+                            className="inline-flex items-center gap-1.5 bg-[#0f2b48] hover:bg-[#163a5f] text-white text-[11px] font-semibold px-3 py-1.5 rounded-xl shadow-xs transition cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Agregar Tarjeta</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Modal / Menú Selector de Tarjetas */}
+                    {showCardSelector && (
+                      <div className="bg-slate-50 border-2 border-dashed border-[#0f2b48]/30 rounded-2xl p-4 space-y-3 animate-fadeIn">
+                        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Compass className="w-4 h-4 text-sky-700" />
+                            <h6 className="text-xs font-bold text-[#0f2b48]">Seleccionar o Crear Tarjeta de Experiencia</h6>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowCardSelector(false)}
+                            className="text-slate-400 hover:text-slate-700 text-xs font-semibold p-1 cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto pr-1">
+                          {/* Opción 1: Crear tarjeta en blanco */}
+                          <div
+                            onClick={handleAddBlankCard}
+                            className="p-3 bg-white border-2 border-dashed border-sky-400/80 hover:border-sky-600 rounded-xl cursor-pointer hover:bg-sky-50/40 transition flex flex-col justify-center items-center text-center space-y-1 shadow-2xs group"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-800 flex items-center justify-center group-hover:scale-110 transition">
+                              <Plus className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs font-bold text-[#0f2b48]">✍️ Crear tarjeta en blanco</span>
+                            <span className="text-[10px] text-slate-400 font-light">Escribe tu propio título y descripción</span>
+                          </div>
+
+                          {/* Opciones de la biblioteca existente */}
+                          {existingCardLibrary.map((item, idx) => {
+                            const isAlreadyAdded = customPillars.some(p => isDuplicateCard(p.title, p.desc, item.title, item.desc));
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  if (!isAlreadyAdded) handleSelectExistingCard(item);
+                                }}
+                                className={`p-3 rounded-xl border text-left transition flex flex-col justify-between space-y-1 ${
+                                  isAlreadyAdded
+                                    ? 'bg-slate-100 border-slate-200 opacity-50 cursor-not-allowed'
+                                    : 'bg-white border-slate-200 hover:border-[#0f2b48] hover:shadow-xs cursor-pointer group'
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="text-[9px] font-mono font-bold text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded">
+                                      {item.source}
+                                    </span>
+                                    {isAlreadyAdded && (
+                                      <span className="text-[9px] font-mono text-emerald-700 font-semibold">Ya agregada</span>
+                                    )}
+                                  </div>
+                                  <h6 className="text-xs font-bold text-[#0f2b48] line-clamp-1">{item.title}</h6>
+                                  <p className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed font-light">{item.desc}</p>
+                                </div>
+                                <span className="text-[10px] font-semibold text-sky-600 group-hover:underline pt-1">
+                                  {isAlreadyAdded ? '✓ Agregada' : '+ Usar esta tarjeta'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tarjetas agregadas (Grid de edición) */}
+                    {customPillars.length === 0 ? (
+                      <div className="bg-[#f8fafc] border border-dashed border-slate-300 rounded-2xl p-6 text-center space-y-2 animate-fadeIn">
+                        <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-400 shadow-3xs">
+                          <Sparkles className="w-5 h-5 text-slate-400" />
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700">
+                          No hay tarjetas de experiencias configuradas
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-light max-w-md mx-auto">
+                          Al crear la expedición con 0 tarjetas, la sección no se mostrará a los visitantes en la web pública. Haz clic en "Agregar Tarjeta" para añadir hasta 4 tarjetas destacadas.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fadeIn">
+                        {customPillars.map((pillar, idx) => {
+                          const icons = [Anchor, Utensils, Compass, Waves];
+                          const IconComp = icons[idx % icons.length];
+                          return (
+                            <div
+                              key={idx}
+                              className="p-3 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-3xs hover:border-slate-300 transition"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <div className="w-6 h-6 rounded-lg bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
+                                    <IconComp className="w-3.5 h-3.5 text-sky-800" />
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">
+                                    Tarjeta {idx + 1} de 4
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCard(idx)}
+                                  title="Eliminar tarjeta"
+                                  className="w-6 h-6 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              <div>
+                                <input
+                                  type="text"
+                                  value={pillar.title}
+                                  onChange={(e) => handleUpdateCard(idx, 'title', e.target.value)}
+                                  placeholder="Título de la experiencia (ej: Velerismo Oceánico)"
+                                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#0f2b48] focus:outline-none focus:border-[#0f2b48]"
+                                />
+                              </div>
+
+                              <div>
+                                <textarea
+                                  rows={2}
+                                  value={pillar.desc}
+                                  onChange={(e) => handleUpdateCard(idx, 'desc', e.target.value)}
+                                  placeholder="Descripción detallada de la experiencia que vivirá el pasajero..."
+                                  className="w-full bg-[#fbfcfd] border border-slate-200 rounded-xl p-2 text-[11px] text-slate-600 leading-snug focus:outline-none focus:border-[#0f2b48] resize-none font-light"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   {/* EXPERIENCIAS & SERVICIOS DEL CATÁLOGO */}
                   <div className="space-y-3 pt-4 border-t border-slate-100">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2004,6 +2369,35 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Tarjetas de Experiencia Preview */}
+                  <div className="pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] uppercase font-mono font-bold text-[#0f2b48]">
+                        Tarjetas de Experiencia & Pilares
+                      </span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                        customPillars.length > 0 ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {customPillars.length > 0 ? `${customPillars.length} configuradas` : 'Sin tarjetas (sección oculta en web pública)'}
+                      </span>
+                    </div>
+
+                    {customPillars.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {customPillars.map((p, idx) => (
+                          <div key={idx} className="p-2 bg-slate-50 rounded-xl border border-slate-150">
+                            <p className="text-xs font-bold text-[#0f2b48] truncate">{p.title || `Tarjeta ${idx + 1}`}</p>
+                            <p className="text-[10px] text-slate-500 line-clamp-1 font-light">{p.desc}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 font-light">
+                        Esta expedición no mostrará tarjetas de experiencia destacadas en el modal público.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -2326,61 +2720,31 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                   </p>
                 </div>
 
-                {/* Experiencias del Catálogo */}
-                <div className="space-y-3">
-                  <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
-                    Experiencias & Pilares de la Expedición ({selectedServicesList.length > 0 ? selectedServicesList.length : publicPillars.length})
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {selectedServicesList.length > 0 ? (
-                      selectedServicesList.map((svc) => (
-                        <div key={svc.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2">
-                          <div className="flex items-center gap-2.5">
-                            {svc.image_url ? (
-                              <img
-                                src={normalizeExternalMediaUrl(svc.image_url)}
-                                alt={svc.name}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = '/rincon-de-navegantes.jpg';
-                                }}
-                                className="w-8 h-8 rounded-xl object-cover shrink-0 border border-slate-200"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-blue-900 shadow-2xs">
-                                <Sparkles className="w-4 h-4" />
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <span className="text-[9px] uppercase font-mono font-bold text-sky-700 block">{svc.category}</span>
-                              <h4 className="font-serif font-bold text-xs sm:text-sm text-slate-900 leading-tight truncate">
-                                {svc.name}
-                              </h4>
-                            </div>
-                          </div>
-                          <p className="text-slate-600 text-xs leading-relaxed font-light">
-                            {svc.description}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      publicPillars.map((pillar, idx) => (
+                {/* Pilares & Experiencias de la Expedición (Vista Previa en Vivo) */}
+                {customPillars.length > 0 && (
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase block">
+                      Pilares & Experiencias de la Expedición ({customPillars.length})
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {customPillars.map((pillar, idx) => (
                         <div key={idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-150/70 space-y-2">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-blue-900 shadow-2xs">
                               {idx === 0 ? <Sailboat className="w-4 h-4" /> : idx === 1 ? <Utensils className="w-4 h-4" /> : idx === 2 ? <Anchor className="w-4 h-4" /> : <Waves className="w-4 h-4" />}
                             </div>
                             <h4 className="font-serif font-bold text-xs sm:text-sm text-slate-900 leading-tight">
-                              {pillar.title}
+                              {pillar.title || `Tarjeta ${idx + 1}`}
                             </h4>
                           </div>
                           <p className="text-slate-600 text-xs leading-relaxed font-light">
-                            {pillar.desc}
+                            {pillar.desc || 'Descripción personalizada...'}
                           </p>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Weather Policy Alert */}
                 <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-start gap-3.5">
