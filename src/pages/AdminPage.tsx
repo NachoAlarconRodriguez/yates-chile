@@ -3703,6 +3703,8 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         publicTempEstimate: wizardData.publicTempEstimate,
         publicBrochureUrl: wizardData.publicBrochureUrl,
         publicPolicyUrl: wizardData.publicPolicyUrl || wizardData.publicWeatherPolicy,
+        publicHighlights: wizardData.publicPillars ? JSON.stringify(wizardData.publicPillars) : undefined,
+        publicIncludedServices: wizardData.publicIncluded ? wizardData.publicIncluded.join(' • ') : undefined,
       });
 
       if (res.success) {

@@ -142,8 +142,66 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
     overview.summary = exp.description;
   }
 
-  // Ensure pillars remain strictly the unified standard set for all expeditions
-  overview.pillars = unifiedPillars;
+  // Reflect custom pillars/experiences configured uniquely for this expedition in the admin panel
+  if (exp.highlights) {
+    try {
+      const parsed = typeof exp.highlights === 'string' ? JSON.parse(exp.highlights) : exp.highlights;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const defaultIcons = [
+          <Anchor className="w-5 h-5 text-blue-900" />,
+          <Utensils className="w-5 h-5 text-blue-900" />,
+          <Compass className="w-5 h-5 text-blue-900" />,
+          <Waves className="w-5 h-5 text-blue-900" />,
+        ];
+
+        const customPillars: ExpeditionPillar[] = parsed
+          .filter((p: any) => p && (typeof p === 'string' ? p.trim() : (p.title && p.title.trim())))
+          .map((p: any, idx: number) => {
+            const title = typeof p === 'string' ? p.trim() : (p.title || '').trim();
+            const desc = typeof p === 'string' ? '' : (p.desc || '').trim();
+            const tLower = title.toLowerCase();
+
+            let icon = defaultIcons[idx % defaultIcons.length];
+            if (tLower.includes('vela') || tLower.includes('navega') || tLower.includes('altamar') || tLower.includes('cubierta') || tLower.includes('barco') || tLower.includes('lrc') || tLower.includes('patrón')) {
+              icon = <Anchor className="w-5 h-5 text-blue-900" />;
+            } else if (tLower.includes('lodge') || tLower.includes('alojamiento') || tLower.includes('quincho') || tLower.includes('gastronom') || tLower.includes('menú') || tLower.includes('comida') || tLower.includes('chef') || tLower.includes('cena')) {
+              icon = <Utensils className="w-5 h-5 text-blue-900" />;
+            } else if (tLower.includes('explora') || tLower.includes('trek') || tLower.includes('sender') || tLower.includes('cabalgata') || tLower.includes('hito') || tLower.includes('mirador') || tLower.includes('ruta') || tLower.includes('recalada')) {
+              icon = <Compass className="w-5 h-5 text-blue-900" />;
+            } else if (tLower.includes('starlink') || tLower.includes('satelit') || tLower.includes('autonom') || tLower.includes('zodiac') || tLower.includes('desembarco') || tLower.includes('agua') || tLower.includes('mar') || tLower.includes('pesca') || tLower.includes('fauna')) {
+              icon = <Waves className="w-5 h-5 text-blue-900" />;
+            }
+
+            return {
+              icon,
+              title,
+              desc,
+            };
+          });
+
+        if (customPillars.length > 0) {
+          overview.pillars = customPillars.slice(0, 4);
+        }
+      }
+    } catch {
+      if (typeof exp.highlights === 'string' && exp.highlights.trim()) {
+        const items = exp.highlights.split(/[•\n]/).map((s) => s.trim()).filter(Boolean);
+        if (items.length > 0) {
+          const defaultIcons = [
+            <Anchor className="w-5 h-5 text-blue-900" />,
+            <Utensils className="w-5 h-5 text-blue-900" />,
+            <Compass className="w-5 h-5 text-blue-900" />,
+            <Waves className="w-5 h-5 text-blue-900" />,
+          ];
+          overview.pillars = items.slice(0, 4).map((title, idx) => ({
+            icon: defaultIcons[idx % defaultIcons.length],
+            title,
+            desc: unifiedPillars[idx]?.desc || '',
+          }));
+        }
+      }
+    }
+  }
 
   return overview;
 };
@@ -189,48 +247,21 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
 
   const filteredExpeditions = useMemo(() => {
     if (selectedType === 'todos') return expeditions;
+
     return expeditions.filter((exp) => {
-      if (exp.routeId === selectedType) return true;
-      if (selectedType === 'ruta-juan-fernandez') {
-        return (
-          exp.routeId === 'ruta-juan-fernandez' ||
-          exp.name.toLowerCase().includes('robinson') ||
-          exp.location.toLowerCase().includes('fernández') ||
-          exp.location.toLowerCase().includes('fernandez')
-        );
-      }
-      if (selectedType === 'ruta-cabo-hornos') {
-        return (
-          exp.routeId === 'ruta-cabo-hornos' ||
-          exp.name.toLowerCase().includes('cabo de hornos') ||
-          exp.location.toLowerCase().includes('hornos')
-        );
-      }
-      if (selectedType === 'ruta-fiordos-glaciares') {
-        return (
-          exp.routeId === 'ruta-fiordos-glaciares' ||
-          exp.routeId === 'ruta-selkirk' ||
-          exp.name.toLowerCase().includes('fiordo') ||
-          exp.location.toLowerCase().includes('glaciar')
-        );
+      const expRoute = exp.routeId || (exp as any).route_id || 'ruta-juan-fernandez';
+
+      // 1. Coincidencia canónica 1:1 con la categoría seleccionada (base o nueva del CMS)
+      if (expRoute === selectedType) return true;
+
+      // 2. Compatibilidad geográfica: Alejandro Selkirk pertenece al Archipiélago Juan Fernández
+      if (selectedType === 'ruta-juan-fernandez' && expRoute === 'ruta-selkirk') {
+        return true;
       }
 
-      // Dynamic match for any newly created or edited category
-      const matchedCat = cmsCategories.find((c) => c.id === selectedType);
-      if (matchedCat) {
-        const catNameLower = matchedCat.name.toLowerCase();
-        const catTagLower = (matchedCat.tag || '').toLowerCase();
-        const expNameLower = exp.name.toLowerCase();
-        const expLocLower = exp.location.toLowerCase();
-        return (
-          exp.routeId === matchedCat.id ||
-          (catNameLower && (expNameLower.includes(catNameLower) || expLocLower.includes(catNameLower))) ||
-          (catTagLower && (expNameLower.includes(catTagLower) || expLocLower.includes(catTagLower)))
-        );
-      }
       return false;
     });
-  }, [expeditions, selectedType, cmsCategories]);
+  }, [expeditions, selectedType]);
 
   const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition, t) : null;
 

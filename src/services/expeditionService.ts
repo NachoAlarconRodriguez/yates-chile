@@ -1629,6 +1629,8 @@ export const expeditionService = {
     publicTempEstimate?: string;
     publicBrochureUrl?: string;
     publicPolicyUrl?: string;
+    publicHighlights?: string;
+    publicIncludedServices?: string;
   }): Promise<{ success: boolean; data?: DepartureRow; error?: string }> {
     try {
       const newId = `exp-dep-${Date.now()}`;
@@ -1664,6 +1666,8 @@ export const expeditionService = {
         brochureUrl: params.publicBrochureUrl,
         policyUrl: params.publicPolicyUrl,
         status: params.status || 'scheduled',
+        highlights: params.publicHighlights,
+        includedServices: params.publicIncludedServices,
       };
 
       // Try Supabase insert
@@ -1732,6 +1736,8 @@ export const expeditionService = {
               description: newPublicExp.description,
               image: newPublicExp.image,
               tempEstimate: newPublicExp.tempEstimate,
+              highlights: params.publicHighlights,
+              includedServices: params.publicIncludedServices,
               brochureUrl: newPublicExp.brochureUrl,
               totalSlots: newPublicExp.totalSlots,
               availableSlots: newPublicExp.availableSlots,
