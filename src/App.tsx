@@ -13,7 +13,7 @@ import { useExpeditions } from './hooks/useExpeditions';
 // - Poner en `true` para activar la pantalla de mantención con el video de Vegvisir.
 // - Poner en `false` para restaurar todo el sitio web exactamente a su estado normal.
 // =========================================================================
-export const IS_MAINTENANCE_MODE = true;
+export const IS_MAINTENANCE_MODE = false;
 
 // Claves secretas autorizadas para vista previa privada del cliente:
 // Permite ingresar mediante: https://yateschile.cl/?preview=yates2026 (o ?preview=cliente)
