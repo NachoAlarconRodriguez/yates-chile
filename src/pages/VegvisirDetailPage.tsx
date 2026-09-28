@@ -332,7 +332,7 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                             `• Embarcación: Velero Vegvisir\n\n` +
                             `Solicito disponibilidad y valores para confirmar mi reserva.`
                           );
-                          window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
+                          window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
                         }}
                         className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
                       >

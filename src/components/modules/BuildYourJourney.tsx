@@ -91,7 +91,7 @@ export const BuildYourJourney: React.FC = () => {
           `Deseo coordinar la reserva y recibir el Brochure PDF oficial.`
       );
 
-      const whatsappUrl = `https://wa.me/56981312920?text=${text}`;
+      const whatsappUrl = `https://wa.me/56951493394?text=${text}`;
 
       // Automatically open WhatsApp after brief delay
       setTimeout(() => {

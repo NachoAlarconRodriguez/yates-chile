@@ -329,7 +329,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
 
           <div className="pt-4 border-t border-slate-200">
             <a
-              href="https://wa.me/56981312920"
+              href="https://wa.me/56951493394"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full inline-flex items-center justify-center gap-2 bg-slate-950 text-white font-bold px-4 py-3.5 rounded-xl text-center min-h-[48px] shadow-md"

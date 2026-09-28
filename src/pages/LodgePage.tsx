@@ -1196,7 +1196,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
               <span>Reservar Habitación en el Lodge</span>
             </button>
             <a
-              href={`https://wa.me/56981312920?text=${encodeURIComponent('Hola, me gustaría comunicarme con un Concierge de Yates Chile para consultar sobre estadías en el Lodge y excursiones.')}`}
+              href={`https://wa.me/56951493394?text=${encodeURIComponent('Hola, me gustaría comunicarme con un Concierge de Yates Chile para consultar sobre estadías en el Lodge y excursiones.')}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold px-6 py-4 rounded-xl transition text-sm min-h-[48px] cursor-pointer border border-slate-700"

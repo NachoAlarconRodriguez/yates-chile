@@ -19,13 +19,18 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
     address?: string;
   };
 
-  const rawWhatsapp = footerMeta.whatsapp || '56981312920';
+  const rawWhatsapp = footerMeta.whatsapp || '56951493394';
   const cleanWhatsapp = rawWhatsapp.replace(/[^0-9]/g, '');
   const rawInstagram = footerMeta.instagram || 'https://www.instagram.com/vegvisir_sailing';
   const instagramUrl = rawInstagram.startsWith('http')
     ? rawInstagram
     : `https://www.instagram.com/${rawInstagram.replace('@', '')}`;
-  const emailAddress = footerMeta.email || 'concierge@yateschile.com';
+  const emailAddress = footerMeta.email || 'pablo@yateschile.com, evelyn@yateschile.com';
+  const mailtoTarget = emailAddress
+    .split(/[\s,;]+/)
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .join(',');
   const addressText = footerMeta.address || 'Uberlindo Andaur 222, Isla Robinson Crusoe';
 
   const handleNavClick = (path: string) => {
@@ -106,7 +111,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               target="_blank"
               rel="noopener noreferrer"
               className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#25D366] border border-white/10 hover:border-[#25D366]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 cursor-pointer shadow-md"
-              title="WhatsApp Concierge"
+              title="WhatsApp Concierge: +56 9 5149 3394 / +56 9 8131 2920"
             >
               <svg viewBox="0 0 24 24" fill="currentColor" className="w-4.5 h-4.5">
                 <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.005 5.278 5.286.002 11.793.002c3.148 0 6.112 1.229 8.342 3.46 2.23 2.23 3.456 5.196 3.456 8.349 0 6.518-5.28 11.794-11.785 11.794-1.996 0-3.957-.506-5.702-1.472L0 24zm6.49-4.22c1.688.995 3.328 1.547 5.244 1.547 5.28 0 9.584-4.298 9.584-9.584C21.32 6.46 17.02 2.16 11.74 2.16c-5.28 0-9.58 4.298-9.58 9.58 0 2.052.57 4.02 1.64 5.76l-.99 3.6 3.73-.972zm12.355-6.52c-.27-.135-1.602-.79-1.85-.88-.248-.09-.43-.135-.61.135-.18.27-.7.88-.857 1.06-.158.18-.315.2-.585.065-.27-.135-1.143-.42-2.176-1.34-.805-.718-1.348-1.608-1.507-1.878-.158-.27-.017-.417.118-.552.12-.12.27-.315.405-.47.135-.158.18-.27.27-.45.09-.18.045-.337-.02-.47-.068-.135-.61-1.47-.837-2.013-.22-.53-.442-.46-.61-.468-.16-.008-.344-.01-.527-.01-.18 0-.475.067-.723.337-.248.27-.948.924-.948 2.254 0 1.33.97 2.614 1.103 2.794.135.18 1.9 2.9 4.606 4.066.645.277 1.148.443 1.54.568.647.206 1.238.177 1.705.107.52-.078 1.602-.656 1.83-1.26.226-.605.226-1.125.158-1.235-.068-.11-.248-.18-.518-.315z" />
@@ -130,9 +135,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
             {/* Email */}
             <a
-              href={`mailto:${emailAddress}`}
+              href={`mailto:${mailtoTarget}`}
               className="w-10 h-10 rounded-full bg-white/5 hover:bg-[#1a73e8] border border-white/10 hover:border-[#1a73e8]/20 flex items-center justify-center text-white transition-all duration-300 hover:scale-105 cursor-pointer shadow-md"
-              title="Mail Concierge"
+              title={`Contacto: ${emailAddress}`}
             >
               <Mail className="w-4.5 h-4.5" />
             </a>

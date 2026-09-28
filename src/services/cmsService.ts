@@ -484,9 +484,9 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
     body_text: '',
     media_url: '',
     metadata: {
-      whatsapp: '56981312920',
+      whatsapp: '56951493394',
       instagram: 'https://www.instagram.com/vegvisir_sailing',
-      email: 'concierge@yateschile.com',
+      email: 'pablo@yateschile.com, evelyn@yateschile.com',
       address: 'Uberlindo Andaur 222, Isla Robinson Crusoe',
     },
   },
@@ -504,7 +504,7 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
   },
 };
 
-const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v14';
+const LOCAL_STORAGE_CMS_KEY = 'yates_chile_cms_content_cache_v16';
 
 function cleanMediaUrl(sectionKey: string, url?: string | null): string {
   const defaultUrl = DEFAULT_CMS_CONTENT[sectionKey]?.media_url || '';

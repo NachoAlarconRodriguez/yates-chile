@@ -102,7 +102,7 @@ export const HeroCarousel: React.FC<HeroCarouselProps> = ({ onNavigate }) => {
       const msg = encodeURIComponent(
         `Hola Concierge Yates Chile, quisiera solicitar el brochure/dossier en PDF para la expedición "${bannerTitle}".`
       );
-      window.open(`https://wa.me/56981312920?text=${msg}`, '_blank');
+      window.open(`https://wa.me/56951493394?text=${msg}`, '_blank');
     }
   };
 

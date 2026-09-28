@@ -743,7 +743,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                       </div>
 
                       <a
-                        href={`https://wa.me/56981312920?text=${encodeURIComponent(
+                        href={`https://wa.me/56951493394?text=${encodeURIComponent(
                           `Hola Concierge Yates Chile, veo que la expedición "${currentActiveExp.name}" (${currentActiveExp.startDate} al ${currentActiveExp.endDate}) está completa. Deseo anotarme en la Lista de Espera Prioritaria por si se libera algún cupo o se programa una nueva salida.`
                         )}`}
                         target="_blank"
@@ -1293,7 +1293,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-sm sm:max-w-md">
               {/* WhatsApp CTA */}
               <a
-                href={`https://wa.me/56981312920?text=${whatsappMessage}`}
+                href={`https://wa.me/56951493394?text=${whatsappMessage}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex-1 w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white text-xs sm:text-sm font-semibold px-5 py-3 rounded-2xl shadow-lg shadow-emerald-950/50 hover:shadow-emerald-500/20 border border-emerald-400/20 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
