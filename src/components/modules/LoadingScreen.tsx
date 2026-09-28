@@ -40,7 +40,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   // Intelligent dynamic loader
   useEffect(() => {
     const startTime = Date.now();
-    const isActuallyReady = isReady || isVideoReady;
+    const isActuallyReady = typeof isReady === 'boolean' ? isReady : isVideoReady;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;

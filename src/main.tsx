@@ -4,12 +4,15 @@ import './styles/globals.css'
 import App from './App.tsx'
 import { LanguageProvider } from './context/LanguageContext'
 import { SiteContentProvider } from './context/SiteContentContext'
+import { ExpeditionsProvider } from './context/ExpeditionsContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LanguageProvider>
       <SiteContentProvider>
-        <App />
+        <ExpeditionsProvider>
+          <App />
+        </ExpeditionsProvider>
       </SiteContentProvider>
     </LanguageProvider>
   </StrictMode>,

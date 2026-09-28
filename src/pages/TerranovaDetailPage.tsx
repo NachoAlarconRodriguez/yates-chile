@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, Compass, Sparkles, Anchor, Maximize2, ChevronLeft, ChevronRight, X, Ship, Radio, FileText, Layers, Gauge, Download, ArrowRight, ChevronDown } from 'lucide-react';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useExpeditions } from '../hooks/useExpeditions';
+import { isExpeditionSoldOut, getExpeditionAvailableSpots, getDirectPdfUrl, type PublicExpedition } from '../services/expeditionService';
 import { useLanguage } from '../context/LanguageContext';
 import { normalizeExternalMediaUrl, isMediaVideo, getMediaFallbackUrl } from '../services/cmsService';
 
@@ -11,6 +12,20 @@ interface TerranovaDetailPageProps {
 
 export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavigate }) => {
   const { expeditions } = useExpeditions();
+
+  const terranovaExpeditions = React.useMemo(() => {
+    return expeditions
+      .filter((e) => {
+        const vId = (e.vesselId || '').toLowerCase();
+        const vName = (e.vessel || '').toLowerCase();
+        return vId === 'terranova' || vName.includes('terranova') || (!vName.includes('velero') && !vId.includes('vegvisir'));
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.departureDate || a.startDate || '2099-01-01').getTime();
+        const dateB = new Date(b.departureDate || b.startDate || '2099-01-01').getTime();
+        return dateA - dateB;
+      });
+  }, [expeditions]);
   const { getSection } = useSiteContent();
   const { language, t } = useLanguage();
   const isEn = language === 'EN';
@@ -244,95 +259,162 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
 
             {/* Expeditions List */}
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 bg-slate-50">
-              {expeditions.filter((e) =>
-                e.vessel.toLowerCase().includes('terranova') ||
-                e.vessel.toLowerCase().includes('yate') ||
-                e.name.toLowerCase().includes('cabo de hornos') ||
-                e.name.toLowerCase().includes('fiordos')
-              ).map((exp) => (
-                <div
-                  key={exp.id}
-                  className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center hover:shadow-md transition-all"
-                >
-                  <div className="flex items-start gap-4">
-                    <img
-                      src={exp.image}
-                      alt={exp.name}
-                      referrerPolicy="no-referrer"
-                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-slate-200"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/yate-terranova.jpg';
-                      }}
-                    />
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono font-bold uppercase text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md">
-                          {exp.startDate} {t('al', 'to')} {exp.endDate}
-                        </span>
-                        {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) ? (
-                          <span className="text-[10px] font-mono font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 uppercase">
-                            {t('Completo', 'Sold Out')}
-                          </span>
-                        ) : typeof exp.spotsLeft === 'number' && exp.spotsLeft > 0 ? (
-                          <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                            {exp.spotsLeft} {t('cupos disponibles', 'spots available')}
-                          </span>
-                        ) : null}
-                      </div>
-                      <h4 className="font-serif font-bold text-base text-[#0f2b48]">{exp.name}</h4>
-                      <p className="text-xs text-slate-500 font-light line-clamp-2 max-w-md">
-                        {exp.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = '#';
-                        link.setAttribute('download', `Dossier_${exp.name.replace(/\s+/g, '_')}_2026.pdf`);
-                        document.body.appendChild(link);
-                        setTimeout(() => {
-                          alert(`Descargando Brochure Oficial en PDF de: ${exp.name}`);
-                        }, 200);
-                      }}
-                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>{t('Brochure PDF', 'PDF Brochure')}</span>
-                    </button>
-
-                    {(exp.spotsLeft === 'completo' || exp.spotsLeft === 0 || (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0)) ? (
-                      <button
-                        disabled
-                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 text-slate-400 px-4 py-2 rounded-xl text-xs font-bold cursor-not-allowed border border-slate-200 uppercase tracking-wider"
-                      >
-                        <span>{t('Agotado', 'Sold Out')}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const text = encodeURIComponent(
-                            `Hola Yates Chile, deseo reservar cupo para la expedición en Yate Terranova:\n\n` +
-                            `• Travesía: ${exp.name}\n` +
-                            `• Fechas: ${exp.startDate} al ${exp.endDate}\n` +
-                            `• Embarcación: Yate Terranova\n\n` +
-                            `Solicito disponibilidad y valores para confirmar mi reserva.`
-                          );
-                          window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
-                        }}
-                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
-                      >
-                        <span>{t('Reservar Cupo', 'Book Spot')}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+              {terranovaExpeditions.length === 0 ? (
+                <div className="text-center py-10 space-y-3 bg-white rounded-2xl border border-slate-200 p-8 shadow-xs">
+                  <Compass className="w-10 h-10 text-slate-400 mx-auto" />
+                  <p className="text-sm text-slate-600 font-medium">
+                    {t(
+                      'No hay expediciones públicas programadas en este momento para el Yate Terranova. Consulta por programas privados o chárter exclusivo.',
+                      'No open public expeditions right now for Terranova Yacht. Enquire for custom private charters.'
                     )}
-                  </div>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = encodeURIComponent(
+                        'Hola Concierge Yates Chile, deseo cotizar una travesía privada a medida en el Yate Terranova.'
+                      );
+                      window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                    }}
+                    className="inline-flex items-center gap-2 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-5 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer"
+                  >
+                    <span>{t('Cotizar Travesía Privada', 'Enquire Private Charter')}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              ))}
+              ) : (
+                terranovaExpeditions.map((exp: PublicExpedition) => {
+                  const isSoldOut =
+                    isExpeditionSoldOut(exp) ||
+                    exp.spotsLeft === 'completo' ||
+                    exp.spotsLeft === 'bloqueado' ||
+                    (typeof exp.availableSlots === 'number' && exp.availableSlots <= 0);
+                  const availableSpots = getExpeditionAvailableSpots(exp);
+
+                  return (
+                    <div
+                      key={exp.id}
+                      className={`rounded-2xl p-4 sm:p-5 border transition-all flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center ${
+                        isSoldOut
+                          ? 'bg-slate-100/90 border-slate-200/90 shadow-2xs'
+                          : 'bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                          <img
+                            src={normalizeExternalMediaUrl(exp.image) || '/yate-terranova.jpg'}
+                            alt={exp.name}
+                            referrerPolicy="no-referrer"
+                            className={`w-full h-full object-cover transition-all ${
+                              isSoldOut ? 'grayscale contrast-90 opacity-60' : ''
+                            }`}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/yate-terranova.jpg';
+                            }}
+                          />
+                          {isSoldOut && (
+                            <div className="absolute inset-0 bg-slate-900/10 pointer-events-none" />
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-md ${
+                                isSoldOut
+                                  ? 'bg-slate-200 text-slate-600'
+                                  : 'bg-amber-100 text-amber-900'
+                              }`}
+                            >
+                              {exp.startDate} {t('al', 'to')} {exp.endDate}
+                            </span>
+
+                            {isSoldOut ? (
+                              <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-200 px-2 py-0.5 rounded-md border border-slate-300 uppercase">
+                                {t('Completo', 'Sold Out')}
+                              </span>
+                            ) : availableSpots === 1 ? (
+                              <span className="text-[10px] font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300 uppercase animate-pulse">
+                                {t('¡Último cupo libre!', '1 spot left!')}
+                              </span>
+                            ) : availableSpots > 1 ? (
+                              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                                {availableSpots} {t('cupos disponibles', 'spots available')}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <h4
+                            className={`font-serif font-bold text-base ${
+                              isSoldOut ? 'text-slate-600' : 'text-[#0f2b48]'
+                            }`}
+                          >
+                            {exp.name}
+                          </h4>
+
+                          <p
+                            className={`text-xs font-light line-clamp-2 max-w-md ${
+                              isSoldOut ? 'text-slate-400' : 'text-slate-500'
+                            }`}
+                          >
+                            {exp.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex sm:flex-col gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0">
+                        {exp.brochureUrl && exp.brochureUrl.trim() !== '' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const direct = getDirectPdfUrl(exp.brochureUrl);
+                              window.open(direct || exp.brochureUrl, '_blank', 'noopener,noreferrer');
+                            }}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>{t('Brochure PDF', 'PDF Brochure')}</span>
+                          </button>
+                        )}
+
+                        {isSoldOut ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const text = encodeURIComponent(
+                                `Hola Yates Chile, consulto por lista de espera para la expedición ${exp.name} (${exp.startDate} al ${exp.endDate}) en Yate Terranova que figura completa.`
+                              );
+                              window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                            }}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border border-slate-300/80"
+                          >
+                            <span>{t('Lista de Espera', 'Waitlist')}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const text = encodeURIComponent(
+                                `Hola Yates Chile, deseo reservar cupo para la expedición en Yate Terranova:\n\n` +
+                                `• Travesía: ${exp.name}\n` +
+                                `• Fechas: ${exp.startDate} al ${exp.endDate}\n` +
+                                `• Embarcación: Yate Terranova\n\n` +
+                                `Solicito disponibilidad y valores para confirmar mi reserva.`
+                              );
+                              window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                            }}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
+                          >
+                            <span>{t('Reservar Cupo', 'Book Spot')}</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -1389,8 +1471,8 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
           </p>
           <div className="pt-4">
             <button
-              onClick={() => onNavigate('/contacto')}
-              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-8 py-4 rounded-xl transition shadow-xl text-sm min-h-[48px] cursor-pointer"
+              onClick={() => setShowExpeditionsModal(true)}
+              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-950 font-extrabold px-8 py-4 rounded-xl transition shadow-xl text-sm min-h-[48px] cursor-pointer hover:scale-[1.02] active:scale-95"
             >
               <Ship className="w-4 h-4 text-slate-950" />
               <span>Revisar Próximas Fechas de Programas</span>

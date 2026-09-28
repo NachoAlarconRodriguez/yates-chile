@@ -6,6 +6,7 @@ import { WelcomeSplash } from './components/modules/WelcomeSplash';
 import { LoadingScreen } from './components/modules/LoadingScreen';
 import { MaintenanceScreen } from './components/modules/MaintenanceScreen';
 import { analyticsService } from './services/analyticsService';
+import { useExpeditions } from './hooks/useExpeditions';
 
 // =========================================================================
 // INTERRUPTOR DE MODO MANTENCIÓN:
@@ -81,6 +82,7 @@ const PageLoaderFallback = () => (
 );
 
 export function App() {
+  const { isInitialLoaded } = useExpeditions();
   const [appLoading, setAppLoading] = useState<boolean>(true);
   const [isVideoReady, setIsVideoReady] = useState<boolean>(false);
   const [hasPreviewAccess, setHasPreviewAccess] = useState<boolean>(() => checkClientPreviewAccess());
@@ -314,9 +316,9 @@ export function App() {
       {appLoading && (
         <LoadingScreen 
           onComplete={() => setAppLoading(false)} 
-          isReady={!showSplash || isVideoReady}
+          isReady={isInitialLoaded && (!showSplash || isVideoReady)}
           isVideoReady={isVideoReady} 
-          minDuration={400} 
+          minDuration={500} 
         />
       )}
 

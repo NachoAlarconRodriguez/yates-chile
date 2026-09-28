@@ -174,7 +174,7 @@ export const ExpeditionCalendar: React.FC = () => {
   const monthNames = isEn ? MONTH_NAMES_EN : MONTH_NAMES_ES;
 
   const [selectedMonth, setSelectedMonth] = useState<number>(11); // Iniciar en temporada alta (Noviembre)
-  const [activeExpeditionId, setActiveExpeditionId] = useState<string | null>('exp-cabo-nov-26');
+  const [activeExpeditionId, setActiveExpeditionId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // Filter expeditions available in selected month
@@ -192,7 +192,7 @@ export const ExpeditionCalendar: React.FC = () => {
     }
   }, [selectedMonth, activeExpeditions, activeExpeditionId]);
 
-  const activeExpedition = expeditions.find(e => e.id === activeExpeditionId) || activeExpeditions[0] || null;
+  const activeExpedition = (activeExpeditionId ? expeditions.find(e => e.id === activeExpeditionId) : null) || activeExpeditions[0] || null;
 
   const touchStartX = React.useRef<number | null>(null);
   const touchStartY = React.useRef<number | null>(null);
