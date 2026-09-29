@@ -305,7 +305,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
       );
       if (confirmWhatsapp) {
         const msg = encodeURIComponent(`Hola Concierge Yates Chile, quisiera solicitar el brochure/dossier en PDF para la expedición "${exp.name}".`);
-        window.open(`https://wa.me/56951493394?text=${msg}`, '_blank');
+        window.open(`https://wa.me/56981312920?text=${msg}`, '_blank');
       }
     }
   };

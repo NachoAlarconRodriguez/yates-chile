@@ -26,6 +26,41 @@ export interface VesselHotspot {
   image?: string;
 }
 
+export interface VesselCompassCard {
+  badge?: string;
+  title?: string;
+  sub?: string;
+  backTitle?: string;
+  backDesc?: string;
+}
+
+export interface VesselCompassSpecs {
+  norte?: VesselCompassCard;
+  oeste?: VesselCompassCard;
+  sur?: VesselCompassCard;
+  este?: VesselCompassCard;
+}
+
+export interface VesselTechSpecs {
+  satellite?: string;
+  plotter?: string;
+  autopilot?: string;
+  comms?: string;
+  watermaker?: string;
+  tender?: string;
+  tenderEngine?: string;
+  heating?: string;
+  compass?: VesselCompassSpecs;
+  [key: string]: any;
+}
+
+export interface VesselGalleryItem {
+  url: string;
+  title?: string;
+  location?: string;
+  desc?: string;
+}
+
 export interface Vessel {
   id: 'vegvisir' | 'terranova' | string;
   name: string;
@@ -42,10 +77,10 @@ export interface Vessel {
   crew?: string;
   features: string[];
   mainImage: string;
-  gallery?: string[];
+  gallery?: VesselGalleryItem[];
   hotspots?: VesselHotspot[];
   badge?: string;
-  specs?: Record<string, string>;
+  specs?: VesselTechSpecs;
   isActive?: boolean;
 }
 

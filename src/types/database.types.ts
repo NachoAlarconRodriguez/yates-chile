@@ -134,6 +134,9 @@ export interface Database {
           features: Json;
           hotspots: Json;
           is_active: boolean;
+          length?: string | null;
+          specs?: Json | null;
+          gallery?: Json | null;
           created_at: string;
         };
         Insert: {
@@ -153,6 +156,9 @@ export interface Database {
           features?: Json;
           hotspots?: Json;
           is_active?: boolean;
+          length?: string | null;
+          specs?: Json | null;
+          gallery?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -172,6 +178,9 @@ export interface Database {
           features?: Json;
           hotspots?: Json;
           is_active?: boolean;
+          length?: string | null;
+          specs?: Json | null;
+          gallery?: Json | null;
           created_at?: string;
         };
         Relationships: [];

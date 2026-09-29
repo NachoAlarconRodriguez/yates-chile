@@ -58,7 +58,6 @@ export const ContactoPage: React.FC = () => {
                 {t('Nuestros capitanes y asistentes de Concierge responden consultas directas sobre disponibilidad.', 'Our captains and Concierge staff answer direct questions regarding availability.')}
               </p>
               <div className="pt-2 font-bold text-base text-blue-700 flex flex-col gap-1.5">
-                <a href="tel:+56951493394" className="hover:underline">+56 9 5149 3394</a>
                 <a href="tel:+56981312920" className="hover:underline">+56 9 8131 2920</a>
               </div>
             </div>

@@ -484,7 +484,7 @@ export const DEFAULT_CMS_CONTENT: Record<string, Partial<SiteContent>> = {
     body_text: '',
     media_url: '',
     metadata: {
-      whatsapp: '56951493394',
+      whatsapp: '56981312920',
       instagram: 'https://www.instagram.com/vegvisir_sailing',
       email: 'pablo@yateschile.com, evelyn@yateschile.com',
       address: 'Uberlindo Andaur 222, Isla Robinson Crusoe',

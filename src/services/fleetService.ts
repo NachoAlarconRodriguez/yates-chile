@@ -15,7 +15,7 @@ const mapRowToVessel = (row: any): Vessel => {
     type: row.type || fallback.type,
     tagline: row.tagline || fallback.tagline,
     description: row.description || fallback.description,
-    length: row.builder ? `${row.builder}` : fallback.length,
+    length: row.length || fallback.length || '50 ft',
     capacity: `${row.capacity_pax || fallback.maxPax || 12} Pasajeros`,
     maxPax: row.capacity_pax || fallback.maxPax || 12,
     cabins: `${row.cabins_count || fallback.cabins || '5'} Cabinas`,
@@ -25,10 +25,30 @@ const mapRowToVessel = (row: any): Vessel => {
     crew: row.crew || fallback.crew,
     badge: row.badge || fallback.badge,
     mainImage: normalizeExternalMediaUrl(row.main_image) || fallback.mainImage,
-    gallery: fallback.gallery || [],
+    gallery: Array.isArray(row.gallery) && row.gallery.length > 0
+      ? row.gallery.map((item: any) => {
+          if (typeof item === 'string') {
+            return {
+              url: normalizeExternalMediaUrl(item) || item,
+              title: `${row.name || 'Embarcación'} • Vista Interior`,
+              location: 'Flota Yates Chile',
+              desc: 'Habitabilidad y confort a bordo.',
+            };
+          }
+          return {
+            ...item,
+            url: normalizeExternalMediaUrl(item.url) || item.url,
+            title: item.title || `${row.name || 'Embarcación'} • Detalle`,
+            location: item.location || 'Flota Yates Chile',
+            desc: item.desc || '',
+          };
+        })
+      : (fallback.gallery || []),
     features: Array.isArray(row.features) && row.features.length > 0 ? row.features : fallback.features,
     hotspots: Array.isArray(row.hotspots) && row.hotspots.length > 0 ? row.hotspots : fallback.hotspots,
-    specs: fallback.specs,
+    specs: (row.specs && typeof row.specs === 'object' && Object.keys(row.specs).length > 0)
+      ? { ...fallback.specs, ...row.specs }
+      : (fallback.specs || {}),
     isActive: row.is_active !== undefined ? row.is_active : true,
   };
 };
@@ -40,6 +60,7 @@ const mapVesselToRow = (v: Partial<Vessel>): Record<string, any> => {
   if (v.type !== undefined) row.type = v.type;
   if (v.tagline !== undefined) row.tagline = v.tagline;
   if (v.description !== undefined) row.description = v.description;
+  if (v.length !== undefined) row.length = v.length;
   if (v.maxPax !== undefined) row.capacity_pax = v.maxPax;
   if (v.cabins !== undefined) row.cabins_count = parseInt(v.cabins, 10) || 5;
   if (v.bathrooms !== undefined) row.bathrooms_count = parseInt(v.bathrooms, 10) || 5;
@@ -48,8 +69,17 @@ const mapVesselToRow = (v: Partial<Vessel>): Record<string, any> => {
   if (v.crew !== undefined) row.crew = v.crew;
   if (v.badge !== undefined) row.badge = v.badge;
   if (v.mainImage !== undefined) row.main_image = normalizeExternalMediaUrl(v.mainImage) || v.mainImage;
+  if (v.gallery !== undefined) {
+    row.gallery = Array.isArray(v.gallery)
+      ? v.gallery.map((item) => ({
+          ...item,
+          url: normalizeExternalMediaUrl(item.url) || item.url,
+        }))
+      : [];
+  }
   if (v.features !== undefined) row.features = v.features;
   if (v.hotspots !== undefined) row.hotspots = v.hotspots;
+  if (v.specs !== undefined) row.specs = v.specs;
   if (v.isActive !== undefined) row.is_active = v.isActive;
   return row;
 };

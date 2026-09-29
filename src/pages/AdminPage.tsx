@@ -12602,7 +12602,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             <input
                               type="text"
                               required
-                              placeholder="Ej: +56 9 5149 3394"
+                              placeholder="Ej: +56 9 8131 2920"
                               value={guestList[0]?.phone || blockForm.guestPhone}
                               onChange={(e) => {
                                 const val = formatPhone(e.target.value);

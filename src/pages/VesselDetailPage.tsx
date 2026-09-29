@@ -64,6 +64,18 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
   // Curated photo gallery images
   const images = useMemo(() => {
     const vesselName = vessel?.name || 'Embarcación';
+
+    // Prioridad: Galería personalizada configurada desde el Panel Admin mediante enlaces de Google Drive
+    if (vessel?.gallery && vessel.gallery.length > 0) {
+      return vessel.gallery.map((item, idx) => ({
+        url: item.url,
+        title: item.title || `${vesselName} • Foto ${idx + 1}`,
+        location: item.location || 'Flota Yates Chile',
+        desc: item.desc || `${vesselName} navegando en aguas australes con tripulación y seguridad de alta latitud.`,
+      }));
+    }
+
+    // Galería por defecto de navegación austral
     return [
       {
         url: heroMediaUrl,
@@ -363,7 +375,7 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                   <button
                     onClick={() => {
                       const text = encodeURIComponent(`Hola Concierge Yates Chile, deseo cotizar una travesía privada a medida en ${vessel.name}.`);
-                      window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                      window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
                     }}
                     className="inline-flex items-center gap-2 bg-[#0f2b48] text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-[#0a1e34] transition"
                   >
@@ -439,7 +451,7 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                               `• Embarcación: ${vessel.name}\n\n` +
                               `Solicito disponibilidad y valores para confirmar mi reserva.`
                             );
-                            window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                            window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
                           }}
                           className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
                         >
@@ -632,9 +644,15 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_norte_title', vessel?.length || 'Eslora Oceánica')}</span>
-                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_norte_sub', `${vessel?.builder || vessel?.name || ''} • ${vessel?.registration || 'DIRECTEMAR'}`)}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">
+                      {vessel?.specs?.compass?.norte?.badge || getCmsSpec('spec_norte_badge', t('NORTE / ASTILLERO', 'NORTH / SHIPYARD'))}
+                    </span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">
+                      {vessel?.specs?.compass?.norte?.title || getCmsSpec('spec_norte_title', vessel?.length || 'Eslora Oceánica')}
+                    </span>
+                    <span className="text-slate-500 text-[10px] block">
+                      {vessel?.specs?.compass?.norte?.sub || getCmsSpec('spec_norte_sub', `${vessel?.builder || vessel?.name || ''} • ${vessel?.registration || 'DIRECTEMAR'}`)}
+                    </span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -647,9 +665,11 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">{t('Identificación', 'Identification')}</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[190px] mx-auto">
-                    {t(`Diseñado para navegar las aguas del Pacífico Sur, fiordos y canales australes con total serenidad y confort.`, `Designed to sail the waters of the South Pacific, austral channels and fjords with absolute serenity and comfort.`)}
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">
+                    {vessel?.specs?.compass?.norte?.backTitle || t('Identificación', 'Identification')}
+                  </span>
+                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[190px] mx-auto whitespace-pre-line">
+                    {vessel?.specs?.compass?.norte?.backDesc || t(`Diseñado para navegar las aguas del Pacífico Sur, fiordos y canales australes con total serenidad y confort.`, `Designed to sail the waters of the South Pacific, austral channels and fjords with absolute serenity and comfort.`)}
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
@@ -680,9 +700,15 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_oeste_badge', t('OESTE / CAPACIDAD', 'WEST / CAPACITY'))}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_oeste_title', vessel?.capacity || `${vessel?.maxPax || 10} PAX`)}</span>
-                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_oeste_sub', `${vessel?.cabins || 'Cabinas privadas'} • ${vessel?.bathrooms || 'Baños en suite'}`)}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">
+                      {vessel?.specs?.compass?.oeste?.badge || getCmsSpec('spec_oeste_badge', t('OESTE / CAPACIDAD', 'WEST / CAPACITY'))}
+                    </span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">
+                      {vessel?.specs?.compass?.oeste?.title || getCmsSpec('spec_oeste_title', vessel?.capacity || `${vessel?.maxPax || 10} PAX`)}
+                    </span>
+                    <span className="text-slate-500 text-[10px] block">
+                      {vessel?.specs?.compass?.oeste?.sub || getCmsSpec('spec_oeste_sub', `${vessel?.cabins || 'Cabinas privadas'} • ${vessel?.bathrooms || 'Baños en suite'}`)}
+                    </span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -695,9 +721,11 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     transform: 'rotateY(180deg)',
                   }}
                 >
-                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">{t('Habitabilidad', 'Habitability')}</span>
-                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto">
-                    {t(`Alojamiento distribuido en ${vessel?.cabins || 'cabinas privadas'} con ${vessel?.bathrooms || 'baños en suite'}, amplio salón central y cocina para navegación oceánica prolongada.`, `Accommodation laid out across ${vessel?.cabins || 'private cabins'} with ${vessel?.bathrooms || 'en-suite bathrooms'}, spacious central salon and galley for extended voyages.`)}
+                  <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider">
+                    {vessel?.specs?.compass?.oeste?.backTitle || t('Habitabilidad', 'Habitability')}
+                  </span>
+                  <p className="text-slate-600 text-[10px] leading-relaxed max-w-[180px] mx-auto whitespace-pre-line">
+                    {vessel?.specs?.compass?.oeste?.backDesc || t(`Alojamiento distribuido en ${vessel?.cabins || 'cabinas privadas'} con ${vessel?.bathrooms || 'baños en suite'}, amplio salón central y cocina para navegación oceánica prolongada.`, `Accommodation laid out across ${vessel?.cabins || 'private cabins'} with ${vessel?.bathrooms || 'en-suite bathrooms'}, spacious central salon and galley for extended voyages.`)}
                   </p>
                   <span className="text-[8px] text-blue-900/60 font-mono pt-1 uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
@@ -728,11 +756,15 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_sur_badge', t('SUR / TECNOLOGÍA', 'SOUTH / TECHNOLOGY'))}</span>
-                    <span className="text-xs sm:text-[13px] font-bold text-slate-900 block mt-0.5 leading-tight max-w-[160px] mx-auto">
-                      {getCmsSpec('spec_sur_title', t('Starlink 24/7', 'Starlink 24/7'))}
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">
+                      {vessel?.specs?.compass?.sur?.badge || getCmsSpec('spec_sur_badge', t('SUR / TECNOLOGÍA', 'SOUTH / TECHNOLOGY'))}
                     </span>
-                    <span className="text-slate-500 text-[10px] block mt-0.5">{getCmsSpec('spec_sur_sub', t('Conexión Satelital & Navegación', 'Satellite Connection & Navigation'))}</span>
+                    <span className="text-xs sm:text-[13px] font-bold text-slate-900 block mt-0.5 leading-tight max-w-[160px] mx-auto">
+                      {vessel?.specs?.compass?.sur?.title || getCmsSpec('spec_sur_title', t('Starlink 24/7', 'Starlink 24/7'))}
+                    </span>
+                    <span className="text-slate-500 text-[10px] block mt-0.5">
+                      {vessel?.specs?.compass?.sur?.sub || getCmsSpec('spec_sur_sub', t('Conexión Satelital & Navegación', 'Satellite Connection & Navigation'))}
+                    </span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -746,24 +778,34 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                   }}
                 >
                   <div>
-                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">{t('Electrónica', 'Electronics')}</span>
-                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block mt-0.5">RAYMARINE / GARMIN</span>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">
+                      {vessel?.specs?.compass?.sur?.backTitle || t('Electrónica', 'Electronics')}
+                    </span>
+                    {!vessel?.specs?.compass?.sur?.backDesc && (
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block mt-0.5">RAYMARINE / GARMIN</span>
+                    )}
                   </div>
 
-                  <ul className="text-slate-600 text-[9.5px] leading-snug space-y-1 text-left px-1 max-w-[190px]">
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>Plotter náutico y radar marino</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>{t('Piloto Automático Integrado', 'Integrated Autopilot')}</span>
-                    </li>
-                    <li className="flex items-start gap-1.5">
-                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>{t('Conexión satelital Starlink 24/7 de alta velocidad', '24/7 High-speed Starlink Satellite Internet')}</span>
-                    </li>
-                  </ul>
+                  {vessel?.specs?.compass?.sur?.backDesc ? (
+                    <p className="text-slate-600 text-[9.5px] leading-relaxed max-w-[190px] mx-auto whitespace-pre-line text-left px-1">
+                      {vessel.specs.compass.sur.backDesc}
+                    </p>
+                  ) : (
+                    <ul className="text-slate-600 text-[9.5px] leading-snug space-y-1 text-left px-1 max-w-[190px]">
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                        <span>Plotter náutico y radar marino</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                        <span>{t('Piloto Automático Integrado', 'Integrated Autopilot')}</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                        <span>{t('Conexión satelital Starlink 24/7 de alta velocidad', '24/7 High-speed Starlink Satellite Internet')}</span>
+                      </li>
+                    </ul>
+                  )}
 
                   <span className="text-[8px] text-blue-900/60 font-mono uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
@@ -794,9 +836,15 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                     <Compass className="w-9 h-9 text-blue-900/10 absolute" />
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">{getCmsSpec('spec_este_badge', t('ESTE / SERVICIO', 'EAST / SERVICE'))}</span>
-                    <span className="text-base font-bold text-slate-900 block mt-0.5">{getCmsSpec('spec_este_title', vessel?.crew || 'Patrón + Tripulación')}</span>
-                    <span className="text-slate-500 text-[10px] block">{getCmsSpec('spec_este_sub', 'Servicio & Seguridad de Bordo')}</span>
+                    <span className="text-slate-400 text-[8px] uppercase font-bold tracking-widest block">
+                      {vessel?.specs?.compass?.este?.badge || getCmsSpec('spec_este_badge', t('ESTE / SERVICIO', 'EAST / SERVICE'))}
+                    </span>
+                    <span className="text-base font-bold text-slate-900 block mt-0.5">
+                      {vessel?.specs?.compass?.este?.title || getCmsSpec('spec_este_title', vessel?.crew || 'Patrón + Tripulación')}
+                    </span>
+                    <span className="text-slate-500 text-[10px] block">
+                      {vessel?.specs?.compass?.este?.sub || getCmsSpec('spec_este_sub', 'Servicio & Seguridad de Bordo')}
+                    </span>
                   </div>
                   <span className="text-[8px] text-blue-900 font-bold tracking-wider pt-1 animate-pulse uppercase">{t('Click para detalle', 'Click for details')}</span>
                 </div>
@@ -810,27 +858,35 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                   }}
                 >
                   <div>
-                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">{t('Autonomía & Desembarco', 'Autonomy & Landings')}</span>
+                    <span className="text-blue-900 text-[9px] font-bold uppercase tracking-wider block">
+                      {vessel?.specs?.compass?.este?.backTitle || t('Autonomía & Desembarco', 'Autonomy & Landings')}
+                    </span>
                   </div>
 
-                  <ul className="text-slate-700 text-[8px] sm:text-[8.5px] leading-tight space-y-0.5 sm:space-y-1 text-left px-0.5 w-full max-w-[205px]">
-                    <li className="flex items-start gap-1">
-                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span><strong>{t('Desalinizador:', 'Watermaker:')}</strong> 140 Ltrs/hr agua dulce</span>
-                    </li>
-                    <li className="flex items-start gap-1">
-                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span><strong>{t('Auxiliar:', 'Tender:')}</strong> Bote Zodiac semirrígido</span>
-                    </li>
-                    <li className="flex items-start gap-1">
-                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span><strong>{t('Propulsión:', 'Propulsion:')}</strong> Motor marino de gran autonomía</span>
-                    </li>
-                    <li className="flex items-start gap-1">
-                      <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
-                      <span>Sistema de calefacción marina en cabinas</span>
-                    </li>
-                  </ul>
+                  {vessel?.specs?.compass?.este?.backDesc ? (
+                    <p className="text-slate-700 text-[8px] sm:text-[8.5px] leading-relaxed max-w-[205px] mx-auto whitespace-pre-line text-left px-0.5">
+                      {vessel.specs.compass.este.backDesc}
+                    </p>
+                  ) : (
+                    <ul className="text-slate-700 text-[8px] sm:text-[8.5px] leading-tight space-y-0.5 sm:space-y-1 text-left px-0.5 w-full max-w-[205px]">
+                      <li className="flex items-start gap-1">
+                        <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                        <span><strong>{t('Desalinizador:', 'Watermaker:')}</strong> 140 Ltrs/hr agua dulce</span>
+                      </li>
+                      <li className="flex items-start gap-1">
+                        <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                        <span><strong>{t('Auxiliar:', 'Tender:')}</strong> Bote Zodiac semirrígido</span>
+                      </li>
+                      <li className="flex items-start gap-1">
+                        <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                        <span><strong>{t('Propulsión:', 'Propulsion:')}</strong> Motor marino de gran autonomía</span>
+                      </li>
+                      <li className="flex items-start gap-1">
+                        <span className="text-blue-900 font-bold leading-none mt-0.5">•</span>
+                        <span>Sistema de calefacción marina en cabinas</span>
+                      </li>
+                    </ul>
+                  )}
 
                   <span className="text-[7.5px] text-blue-900/60 font-mono uppercase">{t('Volver ➔', 'Back ➔')}</span>
                 </div>
@@ -931,20 +987,20 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                   <span className="text-slate-500">{t('Internet Satelital:', 'Satellite Internet:')}</span>
                   <span className="font-bold text-emerald-700 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Starlink 24/7
+                    {vessel.specs?.satellite || 'Starlink 24/7'}
                   </span>
                 </li>
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">{t('Plotter Náutico:', 'Chartplotter:')}</span>
-                  <span className="font-bold text-slate-900">Raymarine / Garmin</span>
+                  <span className="font-bold text-slate-900">{vessel.specs?.plotter || 'Raymarine / Garmin'}</span>
                 </li>
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">{t('Piloto Automático:', 'Autopilot:')}</span>
-                  <span className="font-bold text-slate-900">Raymarine Integrado</span>
+                  <span className="font-bold text-slate-900">{vessel.specs?.autopilot || 'Raymarine Integrado'}</span>
                 </li>
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">{t('Comunicaciones:', 'Comms:')}</span>
-                  <span className="font-bold text-slate-900">VHF Marino + AIS</span>
+                  <span className="font-bold text-slate-900">{vessel.specs?.comms || 'VHF Marino + AIS'}</span>
                 </li>
               </ul>
             </div>
@@ -961,19 +1017,19 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
               <ul className="space-y-2.5 text-xs text-slate-700 pt-2 border-t border-slate-100">
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">{t('Desalinizador:', 'Watermaker:')}</span>
-                  <span className="font-bold text-blue-900">140 ltrs/hr</span>
+                  <span className="font-bold text-blue-900">{vessel.specs?.watermaker || '140 ltrs/hr'}</span>
                 </li>
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">{t('Bote Auxiliar:', 'Auxiliary Tender:')}</span>
-                  <span className="font-bold text-slate-900">Zodiac Semirrígido</span>
+                  <span className="font-bold text-slate-900">{vessel.specs?.tender || 'Zodiac Semirrígido'}</span>
                 </li>
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">{t('Motor Auxiliar:', 'Outboard Engine:')}</span>
-                  <span className="font-bold text-slate-900">Mercury 4T / 15 HP</span>
+                  <span className="font-bold text-slate-900">{vessel.specs?.tenderEngine || 'Mercury 4T / 15 HP'}</span>
                 </li>
                 <li className="flex justify-between items-center">
                   <span className="text-slate-500">{t('Climatización:', 'Climate Control:')}</span>
-                  <span className="font-bold text-slate-900">Calefacción Marina</span>
+                  <span className="font-bold text-slate-900">{vessel.specs?.heating || 'Calefacción Marina'}</span>
                 </li>
               </ul>
             </div>
@@ -1026,7 +1082,7 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
             })}
           </div>
 
-          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">
+          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
             {/* Left Column: Captain's Logbook (5 cols) */}
             <div className="lg:col-span-5 flex flex-col">
               <div className="flex-1 bg-white border border-slate-200 rounded-3xl shadow-sm hover:shadow-md transition-shadow duration-300 p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden">
@@ -1064,7 +1120,7 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
                   </div>
 
                   {/* Captain's Narrative entry */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-h-[96px] sm:min-h-[108px] flex flex-col justify-start">
                     <span className="font-serif italic text-[11px] font-semibold text-blue-900/60 block">{t('Relato del Capitán:', "Captain's Narrative:")}</span>
                     <p className="font-serif italic text-slate-600 text-sm leading-relaxed border-l-2 border-blue-900/10 pl-3">
                       "{logbookEntries[selectedFeature].text}"
@@ -1088,7 +1144,7 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
             </div>
 
             {/* Right Column: Dynamic Feature selector cards (7 cols) */}
-            <div className="lg:col-span-7 flex flex-col justify-center space-y-4">
+            <div className="lg:col-span-7 flex flex-col justify-start space-y-4">
               {/* Feature 1: Climatizacion */}
               <div
                 onClick={() => setSelectedFeature('climatizacion')}
@@ -1204,81 +1260,95 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
           </div>
 
           {/* Main Photo Gallery Container (550px HUD Slider) */}
-          <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between group">
-            {/* The Active Photo Image */}
-            <div className="absolute inset-0 w-full h-full">
-              <img
-                src={images[currentPhotoIndex].url}
-                alt={images[currentPhotoIndex].title}
-                className="w-full h-full object-cover transition-all duration-700 ease-in-out scale-100"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/40 pointer-events-none" />
-            </div>
+          {(() => {
+            const activePhotoIndex = currentPhotoIndex < images.length ? currentPhotoIndex : 0;
+            const currentImage = images[activePhotoIndex] || images[0];
 
-            {/* Top Bar HUD */}
-            <div className="relative z-20 w-full p-5 sm:p-6 flex justify-between items-center pointer-events-none">
-              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-white/95 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
-                <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                <span>{vessel.name} • Foto 0{currentPhotoIndex + 1} {t('de', 'of')} 0{images.length}</span>
-              </div>
-              <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-sky-300 font-mono text-[10px] sm:text-xs tracking-wider select-none shadow-md hidden sm:flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span>{images[currentPhotoIndex].location || t('Navegación Austral', 'Austral Sailing')}</span>
-              </div>
-            </div>
-
-            {/* Left & Right Slider Controls */}
-            <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 pointer-events-none z-20">
-              <button
-                type="button"
-                onClick={() => setCurrentPhotoIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
-                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
-                aria-label="Foto anterior"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentPhotoIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))}
-                className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
-                aria-label="Foto siguiente"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Bottom Caption Strip & Thumbnail Dots */}
-            <div className="relative z-20 w-full p-5 sm:p-7 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-              <div className="space-y-1 max-w-xl text-left">
-                <span className="text-[10px] font-mono text-sky-400 uppercase tracking-widest block font-bold">
-                  {images[currentPhotoIndex].location}
-                </span>
-                <h4 className="font-serif font-bold text-lg sm:text-2xl text-white">
-                  {images[currentPhotoIndex].title}
-                </h4>
-                <p className="text-slate-300 text-xs sm:text-sm font-light leading-relaxed line-clamp-2">
-                  {images[currentPhotoIndex].desc}
-                </p>
-              </div>
-
-              {/* Dots Selector */}
-              <div className="flex items-center gap-2 self-center sm:self-end bg-slate-900/70 border border-slate-800/80 backdrop-blur-md p-2 rounded-full">
-                {images.map((_, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setCurrentPhotoIndex(idx)}
-                    className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
-                      currentPhotoIndex === idx
-                        ? 'w-7 bg-white shadow-xs'
-                        : 'w-2.5 bg-white/30 hover:bg-white/60'
-                    }`}
-                    aria-label={`Ver foto ${idx + 1}`}
+            return (
+              <div className="relative w-full max-w-5xl mx-auto h-[550px] rounded-3xl overflow-hidden border border-slate-200 shadow-2xl bg-slate-950 flex flex-col justify-between group">
+                {/* The Active Photo Image */}
+                <div className="absolute inset-0 w-full h-full">
+                  <img
+                    src={currentImage?.url}
+                    alt={currentImage?.title}
+                    className="w-full h-full object-cover transition-all duration-700 ease-in-out scale-100"
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      const fallback = vessel?.mainImage || heroMediaUrl || '/velero-vegvisir.jpg';
+                      if (img.src !== fallback && !img.src.endsWith(fallback)) {
+                        img.src = fallback;
+                      }
+                    }}
                   />
-                ))}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-black/40 pointer-events-none" />
+                </div>
+
+                {/* Top Bar HUD */}
+                <div className="relative z-20 w-full p-5 sm:p-6 flex justify-between items-center pointer-events-none">
+                  <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-white/95 font-mono text-[10px] sm:text-xs tracking-wider uppercase flex items-center gap-2 select-none shadow-md">
+                    <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                    <span>{vessel.name} • Foto {String(activePhotoIndex + 1).padStart(2, '0')} {t('de', 'of')} {String(images.length).padStart(2, '0')}</span>
+                  </div>
+                  <div className="bg-slate-900/85 border border-slate-800/60 backdrop-blur-md px-4 py-2 rounded-xl text-sky-300 font-mono text-[10px] sm:text-xs tracking-wider select-none shadow-md hidden sm:flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    <span>{currentImage?.location || t('Navegación Austral', 'Austral Sailing')}</span>
+                  </div>
+                </div>
+
+                {/* Left & Right Slider Controls */}
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 sm:px-6 pointer-events-none z-20">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPhotoIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))}
+                    className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                    aria-label="Foto anterior"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPhotoIndex((prev) => (prev >= images.length - 1 ? 0 : prev + 1))}
+                    className="w-12 h-12 rounded-full bg-slate-900/80 hover:bg-slate-900 border border-white/20 text-white backdrop-blur-md flex items-center justify-center transition-all duration-200 pointer-events-auto hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+                    aria-label="Foto siguiente"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Bottom Caption Strip & Thumbnail Dots */}
+                <div className="relative z-20 w-full p-5 sm:p-7 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+                  <div className="space-y-1 max-w-xl text-left">
+                    <span className="text-[10px] font-mono text-sky-400 uppercase tracking-widest block font-bold">
+                      {currentImage?.location}
+                    </span>
+                    <h4 className="font-serif font-bold text-lg sm:text-2xl text-white">
+                      {currentImage?.title}
+                    </h4>
+                    <p className="text-slate-300 text-xs sm:text-sm font-light leading-relaxed line-clamp-2">
+                      {currentImage?.desc}
+                    </p>
+                  </div>
+
+                  {/* Dots Selector */}
+                  <div className="flex items-center gap-2 self-center sm:self-end bg-slate-900/70 border border-slate-800/80 backdrop-blur-md p-2 rounded-full">
+                    {images.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCurrentPhotoIndex(idx)}
+                        className={`h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                          activePhotoIndex === idx
+                            ? 'w-7 bg-white shadow-xs'
+                            : 'w-2.5 bg-white/30 hover:bg-white/60'
+                        }`}
+                        aria-label={`Ver foto ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       </section>
 

@@ -215,7 +215,7 @@ export const CONTACT_SCHEMA = {
   'mainEntity': {
     '@type': 'TravelAgency',
     'name': 'Yates Chile',
-    'telephone': '+56991234567',
+    'telephone': '+56981312920',
     'email': 'contacto@yateschile.cl',
     'areaServed': 'CL',
     'availableLanguage': ['Spanish', 'English']

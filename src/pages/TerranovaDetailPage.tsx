@@ -274,7 +274,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                       const text = encodeURIComponent(
                         'Hola Concierge Yates Chile, deseo cotizar una travesía privada a medida en el Yate Terranova.'
                       );
-                      window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                      window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
                     }}
                     className="inline-flex items-center gap-2 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-5 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer"
                   >
@@ -385,7 +385,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                               const text = encodeURIComponent(
                                 `Hola Yates Chile, consulto por lista de espera para la expedición ${exp.name} (${exp.startDate} al ${exp.endDate}) en Yate Terranova que figura completa.`
                               );
-                              window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                              window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
                             }}
                             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border border-slate-300/80"
                           >
@@ -402,7 +402,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                                 `• Embarcación: Yate Terranova\n\n` +
                                 `Solicito disponibilidad y valores para confirmar mi reserva.`
                               );
-                              window.open(`https://wa.me/56951493394?text=${text}`, '_blank');
+                              window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
                             }}
                             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#0f2b48] hover:bg-[#0a1e34] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer hover:scale-[1.02]"
                           >
@@ -982,7 +982,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
             })}
           </div>
 
-          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-stretch">
+          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
             
             {/* Left Column: Captain's Logbook (5 cols) */}
             <div className="lg:col-span-5 flex flex-col">
@@ -1022,7 +1022,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
                   </div>
 
                   {/* Captain's Narrative entry */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-h-[96px] sm:min-h-[108px] flex flex-col justify-start">
                     <span className="font-serif italic text-[11px] font-semibold text-blue-900/60 block">{t('Relato del Capitán:', 'Captain\'s Narrative:')}</span>
                     <p className="font-serif italic text-slate-600 text-sm leading-relaxed border-l-2 border-blue-900/10 pl-3">
                       "{logbookEntries[selectedFeature].text}"
@@ -1047,7 +1047,7 @@ export const TerranovaDetailPage: React.FC<TerranovaDetailPageProps> = ({ onNavi
             </div>
 
             {/* Right Column: Dynamic Feature selector cards (7 cols) */}
-            <div className="lg:col-span-7 flex flex-col justify-center space-y-4">
+            <div className="lg:col-span-7 flex flex-col justify-start space-y-4">
               
               {/* Feature 1: Deck Superior & Quincho */}
               <div

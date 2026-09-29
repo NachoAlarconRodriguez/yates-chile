@@ -413,7 +413,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
     const defMeta = (DEFAULT_CMS_CONTENT['footer_contact']?.metadata as any) || {};
     if (defMeta[field] !== undefined && defMeta[field] !== null) return defMeta[field];
 
-    if (field === 'whatsapp') return '56951493394';
+    if (field === 'whatsapp') return '56981312920';
     if (field === 'instagram') return 'https://www.instagram.com/vegvisir_sailing';
     if (field === 'email') return 'pablo@yateschile.com, evelyn@yateschile.com';
     if (field === 'address') return 'Uberlindo Andaur 222, Isla Robinson Crusoe';
@@ -3221,12 +3221,12 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                         type="text"
                         value={getFooterField('whatsapp')}
                         onChange={(e) => setFooterField('whatsapp', e.target.value)}
-                        placeholder="56951493394"
+                        placeholder="56981312920"
                         className="w-full bg-slate-50 border border-slate-200 focus:border-[#0f2b48] focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono focus:outline-none transition shadow-2xs"
                       />
                     </div>
                     <p className="text-[11px] text-slate-400">
-                      Ej: <span className="font-mono text-slate-600">56951493394</span> (genera <code className="text-[10px] bg-slate-100 px-1 py-0.5 rounded">https://wa.me/{getFooterField('whatsapp').replace(/[^0-9]/g, '')}</code>)
+                      Ej: <span className="font-mono text-slate-600">56981312920</span> (genera <code className="text-[10px] bg-slate-100 px-1 py-0.5 rounded">https://wa.me/{getFooterField('whatsapp').replace(/[^0-9]/g, '')}</code>)
                     </p>
                   </div>
 

@@ -1,7 +1,7 @@
 import React from 'react';
 
 export const FloatingConcierge: React.FC = () => {
-  const whatsappNumber = '56951493394';
+  const whatsappNumber = '56981312920';
   const message = encodeURIComponent(
     'Hola, desearía comunicarme con un Concierge de Yates Chile para consultar sobre expediciones privadas.'
   );
