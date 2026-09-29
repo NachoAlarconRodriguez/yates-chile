@@ -155,10 +155,10 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
       </div>
 
       {/* Bottom Main Grid: Left Title/CTA + Right 3 Subtle Luxury Options */}
-      <div className="relative z-10 max-w-7xl mx-auto w-full px-6 sm:px-10 pb-8 sm:pb-12 flex flex-col md:flex-row items-end justify-between gap-6">
+      <div className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 md:px-10 pb-8 sm:pb-12 flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
         
         {/* Bottom-Left Content Container */}
-        <div className="max-w-xl text-left space-y-2.5 text-white">
+        <div className="w-full max-w-xl text-left space-y-2.5 text-white">
           <h1 className="text-base sm:text-lg lg:text-xl font-bold tracking-tight text-white leading-snug drop-shadow-xl">
             <span className="block font-bold">Donde la cartografía termina,</span>
             <span className="block italic font-serif font-normal text-slate-200">comienza tu expedición.</span>
@@ -180,12 +180,12 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
         </div>
 
         {/* Bottom-Right: Subtle Luxury Quick Options */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 bg-slate-950/60 backdrop-blur-md p-2 rounded-2xl border border-white/15 shadow-2xl shrink-0 max-w-full sm:max-w-xl justify-end">
+        <div className="w-full sm:w-auto self-center md:self-auto mx-auto md:mx-0 flex flex-wrap items-center justify-center md:justify-end gap-2 sm:gap-2.5 bg-slate-950/60 backdrop-blur-md p-2 rounded-2xl border border-white/15 shadow-2xl shrink-0 max-w-full sm:max-w-xl">
           
           {/* Option 1: Vegvisir */}
           <button
             onClick={() => onEnterSite('/velero-vegvisir')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-blue-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-blue-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
           >
             <Anchor className="w-3.5 h-3.5 text-blue-300 group-hover:scale-110 transition-transform" />
             <span>Velero Vegvisir</span>
@@ -194,7 +194,7 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           {/* Option 2: Terranova */}
           <button
             onClick={() => onEnterSite('/yate-terranova')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-sky-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-sky-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
           >
             <Ship className="w-3.5 h-3.5 text-sky-300 group-hover:scale-110 transition-transform" />
             <span>Yate Terranova</span>
@@ -206,7 +206,7 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
               <button
                 key={vessel.id}
                 onClick={() => onEnterSite(getVesselPath(vessel))}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-amber-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+                className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-amber-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
               >
                 <Anchor className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
                 <span>{vessel.name || 'Velero Punta Sur'}</span>
@@ -215,7 +215,7 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           ) : (
             <button
               onClick={() => onEnterSite('/flota/punta-sur')}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-amber-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+              className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-amber-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
             >
               <Anchor className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform" />
               <span>Velero Punta Sur</span>
@@ -225,7 +225,7 @@ export const WelcomeSplash: React.FC<WelcomeSplashProps> = ({ onEnterSite, onVid
           {/* Option 4: El Lodge */}
           <button
             onClick={() => onEnterSite('/lodge')}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-emerald-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-emerald-300/60 transition-all text-xs font-semibold backdrop-blur-md group min-h-[42px]"
           >
             <Home className="w-3.5 h-3.5 text-emerald-300 group-hover:scale-110 transition-transform" />
             <span>El Lodge</span>

@@ -16,7 +16,8 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
   const { language, setLanguage, t } = useLanguage();
   const { activeVessels } = useFleet();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [fleetMenuOpen, setFleetMenuOpen] = useState(false);
+  const [desktopFleetOpen, setDesktopFleetOpen] = useState(false);
+  const [mobileFleetOpen, setMobileFleetOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,16 +32,24 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Auto-expand mobile fleet accordion when opening mobile menu if currently on a fleet route
+  useEffect(() => {
+    if (mobileMenuOpen && (currentPath.startsWith('/flota') || currentPath === '/velero-vegvisir' || currentPath === '/yate-terranova')) {
+      setMobileFleetOpen(true);
+    }
+  }, [mobileMenuOpen, currentPath]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setFleetMenuOpen(false);
+        setDesktopFleetOpen(false);
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setFleetMenuOpen(false);
+        setDesktopFleetOpen(false);
         setMobileMenuOpen(false);
+        setMobileFleetOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -51,11 +60,10 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
     };
   }, []);
 
-
-
   const handleNavClick = (path: string) => {
     setMobileMenuOpen(false);
-    setFleetMenuOpen(false);
+    setDesktopFleetOpen(false);
+    setMobileFleetOpen(false);
     if (onNavigate) {
       onNavigate(path);
     } else {
@@ -127,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
             {/* La Flota Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setFleetMenuOpen(!fleetMenuOpen)}
+                onClick={() => setDesktopFleetOpen(!desktopFleetOpen)}
                 className={`text-sm font-semibold transition-colors py-2 border-b-2 min-h-[48px] flex items-center gap-1 cursor-pointer focus:outline-none ${
                   currentPath.startsWith('/flota') || currentPath === '/velero-vegvisir' || currentPath === '/yate-terranova'
                     ? 'text-slate-950 border-slate-950 font-extrabold'
@@ -135,11 +143,11 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                 }`}
               >
                 <span>{t('La Flota', 'The Fleet')}</span>
-                <ChevronDown className={`w-4 h-4 transition-transform duration-305 ${fleetMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform duration-305 ${desktopFleetOpen ? 'rotate-180' : 'rotate-0'}`} />
               </button>
 
               {/* Dropdown Menu */}
-              {fleetMenuOpen && (
+              {desktopFleetOpen && (
                 <div className="absolute left-0 mt-2 w-60 rounded-2xl bg-white/98 backdrop-blur-md border border-slate-200 shadow-xl py-2 z-50 animate-[fadeIn_0.2s_ease-out]">
                   {activeVessels.map((v) => {
                     const vPath = getVesselPath(v);
@@ -221,61 +229,65 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
       {mobileMenuOpen && (
         <div className="lg:hidden bg-white/98 border-b border-slate-200 px-4 pt-4 pb-6 space-y-3 shadow-2xl backdrop-blur-xl">
           {/* Inicio */}
-          <a
-            href="#/"
-            onClick={(e) => { e.preventDefault(); handleNavClick('/'); }}
-            className={`block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center ${
+          <button
+            type="button"
+            onClick={() => handleNavClick('/')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center cursor-pointer ${
               currentPath === '/'
                 ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
-                : 'text-slate-800 hover:bg-slate-50'
+                : 'text-slate-800 hover:bg-slate-50 active:bg-slate-100'
             }`}
           >
             {t('Inicio', 'Home')}
-          </a>
+          </button>
 
           {/* Expediciones */}
-          <a
-            href="#/expediciones"
-            onClick={(e) => { e.preventDefault(); handleNavClick('/expediciones'); }}
-            className={`block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center ${
+          <button
+            type="button"
+            onClick={() => handleNavClick('/expediciones')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center cursor-pointer ${
               currentPath === '/expediciones'
                 ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
-                : 'text-slate-800 hover:bg-slate-50'
+                : 'text-slate-800 hover:bg-slate-50 active:bg-slate-100'
             }`}
           >
             {t('Expediciones', 'Expeditions')}
-          </a>
+          </button>
 
           {/* La Flota Mobile Accordion */}
           <div className="space-y-1">
             <button
-              onClick={() => setFleetMenuOpen(!fleetMenuOpen)}
-              className={`w-full block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center justify-between focus:outline-none ${
+              type="button"
+              onClick={() => setMobileFleetOpen(!mobileFleetOpen)}
+              className={`w-full block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center justify-between focus:outline-none cursor-pointer ${
                 currentPath.startsWith('/flota') || currentPath === '/velero-vegvisir' || currentPath === '/yate-terranova'
                   ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
-                  : 'text-slate-800 hover:bg-slate-50'
+                  : 'text-slate-800 hover:bg-slate-50 active:bg-slate-100'
               }`}
             >
               <span>{t('La Flota', 'The Fleet')}</span>
-              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${fleetMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
+              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${mobileFleetOpen ? 'rotate-180' : 'rotate-0'}`} />
             </button>
 
-            {fleetMenuOpen && (
-              <div className="pl-6 space-y-1 py-1">
+            {mobileFleetOpen && (
+              <div className="pl-4 space-y-1 py-1">
                 {activeVessels.map((v) => {
                   const vPath = getVesselPath(v);
                   const isActive = currentPath === vPath;
                   return (
-                    <a
+                    <button
                       key={v.id}
-                      href={`#${vPath}`}
-                      onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); handleNavClick(vPath); }}
-                      className={`block px-4 py-2.5 rounded-xl text-sm transition-colors min-h-[40px] flex items-center ${
-                        isActive ? 'text-blue-900 font-bold bg-blue-50/40' : 'text-slate-650 hover:bg-slate-50'
+                      type="button"
+                      onClick={() => handleNavClick(vPath)}
+                      className={`w-full text-left px-4 py-2.5 rounded-xl text-sm transition-all min-h-[44px] flex items-center justify-between cursor-pointer active:scale-98 ${
+                        isActive
+                          ? 'text-blue-900 font-bold bg-blue-50/80 border border-blue-200/50 shadow-xs'
+                          : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 active:bg-slate-200'
                       }`}
                     >
-                      {v.name}
-                    </a>
+                      <span className="font-medium">{v.name}</span>
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />}
+                    </button>
                   );
                 })}
               </div>
@@ -283,17 +295,17 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
           </div>
 
           {/* El Lodge */}
-          <a
-            href="#/lodge"
-            onClick={(e) => { e.preventDefault(); handleNavClick('/lodge'); }}
-            className={`block px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center ${
+          <button
+            type="button"
+            onClick={() => handleNavClick('/lodge')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold text-base transition-colors min-h-[48px] flex items-center cursor-pointer ${
               currentPath === '/lodge'
                 ? 'bg-slate-100 text-slate-950 font-extrabold border border-slate-300'
-                : 'text-slate-800 hover:bg-slate-50'
+                : 'text-slate-800 hover:bg-slate-50 active:bg-slate-100'
             }`}
           >
             {t('El Lodge', 'The Lodge')}
-          </a>
+          </button>
 
           {/* Políticas */}
           <button
