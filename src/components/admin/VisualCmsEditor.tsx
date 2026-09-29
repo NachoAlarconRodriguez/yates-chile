@@ -828,27 +828,34 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
           continue;
         }
 
-        // If Spanish texts were edited, translate them to English
-        const titleToTranslate = d.title ?? getField(sectionKey, 'title');
-        const subtitleToTranslate = d.subtitle ?? getField(sectionKey, 'subtitle');
-        const bodyToTranslate = d.body_text ?? getField(sectionKey, 'body_text');
+        // If Spanish texts were edited, translate them to English using Gemini if configured
+        if (editorLanguage === 'ES' && translationService.hasGeminiKey() && (d.title !== undefined || d.subtitle !== undefined || d.body_text !== undefined)) {
+          const currentSec = content[sectionKey] || DEFAULT_CMS_CONTENT[sectionKey] || {};
+          const titleToTranslate = d.title ?? currentSec.title ?? '';
+          const subtitleToTranslate = d.subtitle ?? currentSec.subtitle ?? '';
+          const bodyToTranslate = d.body_text ?? currentSec.body_text ?? '';
 
-        const translated = await translationService.translateSection({
-          title: titleToTranslate,
-          subtitle: subtitleToTranslate,
-          body_text: bodyToTranslate,
-        });
+          const translated = await translationService.translateSection({
+            title: titleToTranslate,
+            subtitle: subtitleToTranslate,
+            body_text: bodyToTranslate,
+          });
 
-        finalDrafts[sectionKey] = {
-          ...d,
-          metadata: {
-            ...combinedMeta,
-            // Only overwrite English if not manually edited in draft
-            title_en: combinedMeta.title_en && editorLanguage === 'EN' ? combinedMeta.title_en : (translated.title_en || combinedMeta.title_en),
-            subtitle_en: combinedMeta.subtitle_en && editorLanguage === 'EN' ? combinedMeta.subtitle_en : (translated.subtitle_en || combinedMeta.subtitle_en),
-            body_text_en: combinedMeta.body_text_en && editorLanguage === 'EN' ? combinedMeta.body_text_en : (translated.body_text_en || combinedMeta.body_text_en),
-          },
-        };
+          finalDrafts[sectionKey] = {
+            ...d,
+            metadata: {
+              ...combinedMeta,
+              title_en: translated.title_en || combinedMeta.title_en,
+              subtitle_en: translated.subtitle_en || combinedMeta.subtitle_en,
+              body_text_en: translated.body_text_en || combinedMeta.body_text_en,
+            },
+          };
+        } else {
+          finalDrafts[sectionKey] = {
+            ...d,
+            metadata: combinedMeta,
+          };
+        }
       }
 
       const res = await onSaveAllSections(finalDrafts);
@@ -870,6 +877,12 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
   // Auto-translate ALL sections of the ENTIRE website on demand
   const handleTranslateAllSiteWithAi = async () => {
+    if (!translationService.hasGeminiKey()) {
+      setApiKeyInput(translationService.getGeminiApiKey());
+      setShowApiKeyModal(true);
+      return;
+    }
+
     setIsTranslatingWithAi(true);
 
     const allSections: Array<{ key: string; label: string; isLogbook?: boolean }> = [
@@ -926,9 +939,9 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             },
           };
         } else {
-          const titleEs = (newDrafts[key]?.title ?? currentSec.title ?? getField(key, 'title') ?? '') as string;
-          const subtitleEs = (newDrafts[key]?.subtitle ?? currentSec.subtitle ?? getField(key, 'subtitle') ?? '') as string;
-          const bodyEs = (newDrafts[key]?.body_text ?? currentSec.body_text ?? getField(key, 'body_text') ?? '') as string;
+          const titleEs = (newDrafts[key]?.title ?? currentSec.title ?? DEFAULT_CMS_CONTENT[key]?.title ?? '') as string;
+          const subtitleEs = (newDrafts[key]?.subtitle ?? currentSec.subtitle ?? DEFAULT_CMS_CONTENT[key]?.subtitle ?? '') as string;
+          const bodyEs = (newDrafts[key]?.body_text ?? currentSec.body_text ?? DEFAULT_CMS_CONTENT[key]?.body_text ?? '') as string;
 
           const trans = await translationService.translateSection({
             title: titleEs,
@@ -1177,6 +1190,20 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
               ) : (
                 <Wand2 className="w-4 h-4 text-purple-600" />
               )}
+            </button>
+
+            {/* Configure Gemini API Key Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setApiKeyInput(translationService.getGeminiApiKey());
+                setShowApiKeyModal(true);
+              }}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center transition cursor-pointer shadow-2xs hover:scale-105 duration-200 shrink-0"
+              title="Configurar Google Gemini API Key"
+              aria-label="Configurar API Key"
+            >
+              <Key className="w-4 h-4 text-slate-600" />
             </button>
           </div>
         </div>

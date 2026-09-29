@@ -42,26 +42,39 @@ Return ONLY the raw translated text, no quotes, no explanations, no markdown for
 Text to translate:
 ${text}`;
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 1000,
-              },
-            }),
-          }
-        );
+        const models = ['gemini-3.5-flash-lite', 'gemini-3.5-flash'];
+        for (const model of models) {
+          try {
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: {
+                    temperature: 0.2,
+                    maxOutputTokens: 1000,
+                  },
+                }),
+              }
+            );
 
-        if (response.ok) {
-          const data = await response.json();
-          const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (candidateText && candidateText.trim()) {
-            return candidateText.trim();
+            if (response.ok) {
+              const data = await response.json();
+              const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (candidateText && candidateText.trim()) {
+                let cleaned = candidateText.trim();
+                if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+                  cleaned = cleaned.slice(1, -1).trim();
+                }
+                return cleaned;
+              }
+            } else {
+              console.warn(`Gemini model ${model} returned HTTP ${response.status}`);
+            }
+          } catch (modelErr) {
+            console.warn(`Gemini model ${model} request failed:`, modelErr);
           }
         }
       } catch (err) {
