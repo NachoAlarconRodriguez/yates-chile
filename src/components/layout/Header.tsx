@@ -157,17 +157,6 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                       </a>
                     );
                   })}
-                  <div className="border-t border-slate-150 mt-1 pt-1">
-                    <a
-                      href="#/flota"
-                      onClick={(e) => { e.preventDefault(); handleNavClick('/flota'); }}
-                      className={`block px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
-                        currentPath === '/flota' ? 'text-blue-900 font-bold' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                      }`}
-                    >
-                      {t('Ver Toda la Flota ➔', 'View All Fleet ➔')}
-                    </a>
-                  </div>
                 </div>
               )}
             </div>
@@ -289,15 +278,6 @@ export const Header: React.FC<HeaderProps> = ({ currentPath = '/', onNavigate })
                     </a>
                   );
                 })}
-                <a
-                  href="#/flota"
-                  onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); handleNavClick('/flota'); }}
-                  className={`block px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
-                    currentPath === '/flota' ? 'text-blue-900' : 'text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  {t('Ver Toda la Flota ➔', 'View All Fleet ➔')}
-                </a>
               </div>
             )}
           </div>

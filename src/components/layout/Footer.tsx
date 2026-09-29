@@ -79,9 +79,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <a href="#/expediciones" onClick={(e) => { e.preventDefault(); handleNavClick('/expediciones'); }} className="hover:text-blue-400 transition">
               Expediciones
             </a>
-            <a href="#/flota" onClick={(e) => { e.preventDefault(); handleNavClick('/flota'); }} className="hover:text-blue-400 transition">
-              La Flota
-            </a>
             <a href="#/lodge" onClick={(e) => { e.preventDefault(); handleNavClick('/lodge'); }} className="hover:text-blue-400 transition">
               El Lodge
             </a>

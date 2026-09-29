@@ -218,11 +218,11 @@ export const VesselDetailPage: React.FC<VesselDetailPageProps> = ({ vesselIdOrSl
           {t('La embarcación solicitada no se encuentra disponible o ha sido pausada temporalmente.', 'The requested vessel is unavailable or currently inactive.')}
         </p>
         <button
-          onClick={() => onNavigate('/flota')}
+          onClick={() => onNavigate('/')}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-950 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>{t('Explorar Toda la Flota', 'Explore The Fleet')}</span>
+          <span>{t('Volver al Inicio', 'Return to Home')}</span>
         </button>
       </div>
     );

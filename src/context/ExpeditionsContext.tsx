@@ -102,10 +102,23 @@ export const ExpeditionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   return <ExpeditionsContext.Provider value={value}>{children}</ExpeditionsContext.Provider>;
 };
 
+const defaultExpeditionsValue: ExpeditionsContextType = {
+  expeditions: typeof window !== 'undefined' ? getCachedPublicExpeditions() : [],
+  departures: [],
+  loading: false,
+  isRevalidating: false,
+  isInitialLoaded: true,
+  refreshExpeditions: async () => {},
+  createDeparture: expeditionService.createDeparture.bind(expeditionService),
+  updateDepartureStatus: expeditionService.updateDepartureStatus.bind(expeditionService),
+  deleteDeparture: expeditionService.deleteDeparture.bind(expeditionService),
+  createBooking: expeditionService.createBooking.bind(expeditionService),
+};
+
 export function useExpeditionsContext(): ExpeditionsContextType {
   const context = useContext(ExpeditionsContext);
   if (!context) {
-    throw new Error('useExpeditionsContext must be used within an ExpeditionsProvider');
+    return defaultExpeditionsValue;
   }
   return context;
 }

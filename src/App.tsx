@@ -63,7 +63,6 @@ import {
 
 // Lazy-loaded pages for optimal bundle code-splitting
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
-const FlotaPage = lazy(() => import('./pages/FlotaPage').then((m) => ({ default: m.FlotaPage })));
 const LodgePage = lazy(() => import('./pages/LodgePage').then((m) => ({ default: m.LodgePage })));
 const ExpedicionesPage = lazy(() => import('./pages/ExpedicionesPage').then((m) => ({ default: m.ExpedicionesPage })));
 const ContactoPage = lazy(() => import('./pages/ContactoPage').then((m) => ({ default: m.ContactoPage })));
@@ -97,11 +96,11 @@ export function App() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
     const hash = window.location.hash.replace('#', '');
     if (hash && hash !== '' && hash !== '/welcome' && hash !== '/intro') {
-      return hash;
+      return hash === '/flota' ? '/' : hash;
     }
     const pathname = window.location.pathname;
     if (pathname && pathname !== '/' && pathname !== '') {
-      return pathname;
+      return pathname === '/flota' ? '/' : pathname;
     }
     return '/welcome';
   });
@@ -126,9 +125,9 @@ export function App() {
 
       let target = '/welcome';
       if (hash && hash !== '') {
-        target = hash;
+        target = hash === '/flota' ? '/' : hash;
       } else if (pathname && pathname !== '/' && pathname !== '') {
-        target = pathname;
+        target = pathname === '/flota' ? '/' : pathname;
       } else if (pathname === '/' && !showSplash) {
         target = '/';
       }
@@ -183,6 +182,13 @@ export function App() {
   // Dynamic SEO, GEO & AEO metadata per route
   const baseRoute = currentPath.split('?')[0];
 
+  // Redirect legacy /flota route to home
+  useEffect(() => {
+    if (baseRoute === '/flota') {
+      navigate('/');
+    }
+  }, [baseRoute]);
+
   const renderSEO = () => {
     switch (baseRoute) {
       case '/expediciones':
@@ -193,16 +199,6 @@ export function App() {
             canonicalPath="/expediciones"
             ogImage="https://yateschile.cl/expediciones-hero.jpg"
             schema={EXPEDITIONS_FAQ_SCHEMA}
-          />
-        );
-      case '/flota':
-        return (
-          <SEOHead
-            title="Nuestra Flota de Alta Mar — Velero Vegvisir & Yate Terranova"
-            description="Conoce nuestra flota de ultralujo: Velero Dufour 52.5 ft y Yate Hatteras 65 ft LRC con tecnología satelital Starlink, desalinizadores y certificación oceánica DIRECTEMAR."
-            canonicalPath="/flota"
-            ogImage="https://yateschile.cl/velero-vegvisir.jpg"
-            schema={[VEGVISIR_VESSEL_SCHEMA, TERRANOVA_VESSEL_SCHEMA]}
           />
         );
       case '/velero-vegvisir':
@@ -340,7 +336,6 @@ export function App() {
           <main className="flex-1">
             <Suspense fallback={<PageLoaderFallback />}>
               {baseRoute === '/' && <HomePage onNavigate={navigate} />}
-              {baseRoute === '/flota' && <FlotaPage onNavigate={navigate} />}
               {baseRoute === '/lodge' && <LodgePage onNavigate={navigate} />}
               {baseRoute === '/expediciones' && <ExpedicionesPage onNavigate={navigate} currentPath={currentPath} />}
               {baseRoute === '/contacto' && <ContactoPage />}
