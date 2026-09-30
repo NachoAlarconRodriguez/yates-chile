@@ -3,10 +3,10 @@
  * Diseñadas para máxima entregabilidad y legibilidad en Gmail, Apple Mail, Outlook y clientes móviles.
  */
 
-const LOGO_URL = 'https://www.yateschile.cl/vegvisir-emblem-dark.png';
+const LOGO_URL = 'https://www.yateschile.com/vegvisir-emblem-dark.png';
 const CONCIERGE_PHONE = '+56 9 8131 2920';
 const CONCIERGE_WA_LINK = 'https://wa.me/56981312920';
-const SITE_URL = 'https://www.yateschile.cl';
+const SITE_URL = 'https://www.yateschile.com';
 
 function escapeHtml(str: string | undefined | null): string {
   if (!str) return '';
