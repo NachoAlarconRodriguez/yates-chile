@@ -593,25 +593,27 @@ export interface LodgeBookingEmailData {
   guestsCount: number;
   cabinType?: string;
   notes?: string;
+  lodgeName?: string;
 }
 
 export function generateLodgeBookingEmail(data: LodgeBookingEmailData, isAdmin: boolean = false): { subject: string; html: string } {
+  const lodgeName = data.lodgeName || 'Lodge Rincón de Navegantes';
   const subject = isAdmin
-    ? `🏡 Nueva Solicitud de Lodge: ${data.fullName} (${data.guestsCount} huéspedes)`
-    : `Solicitud de Estadía en Lodge Recibida | Yates Chile`;
-  const preview = `Detalles de estadía en Lodge para ${data.fullName} del ${data.checkIn} al ${data.checkOut}.`;
+    ? `🏡 Nueva Solicitud en ${lodgeName}: ${data.fullName} (${data.guestsCount} huéspedes)`
+    : `Solicitud de Estadía en ${lodgeName} Recibida | Yates Chile`;
+  const preview = `Detalles de estadía en ${lodgeName} para ${data.fullName} del ${data.checkIn} al ${data.checkOut}.`;
 
   const content = `
     <tr>
       <td style="background-color: #0F172A; padding: 36px 32px; text-align: center; border-bottom: 3px solid #14B8A6;">
         <span class="badge" style="background-color: rgba(20, 184, 166, 0.2); color: #2DD4BF; border: 1px solid rgba(20, 184, 166, 0.4);">
-          ${isAdmin ? 'NUEVA SOLICITUD DE LODGE' : 'SOLICITUD EN PROCESO'}
+          ${isAdmin ? 'NUEVA SOLICITUD DE ESTADÍA' : 'SOLICITUD EN PROCESO'}
         </span>
         <h1 style="font-family: Georgia, serif; font-size: 22px; color: #FFFFFF; margin: 16px 0 8px 0; font-weight: 700;">
-          ${isAdmin ? 'Solicitud de Estadía en el Lodge' : `¡Hola, ${escapeHtml(data.fullName)}!`}
+          ${isAdmin ? `Solicitud de Estadía en ${escapeHtml(lodgeName)}` : `¡Hola, ${escapeHtml(data.fullName)}!`}
         </h1>
         <p style="color: #94A3B8; font-size: 14px; margin: 0;">
-          ${isAdmin ? 'Detalles de la solicitud de reserva en el Lodge.' : 'Hemos recibido tu solicitud de estadía en nuestro refugio costero austral.'}
+          ${isAdmin ? `Detalles de la solicitud de reserva en ${escapeHtml(lodgeName)}.` : `Hemos recibido tu solicitud de estadía en ${escapeHtml(lodgeName)} (Bahía Cumberland, Isla Robinson Crusoe).`}
         </p>
       </td>
     </tr>
@@ -620,13 +622,17 @@ export function generateLodgeBookingEmail(data: LodgeBookingEmailData, isAdmin: 
       <td style="padding: 32px;">
         <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
           ${isAdmin
-            ? `El huésped <strong>${escapeHtml(data.fullName)}</strong> ha solicitado una estadía en el Lodge:`
-            : `Nuestro equipo está verificando la disponibilidad de habitaciones y logística marítima para las fechas solicitadas. Nos pondremos en contacto contigo a la brevedad.`}
+            ? `El huésped <strong>${escapeHtml(data.fullName)}</strong> ha solicitado una estadía en <strong>${escapeHtml(lodgeName)}</strong>:`
+            : `Nuestro equipo está verificando la disponibilidad de habitaciones y logística de zarpe para tu estadía en <strong>${escapeHtml(lodgeName)}</strong>. Nos pondremos en contacto contigo a la brevedad.`}
         </p>
 
         <table role="presentation" width="100%" cellpadding="8" cellspacing="0" style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; font-size: 13px; margin-bottom: 24px;">
           <tr>
-            <td width="35%" style="color: #64748B; font-weight: 600;">Huésped Principal:</td>
+            <td width="35%" style="color: #64748B; font-weight: 600;">Destino / Lodge:</td>
+            <td><strong>${escapeHtml(lodgeName)}</strong> (Bahía Cumberland)</td>
+          </tr>
+          <tr>
+            <td style="color: #64748B; font-weight: 600;">Huésped Principal:</td>
             <td><strong>${escapeHtml(data.fullName)}</strong></td>
           </tr>
           <tr>
@@ -643,8 +649,8 @@ export function generateLodgeBookingEmail(data: LodgeBookingEmailData, isAdmin: 
           </tr>
           ${data.cabinType ? `
           <tr>
-            <td style="color: #64748B; font-weight: 600;">Tipo de Habitación:</td>
-            <td>${escapeHtml(data.cabinType)}</td>
+            <td style="color: #64748B; font-weight: 600;">Habitación Solicitada:</td>
+            <td><strong>${escapeHtml(data.cabinType)}</strong></td>
           </tr>` : ''}
           <tr>
             <td style="color: #64748B; font-weight: 600;">Contacto:</td>
@@ -652,14 +658,14 @@ export function generateLodgeBookingEmail(data: LodgeBookingEmailData, isAdmin: 
           </tr>
           ${data.notes ? `
           <tr>
-            <td style="color: #64748B; font-weight: 600;">Requerimientos:</td>
+            <td style="color: #64748B; font-weight: 600;">Requerimientos / Notas:</td>
             <td><em>${escapeHtml(data.notes)}</em></td>
           </tr>` : ''}
         </table>
 
         <div style="text-align: center;">
-          <a href="${CONCIERGE_WA_LINK}" class="btn-dark" target="_blank">
-            Coordinar con Concierge del Lodge
+          <a href="${CONCIERGE_WA_LINK}?text=${encodeURIComponent(`Hola Concierge Yates Chile, acabo de solicitar una estadía en ${lodgeName} a nombre de ${data.fullName}.`)}" class="btn-dark" target="_blank">
+            Coordinar con Concierge de ${escapeHtml(lodgeName)}
           </a>
         </div>
       </td>

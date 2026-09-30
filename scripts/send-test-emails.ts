@@ -23,6 +23,7 @@ if (!envKey) {
 
 const BREVO_KEY = envKey || '';
 const TARGET_EMAIL = process.argv[2] || 'ialarconr.684@gmail.com';
+const RECIPIENT_NAME = TARGET_EMAIL.toLowerCase().includes('evelyn') ? 'Evelyn' : 'Ignacio Alarcón Rodríguez';
 const SENDER_EMAIL = 'contacto@yateschile.com';
 const SENDER_NAME = 'Yates Chile Concierge';
 
@@ -36,7 +37,7 @@ async function sendBrevoEmail(subject: string, htmlContent: string) {
     },
     body: JSON.stringify({
       sender: { name: SENDER_NAME, email: SENDER_EMAIL },
-      to: [{ email: TARGET_EMAIL, name: 'Ignacio Alarcón' }],
+      to: [{ email: TARGET_EMAIL, name: RECIPIENT_NAME }],
       subject: `[PRUEBA] ${subject}`,
       htmlContent: htmlContent,
     }),
@@ -64,7 +65,7 @@ async function run() {
           expeditionName: 'Expedición Robinson Crusoe – Noviembre 2026',
           startDate: '15 nov 2026',
           endDate: '30 nov 2026',
-          vesselName: 'Velero Végvísir (Koopmans 48)',
+          vesselName: 'Velero Vegvisir',
           paxCount: 2,
           amountClp: 5600000,
         }),
@@ -81,7 +82,7 @@ async function run() {
           expeditionName: 'Expedición Robinson Crusoe – Noviembre 2026',
           startDate: '15 nov 2026',
           endDate: '30 nov 2026',
-          vesselName: 'Velero Végvísir (Koopmans 48)',
+          vesselName: 'Velero Vegvisir',
           paxCount: 2,
           amountClp: 5600000,
           comprobanteUrl: 'https://www.yateschile.com/comprobante-ejemplo.pdf',
@@ -98,7 +99,7 @@ async function run() {
           expeditionName: 'Expedición Robinson Crusoe – Octubre 2026',
           startDate: '01 oct 2026',
           endDate: '15 oct 2026',
-          vesselName: 'Velero Végvísir',
+          vesselName: 'Velero Vegvisir',
           paxCount: 1,
         }),
     },
@@ -128,7 +129,7 @@ async function run() {
           expeditionName: 'Expedición Robinson Crusoe – Noviembre 2026',
           startDate: '15 nov 2026',
           endDate: '30 nov 2026',
-          vesselName: 'Velero Végvísir (Koopmans 48)',
+          vesselName: 'Velero Vegvisir',
           paxCount: 2,
           amountClp: 5600000,
         }),
@@ -153,6 +154,7 @@ async function run() {
       gen: () =>
         generateLodgeBookingEmail(
           {
+            lodgeName: 'Lodge Rincón de Navegantes',
             fullName: 'Ignacio Alarcón Rodríguez',
             email: TARGET_EMAIL,
             phone: '+56 9 5333 2492',

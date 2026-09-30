@@ -1690,6 +1690,7 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
 
                         // Trigger automated Brevo Lodge emails (Guest & Admin)
                         emailService.sendLodgeBookingEmails({
+                          lodgeName: lodgeInfo.title || 'Lodge Rincón de Navegantes',
                           fullName: guestName,
                           email: guestEmail,
                           phone: guestPhone,
