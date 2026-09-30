@@ -10,6 +10,7 @@ import { normalizeExternalMediaUrl, isMediaVideo, getMediaFallbackUrl } from '..
 import { getRoomNightlyRate } from '../services/lodgeService';
 import { LodgeDateRangePicker } from '../components/modules/LodgeDateRangePicker';
 import { getEmbeddablePdfUrl, getDirectPdfUrl } from '../services/expeditionService';
+import { emailService } from '../services/emailService';
 
 // Reliable calculation of stay nights avoiding timezone drift and past-date anomalies
 export const calculateStayNights = (inDate: string, outDate: string): number => {
@@ -1686,6 +1687,18 @@ export const LodgePage: React.FC<LodgePageProps> = ({ onNavigate }) => {
                           roomName: room?.room_name || 'Habitación Lodge',
                           excursionsTotal: excursionsSubtotal,
                         });
+
+                        // Trigger automated Brevo Lodge emails (Guest & Admin)
+                        emailService.sendLodgeBookingEmails({
+                          fullName: guestName,
+                          email: guestEmail,
+                          phone: guestPhone,
+                          checkIn: checkIn,
+                          checkOut: checkOut,
+                          guestsCount: paxCount,
+                          cabinType: room?.room_name || 'Habitación Lodge',
+                          notes: excursionsNote || undefined,
+                        }).catch((emailErr) => console.warn('Could not dispatch lodge booking emails:', emailErr));
                       } else {
                         setBookingError(res.error || 'Error al procesar la reserva.');
                       }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Send, Sparkles } from 'lucide-react';
 import { leadService } from '../../services/leadService';
+import { emailService } from '../../services/emailService';
 import { useLanguage } from '../../context/LanguageContext';
 
 export const NewsletterSection: React.FC = () => {
@@ -25,6 +26,13 @@ export const NewsletterSection: React.FC = () => {
         interestType: 'general',
         notes: 'Suscripción al boletín oficial desde el sitio web público.',
       });
+
+      // Synchronize contact in Brevo CRM list and send automated welcome email
+      emailService.subscribeNewsletter({
+        email: email.trim().toLowerCase(),
+        name: fullName.trim(),
+      }).catch((err) => console.warn('Could not sync newsletter with Brevo:', err));
+
       setSubmitted(true);
       setFullName('');
       setEmail('');

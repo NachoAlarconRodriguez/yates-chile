@@ -121,6 +121,7 @@ import { supabase } from '../lib/supabase';
 import { crmService } from '../services/crmService';
 import { useWaitlist } from '../hooks/useWaitlist';
 import type { WaitlistEntry } from '../services/waitlistService';
+import { emailService } from '../services/emailService';
 
 const DELETED_CLIENTS_KEY = 'yates_chile_deleted_crm_clients';
 
@@ -3677,7 +3678,31 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setDiscountReason('');
       fetchAllData();
       refreshLodge();
-      setActionMessage('Transferencia conciliada y reserva confirmada exitosamente.');
+
+      // Trigger "Bienvenido a Bordo" email via Brevo if this is an expedition booking
+      try {
+        const matchedBooking = allUnifiedBookings.find((b) => b.id === installment.booking_id);
+        if (matchedBooking && matchedBooking.guest_email && matchedBooking.guest_email.includes('@')) {
+          if (matchedBooking.type === 'expedition') {
+            emailService.sendPaymentConfirmedEmail({
+              bookingId: matchedBooking.booking_code,
+              fullName: matchedBooking.guest_name,
+              email: matchedBooking.guest_email,
+              phone: matchedBooking.guest_phone || '',
+              expeditionName: matchedBooking.service_title,
+              startDate: (matchedBooking as any).raw_departure_date || matchedBooking.dates.split('➔')[0]?.trim() || '',
+              endDate: (matchedBooking as any).raw_return_date || matchedBooking.dates.split('➔')[1]?.trim() || '',
+              vesselName: (matchedBooking as any).vessel_name || 'Flota Yates Chile',
+              paxCount: (matchedBooking as any).pax_count || 1,
+              amountClp: matchedBooking.amount,
+            }).catch((err) => console.warn('Could not dispatch payment confirmed email:', err));
+          }
+        }
+      } catch (emailErr) {
+        console.warn('Error checking booking for email notification:', emailErr);
+      }
+
+      setActionMessage('Transferencia conciliada y reserva confirmada exitosamente (correo oficial enviado).');
       setTimeout(() => setActionMessage(null), 4000);
     } else {
       triggerAlert('Error: ' + res.error, 'error');
@@ -7894,7 +7919,44 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     </td>
 
                                     {/* 8. Acciones */}
-                                    <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-right space-x-2">
+                                      <button
+                                        type="button"
+                                        title="Enviar correo de Cupo Liberado vía Brevo"
+                                        onClick={() => {
+                                          triggerConfirm(
+                                            `¿Deseas enviar el correo oficial de Cupo Liberado a ${w.fullName} (${w.email}) para la expedición "${w.departureName}"? Tendrá 24 horas de prioridad.`,
+                                            async () => {
+                                              const res = await emailService.sendWaitlistSlotReleasedEmail({
+                                                waitlistId: w.id,
+                                                fullName: w.fullName,
+                                                email: w.email,
+                                                phone: w.phone,
+                                                expeditionName: w.departureName,
+                                                startDate: w.departureDates.split('al')[0]?.trim() || '',
+                                                endDate: w.departureDates.split('al')[1]?.trim() || '',
+                                                paxCount: w.paxCount,
+                                              });
+                                              if (res.success) {
+                                                await updateWaitlistEntryStatus(w.id, 'contacted');
+                                                setActionMessage(`✓ Notificación de cupo liberado enviada a ${w.fullName} vía Brevo.`);
+                                                setTimeout(() => setActionMessage(null), 4000);
+                                              } else {
+                                                triggerAlert('Error enviando correo: ' + (res.error || 'Revisa la configuración de Brevo'), 'error');
+                                              }
+                                            },
+                                            {
+                                              title: 'Notificar Cupo Liberado (Brevo)',
+                                              confirmText: 'Enviar Correo',
+                                              type: 'info',
+                                            }
+                                          );
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold transition cursor-pointer shadow-2xs"
+                                      >
+                                        <span>⚡ Cupo</span>
+                                      </button>
+
                                       <button
                                         type="button"
                                         onClick={() => {

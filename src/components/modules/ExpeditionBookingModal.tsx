@@ -28,6 +28,7 @@ import { useExpeditions } from '../../hooks/useExpeditions';
 import { leadService } from '../../services/leadService';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatRut, formatPhone } from '../../lib/formatters';
+import { emailService } from '../../services/emailService';
 import { 
   DEFAULT_EXPEDITION_POLICIES, 
   getEmbeddablePdfUrl, 
@@ -215,6 +216,19 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
           spread: 60,
           origin: { y: 0.6 }
         });
+
+        // Trigger automated Brevo emails: Passenger priority confirmation & Concierge alert
+        emailService.sendWaitlistEmails({
+          waitlistId: res.data?.id,
+          fullName: wlFullName.trim(),
+          email: wlEmail.trim().toLowerCase(),
+          phone: wlPhone.trim(),
+          expeditionName: currentActiveExp.name,
+          startDate: currentActiveExp.startDate,
+          endDate: currentActiveExp.endDate,
+          vesselName: currentActiveExp.vesselId === 'terranova' ? 'Yate Terranova' : 'Velero Végvísir',
+          paxCount: wlPaxCount,
+        }).catch((emailErr) => console.warn('Could not dispatch waitlist emails:', emailErr));
       } else {
         setWlError(res.error || 'Ocurrió un error al registrar tus datos. Por favor intenta nuevamente.');
       }
@@ -476,6 +490,21 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
           scalar: 1.1,
         });
       } catch (_) {}
+
+      // 5. Send Brevo Transactional Emails (Passenger confirmation & Concierge alert)
+      emailService.sendExpeditionBookingEmails({
+        bookingId: bookingRes?.bookingCode || generatedCode,
+        fullName: leaderPassenger.fullName,
+        email: leaderPassenger.email,
+        phone: leaderPassenger.phone,
+        documentId: leaderPassenger.docId,
+        expeditionName: currentActiveExp.name,
+        startDate: currentActiveExp.startDate,
+        endDate: currentActiveExp.endDate,
+        vesselName: currentActiveExp.vessel,
+        paxCount: paxCount,
+        amountClp: totalAmount,
+      }).catch((emailErr) => console.warn('Could not dispatch booking emails via Brevo:', emailErr));
 
       setBookingSubmitted(true);
     } catch (err) {
