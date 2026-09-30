@@ -10,12 +10,18 @@ import {
   ArrowLeft, 
   Copy, 
   ShieldCheck,
+  ShieldAlert,
   Compass,
   Lock,
   Clock,
   Sparkles,
   ExternalLink,
-  FileText
+  FileText,
+  User,
+  Mail,
+  Phone,
+  Users,
+  CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useExpeditions } from '../../hooks/useExpeditions';
@@ -30,6 +36,7 @@ import {
   type ExpeditionPolicySection 
 } from '../../services/expeditionService';
 import { cmsService } from '../../services/cmsService';
+import { waitlistService } from '../../services/waitlistService';
 
 export const getExpeditionAvailableSpots = (exp?: PublicExpedition | null): number => {
   if (!exp) return 0;
@@ -130,6 +137,15 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
   const [bookingLoading, setBookingLoading] = useState<boolean>(false);
   const [createdBookingCode, setCreatedBookingCode] = useState<string>('');
 
+  // Waitlist form state
+  const [wlFullName, setWlFullName] = useState<string>('');
+  const [wlPhone, setWlPhone] = useState<string>('');
+  const [wlEmail, setWlEmail] = useState<string>('');
+  const [wlPaxCount, setWlPaxCount] = useState<number>(1);
+  const [wlLoading, setWlLoading] = useState<boolean>(false);
+  const [wlSubmitted, setWlSubmitted] = useState<boolean>(false);
+  const [wlError, setWlError] = useState<string>('');
+
   // Sync state ONLY when modal transitions from closed to open
   const prevIsOpenRef = useRef<boolean>(false);
   useEffect(() => {
@@ -138,6 +154,13 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
       setBookingLoading(false);
       setTermsAccepted(false);
       setCopiedBank(false);
+      setWlFullName('');
+      setWlPhone('');
+      setWlEmail('');
+      setWlPaxCount(1);
+      setWlLoading(false);
+      setWlSubmitted(false);
+      setWlError('');
       const chosen = expedition || (sortedExpeditions.length > 0 ? sortedExpeditions[0] : null);
       setSelectedExp(chosen);
       setStep(initialStep !== undefined ? initialStep : (expedition ? 1 : 0));
@@ -149,6 +172,58 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
     }
     prevIsOpenRef.current = isOpen;
   }, [isOpen, expedition, initialStep]);
+
+  // Handler for waitlist lead submission
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentActiveExp) return;
+
+    if (!wlFullName.trim()) {
+      setWlError('Por favor ingresa tu nombre y apellido.');
+      return;
+    }
+    if (!wlPhone.trim() || wlPhone.replace(/\D/g, '').length < 8) {
+      setWlError('Por favor ingresa un número de teléfono válido.');
+      return;
+    }
+    if (!wlEmail.trim() || !wlEmail.includes('@') || !wlEmail.includes('.')) {
+      setWlError('Por favor ingresa un correo electrónico válido.');
+      return;
+    }
+
+    setWlLoading(true);
+    setWlError('');
+
+    try {
+      const res = await waitlistService.createWaitlistEntry({
+        departureId: currentActiveExp.id,
+        departureName: currentActiveExp.name,
+        departureDates: `${currentActiveExp.startDate} al ${currentActiveExp.endDate}`,
+        vesselId: currentActiveExp.vesselId,
+        vesselName: currentActiveExp.vesselId === 'terranova' ? 'Yate Terranova' : 'Velero Végvísir',
+        fullName: wlFullName.trim(),
+        phone: wlPhone.trim(),
+        email: wlEmail.trim().toLowerCase(),
+        paxCount: wlPaxCount,
+        notes: 'Inscripción prioritaria para salida completa.'
+      });
+
+      if (res.success) {
+        setWlSubmitted(true);
+        confetti({
+          particleCount: 55,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      } else {
+        setWlError(res.error || 'Ocurrió un error al registrar tus datos. Por favor intenta nuevamente.');
+      }
+    } catch (err: any) {
+      setWlError(err?.message || 'Error de conexión con el servidor.');
+    } finally {
+      setWlLoading(false);
+    }
+  };
 
   // Handle ESC key (close policies or close modal explicitly)
   useEffect(() => {
@@ -223,6 +298,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
 
   const availableSpots = getExpeditionAvailableSpots(currentActiveExp);
   const isSoldOut = currentActiveExp ? availableSpots <= 0 : false;
+  const isWaitlistAllowed = currentActiveExp ? (currentActiveExp.allowWaitlist !== false && (currentActiveExp as any).allow_waitlist !== false) : true;
 
   // Maximum allowed passengers for the vessel / expedition, capped strictly by remaining available spots
   const vesselCapacity = currentActiveExp?.totalSlots 
@@ -675,7 +751,9 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                       <span>100% Plazas Ocupadas</span>
                     </div>
                     <p className="text-[10px] text-slate-400 font-light leading-relaxed">
-                      Inscríbete en la lista de espera con nuestro Concierge para ser notificado si se abre un cupo.
+                      {isWaitlistAllowed
+                        ? 'Inscríbete en la lista de espera con nuestro Concierge para ser notificado si se abre un cupo.'
+                        : 'Nómina consolidada y cerrada. Te invitamos a seleccionar otra fecha con cupos disponibles.'}
                     </p>
                   </div>
                 ) : (
@@ -726,34 +804,215 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                       </p>
                     </div>
 
-                    {/* Waitlist Box */}
-                    <div className="bg-gradient-to-br from-slate-900 to-[#0B1528] text-white rounded-2xl p-5 sm:p-6 border border-slate-800 space-y-4 shadow-md">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center justify-center shrink-0">
-                          <Sparkles className="w-5 h-5 text-amber-300" />
+                    {/* Waitlist Box or Closed Notice */}
+                    {isWaitlistAllowed ? (
+                      <div className="bg-gradient-to-br from-slate-900 via-[#0B1528] to-slate-950 text-white rounded-2xl p-5 sm:p-6 border border-amber-500/30 space-y-4 shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                        <div className="flex items-start gap-3 relative z-10">
+                          <div className="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center justify-center shrink-0 shadow-inner">
+                            <Sparkles className="w-5 h-5 text-amber-300" />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-amber-400/30">
+                              Prioridad Exclusiva
+                            </div>
+                            <h4 className="font-serif font-bold text-base text-white">
+                              Lista de Espera Prioritaria
+                            </h4>
+                            <p className="text-xs text-slate-300 font-light leading-relaxed">
+                              Déjanos tus datos de contacto. Si un pasajero cancela o se habilita un cupo adicional, nuestro Concierge te contactará de inmediato con prioridad sobre el público general.
+                            </p>
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <h4 className="font-serif font-bold text-base text-white">
-                            Lista de Espera Prioritaria
-                          </h4>
-                          <p className="text-xs text-slate-300 font-light leading-relaxed">
-                            Si algún pasajero cancela o abrimos un zarpe adicional para esta ruta, nuestro equipo te contactará directamente con prioridad exclusiva antes del lanzamiento general.
-                          </p>
+
+                        {wlSubmitted ? (
+                          <div className="bg-amber-500/10 border border-amber-400/40 rounded-xl p-4 sm:p-5 space-y-3.5 relative z-10 animate-fadeIn">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                              </div>
+                              <div>
+                                <h5 className="font-serif font-bold text-sm text-amber-200">
+                                  ¡Inscripción Exitosa en Lista de Espera!
+                                </h5>
+                                <p className="text-xs text-slate-300 font-light">
+                                  Tus datos han quedado registrados en orden de prioridad.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="p-3 bg-slate-950/70 rounded-lg border border-slate-800 text-xs text-slate-300 space-y-1">
+                              <p><strong className="text-white">Pasajero:</strong> {wlFullName} ({wlPaxCount} {wlPaxCount > 1 ? 'cupos' : 'cupo'})</p>
+                              <p><strong className="text-white">Expedición:</strong> {currentActiveExp.name}</p>
+                              <p><strong className="text-white">Fechas:</strong> {currentActiveExp.startDate} al {currentActiveExp.endDate}</p>
+                              <p><strong className="text-white">Contacto:</strong> {wlPhone} · {wlEmail}</p>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                              <a
+                                href={`https://wa.me/56981312920?text=${encodeURIComponent(
+                                  `Hola Concierge Yates Chile, acabo de anotarme en la Lista de Espera de "${currentActiveExp.name}" (${currentActiveExp.startDate} al ${currentActiveExp.endDate}) para ${wlPaxCount} cupo(s) a nombre de ${wlFullName}. Quería confirmar la recepción.`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full sm:flex-1 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-2.5 px-3 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow cursor-pointer active:scale-98"
+                              >
+                                <WhatsAppIcon className="w-4 h-4 text-white" />
+                                <span>Avisar al Concierge vía WhatsApp</span>
+                              </a>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWlSubmitted(false);
+                                  setWlFullName('');
+                                  setWlPhone('');
+                                  setWlEmail('');
+                                  setWlPaxCount(1);
+                                }}
+                                className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white text-xs transition cursor-pointer"
+                              >
+                                Inscribir otro pasajero
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <form onSubmit={handleWaitlistSubmit} className="space-y-3.5 pt-1 relative z-10">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Nombre y Apellido */}
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-200 flex items-center gap-1.5">
+                                  <User className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Nombre y Apellido *</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={wlFullName}
+                                  onChange={(e) => setWlFullName(e.target.value)}
+                                  placeholder="ej. Matías Vial"
+                                  className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 transition"
+                                />
+                              </div>
+
+                              {/* Teléfono Móvil */}
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-200 flex items-center gap-1.5">
+                                  <Phone className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Teléfono de Contacto *</span>
+                                </label>
+                                <input
+                                  type="tel"
+                                  required
+                                  value={wlPhone}
+                                  onChange={(e) => setWlPhone(formatPhone(e.target.value))}
+                                  placeholder="+56 9 1234 5678"
+                                  className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 transition"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              {/* Correo Electrónico */}
+                              <div className="sm:col-span-2 space-y-1">
+                                <label className="text-[11px] font-medium text-slate-200 flex items-center gap-1.5">
+                                  <Mail className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Correo Electrónico *</span>
+                                </label>
+                                <input
+                                  type="email"
+                                  required
+                                  value={wlEmail}
+                                  onChange={(e) => setWlEmail(e.target.value)}
+                                  placeholder="ej. contacto@ejemplo.com"
+                                  className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 transition"
+                                />
+                              </div>
+
+                              {/* Cupos Solicitados */}
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-medium text-slate-200 flex items-center gap-1.5">
+                                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Cupos</span>
+                                </label>
+                                <select
+                                  value={wlPaxCount}
+                                  onChange={(e) => setWlPaxCount(Number(e.target.value))}
+                                  className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 transition cursor-pointer"
+                                >
+                                  <option value={1} className="bg-slate-900 text-white">1 cupo</option>
+                                  <option value={2} className="bg-slate-900 text-white">2 cupos</option>
+                                  <option value={3} className="bg-slate-900 text-white">3 cupos</option>
+                                  <option value={4} className="bg-slate-900 text-white">4 cupos</option>
+                                  <option value={6} className="bg-slate-900 text-white">6 cupos (Grupo)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {wlError && (
+                              <div className="p-2.5 rounded-xl bg-red-950/70 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
+                                <ShieldAlert className="w-4 h-4 shrink-0 text-red-400" />
+                                <span>{wlError}</span>
+                              </div>
+                            )}
+
+                            <button
+                              type="submit"
+                              disabled={wlLoading}
+                              className="w-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold py-3.5 px-4 rounded-xl transition text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                            >
+                              {wlLoading ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                                  <span>Inscribiendo en Lista de Espera...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-4 h-4 text-slate-950" />
+                                  <span>Anotarme en Lista de Espera Prioritaria</span>
+                                </>
+                              )}
+                            </button>
+
+                            <p className="text-[10px] text-slate-400 text-center font-light">
+                              Tus datos quedan guardados y serán gestionados con estricta confidencialidad náutica.
+                            </p>
+                          </form>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-[#0f172a] text-white rounded-2xl p-5 sm:p-6 border border-slate-800 space-y-4 shadow-md">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center shrink-0">
+                            <ShieldAlert className="w-5 h-5 text-slate-300" />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-slate-700">
+                              Nómina de Zarpe Oficial Cerrada
+                            </div>
+                            <h4 className="font-serif font-bold text-base text-white">
+                              No se admiten inscripciones en lista de espera
+                            </h4>
+                            <p className="text-xs text-slate-300 font-light leading-relaxed">
+                              Esta salida ha completado su capacidad máxima autorizada y su lista de tripulantes y pasajeros se encuentra consolidada. Esta expedición no cuenta con lista de espera activa. Te invitamos cordialmente a seleccionar otra fecha con cupos abiertos en el calendario.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                          <span>¿Consultas por zarpes especiales o chárter privado?</span>
+                          <a
+                            href="https://wa.me/56981312920?text=Hola%20Concierge%20Yates%20Chile,%20quisiera%20consultar%20por%20disponibilidad%20general%20y%20pr%C3%B3ximas%20expediciones."
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-amber-300 hover:text-amber-200 font-semibold underline underline-offset-2 transition"
+                          >
+                            Contactar Concierge
+                          </a>
                         </div>
                       </div>
-
-                      <a
-                        href={`https://wa.me/56981312920?text=${encodeURIComponent(
-                          `Hola Concierge Yates Chile, veo que la expedición "${currentActiveExp.name}" (${currentActiveExp.startDate} al ${currentActiveExp.endDate}) está completa. Deseo anotarme en la Lista de Espera Prioritaria por si se libera algún cupo o se programa una nueva salida.`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3.5 px-4 rounded-xl transition text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                      >
-                        <WhatsAppIcon className="w-4 h-4 text-white" />
-                        <span>Unirse a Lista de Espera vía WhatsApp</span>
-                      </a>
-                    </div>
+                    )}
 
                     {/* Alternate Departures Suggestion */}
                     <div className="space-y-3 pt-1">

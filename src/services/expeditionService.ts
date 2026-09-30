@@ -2,6 +2,7 @@ import { supabase, supabaseAdmin } from '../lib/supabase';
 import type { Database } from '../types/database.types';
 import { EXPEDITION_ROUTES, FLEET_DATA } from '../lib/constants';
 import { normalizeExternalMediaUrl } from './cmsService';
+import { translationService } from './translationService';
 
 export type ExpeditionRouteRow = Database['public']['Tables']['expedition_routes']['Row'];
 export type VesselRow = Database['public']['Tables']['vessels']['Row'];
@@ -28,6 +29,15 @@ export type DepartureRow = Database['public']['Tables']['expedition_departures']
   policies?: ExpeditionPolicySection[] | string;
   pending_pax?: number;
   pendingPax?: number;
+  allowWaitlist?: boolean;
+  allow_waitlist?: boolean;
+  name_en?: string;
+  headline_en?: string;
+  description_en?: string;
+  location_en?: string;
+  tempEstimate_en?: string;
+  highlights_en?: string;
+  includedServices_en?: string;
 };
 export type ExpeditionBookingRow = Database['public']['Tables']['expedition_bookings']['Row'];
 
@@ -147,6 +157,14 @@ export interface PublicExpedition {
   includedServices?: string;
   policies?: ExpeditionPolicySection[] | string;
   pendingPax?: number;
+  allowWaitlist?: boolean;
+  name_en?: string;
+  headline_en?: string;
+  description_en?: string;
+  location_en?: string;
+  tempEstimate_en?: string;
+  highlights_en?: string;
+  includedServices_en?: string;
 }
 
 export const getExpeditionAvailableSpots = (exp?: Partial<PublicExpedition> | any | null): number => {
@@ -544,9 +562,18 @@ const sanitizePublicExpedition = (e: PublicExpedition): PublicExpedition => {
     ? ('completo' as const)
     : (typeof e.spotsLeft === 'number' ? e.spotsLeft : availableSlots);
 
+  const name_en = e.name_en || (name ? translationService.fallbackTranslate(name, 'EN') : undefined);
+  const location_en = e.location_en || (e.location ? translationService.fallbackTranslate(e.location, 'EN') : undefined);
+  const description_en = e.description_en || (e.description ? translationService.fallbackTranslate(e.description, 'EN') : undefined);
+  const headline_en = e.headline_en || (e.headline ? translationService.fallbackTranslate(e.headline, 'EN') : undefined);
+
   return {
     ...e,
     name,
+    name_en,
+    location_en,
+    description_en,
+    headline_en,
     vessel,
     vesselId,
     image,
@@ -692,6 +719,8 @@ export const expeditionService = {
             policyUrl: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
             policy_url: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
             isFeatured: meta.isFeatured,
+            allowWaitlist: meta.allowWaitlist !== undefined ? meta.allowWaitlist : (meta.allow_waitlist !== undefined ? meta.allow_waitlist : true),
+            allow_waitlist: meta.allowWaitlist !== undefined ? meta.allowWaitlist : (meta.allow_waitlist !== undefined ? meta.allow_waitlist : true),
           };
         });
       }
@@ -742,6 +771,8 @@ export const expeditionService = {
         highlights: cloud?.highlights || e.highlights,
         includedServices: cloud?.includedServices || e.includedServices,
         policies: cloud?.policies || e.policies || DEFAULT_EXPEDITION_POLICIES,
+        allowWaitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (e.allowWaitlist !== undefined ? e.allowWaitlist : true),
+        allow_waitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (e.allowWaitlist !== undefined ? e.allowWaitlist : true),
         route: EXPEDITION_ROUTES.find((r) => r.id === (cloud?.route_id || cloud?.routeId || e.routeId)) || {
           id: cloud?.route_id || cloud?.routeId || e.routeId,
           title: name,
@@ -871,6 +902,8 @@ export const expeditionService = {
             policies: cloud?.policies || matchedLocal?.policies || DEFAULT_EXPEDITION_POLICIES,
             policyUrl: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
             policy_url: cloud?.policyUrl || matchedLocal?.policyUrl || (d as any).policy_url || (d as any).policyUrl,
+            allowWaitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (matchedLocal?.allowWaitlist !== undefined ? matchedLocal.allowWaitlist : ((d as any).allow_waitlist !== undefined ? (d as any).allow_waitlist : true)),
+            allow_waitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (matchedLocal?.allowWaitlist !== undefined ? matchedLocal.allowWaitlist : ((d as any).allow_waitlist !== undefined ? (d as any).allow_waitlist : true)),
             vessel_id: targetVesselId,
             vessel: {
               id: targetVesselId,
@@ -930,12 +963,19 @@ export const expeditionService = {
             route_id: meta.routeId || meta.route_id,
             image: normalizeExternalMediaUrl(row.media_url || meta.image),
             name: meta.name || row.title,
+            name_en: meta.name_en || meta.nameEn || row.title_en,
             headline: meta.headline,
+            headline_en: meta.headline_en || meta.headlineEn || row.subtitle_en,
             location: meta.location,
+            location_en: meta.location_en || meta.locationEn,
             description: meta.description || row.body_text,
+            description_en: meta.description_en || meta.descriptionEn || row.body_text_en,
             tempEstimate: meta.tempEstimate,
+            tempEstimate_en: meta.tempEstimate_en || meta.temp_estimate_en,
             highlights: meta.highlights,
+            highlights_en: meta.highlights_en,
             includedServices: meta.includedServices,
+            includedServices_en: meta.includedServices_en,
             brochureUrl: meta.brochureUrl || meta.brochure_url,
             totalSlots: meta.totalSlots !== undefined ? Number(meta.totalSlots) : undefined,
             availableSlots: meta.availableSlots !== undefined ? Number(meta.availableSlots) : undefined,
@@ -945,6 +985,7 @@ export const expeditionService = {
             policyUrl: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
             policy_url: meta.policyUrl || meta.policy_url || meta.policies_pdf_url || meta.policiesUrl,
             isFeatured: meta.isFeatured,
+            allowWaitlist: meta.allowWaitlist !== undefined ? meta.allowWaitlist : (meta.allow_waitlist !== undefined ? meta.allow_waitlist : true),
           };
         });
       }
@@ -1057,7 +1098,9 @@ export const expeditionService = {
           return {
             id: d.id,
             name: routeTitle,
+            name_en: cloud?.name_en || matchedLocal?.name_en || (routeTitle ? translationService.fallbackTranslate(routeTitle, 'EN') : undefined),
             headline: cloud?.headline || matchedLocal?.headline,
+            headline_en: cloud?.headline_en || matchedLocal?.headline_en,
             startDate: formatDateSpan(d.departure_date),
             endDate: formatDateSpan(d.return_date),
             departureDate: d.departure_date,
@@ -1074,11 +1117,15 @@ export const expeditionService = {
             vesselId: vesselId,
             routeId: cloud?.routeId || cloud?.route_id || d.route_id || matchedLocal?.routeId || 'ruta-juan-fernandez',
             description: cloud?.description || matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.',
+            description_en: cloud?.description_en || matchedLocal?.description_en || translationService.fallbackTranslate(cloud?.description || matchedLocal?.description || d.route?.description || 'Expedición náutica oceánica.', 'EN'),
             location: cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández',
+            location_en: cloud?.location_en || matchedLocal?.location_en || translationService.fallbackTranslate(cloud?.location || matchedLocal?.location || ROUTE_LOCATION_MAP[d.route_id] || 'Archipiélago Juan Fernández', 'EN'),
             image: cloud?.image || normalizeExternalMediaUrl(matchedLocal?.image) || normalizeExternalMediaUrl(d.image) || ROUTE_IMAGE_MAP[d.route_id] || (isTerranova ? '/zarpe-archipielago.jpg' : '/travesia-robinson.jpg'),
             bestViewTime: matchedLocal?.bestViewTime || 'Zarpe matutino',
             tempEstimate: cloud?.tempEstimate || matchedLocal?.tempEstimate || '14°C - 18°C',
+            tempEstimate_en: cloud?.tempEstimate_en || matchedLocal?.tempEstimate_en,
             highlights: cloud?.highlights || matchedLocal?.highlights,
+            highlights_en: cloud?.highlights_en || matchedLocal?.highlights_en,
             includedServices: cloud?.includedServices || matchedLocal?.includedServices,
             brochureUrl: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
             brochure_url: cloud?.brochureUrl || matchedLocal?.brochureUrl || (d as any).brochure_url,
@@ -1087,6 +1134,7 @@ export const expeditionService = {
             policies: cloud?.policies || matchedLocal?.policies || DEFAULT_EXPEDITION_POLICIES,
             status: effectiveStatus,
             isFeatured: isDepFeatured,
+            allowWaitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (matchedLocal?.allowWaitlist !== undefined ? matchedLocal.allowWaitlist : ((d as any).allow_waitlist !== undefined ? (d as any).allow_waitlist : true)),
           };
         });
 
@@ -1100,9 +1148,16 @@ export const expeditionService = {
             const vName = cloud?.vessel || (isTerranova ? 'Yate Terranova' : isLodge ? 'Lodge Rincón de Navegantes' : 'Velero Vegvisir');
             return {
               ...l,
+              name_en: cloud?.name_en || l.name_en || (l.name ? translationService.fallbackTranslate(l.name, 'EN') : undefined),
+              headline_en: cloud?.headline_en || l.headline_en,
+              location_en: cloud?.location_en || l.location_en || (l.location ? translationService.fallbackTranslate(l.location, 'EN') : undefined),
+              description_en: cloud?.description_en || l.description_en || (l.description ? translationService.fallbackTranslate(l.description, 'EN') : undefined),
+              tempEstimate_en: cloud?.tempEstimate_en || l.tempEstimate_en,
+              highlights_en: cloud?.highlights_en || l.highlights_en,
               vessel: vName,
               vesselId: targetVesselId,
               isFeatured: effectiveFeaturedSet.has(l.id) || cloud?.isFeatured === true || l.isFeatured === true,
+              allowWaitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (l.allowWaitlist !== undefined ? l.allowWaitlist : true),
             };
           });
         const allPublic = [...mapped, ...extraLocal];
@@ -1129,6 +1184,7 @@ export const expeditionService = {
           vesselId: targetVesselId,
           isFeatured: effectiveFeaturedSet.has(c.id) || cloud?.isFeatured === true || c.isFeatured === true,
           policies: c.policies || DEFAULT_EXPEDITION_POLICIES,
+          allowWaitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (c.allowWaitlist !== undefined ? c.allowWaitlist : true),
         };
       });
     }
@@ -1145,6 +1201,7 @@ export const expeditionService = {
         isFeatured: effectiveFeaturedSet.has(l.id) || cloud?.isFeatured === true || l.isFeatured === true,
         image: normalizeExternalMediaUrl(l.image),
         policies: l.policies || DEFAULT_EXPEDITION_POLICIES,
+        allowWaitlist: cloud?.allowWaitlist !== undefined ? cloud.allowWaitlist : (l.allowWaitlist !== undefined ? l.allowWaitlist : true),
       };
     });
   },
@@ -1623,14 +1680,22 @@ export const expeditionService = {
     priceCharterFullClp?: number;
     status?: 'scheduled' | 'guaranteed' | 'completed' | 'cancelled';
     publicName?: string;
+    publicName_en?: string;
+    publicHeadline?: string;
+    publicHeadline_en?: string;
     publicLocation?: string;
+    publicLocation_en?: string;
     publicCoverImage?: string;
     publicDescription?: string;
+    publicDescription_en?: string;
     publicTempEstimate?: string;
+    publicTempEstimate_en?: string;
     publicBrochureUrl?: string;
     publicPolicyUrl?: string;
     publicHighlights?: string;
+    publicHighlights_en?: string;
     publicIncludedServices?: string;
+    allowWaitlist?: boolean;
   }): Promise<{ success: boolean; data?: DepartureRow; error?: string }> {
     try {
       const newId = `exp-dep-${Date.now()}`;
@@ -1641,9 +1706,16 @@ export const expeditionService = {
       const months = getMonthsFromDates(params.departureDate, params.returnDate);
       const year = parseInt(params.departureDate.split('-')[0], 10) || 2026;
 
+      const baseName = params.publicName || `${vesselName} — ${startFormatted}`;
+      const baseLoc = params.publicLocation || 'Archipiélago Juan Fernández';
+      const baseDesc = params.publicDescription || 'Expedición programada en aguas australes con tripulación y servicios de alto nivel.';
+
       const newPublicExp: PublicExpedition = {
         id: newId,
-        name: params.publicName || `${vesselName} — ${startFormatted}`,
+        name: baseName,
+        name_en: params.publicName_en || (baseName ? translationService.fallbackTranslate(baseName, 'EN') : undefined),
+        headline: params.publicHeadline,
+        headline_en: params.publicHeadline_en || (params.publicHeadline ? translationService.fallbackTranslate(params.publicHeadline, 'EN') : undefined),
         startDate: startFormatted,
         endDate: endFormatted,
         departureDate: params.departureDate,
@@ -1658,16 +1730,21 @@ export const expeditionService = {
         vessel: vesselName,
         vesselId: params.vesselId,
         routeId: params.routeId,
-        description: params.publicDescription || 'Expedición programada en aguas australes con tripulación y servicios de alto nivel.',
-        location: params.publicLocation || 'Archipiélago Juan Fernández',
+        description: baseDesc,
+        description_en: params.publicDescription_en || (baseDesc ? translationService.fallbackTranslate(baseDesc, 'EN') : undefined),
+        location: baseLoc,
+        location_en: params.publicLocation_en || (baseLoc ? translationService.fallbackTranslate(baseLoc, 'EN') : undefined),
         image: params.publicCoverImage || (params.vesselId === 'terranova' ? '/yate-terranova.jpg' : '/travesia-robinson.jpg'),
         bestViewTime: 'Zarpe matutino',
         tempEstimate: params.publicTempEstimate || '14°C - 18°C',
+        tempEstimate_en: params.publicTempEstimate_en,
         brochureUrl: params.publicBrochureUrl,
         policyUrl: params.publicPolicyUrl,
         status: params.status || 'scheduled',
         highlights: params.publicHighlights,
+        highlights_en: params.publicHighlights_en,
         includedServices: params.publicIncludedServices,
+        allowWaitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : true,
       };
 
       // Try Supabase insert
@@ -1732,11 +1809,18 @@ export const expeditionService = {
               routeId: params.routeId,
               route_id: params.routeId,
               name: newPublicExp.name,
+              name_en: newPublicExp.name_en,
+              headline: newPublicExp.headline,
+              headline_en: newPublicExp.headline_en,
               location: newPublicExp.location,
+              location_en: newPublicExp.location_en,
               description: newPublicExp.description,
+              description_en: newPublicExp.description_en,
               image: newPublicExp.image,
               tempEstimate: newPublicExp.tempEstimate,
+              tempEstimate_en: newPublicExp.tempEstimate_en,
               highlights: params.publicHighlights,
+              highlights_en: newPublicExp.highlights_en,
               includedServices: params.publicIncludedServices,
               brochureUrl: newPublicExp.brochureUrl,
               totalSlots: newPublicExp.totalSlots,
@@ -1744,6 +1828,8 @@ export const expeditionService = {
               status: newPublicExp.status,
               pricePerPaxClp: newPublicExp.pricePerPaxClp,
               priceCharterFullClp: newPublicExp.priceCharterFullClp,
+              allowWaitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : true,
+              allow_waitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : true,
               updated_at: new Date().toISOString(),
             },
             updated_at: new Date().toISOString(),
@@ -1782,6 +1868,8 @@ export const expeditionService = {
         brochureUrl: newPublicExp.brochureUrl,
         policyUrl: newPublicExp.policyUrl,
         bestViewTime: newPublicExp.bestViewTime,
+        allowWaitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : true,
+        allow_waitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : true,
         route: EXPEDITION_ROUTES.find((r) => r.id === newPublicExp.routeId),
         vessel: FLEET_DATA.find((v) => v.id === newPublicExp.vesselId),
       };
@@ -1805,16 +1893,23 @@ export const expeditionService = {
       priceCharterFullClp?: number;
       status?: 'scheduled' | 'guaranteed' | 'completed' | 'cancelled';
       publicName?: string;
+      publicName_en?: string;
       publicHeadline?: string;
+      publicHeadline_en?: string;
       publicLocation?: string;
+      publicLocation_en?: string;
       publicCoverImage?: string;
       publicDescription?: string;
+      publicDescription_en?: string;
       publicTempEstimate?: string;
+      publicTempEstimate_en?: string;
       publicHighlights?: string;
+      publicHighlights_en?: string;
       publicIncludedServices?: string;
       publicBrochureUrl?: string;
       publicPolicyUrl?: string;
       publicPolicies?: ExpeditionPolicySection[] | string;
+      allowWaitlist?: boolean;
     }
   ): Promise<{ success: boolean; data?: DepartureRow; error?: string }> {
     try {
@@ -1891,7 +1986,9 @@ export const expeditionService = {
           return {
             ...e,
             name: params.publicName || e.name,
+            name_en: params.publicName_en !== undefined ? params.publicName_en : (params.publicName ? translationService.fallbackTranslate(params.publicName, 'EN') : e.name_en),
             headline: params.publicHeadline !== undefined ? params.publicHeadline : e.headline,
+            headline_en: params.publicHeadline_en !== undefined ? params.publicHeadline_en : e.headline_en,
             vessel: params.vesselId ? vesselName : e.vessel,
             vesselId: params.vesselId || e.vesselId,
             routeId: params.routeId || e.routeId,
@@ -1908,16 +2005,21 @@ export const expeditionService = {
             priceCharterFullClp: params.priceCharterFullClp !== undefined ? Number(params.priceCharterFullClp) : e.priceCharterFullClp,
             status: stat,
             description: params.publicDescription !== undefined ? params.publicDescription : e.description,
+            description_en: params.publicDescription_en !== undefined ? params.publicDescription_en : (params.publicDescription ? translationService.fallbackTranslate(params.publicDescription, 'EN') : e.description_en),
             location: params.publicLocation !== undefined ? params.publicLocation : e.location,
+            location_en: params.publicLocation_en !== undefined ? params.publicLocation_en : (params.publicLocation ? translationService.fallbackTranslate(params.publicLocation, 'EN') : e.location_en),
             image: params.publicCoverImage !== undefined ? normalizeExternalMediaUrl(params.publicCoverImage) : e.image,
             tempEstimate: params.publicTempEstimate !== undefined ? params.publicTempEstimate : e.tempEstimate,
+            tempEstimate_en: params.publicTempEstimate_en !== undefined ? params.publicTempEstimate_en : e.tempEstimate_en,
             highlights: params.publicHighlights !== undefined ? params.publicHighlights : e.highlights,
+            highlights_en: params.publicHighlights_en !== undefined ? params.publicHighlights_en : e.highlights_en,
             includedServices: params.publicIncludedServices !== undefined ? params.publicIncludedServices : e.includedServices,
             brochureUrl: params.publicBrochureUrl !== undefined ? params.publicBrochureUrl : e.brochureUrl,
             brochure_url: params.publicBrochureUrl !== undefined ? params.publicBrochureUrl : (e as any).brochure_url,
             policyUrl: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (e.policyUrl || (e as any).policy_url),
             policy_url: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (e.policyUrl || (e as any).policy_url),
             policies: params.publicPolicies !== undefined ? params.publicPolicies : (e as any).policies,
+            allowWaitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : (e.allowWaitlist !== undefined ? e.allowWaitlist : true),
           };
         }
         return e;
@@ -1930,10 +2032,15 @@ export const expeditionService = {
         const availSlots = params.availableSlots !== undefined ? Math.max(0, Number(params.availableSlots)) : 6;
         const isSoldOut = availSlots <= 0;
         const stat = (isSoldOut && params.status !== 'cancelled') ? 'guaranteed' : (params.status || 'scheduled');
+        const bName = params.publicName || 'Expedición Archipiélago';
+        const bLoc = params.publicLocation || 'Archipiélago Juan Fernández';
+        const bDesc = params.publicDescription || 'Expedición náutica oceánica.';
         updated.push({
           id: departureId,
-          name: params.publicName || 'Expedición Archipiélago',
+          name: bName,
+          name_en: params.publicName_en || translationService.fallbackTranslate(bName, 'EN'),
           headline: params.publicHeadline,
+          headline_en: params.publicHeadline_en,
           startDate: formatDateSpan(depDate),
           endDate: formatDateSpan(retDate),
           departureDate: depDate,
@@ -1948,18 +2055,23 @@ export const expeditionService = {
           vessel: vesselName,
           vesselId: params.vesselId || 'vegvisir',
           routeId: params.routeId || 'ruta-juan-fernandez',
-          description: params.publicDescription || 'Expedición náutica oceánica.',
-          location: params.publicLocation || 'Archipiélago Juan Fernández',
+          description: bDesc,
+          description_en: params.publicDescription_en || translationService.fallbackTranslate(bDesc, 'EN'),
+          location: bLoc,
+          location_en: params.publicLocation_en || translationService.fallbackTranslate(bLoc, 'EN'),
           image: params.publicCoverImage ? normalizeExternalMediaUrl(params.publicCoverImage) : '/travesia-robinson.jpg',
           tempEstimate: params.publicTempEstimate || '14°C - 18°C',
+          tempEstimate_en: params.publicTempEstimate_en,
           status: stat as any,
           highlights: params.publicHighlights,
+          highlights_en: params.publicHighlights_en,
           includedServices: params.publicIncludedServices,
           brochureUrl: params.publicBrochureUrl,
           brochure_url: params.publicBrochureUrl,
           policyUrl: params.publicPolicyUrl,
           policy_url: params.publicPolicyUrl,
           policies: params.publicPolicies !== undefined ? params.publicPolicies : DEFAULT_EXPEDITION_POLICIES,
+          allowWaitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : true,
         });
       }
 
@@ -1985,13 +2097,34 @@ export const expeditionService = {
           metaPayload.vessel_id = params.vesselId;
           metaPayload.vessel = vesselName;
         }
-        if (params.publicName !== undefined) metaPayload.name = params.publicName;
+        if (params.publicName !== undefined) {
+          metaPayload.name = params.publicName;
+          metaPayload.name_en = params.publicName_en || translationService.fallbackTranslate(params.publicName, 'EN');
+        } else if (params.publicName_en !== undefined) {
+          metaPayload.name_en = params.publicName_en;
+        }
         if (params.publicHeadline !== undefined) metaPayload.headline = params.publicHeadline;
-        if (params.publicLocation !== undefined) metaPayload.location = params.publicLocation;
-        if (params.publicDescription !== undefined) metaPayload.description = params.publicDescription;
+        if (params.publicHeadline_en !== undefined) metaPayload.headline_en = params.publicHeadline_en;
+
+        if (params.publicLocation !== undefined) {
+          metaPayload.location = params.publicLocation;
+          metaPayload.location_en = params.publicLocation_en || translationService.fallbackTranslate(params.publicLocation, 'EN');
+        } else if (params.publicLocation_en !== undefined) {
+          metaPayload.location_en = params.publicLocation_en;
+        }
+
+        if (params.publicDescription !== undefined) {
+          metaPayload.description = params.publicDescription;
+          metaPayload.description_en = params.publicDescription_en || translationService.fallbackTranslate(params.publicDescription, 'EN');
+        } else if (params.publicDescription_en !== undefined) {
+          metaPayload.description_en = params.publicDescription_en;
+        }
+
         if (normImg !== undefined) metaPayload.image = normImg;
         if (params.publicTempEstimate !== undefined) metaPayload.tempEstimate = params.publicTempEstimate;
+        if (params.publicTempEstimate_en !== undefined) metaPayload.tempEstimate_en = params.publicTempEstimate_en;
         if (params.publicHighlights !== undefined) metaPayload.highlights = params.publicHighlights;
+        if (params.publicHighlights_en !== undefined) metaPayload.highlights_en = params.publicHighlights_en;
         if (params.publicIncludedServices !== undefined) metaPayload.includedServices = params.publicIncludedServices;
         if (params.publicBrochureUrl !== undefined) metaPayload.brochureUrl = params.publicBrochureUrl;
         if (params.publicPolicyUrl !== undefined) {
@@ -2007,17 +2140,23 @@ export const expeditionService = {
         if (effectiveStatusMeta !== undefined) metaPayload.status = effectiveStatusMeta;
         if (params.pricePerPaxClp !== undefined) metaPayload.pricePerPaxClp = Number(params.pricePerPaxClp);
         if (params.priceCharterFullClp !== undefined) metaPayload.priceCharterFullClp = Number(params.priceCharterFullClp);
+        if (params.allowWaitlist !== undefined) {
+          metaPayload.allowWaitlist = params.allowWaitlist;
+          metaPayload.allow_waitlist = params.allowWaitlist;
+        }
+
+        const upsertPayload: Record<string, any> = {
+          section_key: `expedition_departure_${departureId}`,
+          title: params.publicName || 'Expedición Personalizada',
+          media_url: normImg !== undefined ? (normImg || null) : undefined,
+          body_text: params.publicDescription || null,
+          metadata: metaPayload,
+          updated_at: new Date().toISOString(),
+        };
 
         await supabase
           .from('site_content')
-          .upsert({
-            section_key: `expedition_departure_${departureId}`,
-            title: params.publicName || 'Expedición Personalizada',
-            media_url: normImg !== undefined ? (normImg || null) : undefined,
-            body_text: params.publicDescription || null,
-            metadata: metaPayload,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'section_key' });
+          .upsert(upsertPayload, { onConflict: 'section_key' });
       } catch (err) {
         console.warn('Could not sync departure to Supabase site_content:', err);
       }
@@ -2061,6 +2200,7 @@ export const expeditionService = {
                   policyUrl: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (c.policyUrl || (c as any).policy_url),
                   policy_url: params.publicPolicyUrl !== undefined ? params.publicPolicyUrl : (c.policyUrl || (c as any).policy_url),
                   policies: params.publicPolicies !== undefined ? params.publicPolicies : (c as any).policies,
+                  allowWaitlist: params.allowWaitlist !== undefined ? params.allowWaitlist : (c.allowWaitlist !== undefined ? c.allowWaitlist : true),
                 };
               }
               return c;
@@ -2639,6 +2779,84 @@ export const expeditionService = {
       return { success: true, isFeatured: willBeFeatured };
     } catch (err: unknown) {
       return { success: false, error: (err as Error).message };
+    }
+  },
+
+  /**
+   * Translate a single departure into English using Gemini AI (with nautical fallback)
+   */
+  async translateDepartureWithAI(departureId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const all = await this.getPublicExpeditions();
+      const target = all.find((e) => e.id === departureId);
+      if (!target) {
+        return { success: false, error: 'Expedición no encontrada.' };
+      }
+
+      const translations = await translationService.translateExpeditionFields({
+        name: target.name,
+        headline: target.headline,
+        description: target.description,
+        location: target.location,
+        highlights: target.highlights,
+      });
+
+      const res = await this.updateDeparture(departureId, {
+        publicName_en: translations.name_en,
+        publicHeadline_en: translations.headline_en,
+        publicDescription_en: translations.description_en,
+        publicLocation_en: translations.location_en,
+        publicHighlights_en: translations.highlights_en,
+      });
+
+      return { success: res.success, data: translations, error: res.error };
+    } catch (err: any) {
+      console.error('Error translating departure with AI:', err);
+      return { success: false, error: err.message || String(err) };
+    }
+  },
+
+  /**
+   * Translate all expeditions departures into English using Gemini AI (with nautical fallback)
+   */
+  async translateAllDeparturesWithAI(): Promise<{ success: boolean; translatedCount: number; error?: string }> {
+    try {
+      const all = await this.getPublicExpeditions();
+      let translatedCount = 0;
+
+      for (const target of all) {
+        try {
+          const translations = await translationService.translateExpeditionFields({
+            name: target.name,
+            headline: target.headline,
+            description: target.description,
+            location: target.location,
+            highlights: target.highlights,
+          });
+
+          await this.updateDeparture(target.id, {
+            publicName_en: translations.name_en,
+            publicHeadline_en: translations.headline_en,
+            publicDescription_en: translations.description_en,
+            publicLocation_en: translations.location_en,
+            publicHighlights_en: translations.highlights_en,
+          });
+          translatedCount++;
+        } catch (itemErr) {
+          console.warn(`Failed translating departure ${target.id}:`, itemErr);
+        }
+      }
+
+      // Dispatch refresh events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('yates_expeditions_updated'));
+        window.dispatchEvent(new Event('storage'));
+      }
+
+      return { success: true, translatedCount };
+    } catch (err: any) {
+      console.error('Error in translateAllDeparturesWithAI:', err);
+      return { success: false, translatedCount: 0, error: err.message || String(err) };
     }
   },
 };

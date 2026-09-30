@@ -65,6 +65,7 @@ export interface ExpeditionWizardData {
   publicPillars: Array<{ title: string; desc: string; iconKey: 'sail' | 'food' | 'anchor' | 'waves' | 'compass' | 'footprints' }>;
   publicIncluded: string[];
   publicWeatherPolicy: string;
+  allowWaitlist?: boolean;
 }
 
 interface ExpeditionWizardModalProps {
@@ -226,6 +227,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
   const [totalSlots, setTotalSlots] = useState<number>(8);
   const [pricePerPaxClp, setPricePerPaxClp] = useState<number>(1850000);
   const [priceCharterFullClp, setPriceCharterFullClp] = useState<number>(14800000);
+  const [allowWaitlist, setAllowWaitlist] = useState<boolean>(true);
 
   // Initialize selected service IDs from active catalog services once per open
   useEffect(() => {
@@ -285,6 +287,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
     setTotalSlots(8);
     setPricePerPaxClp(1850000);
     setPriceCharterFullClp(14800000);
+    setAllowWaitlist(true);
 
     setPublicName('Travesía Robinson Crusoe');
     setPublicHeadline('Expedición a Vela & Navegación Oceánica Austral');
@@ -834,6 +837,7 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
         publicPillars: activePillars,
         publicIncluded,
         publicWeatherPolicy,
+        allowWaitlist,
       };
 
       // Confetti celebration!
@@ -1685,6 +1689,51 @@ export const ExpeditionWizardModal: React.FC<ExpeditionWizardModalProps> = ({
                       <span className="text-[11px] text-slate-400 font-mono block mt-1">
                         ${priceCharterFullClp.toLocaleString('es-CL')} CLP (embarcación completa)
                       </span>
+                    </div>
+                  </div>
+
+                  {/* Switch Configuración Lista de Espera */}
+                  <div className="p-4 bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-2xl transition shadow-2xs">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <label
+                            className="text-xs font-bold text-[#0f2b48] uppercase tracking-wider cursor-pointer flex items-center gap-1.5"
+                            onClick={() => setAllowWaitlist(prev => !prev)}
+                          >
+                            <Users className="w-3.5 h-3.5 text-sky-700" />
+                            <span>Habilitar Lista de Espera si los cupos se agotan</span>
+                          </label>
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                            allowWaitlist
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-slate-200 text-slate-700 border border-slate-300'
+                          }`}>
+                            {allowWaitlist ? 'ACTIVADA' : 'DESACTIVADA'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-light leading-relaxed">
+                          {allowWaitlist
+                            ? 'Permitido: los interesados podrán solicitar cupo en lista de espera prioritaria vía WhatsApp cuando la salida esté completa.'
+                            : 'Desactivado: al agotarse los cupos, se informará que la nómina de zarpe está cerrada y se orientará al pasajero a otras fechas con disponibilidad.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={allowWaitlist}
+                        onClick={() => setAllowWaitlist(prev => !prev)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          allowWaitlist ? 'bg-emerald-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            allowWaitlist ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
                     </div>
                   </div>
 

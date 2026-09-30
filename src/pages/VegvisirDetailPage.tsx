@@ -390,18 +390,24 @@ export const VegvisirDetailPage: React.FC<VegvisirDetailPageProps> = ({ onNaviga
                         )}
 
                         {isSoldOut ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const text = encodeURIComponent(
-                                `Hola Yates Chile, consulto por lista de espera para la expedición ${exp.name} (${exp.startDate} al ${exp.endDate}) en Velero Vegvisir que figura completa.`
-                              );
-                              window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
-                            }}
-                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border border-slate-300/80"
-                          >
-                            <span>{t('Lista de Espera', 'Waitlist')}</span>
-                          </button>
+                          exp.allowWaitlist !== false && (exp as any).allow_waitlist !== false ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const text = encodeURIComponent(
+                                  `Hola Yates Chile, consulto por lista de espera para la expedición ${exp.name} (${exp.startDate} al ${exp.endDate}) en Velero Vegvisir que figura completa.`
+                                );
+                                window.open(`https://wa.me/56981312920?text=${text}`, '_blank');
+                              }}
+                              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer border border-slate-300/80"
+                            >
+                              <span>{t('Lista de Espera', 'Waitlist')}</span>
+                            </button>
+                          ) : (
+                            <span className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-100 text-slate-400 px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 cursor-default">
+                              <span>{t('Nómina Cerrada', 'Roster Closed')}</span>
+                            </span>
+                          )
                         ) : (
                           <button
                             type="button"

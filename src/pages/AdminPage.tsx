@@ -103,6 +103,7 @@ import {
   type ExpeditionRouteRow,
   type VesselRow,
 } from '../services/expeditionService';
+import { translationService } from '../services/translationService';
 import { cmsService, DEFAULT_CMS_CONTENT, normalizeExternalMediaUrl, diagnoseMediaUrl, type SiteContent } from '../services/cmsService';
 import {
   analyticsService,
@@ -118,6 +119,8 @@ import { CalendarDateCardPicker } from '../components/admin/CalendarDateCardPick
 import { exportBookingsToExcel, exportExpeditionManifestToExcel, type ExpeditionManifestExportRow } from '../lib/excelExport';
 import { supabase } from '../lib/supabase';
 import { crmService } from '../services/crmService';
+import { useWaitlist } from '../hooks/useWaitlist';
+import type { WaitlistEntry } from '../services/waitlistService';
 
 const DELETED_CLIENTS_KEY = 'yates_chile_deleted_crm_clients';
 
@@ -782,13 +785,29 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [kpiTimeframe, setKpiTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('month');
 
   // Estados de la pestaña dedicada de Reservas
-  const [bookingsTypeFilter, setBookingsTypeFilter] = useState<'all' | 'lodge' | 'expedition' | 'service'>('all');
+  const [bookingsTypeFilter, setBookingsTypeFilter] = useState<'all' | 'lodge' | 'expedition' | 'service' | 'waitlist'>('all');
   const [bookingsStatusFilter, setBookingsStatusFilter] = useState<'all' | 'approved' | 'confirmed' | 'reserved' | 'scheduled' | 'pending_transfer' | 'blocked'>('all');
   const [isTypeFilterOpen, setIsTypeFilterOpen] = useState(false);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [bookingsSearchQuery, setBookingsSearchQuery] = useState('');
   const [bookingsViewMode, setBookingsViewMode] = useState<'list' | 'grid'>('list');
   const [selectedBookingForDetail, setSelectedBookingForDetail] = useState<any | null>(null);
+
+  // Hook y Estados de Lista de Espera Prioritaria (Supabase + Local)
+  const {
+    waitlist,
+    updateWaitlistEntryStatus,
+    deleteWaitlistEntry,
+  } = useWaitlist();
+
+  const [selectedDepartureForWaitlist, setSelectedDepartureForWaitlist] = useState<{
+    departure: any;
+    routeTitle: string;
+    vesselName: string;
+    entries: WaitlistEntry[];
+  } | null>(null);
+
+  const [waitlistStatusFilter, setWaitlistStatusFilter] = useState<'all' | 'waiting' | 'contacted' | 'promoted' | 'cancelled'>('all');
 
   // Estados para Login y Recuperación de Contraseña
   const [showPassword, setShowPassword] = useState(false);
@@ -938,6 +957,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const [isUploadingPolicyPdf, setIsUploadingPolicyPdf] = useState(false);
   const policyPdfFileInputRef = useRef<HTMLInputElement | null>(null);
   const [isSavingDeparture, setIsSavingDeparture] = useState(false);
+  const [isTranslatingExpeditions, setIsTranslatingExpeditions] = useState(false);
 
   const expeditionCategoryOptions = useMemo(() => {
     const cats = cmsService.getExpeditionCategories(content);
@@ -1154,6 +1174,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
       brochure_url: dep.brochureUrl || dep.brochure_url || '',
       policyUrl: initialPolicyUrl,
       policy_url: initialPolicyUrl,
+      allow_waitlist: dep.allow_waitlist !== false && dep.allowWaitlist !== false,
+      allowWaitlist: dep.allow_waitlist !== false && dep.allowWaitlist !== false,
     });
     setEditDepartureImgError(false);
     setEditDepartureImgLoading(false);
@@ -3693,6 +3715,19 @@ ${cust.notes || 'Sin notas adicionales.'}`;
   // Handlers para Expediciones
   const handleExpeditionWizardSuccess = async (wizardData: ExpeditionWizardData) => {
     try {
+      let translations: any = { name_en: '', headline_en: '', description_en: '', location_en: '', highlights_en: '' };
+      try {
+        translations = await translationService.translateExpeditionFields({
+          name: wizardData.publicName,
+          headline: wizardData.publicHeadline,
+          description: wizardData.publicDescription,
+          location: wizardData.publicLocation,
+          highlights: wizardData.publicPillars && wizardData.publicPillars.length > 0 ? JSON.stringify(wizardData.publicPillars) : '[]',
+        });
+      } catch (transErr) {
+        console.warn('AI translation notice during wizard departure creation:', transErr);
+      }
+
       const res = await expeditionService.createDeparture({
         routeId: wizardData.routeId,
         vesselId: wizardData.vesselId,
@@ -3703,13 +3738,20 @@ ${cust.notes || 'Sin notas adicionales.'}`;
         priceCharterFullClp: Number(wizardData.priceCharterFullClp),
         status: wizardData.status,
         publicName: wizardData.publicName,
+        publicName_en: translations.name_en,
+        publicHeadline: wizardData.publicHeadline,
+        publicHeadline_en: translations.headline_en,
         publicLocation: wizardData.publicLocation,
+        publicLocation_en: translations.location_en,
         publicCoverImage: wizardData.publicCoverImage,
         publicDescription: wizardData.publicDescription,
+        publicDescription_en: translations.description_en,
         publicTempEstimate: wizardData.publicTempEstimate,
         publicBrochureUrl: wizardData.publicBrochureUrl,
         publicHighlights: wizardData.publicPillars && wizardData.publicPillars.length > 0 ? JSON.stringify(wizardData.publicPillars) : '[]',
+        publicHighlights_en: translations.highlights_en,
         publicIncludedServices: wizardData.publicIncluded ? wizardData.publicIncluded.join(' • ') : undefined,
+        allowWaitlist: wizardData.allowWaitlist !== false,
       });
 
       if (res.success) {
@@ -3811,35 +3853,55 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     if (!editingDeparture || isSavingDeparture) return;
     setIsSavingDeparture(true);
     try {
-    const rawAvail = editingDeparture.available_slots;
-    const availSlots = (rawAvail !== undefined && rawAvail !== null && String(rawAvail).trim() !== '')
-      ? Math.max(0, parseInt(String(rawAvail), 10) || 0)
-      : 0;
-    const targetStatus = (availSlots <= 0 && editingDeparture.status !== 'cancelled')
-      ? 'guaranteed'
-      : (editingDeparture.status as any);
+      const rawAvail = editingDeparture.available_slots;
+      const availSlots = (rawAvail !== undefined && rawAvail !== null && String(rawAvail).trim() !== '')
+        ? Math.max(0, parseInt(String(rawAvail), 10) || 0)
+        : 0;
+      const targetStatus = (availSlots <= 0 && editingDeparture.status !== 'cancelled')
+        ? 'guaranteed'
+        : (editingDeparture.status as any);
 
-    const res = await expeditionService.updateDeparture(editingDeparture.id, {
-      routeId: editingDeparture.route_id || (editingDeparture as any).routeId,
-      publicName: editingDeparture.name,
-      publicHeadline: editingDeparture.headline,
-      vesselId: editingDeparture.vessel_id,
-      departureDate: editingDeparture.departure_date,
-      returnDate: editingDeparture.return_date,
-      totalSlots: Number(editingDeparture.total_slots),
-      availableSlots: availSlots,
-      pricePerPaxClp: Number(editingDeparture.price_per_pax_clp),
-      status: targetStatus,
-      publicLocation: editingDeparture.location,
-      publicDescription: editingDeparture.description,
-      publicCoverImage: editingDeparture.image,
-      publicTempEstimate: editingDeparture.tempEstimate,
-      publicHighlights: JSON.stringify(editPillars),
-      publicIncludedServices: editingDeparture.includedServices,
-      publicBrochureUrl: (editingDeparture as any).brochureUrl || (editingDeparture as any).brochure_url || '',
-      publicPolicyUrl: (editingDeparture as any).policyUrl || (editingDeparture as any).policy_url || '',
-      publicPolicies: editPolicies,
-    });
+      // Auto-traducir campos editados con IA en segundo plano
+      let translations: any = { name_en: '', headline_en: '', description_en: '', location_en: '', highlights_en: '' };
+      try {
+        translations = await translationService.translateExpeditionFields({
+          name: editingDeparture.name,
+          headline: editingDeparture.headline,
+          description: editingDeparture.description,
+          location: editingDeparture.location,
+          highlights: JSON.stringify(editPillars),
+        });
+      } catch (transErr) {
+        console.warn('AI translation notice during departure save:', transErr);
+      }
+
+      const res = await expeditionService.updateDeparture(editingDeparture.id, {
+        routeId: editingDeparture.route_id || (editingDeparture as any).routeId,
+        publicName: editingDeparture.name,
+        publicName_en: translations.name_en || editingDeparture.name_en,
+        publicHeadline: editingDeparture.headline,
+        publicHeadline_en: translations.headline_en || editingDeparture.headline_en,
+        vesselId: editingDeparture.vessel_id,
+        departureDate: editingDeparture.departure_date,
+        returnDate: editingDeparture.return_date,
+        totalSlots: Number(editingDeparture.total_slots),
+        availableSlots: availSlots,
+        pricePerPaxClp: Number(editingDeparture.price_per_pax_clp),
+        status: targetStatus,
+        publicLocation: editingDeparture.location,
+        publicLocation_en: translations.location_en || editingDeparture.location_en,
+        publicDescription: editingDeparture.description,
+        publicDescription_en: translations.description_en || editingDeparture.description_en,
+        publicCoverImage: editingDeparture.image,
+        publicTempEstimate: editingDeparture.tempEstimate,
+        publicHighlights: JSON.stringify(editPillars),
+        publicHighlights_en: translations.highlights_en || editingDeparture.highlights_en,
+        publicIncludedServices: editingDeparture.includedServices,
+        publicBrochureUrl: (editingDeparture as any).brochureUrl || (editingDeparture as any).brochure_url || '',
+        publicPolicyUrl: (editingDeparture as any).policyUrl || (editingDeparture as any).policy_url || '',
+        publicPolicies: editPolicies,
+        allowWaitlist: editingDeparture.allow_waitlist !== false && (editingDeparture as any).allowWaitlist !== false,
+      });
     if (res.success) {
       await fetchAllData();
       const savedImg = editingDeparture.image;
@@ -3866,6 +3928,25 @@ ${cust.notes || 'Sin notas adicionales.'}`;
     }
     } finally {
       setIsSavingDeparture(false);
+    }
+  };
+
+  const handleTranslateAllExpeditionsWithAI = async () => {
+    if (isTranslatingExpeditions) return;
+    setIsTranslatingExpeditions(true);
+    try {
+      const res = await expeditionService.translateAllDeparturesWithAI();
+      if (res.success) {
+        await fetchAllData();
+        setActionMessage(`✓ Se tradujeron ${res.translatedCount} expediciones al inglés con éxito.`);
+        setTimeout(() => setActionMessage(null), 4500);
+      } else {
+        triggerAlert('Error al traducir expediciones: ' + (res.error || 'Desconocido'), 'error');
+      }
+    } catch (err: any) {
+      triggerAlert('Error al traducir expediciones con IA: ' + (err.message || err), 'error');
+    } finally {
+      setIsTranslatingExpeditions(false);
     }
   };
 
@@ -5792,7 +5873,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
 
                 <div className="p-7">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
                     {/* KPI 1: INGRESOS CONFIRMADOS */}
                     <div className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-slate-200/90 hover:border-[#0b192c] rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer">
                       <div className="flex items-center justify-between gap-2">
@@ -5899,6 +5980,39 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         <p className="text-xs text-slate-500 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
                           <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
                           <span className="truncate">Hasta 11 pax • {kpiBlockedDatesCount} bloqueos</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* KPI 5: LISTA DE ESPERA (EXPEDICIONES) */}
+                    <div
+                      onClick={() => {
+                        setActiveTab('bookings');
+                        setBookingsTypeFilter('waitlist');
+                      }}
+                      className="min-w-0 overflow-hidden bg-[#fcfdfe] hover:bg-white border border-amber-200/90 hover:border-amber-500 rounded-3xl p-5 sm:p-6 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 space-y-3 sm:space-y-4 group cursor-pointer"
+                      title="Ver solicitudes en Lista de Espera"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-500 group-hover:text-amber-800 transition-colors truncate">
+                          Lista de Espera
+                        </span>
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-700 border border-amber-200 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                          <Clock className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-amber-600" />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-1.5 min-w-0">
+                          <span className="text-xl sm:text-2xl 2xl:text-3xl font-extrabold text-[#0b192c] tracking-tight font-sans truncate">
+                            {waitlist.filter((w) => w.status === 'waiting').length}
+                          </span>
+                          <span className="text-xs font-normal text-slate-400 font-sans shrink-0">solicitudes</span>
+                        </div>
+                        <p className="text-xs text-amber-700 font-medium mt-2 flex items-center gap-1.5 min-w-0 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span className="truncate">
+                            {waitlist.reduce((acc, w) => w.status === 'waiting' ? acc + (w.paxCount || 1) : acc, 0)} cupos solicitados
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -7122,6 +7236,12 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             <span>Tipo: Servicios ({allUnifiedBookings.filter((b) => (b.type as string) === 'service').length})</span>
                           </div>
                         )}
+                        {bookingsTypeFilter === 'waitlist' && (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Tipo: Lista de Espera ({waitlist.length})</span>
+                          </div>
+                        )}
                         <ChevronDown
                           className={`w-3.5 h-3.5 transition-transform duration-200 ${
                             isTypeFilterOpen ? 'rotate-180 text-sky-300' : 'text-slate-300'
@@ -7136,7 +7256,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                             className="fixed inset-0 z-30"
                             onClick={() => setIsTypeFilterOpen(false)}
                           />
-                          <div className="absolute left-0 top-full mt-1.5 z-40 w-52 bg-white border border-slate-200/90 rounded-2xl shadow-[0_12px_30px_rgba(11,25,44,0.15)] p-1.5 space-y-0.5 animate-fadeIn">
+                          <div className="absolute left-0 top-full mt-1.5 z-40 w-56 bg-white border border-slate-200/90 rounded-2xl shadow-[0_12px_30px_rgba(11,25,44,0.15)] p-1.5 space-y-0.5 animate-fadeIn">
                             <button
                               type="button"
                               onClick={() => {
@@ -7241,10 +7361,57 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                 {allUnifiedBookings.filter((b) => (b.type as string) === 'service').length}
                               </span>
                             </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingsTypeFilter('waitlist');
+                                setIsTypeFilterOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition cursor-pointer border-t border-slate-100 pt-1.5 ${
+                                bookingsTypeFilter === 'waitlist'
+                                  ? 'bg-[#0b192c] text-white shadow-xs'
+                                  : 'text-amber-900 bg-amber-50/50 hover:bg-amber-100/70'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span className="font-bold">Lista de Espera</span>
+                              </div>
+                              <span
+                                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                                  bookingsTypeFilter === 'waitlist'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-amber-200 text-amber-900'
+                                }`}
+                              >
+                                {waitlist.length}
+                              </span>
+                            </button>
                           </div>
                         </>
                       )}
                     </div>
+
+                    {/* BOTÓN RÁPIDO DE ACCESO DIRECTO A LISTA DE ESPERA */}
+                    <button
+                      type="button"
+                      onClick={() => setBookingsTypeFilter(bookingsTypeFilter === 'waitlist' ? 'all' : 'waitlist')}
+                      className={`h-8.5 px-3.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border shadow-2xs active:scale-95 ${
+                        bookingsTypeFilter === 'waitlist'
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:text-amber-800'
+                      }`}
+                      title="Filtrar por Lista de Espera Prioritaria"
+                    >
+                      <Clock className={`w-3.5 h-3.5 ${bookingsTypeFilter === 'waitlist' ? 'text-slate-950' : 'text-amber-600'}`} />
+                      <span>Lista de Espera</span>
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ${
+                        bookingsTypeFilter === 'waitlist' ? 'bg-slate-950 text-white' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {waitlist.filter((w) => w.status === 'waiting').length}
+                      </span>
+                    </button>
 
                     {/* DROPDOWN FILTRO ESTADO */}
                     <div className="relative">
@@ -7481,8 +7648,283 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 </div>
               </div>
 
-              {/* 4. RESULTADOS: VISTA LISTA O VISTA GRID */}
-              {filteredUnifiedBookings.length === 0 ? (
+              {/* 4. RESULTADOS: VISTA LISTA O VISTA GRID O LISTA DE ESPERA */}
+              {bookingsTypeFilter === 'waitlist' ? (
+                /* 4.WL VISTA DEDICADA: TABLA DE LISTA DE ESPERA PRIORITARIA */
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Banner descriptivo & Filtro por estado */}
+                  <div className="bg-gradient-to-r from-[#0b192c] via-[#12233c] to-[#0b192c] text-white rounded-3xl p-6 shadow-md border border-amber-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center justify-center shrink-0 shadow-inner">
+                        <Sparkles className="w-5 h-5 text-amber-300" />
+                      </div>
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-bold border border-amber-400/30 mb-1">
+                          Gestión Centralizada
+                        </div>
+                        <h4 className="font-serif font-bold text-lg text-white">
+                          Lista de Espera Prioritaria (Expediciones)
+                        </h4>
+                        <p className="text-xs text-slate-300 font-light max-w-xl">
+                          Pasajeros registrados para salidas 100% completas. El orden de prioridad es estrictamente por fecha de inscripción para la asignación de plazas liberadas.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Filtros de estado */}
+                    <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-700/80">
+                      {[
+                        { id: 'all', label: 'Todos', count: waitlist.length },
+                        { id: 'waiting', label: 'En Espera', count: waitlist.filter((w) => w.status === 'waiting').length },
+                        { id: 'contacted', label: 'Contactados', count: waitlist.filter((w) => w.status === 'contacted').length },
+                        { id: 'promoted', label: 'Asignados', count: waitlist.filter((w) => w.status === 'promoted').length },
+                        { id: 'cancelled', label: 'Cancelados', count: waitlist.filter((w) => w.status === 'cancelled').length },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setWaitlistStatusFilter(st.id as any)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                            waitlistStatusFilter === st.id
+                              ? 'bg-amber-400 text-slate-950 font-bold shadow-xs'
+                              : 'text-slate-300 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <span>{st.label}</span>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                            waitlistStatusFilter === st.id ? 'bg-slate-950 text-amber-300' : 'bg-white/10 text-slate-300'
+                          }`}>
+                            {st.count}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tabla de Registros */}
+                  {(() => {
+                    const filteredWaitlist = waitlist.filter((w) => {
+                      if (waitlistStatusFilter !== 'all' && w.status !== waitlistStatusFilter) {
+                        return false;
+                      }
+                      if (bookingsSearchQuery.trim()) {
+                        const q = bookingsSearchQuery.toLowerCase().trim();
+                        const matchName = w.fullName.toLowerCase().includes(q);
+                        const matchDep = w.departureName.toLowerCase().includes(q);
+                        const matchEmail = w.email.toLowerCase().includes(q);
+                        const matchPhone = w.phone.toLowerCase().includes(q);
+                        if (!matchName && !matchDep && !matchEmail && !matchPhone) return false;
+                      }
+                      return true;
+                    });
+
+                    if (filteredWaitlist.length === 0) {
+                      return (
+                        <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center space-y-4 shadow-[0_4px_24px_rgba(11,25,44,0.03)]">
+                          <div className="w-12 h-12 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-center mx-auto text-amber-700 shadow-2xs">
+                            <Clock className="w-6 h-6 text-amber-600" />
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="font-serif font-bold text-base text-[#0b192c]">
+                              No hay pasajeros en lista de espera con los filtros seleccionados
+                            </h4>
+                            <p className="text-xs text-slate-500 max-w-md mx-auto font-light leading-relaxed">
+                              Cuando un interesado complete el formulario de lista de espera en una salida completa, aparecerá automáticamente aquí en orden cronológico.
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="bg-white border border-slate-200/80 rounded-3xl shadow-[0_4px_24px_rgba(11,25,44,0.03)] overflow-hidden">
+                        <div className="overflow-x-auto custom-scrollbar">
+                          <table className="w-full min-w-[900px] text-left text-xs">
+                            <thead>
+                              <tr className="bg-[#fbfcfd] border-b border-slate-100 text-[10px] uppercase font-mono font-bold text-slate-400 tracking-wider">
+                                <th className="px-5 py-3.5 whitespace-nowrap text-center"># Prioridad</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap">Expedición & Fechas</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap">Pasajero Solicitante</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap text-center">Cupos</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap">Canales de Contacto</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap">Registrado El</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap">Estado</th>
+                                <th className="px-5 py-3.5 whitespace-nowrap text-right">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {filteredWaitlist.map((w, idx) => {
+                                const cleanPhone = (w.phone || '').replace(/[^0-9]/g, '');
+                                const isFirst = idx === 0 && w.status === 'waiting';
+
+                                return (
+                                  <tr
+                                    key={w.id}
+                                    className={`hover:bg-slate-50/80 transition-colors duration-150 ${
+                                      isFirst ? 'bg-amber-50/30' : ''
+                                    }`}
+                                  >
+                                    {/* 1. Prioridad */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                                      <span
+                                        className={`inline-flex items-center justify-center w-7 h-7 rounded-xl font-mono font-bold text-xs shadow-2xs border ${
+                                          isFirst
+                                            ? 'bg-amber-400 text-slate-950 border-amber-500'
+                                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                                        }`}
+                                      >
+                                        #{idx + 1}
+                                      </span>
+                                    </td>
+
+                                    {/* 2. Expedición & Fechas */}
+                                    <td className="px-5 py-3.5">
+                                      <div className="space-y-0.5">
+                                        <div className="font-semibold text-slate-900 text-xs flex items-center gap-1.5">
+                                          <Ship className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                          <span className="truncate max-w-[220px]" title={w.departureName}>
+                                            {w.departureName}
+                                          </span>
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 font-light flex items-center gap-1.5">
+                                          <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                                          <span>{w.departureDates}</span>
+                                          {w.vesselName && (
+                                            <span className="text-[10px] text-slate-400 font-mono">
+                                              • {w.vesselName}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* 3. Pasajero */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-full bg-slate-100 text-[#0b192c] flex items-center justify-center font-bold text-xs border border-slate-200">
+                                          <User className="w-3.5 h-3.5 text-slate-600" />
+                                        </div>
+                                        <div>
+                                          <strong className="text-slate-900 text-xs block">
+                                            {w.fullName}
+                                          </strong>
+                                          <span className="text-[10px] text-slate-400 font-light">
+                                            Solicitud directa
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {/* 4. Cupos */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-center">
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-mono font-bold border border-slate-200/80">
+                                        <Users className="w-3 h-3 text-slate-500" />
+                                        <span>{w.paxCount} {w.paxCount > 1 ? 'pax' : 'pax'}</span>
+                                      </span>
+                                    </td>
+
+                                    {/* 5. Canales de Contacto */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap">
+                                      <div className="flex items-center gap-2">
+                                        {cleanPhone && (
+                                          <a
+                                            href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+                                              `Hola ${w.fullName}, te contactamos desde Yates Chile respecto a tu inscripción en la Lista de Espera para la expedición "${w.departureName}" (${w.departureDates}). ¡Tenemos novedades sobre cupos disponibles!`
+                                            )}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 hover:bg-[#25D366] text-[#128C7E] hover:text-white border border-emerald-200 transition font-semibold text-[11px] shadow-2xs group/wa cursor-pointer"
+                                            title="Contactar por WhatsApp con mensaje personalizado"
+                                          >
+                                            <svg className="w-3.5 h-3.5 fill-[#25D366] group-hover/wa:fill-white transition-colors shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                              <path d="M12.004 2C6.48 2 2 6.48 2 12a9.92 9.92 0 0 0 1.54 5.3L2 22l4.83-1.27A9.97 9.97 0 0 0 12.004 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm5.27 13.91c-.24.66-1.38 1.27-1.93 1.35-.49.07-1.12.1-3.23-.77a11.16 11.16 0 0 1-4.84-4.25c-.84-1.12-1.34-2.43-1.34-3.8 0-1.39.73-2.07.97-2.33.24-.26.49-.33.66-.33.17 0 .34.01.49.02.16.01.37-.06.58.45.22.52.74 1.8.8 1.93.07.13.11.28.02.46-.09.18-.14.28-.28.45-.14.17-.3.38-.43.51-.15.15-.31.32-.13.63.18.31.81 1.33 1.74 2.16.93.83 1.71 1.09 1.95 1.21.24.12.38.1.52-.06.14-.16.61-.71.77-.95.16-.24.33-.2.55-.12.22.08 1.4.66 1.64.78.24.12.4.18.46.28.06.1.06.58-.18 1.24z" />
+                                            </svg>
+                                            <span>WhatsApp</span>
+                                          </a>
+                                        )}
+                                        <a
+                                          href={`tel:${w.phone}`}
+                                          className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                                          title={`Llamar a ${w.phone}`}
+                                        >
+                                          <Phone className="w-3.5 h-3.5" />
+                                        </a>
+                                        <a
+                                          href={`mailto:${w.email}`}
+                                          className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                                          title={`Enviar correo a ${w.email}`}
+                                        >
+                                          <Mail className="w-3.5 h-3.5" />
+                                        </a>
+                                      </div>
+                                    </td>
+
+                                    {/* 6. Fecha Registro */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap font-mono text-[11px] text-slate-600">
+                                      {new Date(w.createdAt).toLocaleDateString('es-CL', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </td>
+
+                                    {/* 7. Estado */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap">
+                                      <select
+                                        value={w.status}
+                                        onChange={async (e) => {
+                                          await updateWaitlistEntryStatus(w.id, e.target.value as any);
+                                        }}
+                                        className={`px-2.5 py-1 rounded-full text-xs font-semibold font-mono border transition cursor-pointer ${
+                                          w.status === 'waiting'
+                                            ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                            : w.status === 'contacted'
+                                            ? 'bg-sky-50 text-sky-900 border-sky-300'
+                                            : w.status === 'promoted'
+                                            ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                                            : 'bg-slate-100 text-slate-600 border-slate-300'
+                                        }`}
+                                      >
+                                        <option value="waiting">🕒 En Espera</option>
+                                        <option value="contacted">💬 Contactado</option>
+                                        <option value="promoted">✅ Cupo Asignado</option>
+                                        <option value="cancelled">❌ Cancelado</option>
+                                      </select>
+                                    </td>
+
+                                    {/* 8. Acciones */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          triggerConfirm(
+                                            `¿Eliminar de la lista de espera a ${w.fullName}?`,
+                                            () => deleteWaitlistEntry(w.id),
+                                            {
+                                              title: 'Eliminar de Lista de Espera',
+                                              confirmText: 'Eliminar',
+                                              type: 'danger',
+                                            }
+                                          );
+                                        }}
+                                        title="Eliminar registro"
+                                        className="w-7 h-7 rounded-full bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 inline-flex items-center justify-center transition border border-slate-200/80 cursor-pointer shadow-2xs"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : filteredUnifiedBookings.length === 0 ? (
                 <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center space-y-4 shadow-[0_4px_24px_rgba(11,25,44,0.03)]">
                   <div className="w-12 h-12 bg-[#f4f7fb] border border-slate-200/80 rounded-2xl flex items-center justify-center mx-auto text-[#0b192c] shadow-2xs">
                     <CalendarCheck className="w-6 h-6 text-[#0b192c]" />
@@ -9363,16 +9805,30 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       </div>
                     </div>
 
-                    {/* Botón Nueva Salida */}
-                    <button
-                      type="button"
-                      onClick={() => setShowNewDepartureModal(true)}
-                      title="Programar Salida"
-                      aria-label="Programar Salida"
-                      className="w-8 h-8 bg-[#0b192c] hover:bg-[#182a44] text-white rounded-full flex items-center justify-center transition shadow-xs cursor-pointer active:scale-95 shrink-0"
-                    >
-                      <Plus className="w-4 h-4 text-sky-300" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Botón Traducir Expediciones con IA */}
+                      <button
+                        type="button"
+                        disabled={isTranslatingExpeditions}
+                        onClick={handleTranslateAllExpeditionsWithAI}
+                        title="Traducir todas las expediciones a inglés con IA"
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-sky-50 to-indigo-50 hover:from-sky-100 hover:to-indigo-100 text-sky-950 border border-sky-200/90 rounded-full flex items-center gap-1.5 transition shadow-2xs cursor-pointer active:scale-95 text-xs font-semibold shrink-0 disabled:opacity-50"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 text-sky-600 ${isTranslatingExpeditions ? 'animate-spin' : ''}`} />
+                        <span>{isTranslatingExpeditions ? 'Traduciendo...' : 'Traducir con IA'}</span>
+                      </button>
+
+                      {/* Botón Nueva Salida */}
+                      <button
+                        type="button"
+                        onClick={() => setShowNewDepartureModal(true)}
+                        title="Programar Salida"
+                        aria-label="Programar Salida"
+                        className="w-8 h-8 bg-[#0b192c] hover:bg-[#182a44] text-white rounded-full flex items-center justify-center transition shadow-xs cursor-pointer active:scale-95 shrink-0"
+                      >
+                        <Plus className="w-4 h-4 text-sky-300" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -9569,6 +10025,31 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                     <Users className={`w-3.5 h-3.5 ${isAgotado ? 'text-emerald-700 group-hover/mbtn:text-white' : 'text-slate-500 group-hover/mbtn:text-sky-300'}`} />
                                     <span>Pasajeros ({realBookedPax})</span>
                                   </button>
+
+                                  {/* Botón Lista de Espera si hay interesados */}
+                                  {(() => {
+                                    const depWaitlist = waitlist.filter((w) =>
+                                      (w.departureId && (w.departureId === dep.id || String(w.departureId) === String(dep.id))) ||
+                                      (w.departureName && routeTitle && w.departureName.toLowerCase().includes(routeTitle.toLowerCase()))
+                                    );
+                                    if (depWaitlist.length === 0) return null;
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedDepartureForWaitlist({
+                                          departure: dep,
+                                          routeTitle,
+                                          vesselName,
+                                          entries: depWaitlist,
+                                        })}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/80 transition cursor-pointer shadow-2xs group/wl"
+                                        title="Ver interesados en Lista de Espera para esta fecha"
+                                      >
+                                        <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                        <span>Lista de Espera ({depWaitlist.length})</span>
+                                      </button>
+                                    );
+                                  })()}
 
                                   {/* Botón Sumar Pasajero: Círculo con un + */}
                                   {!isAgotado && (
@@ -10002,6 +10483,32 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                         <Plus className="w-3.5 h-3.5" />
                                       </button>
                                     )}
+                                    {/* Botón Lista de Espera en Vista Lista */}
+                                    {(() => {
+                                      const depWaitlist = waitlist.filter((w) =>
+                                        (w.departureId && (w.departureId === dep.id || String(w.departureId) === String(dep.id))) ||
+                                        (w.departureName && routeTitle && w.departureName.toLowerCase().includes(routeTitle.toLowerCase()))
+                                      );
+                                      if (depWaitlist.length === 0) return null;
+                                      return (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedDepartureForWaitlist({
+                                            departure: dep,
+                                            routeTitle,
+                                            vesselName,
+                                            entries: depWaitlist,
+                                          })}
+                                          className="w-7 h-7 rounded-full text-amber-600 hover:text-white hover:bg-amber-500 flex items-center justify-center transition cursor-pointer relative shadow-2xs"
+                                          title={`Ver lista de espera (${depWaitlist.length} solicitudes)`}
+                                        >
+                                          <Clock className="w-3.5 h-3.5" />
+                                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full text-[8px] font-bold flex items-center justify-center">
+                                            {depWaitlist.length}
+                                          </span>
+                                        </button>
+                                      );
+                                    })()}
                                     <button
                                       type="button"
                                       onClick={() => handleOpenPassengerManifestModal({ ...dep, routeTitle, vesselName, bookedPax: realBookedPax, maxPax: maxSlots, availablePax: isSoldOut ? 0 : availablePax, departureDates: `${formatDateDDMMYYYY(dep.departure_date)} ➔ ${formatDateDDMMYYYY(dep.return_date)}`, rawDepartureDate: dep.departure_date, pricePerPaxClp: dep.price_per_pax_clp })}
@@ -15344,6 +15851,59 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                     </div>
                   </div>
 
+                  {/* Switch Configuración Lista de Espera */}
+                  <div className="p-4 bg-slate-50/80 hover:bg-slate-50 border border-slate-200/90 rounded-2xl transition shadow-2xs">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <label
+                            className="text-[11px] font-bold text-[#0b192c] uppercase tracking-wider font-mono cursor-pointer flex items-center gap-1.5"
+                            onClick={() => setEditingDeparture({
+                              ...editingDeparture,
+                              allow_waitlist: editingDeparture.allow_waitlist === false ? true : false,
+                              allowWaitlist: editingDeparture.allow_waitlist === false ? true : false,
+                            })}
+                          >
+                            <Users className="w-3.5 h-3.5 text-sky-700" />
+                            <span>Habilitar Lista de Espera si los cupos se agotan</span>
+                          </label>
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                            editingDeparture.allow_waitlist !== false
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-slate-200 text-slate-700 border border-slate-300'
+                          }`}>
+                            {editingDeparture.allow_waitlist !== false ? 'ACTIVADA' : 'DESACTIVADA'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-light leading-relaxed">
+                          {editingDeparture.allow_waitlist !== false
+                            ? 'Permitido: los interesados podrán solicitar cupo en lista de espera prioritaria vía WhatsApp cuando la salida esté completa.'
+                            : 'Desactivado: al agotarse los cupos, se informará que la nómina de zarpe está cerrada y se orientará al pasajero a otras fechas con disponibilidad.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={editingDeparture.allow_waitlist !== false}
+                        onClick={() => setEditingDeparture({
+                          ...editingDeparture,
+                          allow_waitlist: editingDeparture.allow_waitlist === false ? true : false,
+                          allowWaitlist: editingDeparture.allow_waitlist === false ? true : false,
+                        })}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          editingDeparture.allow_waitlist !== false ? 'bg-emerald-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            editingDeparture.allow_waitlist !== false ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Destino / Ubicación */}
                   <div>
                     <label className="block text-[11px] font-bold text-[#0b192c] uppercase tracking-wider mb-1.5 font-mono">
@@ -18136,6 +18696,164 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 }`}
               >
                 {customConfirm.confirmText || 'Aceptar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* MODAL: LISTA DE ESPERA POR EXPEDICIÓN ESPECÍFICA */}
+      {/* ========================================================================= */}
+      {selectedDepartureForWaitlist && (
+        <div
+          className="fixed inset-0 z-50 bg-[#0b192c]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn cursor-pointer"
+          onClick={() => setSelectedDepartureForWaitlist(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden cursor-default"
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-[#0b192c] text-white flex items-center justify-between border-b border-white/10">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-300 shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[10px] font-mono uppercase tracking-wider font-semibold border border-amber-400/30">
+                    Lista de Espera Prioritaria
+                  </div>
+                  <h3 className="font-serif text-base sm:text-lg font-bold text-white tracking-tight truncate mt-1">
+                    {selectedDepartureForWaitlist.routeTitle}
+                  </h3>
+                  <p className="text-xs text-sky-200/80 font-light truncate">
+                    {selectedDepartureForWaitlist.vesselName} • {formatDateDDMMYYYY(selectedDepartureForWaitlist.departure.departure_date)} al {formatDateDDMMYYYY(selectedDepartureForWaitlist.departure.return_date)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDepartureForWaitlist(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer shrink-0 ml-2"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {selectedDepartureForWaitlist.entries.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-xs">
+                  No hay solicitudes en lista de espera para esta fecha.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedDepartureForWaitlist.entries.map((entry, index) => {
+                    const cleanPhone = entry.phone.replace(/[^0-9]/g, '');
+                    return (
+                      <div
+                        key={entry.id}
+                        className="p-4 rounded-2xl border border-slate-200/90 bg-[#fcfdfe] hover:bg-white transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs font-mono flex items-center justify-center shrink-0 border border-amber-200">
+                            #{index + 1}
+                          </div>
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <h5 className="font-semibold text-xs text-[#0b192c]">
+                                {entry.fullName}
+                              </h5>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                {entry.paxCount} {entry.paxCount > 1 ? 'cupos' : 'cupo'}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-light flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span>Tel: <strong className="text-slate-700">{entry.phone}</strong></span>
+                              <span>Email: <strong className="text-slate-700">{entry.email}</strong></span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {new Date(entry.createdAt).toLocaleDateString('es-CL', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          {cleanPhone && (
+                            <a
+                              href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+                                `Hola ${entry.fullName}, te contactamos desde Yates Chile respecto a tu inscripción en la lista de espera para ${selectedDepartureForWaitlist.routeTitle}. Tenemos novedades sobre cupos disponibles.`
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                            >
+                              <svg className="w-3.5 h-3.5 fill-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <path d="M12.004 2C6.48 2 2 6.48 2 12a9.92 9.92 0 0 0 1.54 5.3L2 22l4.83-1.27A9.97 9.97 0 0 0 12.004 22c5.52 0 10-4.48 10-10s-4.48-10-10-10zm5.27 13.91c-.24.66-1.38 1.27-1.93 1.35-.49.07-1.12.1-3.23-.77a11.16 11.16 0 0 1-4.84-4.25c-.84-1.12-1.34-2.43-1.34-3.8 0-1.39.73-2.07.97-2.33.24-.26.49-.33.66-.33.17 0 .34.01.49.02.16.01.37-.06.58.45.22.52.74 1.8.8 1.93.07.13.11.28.02.46-.09.18-.14.28-.28.45-.14.17-.3.38-.43.51-.15.15-.31.32-.13.63.18.31.81 1.33 1.74 2.16.93.83 1.71 1.09 1.95 1.21.24.12.38.1.52-.06.14-.16.61-.71.77-.95.16-.24.33-.2.55-.12.22.08 1.4.66 1.64.78.24.12.4.18.46.28.06.1.06.58-.18 1.24z" />
+                              </svg>
+                              <span>WhatsApp</span>
+                            </a>
+                          )}
+                          <a
+                            href={`tel:${entry.phone}`}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                            title="Llamar por teléfono"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerConfirm(
+                                `¿Eliminar a ${entry.fullName} de la lista de espera?`,
+                                async () => {
+                                  await deleteWaitlistEntry(entry.id);
+                                  setSelectedDepartureForWaitlist((prev) => prev ? ({
+                                    ...prev,
+                                    entries: prev.entries.filter((e) => e.id !== entry.id)
+                                  }) : null);
+                                },
+                                {
+                                  title: 'Eliminar de Lista de Espera',
+                                  confirmText: 'Eliminar',
+                                  type: 'danger',
+                                }
+                              );
+                            }}
+                            className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
+                            title="Eliminar de la lista de espera"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-[#fbfcfd] border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-500 font-mono">
+                Total: <strong className="text-[#0b192c]">{selectedDepartureForWaitlist.entries.length}</strong> solicitudes (
+                {selectedDepartureForWaitlist.entries.reduce((acc, e) => acc + (e.paxCount || 1), 0)} cupos)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDepartureForWaitlist(null);
+                  setActiveTab('bookings');
+                  setBookingsTypeFilter('waitlist');
+                }}
+                className="px-4 py-2 rounded-full bg-[#0b192c] hover:bg-[#182a44] text-white text-xs font-semibold transition cursor-pointer shadow-2xs"
+              >
+                Ver todas en Reservas ➔
               </button>
             </div>
           </div>

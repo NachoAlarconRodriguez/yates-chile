@@ -478,13 +478,20 @@ export const ExpeditionCalendar: React.FC = () => {
                 <div>
                   {/* Status CTA buttons */}
                   {isExpeditionSoldOut(activeExpedition) && (
-                    <a
-                      href="#/contacto"
-                      className="inline-flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-slate-950 font-bold px-6 py-3.5 rounded-xl transition text-sm border border-slate-200 shadow-sm min-h-[48px] cursor-pointer"
-                    >
-                      <span>{t('Unirse a Lista de Espera', 'Join Waitlist')}</span>
-                      <ArrowRight className="w-4 h-4 text-slate-700" />
-                    </a>
+                    activeExpedition.allowWaitlist !== false && (activeExpedition as any).allow_waitlist !== false ? (
+                      <a
+                        href="#/contacto"
+                        className="inline-flex items-center justify-center gap-2 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-slate-950 font-bold px-6 py-3.5 rounded-xl transition text-sm border border-slate-200 shadow-sm min-h-[48px] cursor-pointer"
+                      >
+                        <span>{t('Unirse a Lista de Espera', 'Join Waitlist')}</span>
+                        <ArrowRight className="w-4 h-4 text-slate-700" />
+                      </a>
+                    ) : (
+                      <div className="inline-flex items-center justify-center gap-2 w-full bg-slate-100/90 text-slate-600 font-semibold px-4 py-3.5 rounded-xl text-xs border border-slate-200 text-center shadow-xs">
+                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{t('Nómina Cerrada • Sin Lista de Espera', 'Roster Closed • No Waitlist')}</span>
+                      </div>
+                    )
                   )}
                   {!isExpeditionSoldOut(activeExpedition) && activeExpedition.spotsLeft === 'bloqueado' && (
                     <button

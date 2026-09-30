@@ -5,6 +5,7 @@ import { isExpeditionSoldOut, getExpeditionAvailableSpots, type PublicExpedition
 import { normalizeExternalMediaUrl, normalizeBrochureUrl, type ExpeditionCategory, DEFAULT_EXPEDITION_CATEGORIES } from '../services/cmsService';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useLanguage } from '../context/LanguageContext';
+import { translationService } from '../services/translationService';
 import { ExpeditionBookingModal } from '../components/modules/ExpeditionBookingModal';
 import { ExpeditionsLoadingState } from '../components/modules/ExpeditionsLoadingState';
 import { 
@@ -40,7 +41,7 @@ interface ExpeditionOverview {
   weatherPolicy: string;
 }
 
-const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => string): ExpeditionOverview => {
+const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => string, isEn: boolean = false): ExpeditionOverview => {
   const v = exp.vessel.toLowerCase();
 
   const unifiedPillars: ExpeditionPillar[] = [
@@ -136,10 +137,14 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
 
   // Custom headline and summary enhancement
   if (exp.headline && exp.headline.trim()) {
-    overview.headline = exp.headline;
+    overview.headline = isEn
+      ? (exp.headline_en || translationService.fallbackTranslate(exp.headline, 'EN'))
+      : exp.headline;
   }
   if (exp.description && exp.description.trim()) {
-    overview.summary = exp.description;
+    overview.summary = isEn
+      ? (exp.description_en || translationService.fallbackTranslate(exp.description, 'EN'))
+      : exp.description;
   }
 
   // Reflect custom pillars/experiences configured uniquely for this expedition in the admin panel
@@ -160,8 +165,12 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
           const customPillars: ExpeditionPillar[] = parsed
             .filter((p: any) => p && (typeof p === 'string' ? p.trim() : (p.title && p.title.trim())))
             .map((p: any, idx: number) => {
-              const title = typeof p === 'string' ? p.trim() : (p.title || '').trim();
-              const desc = typeof p === 'string' ? '' : (p.desc || '').trim();
+              let title = typeof p === 'string' ? p.trim() : (p.title || '').trim();
+              let desc = typeof p === 'string' ? '' : (p.desc || '').trim();
+              if (isEn) {
+                title = p.title_en || translationService.fallbackTranslate(title, 'EN');
+                if (desc) desc = p.desc_en || translationService.fallbackTranslate(desc, 'EN');
+              }
               const tLower = title.toLowerCase();
 
               let icon = defaultIcons[idx % defaultIcons.length];
@@ -212,7 +221,8 @@ const getExpeditionOverview = (exp: Expedition, t: (es: string, en: string) => s
 
 export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: _onNavigate, currentPath }) => {
   const { expeditions, loading } = useExpeditions();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const isEn = language === 'EN';
   const [selectedExpedition, setSelectedExpedition] = useState<Expedition | null>(null);
   const [bookingModalExpedition, setBookingModalExpedition] = useState<Expedition | null>(null);
   const [bookingModalInitialStep, setBookingModalInitialStep] = useState<0 | 1>(0);
@@ -267,7 +277,7 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
     });
   }, [expeditions, selectedType]);
 
-  const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition, t) : null;
+  const overview = selectedExpedition ? getExpeditionOverview(selectedExpedition, t, isEn) : null;
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -497,13 +507,13 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                         <h3 className={`font-serif text-lg font-bold leading-snug transition-colors ${
                           isUnavailable ? 'text-slate-500 group-hover:text-slate-800' : 'text-slate-900 group-hover:text-blue-950'
                         }`}>
-                          {exp.name}
+                          {isEn ? (exp.name_en || translationService.fallbackTranslate(exp.name, 'EN')) : exp.name}
                         </h3>
 
                         <p className={`text-xs line-clamp-2 leading-relaxed font-light ${
                           isUnavailable ? 'text-slate-400' : 'text-slate-500'
                         }`}>
-                          {exp.description}
+                          {isEn ? (exp.description_en || translationService.fallbackTranslate(exp.description, 'EN')) : exp.description}
                         </p>
                       </div>
 
@@ -512,7 +522,9 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                           isUnavailable ? 'text-slate-400' : 'text-slate-500'
                         }`}>
                           <MapPin className={`w-3.5 h-3.5 ${isUnavailable ? 'text-slate-400' : 'text-blue-900'}`} />
-                          <span className="truncate max-w-[140px]">{exp.location}</span>
+                          <span className="truncate max-w-[140px]">
+                            {isEn ? (exp.location_en || translationService.fallbackTranslate(exp.location, 'EN')) : exp.location}
+                          </span>
                         </div>
                         
                         <span className={`font-bold text-xs uppercase tracking-wider group-hover:translate-x-1 transition-transform inline-flex items-center gap-1 ${
@@ -573,11 +585,11 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                 </span>
                 <div className="space-y-1.5">
                   <h2 className="font-serif font-bold text-xl sm:text-2xl lg:text-[26px] text-white leading-snug">
-                    {selectedExpedition.name}
+                    {isEn ? (selectedExpedition.name_en || translationService.fallbackTranslate(selectedExpedition.name, 'EN')) : selectedExpedition.name}
                   </h2>
                   <div className="flex items-center gap-1.5 text-slate-350 text-xs">
                     <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <span>{selectedExpedition.location}</span>
+                    <span>{isEn ? (selectedExpedition.location_en || translationService.fallbackTranslate(selectedExpedition.location, 'EN')) : selectedExpedition.location}</span>
                   </div>
                 </div>
 
@@ -592,12 +604,16 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                   </div>
                   <div className="flex justify-between">
                     <span>{t('Embarcación / Base:', 'Vessel / Base:')}</span>
-                    <span className="font-bold text-white truncate max-w-[140px] text-right">{selectedExpedition.vessel}</span>
+                    <span className="font-bold text-white truncate max-w-[140px] text-right">
+                      {isEn ? translationService.fallbackTranslate(selectedExpedition.vessel, 'EN') : selectedExpedition.vessel}
+                    </span>
                   </div>
                   {selectedExpedition.tempEstimate && (
                     <div className="flex justify-between">
                       <span>{t('Temp. Estimada:', 'Est. Temp:')}</span>
-                      <span className="font-bold text-white">{selectedExpedition.tempEstimate}</span>
+                      <span className="font-bold text-white">
+                        {isEn ? (selectedExpedition.tempEstimate_en || translationService.fallbackTranslate(selectedExpedition.tempEstimate, 'EN')) : selectedExpedition.tempEstimate}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -623,7 +639,11 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                       className="w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 font-bold py-3 rounded-xl transition text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
                     >
                       <Clock className="w-4 h-4 text-amber-300" />
-                      <span>{t('Salida Completa • Lista de Espera', 'Sold Out • Join Waitlist')}</span>
+                      <span>
+                        {selectedExpedition.allowWaitlist !== false && (selectedExpedition as any).allow_waitlist !== false
+                          ? t('Salida Completa • Lista de Espera', 'Sold Out • Join Waitlist')
+                          : t('Salida Completa • Nómina Cerrada', 'Sold Out • Roster Closed')}
+                      </span>
                     </button>
                   </>
                 ) : selectedExpedition.spotsLeft === 'bloqueado' ? (
@@ -739,7 +759,11 @@ export const ExpedicionesPage: React.FC<ExpedicionesPageProps> = ({ onNavigate: 
                   className="flex-1 bg-amber-500/20 text-amber-300 border border-amber-400/30 font-bold py-3 px-3 rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
                   <Clock className="w-4 h-4 shrink-0 text-amber-400" />
-                  <span className="truncate">{t('Lista de Espera', 'Join Waitlist')}</span>
+                  <span className="truncate">
+                    {selectedExpedition.allowWaitlist !== false && (selectedExpedition as any).allow_waitlist !== false
+                      ? t('Lista de Espera', 'Join Waitlist')
+                      : t('Nómina Cerrada', 'Roster Closed')}
+                  </span>
                 </button>
               ) : (
                 <button

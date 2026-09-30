@@ -134,9 +134,60 @@ ${text}`;
   },
 
   /**
+   * Translate all text fields of an expedition departure
+   */
+  async translateExpeditionFields(fields: {
+    name?: string | null;
+    headline?: string | null;
+    description?: string | null;
+    location?: string | null;
+    highlights?: string | null;
+  }): Promise<{
+    name_en: string;
+    headline_en: string;
+    description_en: string;
+    location_en: string;
+    highlights_en: string;
+  }> {
+    const [name_en, headline_en, description_en, location_en] = await Promise.all([
+      fields.name ? this.translateText(fields.name, 'EN') : Promise.resolve(''),
+      fields.headline ? this.translateText(fields.headline, 'EN') : Promise.resolve(''),
+      fields.description ? this.translateText(fields.description, 'EN') : Promise.resolve(''),
+      fields.location ? this.translateText(fields.location, 'EN') : Promise.resolve(''),
+    ]);
+
+    let highlights_en = '';
+    if (fields.highlights) {
+      try {
+        const parsed = typeof fields.highlights === 'string' ? JSON.parse(fields.highlights) : fields.highlights;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const translatedPillars = await Promise.all(
+            parsed.map(async (p: any) => ({
+              ...p,
+              title: p.title ? await this.translateText(p.title, 'EN') : p.title,
+              desc: p.desc ? await this.translateText(p.desc, 'EN') : p.desc,
+            }))
+          );
+          highlights_en = JSON.stringify(translatedPillars);
+        }
+      } catch (e) {
+        highlights_en = '';
+      }
+    }
+
+    return {
+      name_en,
+      headline_en,
+      description_en,
+      location_en,
+      highlights_en,
+    };
+  },
+
+  /**
    * Domain-specific fallback translator for immediate offline/no-key usage
    */
-  fallbackTranslate(text: string, targetLang: 'EN' | 'ES'): string {
+  fallbackTranslate(text: string, targetLang: 'EN' | 'ES' = 'EN'): string {
     if (!text || targetLang === 'ES') return text;
 
     const DICTIONARY: Record<string, string> = {
@@ -276,9 +327,38 @@ ${text}`;
       'Primavera austral': 'Austral spring',
       'Solsticio de verano': 'Summer solstice',
       'Verano austral': 'Austral summer',
+      // Dynamic Specs, Badges & Labels
+      'NORTE / ASTILLERO': 'NORTH / SHIPYARD',
+      'OESTE / CAPACIDAD': 'WEST / CAPACITY',
+      'SUR / TECNOLOGÍA': 'SOUTH / TECHNOLOGY',
+      'SUR / PROPULSIÓN': 'SOUTH / PROPULSION',
+      'ESTE / SERVICIO': 'EAST / SERVICE',
+      'ESTE / DESEMBARCO': 'EAST / LANDINGS',
+      'ESTE / AUXILIAR': 'EAST / AUXILIARY TENDER',
+      'Conexión Satelital & Navegación': 'Satellite Connection & Navigation',
+      'Servicio & Seguridad de Bordo': 'Onboard Service & Safety',
+      'Patrón + Tripulación': 'Skipper + Crew',
+      'Patrón de Ultramar + Tripulación': 'Master Mariner + Crew',
+      'Chartes Privados': 'Private Charters',
+      'Charters Privados': 'Private Charters',
+      'Astillero Naval': 'Naval Shipyard',
+      'Matrícula': 'Registry',
+      'Velero Punta Sur': 'Sailboat Punta Sur',
+      'Climatización & Confort Térmico': 'Climate Control & Thermal Comfort',
+      'Diseñado para Expediciones': 'Engineered for Expeditions',
+      'Diseñado para Expediciones ': 'Engineered for Expeditions',
+      'Gastronomía Oceánica': 'Oceanic Gastronomy',
+      'Día 12 de Travesía': 'Day 12 of Passage',
+      'Día 15 de Travesía': 'Day 15 of Passage',
+      'Día 17 de Travesía': 'Day 17 of Passage',
+      'Día 18 de Travesía': 'Day 18 of Passage',
+      'Día 20 de Travesía': 'Day 20 of Passage',
+      'Calma': 'Calm',
+      'Editando': 'Editing',
     };
 
-    if (DICTIONARY[text.trim()]) return DICTIONARY[text.trim()];
+    const trimmed = text.trim();
+    if (DICTIONARY[trimmed]) return DICTIONARY[trimmed];
 
     // Pattern-based translations
     let translated = text
@@ -289,12 +369,29 @@ ${text}`;
       .replace(/Travesía Robinson Crusoe/gi, 'Robinson Crusoe Voyage')
       .replace(/Expedición Robinson Crusoe/gi, 'Robinson Crusoe Expedition')
       .replace(/Desafío Alejandro Selkirk/gi, 'Alejandro Selkirk Challenge')
+      .replace(/Velero Punta Sur/gi, 'Sailboat Punta Sur')
       .replace(/Velero Vegvisir/gi, 'Vegvisir Sailboat')
       .replace(/Yate Terranova/gi, 'Terranova Yacht')
       .replace(/Bahía Cumberland/gi, 'Cumberland Bay')
       .replace(/Isla Robinson Crusoe/gi, 'Robinson Crusoe Island')
       .replace(/Isla Alejandro Selkirk/gi, 'Alejandro Selkirk Island')
       .replace(/Cabo de Hornos/gi, 'Cape Horn')
+      .replace(/NORTE\s*\/\s*ASTILLERO/gi, 'NORTH / SHIPYARD')
+      .replace(/OESTE\s*\/\s*CAPACIDAD/gi, 'WEST / CAPACITY')
+      .replace(/SUR\s*\/\s*TECNOLOG[ÍI]A/gi, 'SOUTH / TECHNOLOGY')
+      .replace(/SUR\s*\/\s*PROPULSI[ÓO]N/gi, 'SOUTH / PROPULSION')
+      .replace(/ESTE\s*\/\s*SERVICIO/gi, 'EAST / SERVICE')
+      .replace(/ESTE\s*\/\s*DESEMBARCO/gi, 'EAST / LANDINGS')
+      .replace(/ESTE\s*\/\s*AUXILIAR/gi, 'EAST / AUXILIARY TENDER')
+      .replace(/Conexi[oó]n Satelital\s*&\s*Navegaci[oó]n/gi, 'Satellite Connection & Navigation')
+      .replace(/Servicio\s*&\s*Seguridad de Bordo/gi, 'Onboard Service & Safety')
+      .replace(/Patr[oó]n de Ultramar\s*\+\s*Tripulaci[oó]n/gi, 'Master Mariner + Crew')
+      .replace(/Patr[oó]n\s*\+\s*Tripulaci[oó]n/gi, 'Skipper + Crew')
+      .replace(/Chart?ers?\s+Privados/gi, 'Private Charters')
+      .replace(/Matr[íi]cula\s*([A-Za-z0-9\s]+)/gi, 'Registry $1')
+      .replace(/(\d+)\s+Pasajeros/gi, '$1 Guests')
+      .replace(/(\d+)\s+Cabinas?\s*•\s*(\d+)\s+Baños?/gi, '$1 Cabins • $2 Bathrooms')
+      .replace(/(\d+)\s+Cubiertas?\s*•\s*(\d+)\s+Cabinas?\s*\/\s*(\d+)\s+Baños?/gi, '$1 Decks • $2 Cabins / $3 Bathrooms')
       .replace(/1 de Enero/gi, 'January 1st')
       .replace(/1 de Febrero/gi, 'February 1st')
       .replace(/1 de Marzo/gi, 'March 1st')
@@ -316,6 +413,20 @@ ${text}`;
       .replace(/Verano calmo/gi, 'Calm summer')
       .replace(/Pesca y trekking/gi, 'Fishing & trekking')
       .replace(/Viento favorable/gi, 'Favorable wind')
+      .replace(/Expedición Robinson Crusoe\s*[-–—]\s*Oct\s*(\d{4})/gi, 'Robinson Crusoe Expedition – Oct $1')
+      .replace(/Expedición Robinson Crusoe\s*[-–—]\s*Nov\s*(\d{4})/gi, 'Robinson Crusoe Expedition – Nov $1')
+      .replace(/Expedición Robinson Crusoe\s*[-–—]\s*Dic\s*(\d{4})/gi, 'Robinson Crusoe Expedition – Dec $1')
+      .replace(/Expedición Robinson Crusoe\s*[-–—]\s*Ene\s*(\d{4})/gi, 'Robinson Crusoe Expedition – Jan $1')
+      .replace(/Expedición Robinson Crusoe\s*[-–—]\s*Feb\s*(\d{4})/gi, 'Robinson Crusoe Expedition – Feb $1')
+      .replace(/Expedición Robinson Crusoe\s*[-–—]\s*Mar\s*(\d{4})/gi, 'Robinson Crusoe Expedition – Mar $1')
+      .replace(/La expedición insular por excelencia hacia uno de los ecosistemas con mayor endemismo del planeta\./gi, 'The quintessential island expedition to one of the ecosystems with the highest endemism on the planet.')
+      .replace(/Una travesía de 15 días navegando a vela hacia la mítica isla que inspiró la novela de Daniel Defoe, combinando navegación de alta mar, buceo con lobos marinos finos de dos pelos, senderismo por bosques de helechos gigantes y descanso en cabinas privadas\./gi, 'A 15-day ocean sailing journey to the mythical island that inspired Daniel Defoe’s novel, blending offshore sailing, scuba diving with Juan Fernández fur seals, trekking through giant fern forests, and lodging in private en-suite cabins.')
+      .replace(/Una travesía de 15 días navegando a vela hacia la mítica isla que inspiró la novela de Daniel Defoe/gi, 'A 15-day ocean sailing journey to the mythical island that inspired Daniel Defoe’s novel')
+      .replace(/Archipiélago Juan Fernández/gi, 'Juan Fernández Archipelago')
+      .replace(/[-–—]\s*Ene\s+(\d{4})/gi, '– Jan $1')
+      .replace(/[-–—]\s*Abr\s+(\d{4})/gi, '– Apr $1')
+      .replace(/[-–—]\s*Ago\s+(\d{4})/gi, '– Aug $1')
+      .replace(/[-–—]\s*Dic\s+(\d{4})/gi, '– Dec $1')
       .replace(/Velero/gi, 'Sailboat')
       .replace(/Yate/gi, 'Yacht')
       .replace(/Expedición/gi, 'Expedition')
@@ -334,5 +445,9 @@ ${text}`;
       .replace(/Cupos disponibles/gi, 'spots available');
 
     return translated;
+  },
+
+  translateFallbackText(text: string, targetLang: 'EN' | 'ES' = 'EN'): string {
+    return this.fallbackTranslate(text, targetLang);
   },
 };

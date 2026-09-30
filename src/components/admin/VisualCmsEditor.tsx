@@ -55,6 +55,7 @@ import {
 } from '../../services/cmsService';
 import { translationService } from '../../services/translationService';
 import { useFleet } from '../../hooks/useFleet';
+import { useLanguage } from '../../context/LanguageContext';
 import { getVesselSlug, getVesselPath } from '../../services/fleetService';
 import type { Vessel } from '../../types';
 import { ExpeditionCalendar } from '../modules/ExpeditionCalendar';
@@ -72,9 +73,11 @@ interface VisualCmsEditorProps {
 const CmsContext = React.createContext<{
   getField: (sectionKey: string, field: string) => string;
   setField: (sectionKey: string, field: string, value: string) => void;
+  editorLanguage: 'ES' | 'EN';
 }>({
   getField: () => '',
   setField: () => {},
+  editorLanguage: 'ES',
 });
 
 // =========================================================================
@@ -88,8 +91,10 @@ const InlineText: React.FC<{
   fallback?: string;
   multiline?: boolean;
 }> = ({ sectionKey, field, tag: Tag = 'div', className = '', fallback = '', multiline = false }) => {
-  const { getField, setField } = React.useContext(CmsContext);
-  const currentVal = getField(sectionKey, field) || fallback;
+  const { getField, setField, editorLanguage } = React.useContext(CmsContext);
+  const rawVal = getField(sectionKey, field);
+  const effectiveFallback = editorLanguage === 'EN' ? translationService.translateFallbackText(fallback) : fallback;
+  const currentVal = rawVal || effectiveFallback;
   const [isEditing, setIsEditing] = useState(false);
   const [localVal, setLocalVal] = useState(currentVal);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
@@ -230,7 +235,12 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   };
 
   // Language Mode: 'ES' (Spanish base) or 'EN' (English AI review/edit)
+  const { setLanguage: setGlobalLanguage } = useLanguage();
   const [editorLanguage, setEditorLanguage] = useState<'ES' | 'EN'>('ES');
+
+  useEffect(() => {
+    setGlobalLanguage(editorLanguage);
+  }, [editorLanguage, setGlobalLanguage]);
   const [isTranslatingWithAi, setIsTranslatingWithAi] = useState<boolean>(false);
   const [translationProgress, setTranslationProgress] = useState<{
     current: number;
@@ -314,46 +324,58 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       const dynamicFallbacks: Record<string, any> = {
         climatizacion: {
           nav_title: 'Climatización & Confort Térmico',
+          nav_title_en: 'Climate Control & Thermal Comfort',
           nav_description: 'Sistema de calefacción marina controlable en cada camarote, garantizando noches de confort y abrigo térmico absoluto en aguas glaciales.',
+          nav_description_en: 'Controllable marine heating system in every cabin, guaranteeing optimal thermal comfort and coziness in glacial waters.',
           day: 'Día 12 de Travesía',
           location: 'Canal Sarmiento',
           coordinates: "51°52' S, 73°40' W",
           wind: 'W 32 Nudos',
           temp: '2°C Ext',
           text: `El frío antártico cala hondo en cubierta, pero el ${vesselName} nos abraza en su interior. La climatización mantiene la cabina a unos constantes 21°C. Las tazas de café humean sobre la mesa mientras contemplamos la ventisca desde el ventanal templado.`,
+          text_en: `The Antarctic chill penetrates deep on deck, but ${vesselName} warms us inside. Marine climate control keeps the salon at a steady 21°C. Coffee cups steam on the table as we take in the squall from heated panoramic windows.`,
           image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1000&q=80',
         },
         gastronomia: {
-          nav_title: 'Gastronomía Oceánica',
-          nav_description: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica.',
+          nav_title: 'Diseñado para Expediciones',
+          nav_title_en: 'Engineered for Expeditions',
+          nav_description: 'Cada travesía combina navegación a vela, exploración y tiempo para disfrutar del entorno. A bordo, la tripulación acompaña la experiencia y coordina las actividades según las condiciones de navegación.',
+          nav_description_en: 'Every voyage pairs offshore sailing, remote exploration, and unhurried time in nature. On board, our seasoned crew tailors daily itineraries to the rhythm of the sea.',
           day: 'Día 15 de Travesía',
           location: 'Seno Ventisquero',
           coordinates: "54°30' S, 69°12' W",
           wind: 'Calma',
           temp: '4°C Ext',
           text: 'La alimentación durante nuestras travesías está pensada para acompañar la vida a bordo: comidas caseras, nutritivas y adecuadas a una navegación oceánica. La alimentación es parte de la experiencia de navegar: simple, abundante y adaptada al ritmo del mar.',
+          text_en: 'Catering throughout our voyages is tailored for life at sea: hearty, wholesome, nourishing meals adapted to oceanic sailing rhythms. Food is an essential part of the sailing experience: simple, generous, and attuned to the ocean’s rhythm.',
           image: '/flota/vegvisir/vegvisir-gastronomia.jpg',
         },
         casco: {
           nav_title: 'Casco Reforzado',
+          nav_title_en: 'Reinforced Heavy-Duty Hull',
           nav_description: 'Ingeniería de casco robusta y preparada para navegaciones oceánicas y zonas remotas, desde las aguas abiertas del Pacífico hasta los fiordos australes.',
+          nav_description_en: 'Robust hull engineering prepared for oceanic routes and remote frontiers, from open Pacific crossings to extreme Patagonian fiord navigation.',
           day: 'Día 18 de Travesía',
           location: 'Paso del Indio',
           coordinates: "49°02' S, 74°24' W",
           wind: 'NW 45 Nudos',
           temp: '1°C Ext',
           text: `Navegando entre pequeños témpanos de hielo a la deriva bajo una tormenta austral. La solidez del casco reforzado del ${vesselName} infunde total confianza cuando el hielo roza suavemente la estructura.`,
+          text_en: `Sailing among drifting ice floes under an austral storm. The solidity of ${vesselName}’s reinforced hull inspires total confidence as ice gently brushes against the structure.`,
           image: vesselImg,
         },
         desembarcos: {
           nav_title: 'Desembarcos Seguros',
+          nav_title_en: 'Safe Coastal Landings',
           nav_description: 'Equipado con bote auxiliar semirrígido de alta flotabilidad, que permite realizar desembarcos y aproximaciones en sectores sin muelles portuarios.',
+          nav_description_en: 'Equipped with a high-buoyancy auxiliary tender for safe landings and close approaches in remote bays without port infrastructure.',
           day: 'Día 20 de Travesía',
           location: 'Bahía Ainsworth',
           coordinates: "54°22' S, 69°38' W",
           wind: 'SW 15 Nudos',
           temp: '5°C Ext',
           text: 'Alistamos el bote auxiliar semirrígido de alta flotabilidad. La aproximación al frente glaciar y el desembarco en la playa de morrena para caminar hacia los bosques subantárticos transcurren sin contratiempos.',
+          text_en: 'We ready the high-buoyancy rigid-inflatable auxiliary tender. The approach to the glacier front and the landing on the moraine beach to hike into subantarctic forests proceed smoothly.',
           image: '/flota/vegvisir/vegvisir-desembarcos.jpg',
         },
       };
@@ -678,18 +700,17 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
       }
       // If it's a custom metadata field (like spec_*), fallback to Spanish metadata value if no English yet
       if (isMetadataField) {
-        if (draftMeta[field] !== undefined && draftMeta[field] !== null) return draftMeta[field] as string;
-        if (secMeta[field] !== undefined && secMeta[field] !== null && secMeta[field] !== '') return secMeta[field] as string;
-        if (defMeta[field] !== undefined && defMeta[field] !== null) return defMeta[field] as string;
+        const rawVal = (draftMeta[field] ?? secMeta[field] ?? defMeta[field] ?? '') as string;
+        if (rawVal) return translationService.translateFallbackText(rawVal);
         return '';
       }
       // Fallback to Spanish field if no English exists yet
       const baseVal = (content[sectionKey]?.[field as 'title' | 'subtitle' | 'body_text'] || DEFAULT_CMS_CONTENT[sectionKey]?.[field as 'title' | 'subtitle' | 'body_text'] || '') as string;
-      if (baseVal) return baseVal;
+      if (baseVal) return translationService.translateFallbackText(baseVal);
       if (vesselMatch) {
-        if (field === 'title') return vesselMatch.name;
-        if (field === 'subtitle') return `${vesselMatch.builder || vesselMatch.type} • ${vesselMatch.capacity || `${vesselMatch.maxPax || 10} Pasajeros`}`;
-        if (field === 'body_text') return vesselMatch.description || vesselMatch.tagline || '';
+        if (field === 'title') return translationService.translateFallbackText(vesselMatch.name);
+        if (field === 'subtitle') return translationService.translateFallbackText(`${vesselMatch.builder || vesselMatch.type} • ${vesselMatch.capacity || `${vesselMatch.maxPax || 10} Pasajeros`}`);
+        if (field === 'body_text') return translationService.translateFallbackText(vesselMatch.description || vesselMatch.tagline || '');
       }
       return '';
     }
@@ -939,9 +960,10 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
             },
           };
         } else {
-          const titleEs = (newDrafts[key]?.title ?? currentSec.title ?? DEFAULT_CMS_CONTENT[key]?.title ?? '') as string;
-          const subtitleEs = (newDrafts[key]?.subtitle ?? currentSec.subtitle ?? DEFAULT_CMS_CONTENT[key]?.subtitle ?? '') as string;
-          const bodyEs = (newDrafts[key]?.body_text ?? currentSec.body_text ?? DEFAULT_CMS_CONTENT[key]?.body_text ?? '') as string;
+          const vMatch = findVesselForSectionKey(key);
+          const titleEs = (newDrafts[key]?.title ?? currentSec.title ?? DEFAULT_CMS_CONTENT[key]?.title ?? vMatch?.name ?? '') as string;
+          const subtitleEs = (newDrafts[key]?.subtitle ?? currentSec.subtitle ?? DEFAULT_CMS_CONTENT[key]?.subtitle ?? (vMatch ? `${vMatch.builder || vMatch.type} • ${vMatch.capacity || `${vMatch.maxPax || 10} Pasajeros`}` : '')) as string;
+          const bodyEs = (newDrafts[key]?.body_text ?? currentSec.body_text ?? DEFAULT_CMS_CONTENT[key]?.body_text ?? vMatch?.description ?? vMatch?.tagline ?? '') as string;
 
           const trans = await translationService.translateSection({
             title: titleEs,
@@ -1012,7 +1034,7 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
   const [ingestingVideo, setIngestingVideo] = useState(false);
 
   return (
-    <CmsContext.Provider value={{ getField, setField }}>
+    <CmsContext.Provider value={{ getField, setField, editorLanguage }}>
       <div className="space-y-4">
       {/* ========================================================================= */}
       {/* TOP CONTROL TOOLBAR */}
@@ -2926,8 +2948,16 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                                 )}
                               </div>
                               <div className="space-y-1">
-                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">{eData.nav_title || key}</h4>
-                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">{eData.nav_description || 'Descripción...'}</p>
+                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">
+                                  {editorLanguage === 'EN'
+                                    ? (eData.nav_title_en || translationService.translateFallbackText(eData.nav_title || key))
+                                    : (eData.nav_title || key)}
+                                </h4>
+                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">
+                                  {editorLanguage === 'EN'
+                                    ? (eData.nav_description_en || translationService.translateFallbackText(eData.nav_description || ''))
+                                    : (eData.nav_description || 'Descripción...')}
+                                </p>
                               </div>
                             </div>
                           );
@@ -2961,8 +2991,16 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                                 )}
                               </div>
                               <div className="space-y-1">
-                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">{eData.nav_title || key}</h4>
-                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">{eData.nav_description || 'Descripción...'}</p>
+                                <h4 className="font-bold text-sm text-slate-900 line-clamp-2">
+                                  {editorLanguage === 'EN'
+                                    ? (eData.nav_title_en || translationService.translateFallbackText(eData.nav_title || key))
+                                    : (eData.nav_title || key)}
+                                </h4>
+                                <p className="text-slate-600 text-xs leading-relaxed line-clamp-3">
+                                  {editorLanguage === 'EN'
+                                    ? (eData.nav_description_en || translationService.translateFallbackText(eData.nav_description || ''))
+                                    : (eData.nav_description || 'Descripción...')}
+                                </p>
                               </div>
                             </div>
                           );
@@ -2993,31 +3031,65 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
 
                       <div className="space-y-3.5">
                         <div>
-                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                            Título de la Característica:
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              {editorLanguage === 'EN' ? 'Título de la Característica (Inglés):' : 'Título de la Característica:'}
+                            </label>
+                            {editorLanguage === 'EN' && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900">
+                                Modo EN
+                              </span>
+                            )}
+                          </div>
                           <input
                             type="text"
-                            value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_title || ''}
-                            onChange={(e) =>
-                              setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'nav_title', e.target.value)
+                            value={
+                              editorLanguage === 'EN'
+                                ? (getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_title_en ??
+                                   translationService.translateFallbackText(getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_title || ''))
+                                : (getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_title || '')
                             }
-                            placeholder="Ej: Climatización Sistema Webasto"
+                            onChange={(e) =>
+                              setLogbookEntryField(
+                                activeLogbookVessel,
+                                activeLogbookEntry,
+                                editorLanguage === 'EN' ? 'nav_title_en' : 'nav_title',
+                                e.target.value
+                              )
+                            }
+                            placeholder={editorLanguage === 'EN' ? "Ex: Webasto Heating System" : "Ej: Climatización Sistema Webasto"}
                             className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-semibold focus:outline-none transition shadow-2xs"
                           />
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                            Descripción Breve del Botón:
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              {editorLanguage === 'EN' ? 'Descripción Breve del Botón (Inglés):' : 'Descripción Breve del Botón:'}
+                            </label>
+                            {editorLanguage === 'EN' && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900">
+                                Modo EN
+                              </span>
+                            )}
+                          </div>
                           <textarea
                             rows={3}
-                            value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_description || ''}
-                            onChange={(e) =>
-                              setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'nav_description', e.target.value)
+                            value={
+                              editorLanguage === 'EN'
+                                ? (getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_description_en ??
+                                   translationService.translateFallbackText(getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_description || ''))
+                                : (getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.nav_description || '')
                             }
-                            placeholder="Breve resumen visible en el botón..."
+                            onChange={(e) =>
+                              setLogbookEntryField(
+                                activeLogbookVessel,
+                                activeLogbookEntry,
+                                editorLanguage === 'EN' ? 'nav_description_en' : 'nav_description',
+                                e.target.value
+                              )
+                            }
+                            placeholder={editorLanguage === 'EN' ? "Short summary visible on the button..." : "Breve resumen visible en el botón..."}
                             className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-2 text-xs text-slate-700 leading-relaxed focus:outline-none transition resize-none shadow-2xs"
                           />
                         </div>
@@ -3154,16 +3226,33 @@ export const VisualCmsEditor: React.FC<VisualCmsEditorProps> = ({
                           </div>
 
                           <div>
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                              Relato del Capitán / Narrativa de Travesía:
-                            </label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                                {editorLanguage === 'EN' ? 'Relato del Capitán / Narrativa de Travesía (Inglés):' : 'Relato del Capitán / Narrativa de Travesía:'}
+                              </label>
+                              {editorLanguage === 'EN' && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900">
+                                  Modo EN
+                                </span>
+                              )}
+                            </div>
                             <textarea
                               rows={11}
-                              value={getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.text || ''}
-                              onChange={(e) =>
-                                setLogbookEntryField(activeLogbookVessel, activeLogbookEntry, 'text', e.target.value)
+                              value={
+                                editorLanguage === 'EN'
+                                  ? (getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.text_en ??
+                                     translationService.translateFallbackText(getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.text || ''))
+                                  : (getLogbookEntry(activeLogbookVessel, activeLogbookEntry)?.text || '')
                               }
-                              placeholder="Escribe aquí el relato en primera persona..."
+                              onChange={(e) =>
+                                setLogbookEntryField(
+                                  activeLogbookVessel,
+                                  activeLogbookEntry,
+                                  editorLanguage === 'EN' ? 'text_en' : 'text',
+                                  e.target.value
+                                )
+                              }
+                              placeholder={editorLanguage === 'EN' ? "Write captain's story in English..." : "Escribe aquí el relato en primera persona..."}
                               className="w-full bg-white border border-slate-200 focus:border-blue-900 focus:ring-1 focus:ring-blue-900 rounded-xl px-3.5 py-3 text-xs text-slate-700 italic leading-relaxed focus:outline-none transition resize-none shadow-2xs"
                             />
                           </div>
