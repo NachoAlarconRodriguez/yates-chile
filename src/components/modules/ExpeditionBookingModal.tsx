@@ -849,19 +849,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                               <p><strong className="text-white">Contacto:</strong> {wlPhone} · {wlEmail}</p>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
-                              <a
-                                href={`https://wa.me/56981312920?text=${encodeURIComponent(
-                                  `Hola Concierge Yates Chile, acabo de anotarme en la Lista de Espera de "${currentActiveExp.name}" (${currentActiveExp.startDate} al ${currentActiveExp.endDate}) para ${wlPaxCount} cupo(s) a nombre de ${wlFullName}. Quería confirmar la recepción.`
-                                )}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full sm:flex-1 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-2.5 px-3 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow cursor-pointer active:scale-98"
-                              >
-                                <WhatsAppIcon className="w-4 h-4 text-white" />
-                                <span>Avisar al Concierge vía WhatsApp</span>
-                              </a>
-
+                            <div className="pt-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -870,10 +858,11 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                                   setWlPhone('');
                                   setWlEmail('');
                                   setWlPaxCount(1);
+                                  onClose();
                                 }}
-                                className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white text-xs transition cursor-pointer"
+                                className="w-full bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-white font-semibold py-2.5 px-4 rounded-xl transition text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 hover:border-slate-600 shadow-sm cursor-pointer"
                               >
-                                Inscribir otro pasajero
+                                <span>{t('Cerrar', 'Close')}</span>
                               </button>
                             </div>
                           </div>
