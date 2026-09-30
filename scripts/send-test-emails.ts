@@ -145,7 +145,7 @@ async function run() {
           startDate: '01 oct 2026',
           endDate: '15 oct 2026',
           paxCount: 1,
-          claimUrl: 'https://www.yateschile.com/#/expediciones',
+          claimUrl: 'https://www.yateschile.com/expediciones',
         }),
     },
     {

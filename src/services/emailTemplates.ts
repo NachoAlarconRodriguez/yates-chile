@@ -105,7 +105,7 @@ function baseEmailLayout(contentHtml: string, previewText: string = 'Yates Chile
           Yates Chile · Experiencias Náuticas Exclusivas &amp; Lodge Austral
         </p>
         <p style="margin: 0 0 16px 0;">
-          Puerto Montt · Archipiélago Juan Fernández · Fiordos Patagónicos
+          Archipiélago de Juan Fernández · Cabo de Hornos · Alejandro Selkirk
         </p>
         <p style="margin: 0 0 16px 0;">
           <a href="${CONCIERGE_WA_LINK}" target="_blank" style="color: #F59E0B; text-decoration: none; font-weight: 600;">
@@ -294,7 +294,7 @@ export function generateExpeditionBookingAdminEmail(data: ExpeditionBookingPasse
         </table>
 
         <div style="text-align: center; padding-top: 8px;">
-          <a href="${SITE_URL}/#/admin" class="btn-dark" target="_blank">
+          <a href="${SITE_URL}/admin" class="btn-dark" target="_blank">
             Ir al Panel de Administración →
           </a>
         </div>
@@ -429,7 +429,7 @@ export function generateWaitlistAdminEmail(data: WaitlistEmailData): { subject: 
         </table>
 
         <div style="text-align: center;">
-          <a href="${SITE_URL}/#/admin" class="btn-dark" target="_blank">
+          <a href="${SITE_URL}/admin" class="btn-dark" target="_blank">
             Ver Lista de Espera en Admin →
           </a>
         </div>
@@ -538,7 +538,7 @@ export function generateWaitlistSlotReleasedEmail(data: WaitlistEmailData): { su
   const subject = `⚡ Cupo Liberado Disponible | ${data.expeditionName} - Yates Chile`;
   const preview = `Se ha liberado un cupo con prioridad exclusiva para ti en ${data.expeditionName}.`;
 
-  const claimLink = data.claimUrl || `${SITE_URL}/#/expediciones`;
+  const claimLink = data.claimUrl || `${SITE_URL}/expediciones`;
 
   const content = `
     <tr>
@@ -710,8 +710,8 @@ export function generateNewsletterWelcomeEmail(data: NewsletterEmailData): { sub
           </ul>
         </div>
 
-        <div style="text-align: center; padding: 8px 0;">
-          <a href="${SITE_URL}/#/expediciones" class="btn-gold" target="_blank">
+        <div style="text-align: center; padding-top: 8px;">
+          <a href="${SITE_URL}/expediciones" class="btn-gold" target="_blank">
             Explorar Calendario de Expediciones →
           </a>
         </div>
