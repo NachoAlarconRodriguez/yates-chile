@@ -163,7 +163,7 @@ export function generateExpeditionBookingPassengerEmail(data: ExpeditionBookingP
           ¡Gracias por tu Reserva, ${escapeHtml(data.fullName)}!
         </h1>
         <p style="color: #94A3B8; font-size: 14px; margin: 0; line-height: 1.5;">
-          Hemos recibido tus antecedentes y comprobante de transferencia para tu próxima travesía marítima.
+          Hemos recibido los antecedentes y datos de tu solicitud para tu próxima travesía marítima.
         </p>
       </td>
     </tr>
@@ -172,7 +172,7 @@ export function generateExpeditionBookingPassengerEmail(data: ExpeditionBookingP
     <tr>
       <td style="padding: 32px 32px 24px 32px;">
         <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 24px 0;">
-          Tu solicitud está siendo revisada por nuestro Concierge Náutico. En un plazo máximo de <strong>24 horas hábiles</strong> validaremos la recepción de los fondos bancarios y recibirás tu <strong>Voucher Definitivo y Bienvenida a Bordo</strong>.
+          Tu solicitud está siendo procesada por nuestro Concierge Náutico. Una vez realizada y confirmada la transferencia de tu abono inicial (50%), validaremos la recepción de los fondos y recibirás tu <strong>Voucher Definitivo y Bienvenida a Bordo</strong>.
         </p>
 
         <!-- SUMMARY CARD -->
