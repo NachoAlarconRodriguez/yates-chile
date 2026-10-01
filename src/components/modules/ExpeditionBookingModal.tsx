@@ -392,7 +392,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
       `• Titular: Yates Chile SpA\n` +
       `• RUT: 77.892.340-K\n` +
       `• Nº de Cuenta: 78-29384-01\n` +
-      `• Correo para Comprobante: reservas@yateschile.cl\n` +
+      `• Correo para Comprobante: evelyn@yateschile.com\n` +
       `• Asunto: Reserva ${currentActiveExp?.name || 'Expedicion'} - ${leaderPassenger.fullName || 'Pasajero'}\n` +
       `• Monto de Abono (50%): $${depositAmount.toLocaleString('es-CL')} CLP`;
     
@@ -1454,7 +1454,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                         </div>
                         <div>
                           <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Correo Comprobante:</span>
-                          <span className="text-slate-200">reservas@yateschile.cl</span>
+                          <span className="text-slate-200">evelyn@yateschile.com</span>
                         </div>
                       </div>
                     </div>
@@ -1562,7 +1562,7 @@ export const ExpeditionBookingModal: React.FC<ExpeditionBookingModalProps> = ({
                 Tu cupo quedará formalmente reservado al momento de realizar el abono del 50% ($<strong>{depositAmount.toLocaleString('es-CL')} CLP</strong>).
               </p>
               <p className="text-[10px] text-slate-400 font-light leading-relaxed">
-                Envía el comprobante por WhatsApp o a <strong>reservas@yateschile.cl</strong> para validar tu abono.
+                Envía el comprobante por WhatsApp o a <strong>evelyn@yateschile.com</strong> para validar tu abono.
               </p>
             </div>
 

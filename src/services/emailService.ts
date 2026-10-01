@@ -12,7 +12,11 @@ import {
   type LodgeBookingEmailData,
 } from './emailTemplates';
 
-const ADMIN_EMAIL = 'contacto@yateschile.com';
+const SENDER_EMAIL = 'contacto@yateschile.com';
+const ADMIN_EMAILS = [
+  { email: 'evelyn@yateschile.com', name: 'Evelyn - Yates Chile' },
+  { email: 'pablo@yateschile.com', name: 'Pablo - Yates Chile' },
+];
 
 interface SendEmailPayload {
   to: string | { email: string; name?: string } | { email: string; name?: string }[];
@@ -97,7 +101,7 @@ class EmailService {
             'Accept': 'application/json',
           },
           body: JSON.stringify({
-            sender: { name: 'Yates Chile Concierge', email: ADMIN_EMAIL },
+            sender: { name: 'Yates Chile Concierge', email: SENDER_EMAIL },
             to: toRecipients,
             subject: body.subject,
             htmlContent: body.htmlContent,
@@ -151,7 +155,7 @@ class EmailService {
       // 2. Alerta al Admin/Concierge
       const adminTemplate = generateExpeditionBookingAdminEmail(data);
       const resAdmin = await this.sendEmail({
-        to: ADMIN_EMAIL,
+        to: ADMIN_EMAILS,
         subject: adminTemplate.subject,
         htmlContent: adminTemplate.html,
       });
@@ -186,7 +190,7 @@ class EmailService {
       // 2. Al Admin/Concierge
       const adminTemplate = generateWaitlistAdminEmail(data);
       const resAdmin = await this.sendEmail({
-        to: ADMIN_EMAIL,
+        to: ADMIN_EMAILS,
         subject: adminTemplate.subject,
         htmlContent: adminTemplate.html,
       });
@@ -243,7 +247,7 @@ class EmailService {
     try {
       const adminTemplate = generateLodgeBookingEmail(data, true);
       const resAdmin = await this.sendEmail({
-        to: ADMIN_EMAIL,
+        to: ADMIN_EMAILS,
         subject: adminTemplate.subject,
         htmlContent: adminTemplate.html,
       });

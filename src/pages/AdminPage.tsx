@@ -3182,7 +3182,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setIsAuthenticated(true);
       setLoginError('');
     } else {
-      setLoginError('Credenciales incorrectas. Ingrese con admin / yates2026');
+      setLoginError('Credenciales incorrectas. Verifique sus datos de acceso.');
     }
   };
 
@@ -4870,7 +4870,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="admin"
+                      placeholder="usuario o correo"
                       className="w-full bg-[#f8fafc] border border-slate-200 focus:border-[#0b192c] focus:bg-white rounded-2xl px-4 py-3 text-xs text-[#0b192c] font-medium focus:outline-none transition shadow-2xs"
                       required
                     />
@@ -5131,11 +5131,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       Se ha enviado un enlace de restablecimiento seguro a <strong>{forgotEmail || 'contacto@yateschile.cl'}</strong>.
                     </p>
                   </div>
-                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-[11px] text-slate-500 text-left space-y-1">
-                    <div className="font-bold text-[#0b192c]">Credenciales maestras por defecto:</div>
-                    <div>• Usuario: <code className="font-mono text-[#0b192c] bg-white px-1.5 py-0.5 rounded border border-slate-200">admin</code></div>
-                    <div>• Clave de acceso: <code className="font-mono text-[#0b192c] bg-white px-1.5 py-0.5 rounded border border-slate-200">yates2026</code></div>
-                  </div>
+
                   <button
                     type="button"
                     onClick={() => {

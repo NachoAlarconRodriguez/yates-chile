@@ -112,8 +112,12 @@ function baseEmailLayout(contentHtml: string, previewText: string = 'Yates Chile
             WhatsApp Concierge: ${CONCIERGE_PHONE}
           </a>
           &nbsp;·&nbsp;
-          <a href="mailto:contacto@yateschile.com" style="color: #CBD5E1; text-decoration: none;">
-            contacto@yateschile.com
+          <a href="mailto:evelyn@yateschile.com" style="color: #CBD5E1; text-decoration: none;">
+            evelyn@yateschile.com
+          </a>
+          &nbsp;·&nbsp;
+          <a href="mailto:pablo@yateschile.com" style="color: #CBD5E1; text-decoration: none;">
+            pablo@yateschile.com
           </a>
         </p>
         <p style="margin: 0; font-size: 11px; color: #64748B;">
