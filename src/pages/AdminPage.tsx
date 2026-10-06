@@ -1636,6 +1636,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     image_url: '',
   });
   const [reservationWizardStep, setReservationWizardStep] = useState<1 | 2 | 3 | 4>(1);
+  const [lodgeModalMode, setLodgeModalMode] = useState<'booking' | 'block'>('booking');
+  const [blockStep, setBlockStep] = useState<1 | 2>(1);
+  const [blockAllRooms, setBlockAllRooms] = useState(false);
+  const [blockReasonType, setBlockReasonType] = useState('Mantención técnica');
+  const [blockNotes, setBlockNotes] = useState('');
+  const [isSubmittingBlock, setIsSubmittingBlock] = useState(false);
   const [guestList, setGuestList] = useState<Array<{ name: string; rut: string; email?: string; phone?: string }>>([
     { name: '', rut: '', email: '', phone: '' },
     { name: '', rut: '', email: '', phone: '' },
@@ -3183,6 +3189,76 @@ ${cust.notes || 'Sin notas adicionales.'}`;
       setLoginError('');
     } else {
       setLoginError('Credenciales incorrectas. Verifique sus datos de acceso.');
+    }
+  };
+
+  const handleConfirmBlockDates = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!blockForm.checkIn || !blockForm.checkOut) {
+      triggerAlert('Por favor selecciona las fechas de inicio y fin del bloqueo.', 'warning', 'Fechas requeridas');
+      return;
+    }
+    const checkInDate = new Date(blockForm.checkIn);
+    const checkOutDate = new Date(blockForm.checkOut);
+    if (checkOutDate <= checkInDate) {
+      triggerAlert('La fecha de fin (check-out) debe ser posterior a la fecha de inicio (check-in).', 'warning', 'Fechas inválidas');
+      return;
+    }
+    if (!blockAllRooms && !blockForm.roomId) {
+      triggerAlert('Por favor selecciona una habitación para bloquear o activa la opción de Lodge Completo.', 'warning', 'Habitación requerida');
+      return;
+    }
+
+    setIsSubmittingBlock(true);
+    try {
+      const targetRooms = blockAllRooms ? rooms : rooms.filter((r) => r.id === blockForm.roomId);
+      const combinedReason = blockNotes.trim()
+        ? `${blockReasonType}: ${blockNotes.trim()}`
+        : blockReasonType;
+
+      let successCount = 0;
+      let lastError = '';
+
+      for (const room of targetRooms) {
+        const res = await adminBlockRoom({
+          roomId: room.id,
+          checkIn: blockForm.checkIn,
+          checkOut: blockForm.checkOut,
+          channelSource: 'maintenance',
+          reason: combinedReason,
+          guestName: `Bloqueo (${blockReasonType})`,
+        });
+        if (res.success) {
+          successCount++;
+        } else {
+          lastError = res.error || 'Error al guardar bloqueo.';
+        }
+      }
+
+      if (successCount > 0) {
+        await refreshLodge();
+        setShowBlockModal(false);
+        setReservationWizardStep(1);
+        setBlockStep(1);
+        setLodgeModalMode('booking');
+        setBlockNotes('');
+        setBlockAllRooms(false);
+        triggerAlert(
+          blockAllRooms
+            ? `Se han bloqueado las 4 habitaciones del Lodge exitosamente (${formatDateDDMMYYYY(blockForm.checkIn)} al ${formatDateDDMMYYYY(blockForm.checkOut)}).`
+            : `Fechas bloqueadas exitosamente para la habitación seleccionada.`,
+          'success',
+          'Bloqueo Registrado'
+        );
+        setActionMessage('Fechas bloqueadas con éxito en el calendario.');
+        setTimeout(() => setActionMessage(null), 4000);
+      } else {
+        triggerAlert('No se pudo registrar el bloqueo: ' + lastError, 'error');
+      }
+    } catch (err: any) {
+      triggerAlert('Error inesperado al bloquear fechas: ' + (err?.message || ''), 'error');
+    } finally {
+      setIsSubmittingBlock(false);
     }
   };
 
@@ -9110,10 +9186,44 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                       })}
                     </div>
 
-                    <span className="text-xs text-slate-400 font-light flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      <span>Haz clic en un día libre para reservar directamente.</span>
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-400 font-light flex items-center gap-1.5 hidden sm:flex">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span>Haz clic en un día libre para reservar directamente.</span>
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nowDate = new Date();
+                          const checkInStr = nowDate.toISOString().split('T')[0];
+                          const dNext = new Date(nowDate);
+                          dNext.setDate(dNext.getDate() + 2);
+                          const checkOutStr = dNext.toISOString().split('T')[0];
+                          setBlockForm({
+                            roomId: rooms[0]?.id || '',
+                            checkIn: checkInStr,
+                            checkOut: checkOutStr,
+                            channelSource: 'maintenance',
+                            reason: '',
+                            guestName: '',
+                            guestEmail: '',
+                            guestPhone: '',
+                            paxCount: 2,
+                            status: 'approved',
+                          });
+                          setLodgeModalMode('block');
+                          setBlockStep(1);
+                          setBlockAllRooms(false);
+                          setShowBlockModal(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition cursor-pointer shadow-2xs active:scale-95"
+                        title="Bloquear fechas del Lodge en el calendario"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Bloquear Fechas</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Gantt Scroll Container */}
@@ -9229,6 +9339,9 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                                           paxCount: room.room_number === 1 ? 2 : 3,
                                           status: 'approved',
                                         });
+                                        setLodgeModalMode('booking');
+                                        setBlockStep(1);
+                                        setBlockAllRooms(false);
                                         setShowBlockModal(true);
                                       }}
                                       className={`h-full border-r border-slate-100/80 transition-colors cursor-pointer flex items-center justify-center relative group/slot ${
@@ -12687,20 +12800,32 @@ ${cust.notes || 'Sin notas adicionales.'}`;
             {/* Header with Title & Close */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-200 text-[#0b192c] flex items-center justify-center shadow-xs shrink-0">
-                  <BedDouble className="w-5 h-5 text-sky-700" />
+                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shadow-xs shrink-0 transition-colors ${
+                  lodgeModalMode === 'block'
+                    ? 'bg-amber-50 border-amber-200 text-amber-700'
+                    : 'bg-sky-50 border-sky-200 text-sky-700'
+                }`}>
+                  {lodgeModalMode === 'block' ? (
+                    <Lock className="w-5 h-5 text-amber-700" />
+                  ) : (
+                    <BedDouble className="w-5 h-5 text-sky-700" />
+                  )}
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-mono tracking-widest text-slate-400 font-bold block">
                     Lodge Rincón de Navegantes
                   </span>
-                  <h4 className="font-serif text-xl font-bold text-[#0b192c]">Reservar Hospedaje</h4>
+                  <h4 className="font-serif text-xl font-bold text-[#0b192c]">
+                    {lodgeModalMode === 'block' ? 'Bloquear Fechas del Lodge' : 'Reservar Hospedaje'}
+                  </h4>
                 </div>
               </div>
               <button
                 onClick={() => {
                   setShowBlockModal(false);
                   setReservationWizardStep(1);
+                  setBlockStep(1);
+                  setLodgeModalMode('booking');
                 }}
                 className="w-8 h-8 rounded-full text-slate-400 hover:text-[#0b192c] hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
                 title="Cerrar modal"
@@ -12709,54 +12834,137 @@ ${cust.notes || 'Sin notas adicionales.'}`;
               </button>
             </div>
 
+            {/* Mode Switcher: [ 🛎️ Nueva Reserva ] | [ 🔒 Bloquear Fechas ] */}
+            <div className="grid grid-cols-2 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setLodgeModalMode('booking');
+                  setReservationWizardStep(1);
+                }}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  lodgeModalMode === 'booking'
+                    ? 'bg-[#0b192c] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-[#0b192c] hover:bg-white/60'
+                }`}
+              >
+                <BedDouble className="w-4 h-4" />
+                <span>Nueva Reserva</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setLodgeModalMode('block');
+                  setBlockStep(1);
+                }}
+                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  lodgeModalMode === 'block'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-amber-800 hover:bg-white/60'
+                }`}
+              >
+                <Lock className="w-4 h-4" />
+                <span>Bloquear Fechas</span>
+              </button>
+            </div>
+
             {/* Stepper Progress Bar */}
-            <div className="grid grid-cols-4 gap-2 pt-1">
-              {[
-                { step: 1, label: '1. Fechas' },
-                { step: 2, label: '2. Pasajeros' },
-                { step: 3, label: '3. Habitación' },
-                { step: 4, label: '4. Huéspedes' },
-              ].map((s) => {
-                const isActive = reservationWizardStep === s.step;
-                const isPassed = reservationWizardStep > s.step;
-                return (
-                  <div
-                    key={s.step}
-                    onClick={() => {
-                      if (isPassed) setReservationWizardStep(s.step as any);
-                    }}
-                    className={`rounded-2xl py-2 px-1 text-center transition ${
-                      isPassed ? 'cursor-pointer' : ''
-                    }`}
-                  >
-                    <div className="flex items-center justify-center mb-1">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-mono transition ${
-                          isActive
-                            ? 'bg-[#0b192c] text-white shadow-xs'
-                            : isPassed
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-slate-100 text-slate-400'
-                        }`}
-                      >
-                        {isPassed ? '✓' : s.step}
-                      </div>
-                    </div>
-                    <span
-                      className={`text-[10px] font-bold block truncate ${
-                        isActive
-                          ? 'text-[#0b192c]'
-                          : isPassed
-                          ? 'text-emerald-700'
-                          : 'text-slate-400'
+            {lodgeModalMode === 'booking' ? (
+              <div className="grid grid-cols-4 gap-2 pt-1">
+                {[
+                  { step: 1, label: '1. Fechas' },
+                  { step: 2, label: '2. Pasajeros' },
+                  { step: 3, label: '3. Habitación' },
+                  { step: 4, label: '4. Huéspedes' },
+                ].map((s) => {
+                  const isActive = reservationWizardStep === s.step;
+                  const isPassed = reservationWizardStep > s.step;
+                  return (
+                    <div
+                      key={s.step}
+                      onClick={() => {
+                        if (isPassed) setReservationWizardStep(s.step as any);
+                      }}
+                      className={`rounded-2xl py-2 px-1 text-center transition ${
+                        isPassed ? 'cursor-pointer' : ''
                       }`}
                     >
-                      {s.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                      <div className="flex items-center justify-center mb-1">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-mono transition ${
+                            isActive
+                              ? 'bg-[#0b192c] text-white shadow-xs'
+                              : isPassed
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-slate-100 text-slate-400'
+                          }`}
+                        >
+                          {isPassed ? '✓' : s.step}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold block truncate ${
+                          isActive
+                            ? 'text-[#0b192c]'
+                            : isPassed
+                            ? 'text-emerald-700'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {s.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {[
+                  { step: 1, label: '1. Fechas y Habitación' },
+                  { step: 2, label: '2. Motivo y Confirmación' },
+                ].map((s) => {
+                  const isActive = blockStep === s.step;
+                  const isPassed = blockStep > s.step;
+                  return (
+                    <div
+                      key={s.step}
+                      onClick={() => {
+                        if (isPassed) setBlockStep(s.step as any);
+                      }}
+                      className={`rounded-2xl py-2 px-1 text-center transition ${
+                        isPassed ? 'cursor-pointer' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-center mb-1">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-mono transition ${
+                            isActive
+                              ? 'bg-amber-600 text-white shadow-xs'
+                              : isPassed
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-slate-100 text-slate-400'
+                          }`}
+                        >
+                          {isPassed ? '✓' : s.step}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold block truncate ${
+                          isActive
+                            ? 'text-amber-900 font-extrabold'
+                            : isPassed
+                            ? 'text-emerald-700'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {s.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Logic & Form Body */}
             {(() => {
@@ -12782,7 +12990,7 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                 selectedRoom.max_pax >= blockForm.paxCount
               );
 
-              return (
+              return lodgeModalMode === 'booking' ? (
                 <form onSubmit={handleCreateBlock} className="space-y-4 text-xs">
                   
                   {/* ======================================================== */}
@@ -13345,6 +13553,308 @@ ${cust.notes || 'Sin notas adicionales.'}`;
                         >
                           <Check className="w-4 h-4 text-sky-300" />
                           <span>Confirmar Reserva de Hospedaje</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </form>
+              ) : (
+                <form onSubmit={handleConfirmBlockDates} className="space-y-4 text-xs">
+                  {/* ======================================================== */}
+                  {/* MODO BLOQUEO: PASO 1 (FECHAS Y HABITACIÓN) */}
+                  {/* ======================================================== */}
+                  {blockStep === 1 && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 flex items-center gap-2.5 text-amber-950">
+                        <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span className="text-xs font-semibold">
+                          Paso 1: Selecciona las fechas de inicio/fin y la(s) habitación(es) que deseas bloquear.
+                        </span>
+                      </div>
+
+                      {/* Rango de Fechas */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block">
+                            Fecha Inicio (Desde) *
+                          </label>
+                          <input
+                            type="date"
+                            value={blockForm.checkIn}
+                            onChange={(e) => {
+                              const newIn = e.target.value;
+                              setBlockForm((prev) => {
+                                let newOut = prev.checkOut;
+                                if (newIn && (!newOut || newOut <= newIn)) {
+                                  const d = new Date(newIn);
+                                  d.setDate(d.getDate() + 1);
+                                  newOut = d.toISOString().split('T')[0];
+                                }
+                                return { ...prev, checkIn: newIn, checkOut: newOut };
+                              });
+                            }}
+                            className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-amber-600 focus:outline-none font-mono text-xs font-semibold transition shadow-2xs"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block">
+                            Fecha Fin (Hasta) *
+                          </label>
+                          <input
+                            type="date"
+                            value={blockForm.checkOut}
+                            min={blockForm.checkIn || undefined}
+                            onChange={(e) => setBlockForm({ ...blockForm, checkOut: e.target.value })}
+                            className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-amber-600 focus:outline-none font-mono text-xs font-semibold transition shadow-2xs"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Summary of nights / dates */}
+                      {isDatesValid ? (
+                        <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Check className="w-4 h-4 text-amber-700" />
+                            <span className="text-xs font-semibold text-amber-950">
+                              Período: <strong className="font-bold">{calculatedNights} {calculatedNights === 1 ? 'noche' : 'noches'} de bloqueo</strong>
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-100/90 px-3 py-1 rounded-full">
+                            {formatDateDDMMYYYY(blockForm.checkIn)} ➔ {formatDateDDMMYYYY(blockForm.checkOut)}
+                          </span>
+                        </div>
+                      ) : (
+                        blockForm.checkIn && blockForm.checkOut && (
+                          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 flex items-center gap-2 text-rose-800 text-xs">
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                            <span>La fecha de fin debe ser posterior a la fecha de inicio.</span>
+                          </div>
+                        )
+                      )}
+
+                      {/* Habitación(es) a bloquear */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block">
+                          Habitación o Alcance del Bloqueo *
+                        </label>
+
+                        {/* Opción Todo el Lodge */}
+                        <div
+                          onClick={() => setBlockAllRooms(!blockAllRooms)}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                            blockAllRooms
+                              ? 'bg-amber-600 border-amber-600 text-white shadow-xs'
+                              : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                              blockAllRooms ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              <BedDouble className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className={`text-xs font-bold block ${blockAllRooms ? 'text-white' : 'text-[#0b192c]'}`}>
+                                Todo el Lodge (Bloquear las 4 habitaciones)
+                              </span>
+                              <span className={`text-[10px] block ${blockAllRooms ? 'text-amber-100' : 'text-slate-500'}`}>
+                                Albatros, Cumberland, Selkirk y Vidriola simultáneamente
+                              </span>
+                            </div>
+                          </div>
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${
+                            blockAllRooms ? 'bg-white border-white text-amber-700' : 'border-slate-300 bg-white'
+                          }`}>
+                            {blockAllRooms && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </div>
+                        </div>
+
+                        {/* Habitaciones individuales (si no es todo el lodge) */}
+                        {!blockAllRooms && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            {rooms.map((r) => {
+                              const isSelected = blockForm.roomId === r.id;
+                              const isOccupied = isDatesValid && isRoomBookedForRange(r.id, blockForm.checkIn, blockForm.checkOut);
+                              return (
+                                <div
+                                  key={r.id}
+                                  onClick={() => setBlockForm({ ...blockForm, roomId: r.id })}
+                                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                                    isSelected
+                                      ? 'bg-[#0b192c] border-[#0b192c] text-white shadow-xs'
+                                      : 'bg-[#f4f7fb] hover:bg-slate-100 border-slate-200/80 text-slate-700'
+                                  }`}
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <span className={`text-xs font-bold block truncate ${isSelected ? 'text-white' : 'text-[#0b192c]'}`}>
+                                      Hab #{r.room_number} - {r.room_name}
+                                    </span>
+                                    <span className={`text-[10px] block ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                                      Hasta {r.max_pax} huéspedes
+                                    </span>
+                                  </div>
+                                  {isOccupied && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                      isSelected ? 'bg-amber-500/30 text-amber-200' : 'bg-rose-100 text-rose-700'
+                                    }`}>
+                                      Con reservas
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Botones Paso 1 Bloqueo */}
+                      <div className="pt-2 flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBlockModal(false);
+                            setBlockStep(1);
+                            setLodgeModalMode('booking');
+                          }}
+                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer text-xs"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!isDatesValid || (!blockAllRooms && !blockForm.roomId)}
+                          onClick={() => setBlockStep(2)}
+                          className={`w-2/3 py-2.5 rounded-full font-semibold transition shadow-xs flex items-center justify-center gap-2 text-xs active:scale-95 ${
+                            !isDatesValid || (!blockAllRooms && !blockForm.roomId)
+                              ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                              : 'bg-amber-600 hover:bg-amber-700 text-white cursor-pointer'
+                          }`}
+                        >
+                          <span>Siguiente: Motivo del Bloqueo</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ======================================================== */}
+                  {/* MODO BLOQUEO: PASO 2 (MOTIVO Y CONFIRMACIÓN) */}
+                  {/* ======================================================== */}
+                  {blockStep === 2 && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 flex items-center gap-2.5 text-amber-950">
+                        <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span className="text-xs font-semibold">
+                          Paso 2: Especifica el motivo del bloqueo y confirma para cerrar las fechas.
+                        </span>
+                      </div>
+
+                      {/* Motivos Predefinidos */}
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block">
+                          Selecciona el Motivo Principal *
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {[
+                            'Mantención técnica',
+                            'Cierre de temporada',
+                            'Uso privado / Dueños',
+                            'Reserva externa',
+                            'Fumigación y limpieza',
+                            'Otro motivo',
+                          ].map((reasonItem) => {
+                            const isSelected = blockReasonType === reasonItem;
+                            return (
+                              <button
+                                key={reasonItem}
+                                type="button"
+                                onClick={() => setBlockReasonType(reasonItem)}
+                                className={`px-3 py-2.5 rounded-2xl text-xs font-semibold border text-center transition cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-amber-600 border-amber-600 text-white shadow-xs'
+                                    : 'bg-[#f4f7fb] hover:bg-slate-100 border-slate-200/90 text-slate-700'
+                                }`}
+                              >
+                                {reasonItem}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Detalle o Notas adicionales */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-mono font-bold text-[#0b192c] block">
+                          Detalle o Notas Internas (Opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={blockNotes}
+                          onChange={(e) => setBlockNotes(e.target.value)}
+                          placeholder="Ej: Pintura de cabina, cambio de tuberías o reserva telefónica directa..."
+                          className="w-full bg-[#f4f7fb] hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 text-[#0b192c] focus:border-amber-600 focus:outline-none text-xs transition shadow-2xs"
+                        />
+                      </div>
+
+                      {/* Tarjeta de Resumen Visual */}
+                      <div className="bg-[#0b192c] text-white rounded-3xl p-4.5 shadow-sm space-y-2">
+                        <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                          <span className="font-serif font-bold text-xs text-amber-300 flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5" />
+                            <span>Resumen de Fechas Bloqueadas</span>
+                          </span>
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                            {calculatedNights} {calculatedNights === 1 ? 'noche' : 'noches'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1 font-mono">
+                          <div>
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Período</span>
+                            <span className="text-white font-semibold">
+                              {formatDateDDMMYYYY(blockForm.checkIn)} ➔ {formatDateDDMMYYYY(blockForm.checkOut)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Habitación / Alcance</span>
+                            <span className="text-white font-semibold truncate block">
+                              {blockAllRooms
+                                ? '🏨 Todo el Lodge (4 Habitaciones)'
+                                : `Hab #${selectedRoom?.room_number} - ${selectedRoom?.room_name || 'Habitación'}`}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] pt-1 border-t border-white/10 flex items-center justify-between text-slate-300">
+                          <span>Motivo: <strong className="text-white font-semibold">{blockReasonType}</strong></span>
+                          <span className="text-[10px] text-amber-200 font-sans">Bloqueo administrativo</span>
+                        </div>
+                      </div>
+
+                      {/* Botones Paso 2 Bloqueo */}
+                      <div className="pt-2 flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setBlockStep(1)}
+                          className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-full font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>Volver</span>
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmittingBlock}
+                          className="w-2/3 py-2.5 rounded-full font-semibold transition shadow-xs bg-amber-600 hover:bg-amber-700 text-white cursor-pointer flex items-center justify-center gap-2 text-xs active:scale-95 disabled:opacity-50"
+                        >
+                          {isSubmittingBlock ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Lock className="w-4 h-4 text-amber-200" />
+                          )}
+                          <span>{isSubmittingBlock ? 'Guardando Bloqueo...' : 'Confirmar Bloqueo de Fechas'}</span>
                         </button>
                       </div>
                     </div>
